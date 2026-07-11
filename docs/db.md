@@ -1020,21 +1020,21 @@ erDiagram
 
 ## 5. Enum Reference
 
-| Bảng                  | Field             | Values                                                                           |
-| --------------------- | ----------------- | -------------------------------------------------------------------------------- |
-| `users`               | `role`            | `buyer` · `partner_owner` · `partner_staff` · `admin`                            |
-| `users`               | `gender`          | `male` · `female` · `other`                                                      |
-| `partners`            | `approval_status` | `pending` · `approved` · `rejected`                                              |
-| `partners`            | `status`          | `active` · `suspended` · `closed`                                                |
-| `partners`            | `business_type`   | `restaurant` · `spa` · `entertainment` · `hotel` · `other`                       |
-| `voucher_products`    | `status`          | `draft` · `active` · `paused` · `sold_out` · `expired`                           |
-| `voucher_products`    | `approval_status` | `pending` · `approved` · `rejected`                                              |
-| `orders`              | `payment_method`  | `momo` · `vnpay` · `zalopay` · `bank_transfer`                                   |
-| `orders`              | `payment_status`  | `pending` · `paid` · `failed` · `refunded`                                       |
-| `orders`              | `status`          | `pending` · `confirmed` · `completed` · `cancelled`                              |
-| `payments`            | `status`          | `pending` · `success` · `failed` · `refunded`                                    |
-| `issued_vouchers`     | `status`          | `active` · `used` · `expired` · `refunded`                                       |
-| `complaints`          | `reason`          | `not_as_described` · `cannot_redeem` · `expired_early` · `wrong_value` · `other` |
-| `complaints`          | `status`          | `open` · `under_review` · `resolved` · `closed`                                  |
-| `complaints`          | `resolution_type` | `refund` · `reissue` · `no_action` · `partner_penalized`                         |
-| `complaint_responses` | `responder_role`  | `admin` · `partner` · `user`                                                     |
+| Bảng                  | Field             | Values                                                                                             |
+| --------------------- | ----------------- | -------------------------------------------------------------------------------------------------- |
+| `users`               | `role`            | `buyer` · `partner_manager` · `store_staff` · `admin_content` · `admin_account` · `admin_security` |
+| `users`               | `gender`          | `male` · `female` · `other`                                                                        |
+| `partners`            | `approval_status` | `pending` · `approved` · `rejected`                                                                |
+| `partners`            | `status`          | `active` · `suspended` · `closed`                                                                  |
+| `partners`            | `business_type`   | `restaurant` · `spa` · `entertainment` · `hotel` · `other`                                         |
+| `voucher_products`    | `status`          | `draft` · `active` · `paused` · `sold_out` · `expired`                                             |
+| `voucher_products`    | `approval_status` | `pending` · `approved` · `rejected`                                                                |
+| `orders`              | `payment_method`  | `momo` · `vnpay` · `zalopay` · `bank_transfer`                                                     |
+| `orders`              | `payment_status`  | `pending` · `paid` · `failed` · `refunded`                                                         |
+| `orders`              | `status`          | `pending` · `confirmed` · `completed` · `cancelled`                                                |
+| `payments`            | `status`          | `pending` · `success` · `failed` · `refunded`                                                      |
+| `issued_vouchers`     | `status`          | `active` · `used` · `expired` · `refunded`                                                         |
+| `complaints`          | `reason`          | `not_as_described` · `cannot_redeem` · `expired_early` · `wrong_value` · `other`                   |
+| `complaints`          | `status`          | `open` · `under_review` · `resolved` · `closed`                                                    |
+| `complaints`          | `resolution_type` | `refund` · `reissue` · `no_action` · `partner_penalized`                                           |
+| `complaint_responses` | `responder_role`  | `admin` · `partner` · `user`                                                                       |
