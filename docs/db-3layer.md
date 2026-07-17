@@ -9,7 +9,7 @@
 | **DR-01**  | **Người dùng**           | Thông tin đăng nhập, hồ sơ cá nhân, vai trò, lịch sử giao dịch và lịch sử hoạt động của người dùng trên hệ thống.                                                                                           |
 | **DR-02**  | **Đối tác**              | Thông tin doanh nghiệp, người đại diện, các chi nhánh, trạng thái phê duyệt và trạng thái hoạt động của đối tác cung cấp voucher.                                                                           |
 | **DR-03**  | **Voucher sản phẩm**     | Thông tin voucher bao gồm tên voucher, danh mục, giá gốc, giá bán, điều kiện áp dụng, hướng dẫn sử dụng, thời gian mở bán, thời hạn sử dụng, khu vực áp dụng, số lượng phát hành và trạng thái của voucher. |
-| **DR-04**  | **Đơn hàng**             | Thông tin đơn hàng gồm mã đơn, người mua, danh sách voucher đã mua, tổng tiền, phương thức thanh toán, trạng thái đơn hàng và trạng thái thanh toán.                                                        |
+| **DR-04**  | **Giỏ hàng & đơn hàng**  | Thông tin giỏ hàng, danh sách voucher dự định mua, đơn hàng gồm mã đơn, người mua, danh sách voucher đã mua, tổng tiền, phương thức thanh toán, trạng thái đơn hàng và trạng thái thanh toán.               |
 | **DR-05**  | **Voucher phát hành**    | Thông tin voucher điện tử được phát hành sau khi thanh toán thành công, bao gồm mã voucher, đơn hàng liên quan, người sở hữu, trạng thái sử dụng, ngày phát hành, ngày hết hạn và lịch sử sử dụng voucher.  |
 | **DR-06**  | **Đánh giá và phản hồi** | Thông tin đánh giá của khách hàng đối với voucher, bao gồm điểm đánh giá, nhận xét, hình ảnh minh chứng (nếu có), khiếu nại và phản hồi xử lý từ đối tác hoặc quản trị viên.                                |
 
@@ -17,13 +17,13 @@
 
 ## 0. Ghi chú rà soát (Review Notes)
 
-Đối chiếu Data Dictionary với **Yêu cầu đồ án (DR-01 → DR-06)**: đầy đủ nghiệp vụ (users/orders/audit_logs cho DR-01; partners/partner_branches cho DR-02; voucher_products cho DR-03; orders/order_items cho DR-04; issued_vouchers/voucher_usages cho DR-05; reviews/review_responses/complaints/complaint_responses cho DR-06).
+Đối chiếu Data Dictionary với **Yêu cầu đồ án (DR-01 → DR-06)**: đầy đủ nghiệp vụ (users/orders/các bảng log cho DR-01; partners/partner_branches cho DR-02; voucher_products cho DR-03; carts/cart_items/orders/order_items cho DR-04; issued_vouchers/voucher_usages cho DR-05; reviews/review_responses/complaints/complaint_responses cho DR-06).
 
 ---
 
 ## 1. Conceptual ERD
 
-> Chỉ chứa **thực thể + thuộc tính nghiệp vụ**. Có **khóa chính (PK)** để định danh mỗi thực thể, nhưng **không có khóa ngoại (FK)** và **không có metadata/thuộc tính kỹ thuật** (`created_at`/`updated_at`, url ảnh đại diện, slug, sort*order...), **không có thuộc tính suy diễn** (discount_rate, remaining_quantity, snapped*\*, subtotal...).
+> Chỉ chứa **thực thể + thuộc tính nghiệp vụ**. Có **khóa chính (PK)** để định danh mỗi thực thể, nhưng **không có khóa ngoại (FK)** và **không có metadata/thuộc tính kỹ thuật** (`created_at`/`updated_at`, url ảnh đại diện, slug, sort*order...), **không có thuộc tính suy diễn** (discount_rate, remaining_quantity, snapped*\*, subtotal...). Quan hệ N:N có thuộc tính được biểu diễn bằng **associative entity** (cart_items,order_items) bo tròn góc khi xuất ảnh và không có `id` riêng.
 
 ```mermaid
 erDiagram
@@ -106,8 +106,15 @@ erDiagram
         text   note
     }
 
+    carts {
+        uuid id PK
+    }
+
+    cart_items {
+        int  quantity
+    }
+
     order_items {
-        uuid    id          PK
         int     quantity
         decimal unit_price
     }
@@ -165,43 +172,90 @@ erDiagram
         text   content
     }
 
-    audit_logs {
+    authentication_logs {
         uuid      id           PK
         string    action
-        string    entity_type
+        string    status
+        string    ip_address
+        string    user_agent
+        timestamp occurred_at
+    }
+
+    admin_logs {
+        uuid      id           PK
+        string    action
+        string    description
+        timestamp occurred_at
+    }
+
+    order_logs {
+        uuid      id           PK
+        string    action
+        string    description
+        timestamp occurred_at
+    }
+
+    payment_logs {
+        uuid      id           PK
+        string    action
+        string    status
+        decimal   amount
+        timestamp occurred_at
+    }
+
+    voucher_usage_logs {
+        uuid      id           PK
+        string    action
+        string    status
         timestamp occurred_at
     }
 
 %% ══════════════ BUSINESS RELATIONSHIPS ══════════════
-users              ||--o{ audit_logs             : "performs"
+users              ||--o{ authentication_logs    : "authenticates"
+users              ||--o{ admin_logs             : "administers"
+users              ||--o{ admin_logs             : "target user"
+users              ||--o{ order_logs             : "places"
+users              ||--o{ payment_logs           : "pays"
+users              ||--o{ voucher_usage_logs     : "verifies"
 
 partners           ||--|| users                  : "has representative"
 partners           ||--o{ users                  : "employs"
 partners           ||--o{ partner_branches       : "owns"
 partners           ||--o{ voucher_products       : "offers"
+partners           ||--o{ admin_logs             : "target partner"
 
 categories         ||--o{ categories             : "parent category"
 categories         ||--o{ voucher_products       : "categorizes"
 
 voucher_products   ||--o{ voucher_product_images : "has images"
+voucher_products   ||--o{ admin_logs             : "target voucher"
 voucher_products   }o--o{ partner_branches       : "available at"
-voucher_products   ||--o{ order_items            : "purchased in"
+voucher_products   ||--o{ cart_items : "saved as"
+voucher_products   ||--o{ order_items : "purchased as"
 voucher_products   ||--o{ issued_vouchers        : "generates"
 voucher_products   ||--o{ reviews                : "reviewed in"
 users              ||--o{ voucher_products       : "approves"
 
+users              ||--o| carts                  : "owns"
+carts              ||--o{ cart_items : "contains"
 users              ||--o{ orders                 : "places"
-orders             ||--o{ order_items            : "contains"
+orders             ||--o{ order_items : "contains"
 orders             ||--o{ payments               : "paid via"
 orders             ||--o{ complaints             : "results in"
+orders             ||--o{ order_logs             : "tracked by"
+orders             ||--o{ payment_logs           : "payment tracked by"
 
-order_items        ||--o{ issued_vouchers        : "generates"
+payments           ||--o{ payment_logs           : "tracked by"
+
+order_items ||--o{ issued_vouchers    : "generates"
 
 issued_vouchers    ||--o{ voucher_usages         : "redeemed in"
 issued_vouchers    ||--o{ reviews                : "reviewed in"
 issued_vouchers    ||--o{ complaints             : "results in"
+issued_vouchers    ||--o{ voucher_usage_logs     : "validated by"
 
 partner_branches   ||--o{ voucher_usages         : "redeems at"
+partner_branches   ||--o{ voucher_usage_logs     : "validation at"
 users              ||--o{ voucher_usages         : "verified by"
 
 users              ||--o{ reviews                : "writes"
@@ -220,7 +274,7 @@ users              ||--o{ complaint_responses    : "responds"
 
 ## 2. Logical ERD
 
-> Bổ sung **khóa chính/khóa ngoại (PK/FK)**, chuyển thực thể sang tên bảng (snake*case, khớp tên bảng ở Physical). **Không** có thuộc tính suy diễn (`discount_rate`, `remaining_quantity`, `snapped*\*`, `subtotal`, `total_amount`, `discount_amount`...) và **không** có metadata thuần túy vận hành (`created_at`, `updated_at`). Các mốc thời gian có ý nghĩa nghiệp vụ vẫn được giữ lại.
+> Bổ sung **khóa chính/khóa ngoại (PK/FK)**, chuyển thực thể sang tên bảng (snake*case, khớp tên bảng ở Physical). **Không** có thuộc tính suy diễn (`discount_rate`, `remaining_quantity`, `snapped*\*`, `subtotal`, `total_amount`, `discount_amount`...) và **không** có metadata thuần túy vận hành (`created_at`, `updated_at`). Các mốc thời gian có ý nghĩa nghiệp vụ vẫn được giữ lại. Bảng trung gian của quan hệ N:N dùng **khóa chính composite từ các FK nối quan hệ**, không dùng `id` riêng.
 
 ```mermaid
 erDiagram
@@ -304,9 +358,8 @@ erDiagram
     }
 
     voucher_product_branches {
-        uuid id                  PK
-        uuid voucher_product_id  FK
-        uuid branch_id           FK
+        uuid voucher_product_id  PK, FK
+        uuid branch_id           PK, FK
     }
 
     orders {
@@ -319,10 +372,20 @@ erDiagram
         text   note
     }
 
+    carts {
+        uuid id       PK
+        uuid user_id  FK
+    }
+
+    cart_items {
+        uuid cart_id             PK, FK
+        uuid voucher_product_id  PK, FK
+        int  quantity
+    }
+
     order_items {
-        uuid    id                  PK
-        uuid    order_id            FK
-        uuid    voucher_product_id  FK
+        uuid    order_id            PK, FK
+        uuid    voucher_product_id  PK, FK
         int     quantity
         decimal unit_price
     }
@@ -341,7 +404,7 @@ erDiagram
         uuid   id                  PK
         string voucher_code
         string qr_code_payload
-        uuid   order_item_id       FK
+        uuid   order_id            FK
         uuid   voucher_product_id  FK
         uuid   owner_id            FK
         date   issued_date
@@ -398,47 +461,105 @@ erDiagram
         text   content
     }
 
-    audit_logs {
+    authentication_logs {
         uuid      id           PK
         uuid      user_id      FK
         string    action
-        string    entity_type
-        uuid      entity_id
+        string    status
+        string    ip_address
+        string    user_agent
+        timestamp occurred_at
+    }
+
+    admin_logs {
+        uuid      id                 PK
+        uuid      admin_id           FK
+        uuid      target_user_id     FK
+        uuid      target_partner_id  FK
+        uuid      target_voucher_id  FK
+        string    action
+        text      description
+        timestamp occurred_at
+    }
+
+    order_logs {
+        uuid      id           PK
+        uuid      order_id     FK
+        uuid      user_id      FK
+        string    action
+        text      description
+        timestamp occurred_at
+    }
+
+    payment_logs {
+        uuid      id           PK
+        uuid      payment_id   FK
+        uuid      order_id     FK
+        uuid      user_id      FK
+        string    action
+        string    status
+        decimal   amount
+        timestamp occurred_at
+    }
+
+    voucher_usage_logs {
+        uuid      id                 PK
+        uuid      issued_voucher_id  FK
+        uuid      branch_id          FK
+        uuid      staff_id           FK
+        string    action
+        string    status
         timestamp occurred_at
     }
 
     %% ══════════════ QUAN HỆ ══════════════
-    users                   ||--o{ audit_logs               : "logs"
+    users                   ||--o{ authentication_logs      : "auth logs"
+    users                   ||--o{ admin_logs               : "admin actions"
+    users                   ||--o{ admin_logs               : "target user"
+    users                   ||--o{ order_logs               : "order logs"
+    users                   ||--o{ payment_logs             : "payment logs"
+    users                   ||--o{ voucher_usage_logs       : "staff logs"
 
     partners                o|--|| users                    : "represented by"
-    partners_branches                ||--o{ users                    : "employs"
+    partner_branches        ||--o{ users                    : "employs"
     users                   ||--o{ partners                 : "approves"
     partners                ||--o{ partner_branches          : "has"
     partners                ||--o{ voucher_products          : "lists"
+    partners                ||--o{ admin_logs               : "target partner"
 
     categories              ||--o{ categories                : "parent of"
     categories              ||--o{ voucher_products          : "categorizes"
 
     voucher_products        ||--o{ voucher_product_images    : "has"
+    voucher_products        ||--o{ admin_logs               : "target voucher"
     voucher_products        ||--o{ voucher_product_branches  : "redeemable at"
     partner_branches        ||--o{ voucher_product_branches  : "hosts"
+    voucher_products        ||--o{ cart_items                : "saved in"
     voucher_products        ||--o{ order_items                : "ordered via"
     voucher_products        ||--o{ issued_vouchers            : "issues"
     voucher_products        ||--o{ reviews                    : "reviewed via"
     users                   ||--o{ voucher_products          : "approves"
 
+    users                   ||--o| carts                      : "owns"
+    carts                   ||--o{ cart_items                 : "contains"
     users                   ||--o{ orders                     : "places"
     orders                  ||--o{ order_items                : "contains"
     orders                  ||--o{ payments                   : "paid via"
     orders                  ||--o{ complaints                 : "may trigger"
+    orders                  ||--o{ order_logs                 : "tracked by"
+    orders                  ||--o{ payment_logs               : "payment tracked by"
+
+    payments                ||--o{ payment_logs               : "tracked by"
 
     order_items             ||--o{ issued_vouchers            : "generates"
 
     issued_vouchers         ||--o{ voucher_usages             : "used via"
     issued_vouchers         ||--o{ reviews                    : "tied to"
     issued_vouchers         ||--o{ complaints                 : "may trigger"
+    issued_vouchers         ||--o{ voucher_usage_logs         : "validated by"
 
     partner_branches        ||--o{ voucher_usages             : "redeemed at"
+    partner_branches        ||--o{ voucher_usage_logs         : "validation at"
     users                   ||--o{ voucher_usages             : "confirmed by"
 
     users                   ||--o{ reviews                    : "writes"
@@ -483,14 +604,54 @@ erDiagram
     }
 
 
-    audit_logs {
+    authentication_logs {
         uuid      id          PK
         uuid      user_id     FK
         string    action
-        string    entity_type
-        uuid      entity_id
+        string    status
         string    ip_address
         string    user_agent
+        timestamp occurred_at
+    }
+
+    admin_logs {
+        uuid      id                 PK
+        uuid      admin_id           FK
+        uuid      target_user_id     FK
+        uuid      target_partner_id  FK
+        uuid      target_voucher_id  FK
+        string    action
+        text      description
+        timestamp occurred_at
+    }
+
+    order_logs {
+        uuid      id          PK
+        uuid      order_id    FK
+        uuid      user_id     FK
+        string    action
+        text      description
+        timestamp occurred_at
+    }
+
+    payment_logs {
+        uuid      id          PK
+        uuid      payment_id  FK
+        uuid      order_id    FK
+        uuid      user_id     FK
+        string    action
+        string    status
+        decimal   amount
+        timestamp occurred_at
+    }
+
+    voucher_usage_logs {
+        uuid      id                 PK
+        uuid      issued_voucher_id  FK
+        uuid      branch_id          FK
+        uuid      staff_id           FK
+        string    action
+        string    status
         timestamp occurred_at
     }
 
@@ -584,7 +745,7 @@ erDiagram
     }
 
     %% ══════════════════════════════════════════
-    %% DR-04 · ĐƠN HÀNG
+    %% DR-04 · GIỎ HÀNG & ĐƠN HÀNG
     %% ══════════════════════════════════════════
 
     orders {
@@ -598,6 +759,22 @@ erDiagram
         string    payment_status
         string    status
         string    note
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    carts {
+        uuid      id          PK
+        uuid      user_id     FK
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    cart_items {
+        uuid      id                  PK
+        uuid      cart_id             FK
+        uuid      voucher_product_id  FK
+        int       quantity
         timestamp created_at
         timestamp updated_at
     }
@@ -710,35 +887,51 @@ erDiagram
     %% RELATIONSHIPS
     %% ══════════════════════════════════════════
 
-    users                   ||--o{ audit_logs         : "logs"
+    users                   ||--o{ authentication_logs : "auth logs"
+    users                   ||--o{ admin_logs          : "admin actions"
+    users                   ||--o{ admin_logs          : "target user"
+    users                   ||--o{ order_logs          : "order logs"
+    users                   ||--o{ payment_logs        : "payment logs"
+    users                   ||--o{ voucher_usage_logs  : "staff logs"
 
     partners                o|--|| users    : "has"
     partners                ||--o{ partner_branches           : "has"
     partners                ||--o{ users           : "has"
     partners                ||--o{ voucher_products           : "lists"
+    partners                ||--o{ admin_logs                  : "target partner"
 
     categories              ||--o{ categories                 : "parent of"
     categories              ||--o{ voucher_products           : "categorizes"
 
     voucher_products        ||--o{ voucher_product_images     : "has"
+    voucher_products        ||--o{ admin_logs                  : "target voucher"
     voucher_products        ||--o{ voucher_product_branches   : "redeemable at"
     partner_branches        ||--o{ voucher_product_branches   : "hosts"
+    voucher_products        ||--o{ cart_items                 : "saved in"
     voucher_products        ||--o{ order_items                : "ordered via"
     voucher_products        ||--o{ issued_vouchers            : "issues"
     voucher_products        ||--o{ reviews                    : "reviewed via"
 
+    users                   ||--o| carts                      : "owns"
+    carts                   ||--o{ cart_items                 : "contains"
     users                   ||--o{ orders                     : "places"
     orders                  ||--o{ order_items                : "contains"
     orders                  ||--o{ payments                   : "paid via"
     orders                  ||--o{ complaints                 : "may trigger"
+    orders                  ||--o{ order_logs                 : "tracked by"
+    orders                  ||--o{ payment_logs               : "payment tracked by"
+
+    payments                ||--o{ payment_logs               : "tracked by"
 
     order_items             ||--o{ issued_vouchers            : "generates"
 
     issued_vouchers         ||--o{ voucher_usages             : "used via"
     issued_vouchers         ||--o{ reviews                    : "tied to"
     issued_vouchers         ||--o{ complaints                 : "may trigger"
+    issued_vouchers         ||--o{ voucher_usage_logs         : "validated by"
 
     partner_branches        ||--o{ voucher_usages             : "redeemed at"
+    partner_branches        ||--o{ voucher_usage_logs         : "validation at"
     users        ||--o{ voucher_usages             : "confirmed by"
 
     reviews                 ||--o{ review_responses           : "replied by"
@@ -771,18 +964,68 @@ erDiagram
 | `created_at`          | TIMESTAMP    | NOT NULL        | Thời điểm tạo                                         |
 | `updated_at`          | TIMESTAMP    | NOT NULL        | Thời điểm cập nhật                                    |
 
-### DR-01 · audit_logs
+### DR-01 · authentication_logs
 
-| Column        | Type         | Constraint | Mô tả                                         |
-| ------------- | ------------ | ---------- | --------------------------------------------- |
-| `id`          | UUID         | PK         |                                               |
-| `user_id`     | UUID         | FK         | Tham chiếu `users.id`                         |
-| `action`      | VARCHAR(100) | NOT NULL   | Ví dụ: `login` · `purchase` · `redeem`        |
-| `entity_type` | VARCHAR(50)  |            | Loại đối tượng liên quan: `order` · `voucher` |
-| `entity_id`   | UUID         |            | ID đối tượng liên quan                        |
-| `ip_address`  | VARCHAR(45)  |            | IPv4/IPv6                                     |
-| `user_agent`  | TEXT         |            | Trình duyệt/thiết bị                          |
-| `occurred_at` | TIMESTAMP    | NOT NULL   | Thời điểm xảy ra                              |
+| Column        | Type         | Constraint | Mô tả                                                               |
+| ------------- | ------------ | ---------- | ------------------------------------------------------------------- |
+| `id`          | UUID         | PK         |                                                                     |
+| `user_id`     | UUID         | FK         | Tham chiếu `users.id`; có thể null với đăng nhập thất bại chưa rõ user |
+| `action`      | VARCHAR(100) | NOT NULL   | `LOGIN` · `LOGIN_FAILED` · `LOGOUT` · `CHANGE_PASSWORD` · `RESET_PASSWORD` |
+| `status`      | VARCHAR(50)  | NOT NULL   | Trạng thái kết quả xác thực                                         |
+| `ip_address`  | VARCHAR(45)  |            | IPv4/IPv6                                                           |
+| `user_agent`  | TEXT         |            | Trình duyệt/thiết bị                                                |
+| `occurred_at` | TIMESTAMP    | NOT NULL   | Thời điểm xảy ra                                                    |
+
+### DR-01 · admin_logs
+
+| Column              | Type         | Constraint  | Mô tả                                                        |
+| ------------------- | ------------ | ----------- | ------------------------------------------------------------ |
+| `id`                | UUID         | PK          |                                                              |
+| `admin_id`          | UUID         | FK NOT NULL | Tham chiếu `users.id` của admin thực hiện thao tác           |
+| `target_user_id`    | UUID         | FK NULLABLE | User bị tác động, ví dụ khóa tài khoản hoặc đổi role         |
+| `target_partner_id` | UUID         | FK NULLABLE | Partner bị tác động, ví dụ duyệt/từ chối đối tác             |
+| `target_voucher_id` | UUID         | FK NULLABLE | Voucher bị tác động, ví dụ duyệt/từ chối voucher             |
+| `action`            | VARCHAR(100) | NOT NULL    | `APPROVE_PARTNER` · `REJECT_PARTNER` · `APPROVE_VOUCHER` · `REJECT_VOUCHER` · `LOCK_ACCOUNT` · `CHANGE_ROLE` |
+| `description`       | TEXT         |             | Mô tả chi tiết thao tác quản trị                             |
+| `occurred_at`       | TIMESTAMP    | NOT NULL    | Thời điểm xảy ra                                             |
+
+Ràng buộc nghiệp vụ: mỗi bản ghi `admin_logs` chỉ có một trong ba cột `target_user_id`, `target_partner_id`, `target_voucher_id` khác NULL.
+
+### DR-01 · order_logs
+
+| Column        | Type         | Constraint  | Mô tả                                             |
+| ------------- | ------------ | ----------- | ------------------------------------------------- |
+| `id`          | UUID         | PK          |                                                   |
+| `order_id`    | UUID         | FK NOT NULL | Tham chiếu `orders.id`                            |
+| `user_id`     | UUID         | FK NOT NULL | Tham chiếu `users.id`                             |
+| `action`      | VARCHAR(100) | NOT NULL    | `CREATE_ORDER` · `CANCEL_ORDER` · `UPDATE_STATUS` |
+| `description` | TEXT         |             | Mô tả chi tiết thay đổi vòng đời đơn hàng         |
+| `occurred_at` | TIMESTAMP    | NOT NULL    | Thời điểm xảy ra                                  |
+
+### DR-01 · payment_logs
+
+| Column             | Type         | Constraint  | Mô tả                                             |
+| ------------------ | ------------ | ----------- | ------------------------------------------------- |
+| `id`               | UUID         | PK          |                                                   |
+| `payment_id`       | UUID         | FK NOT NULL | Tham chiếu `payments.id`                          |
+| `order_id`         | UUID         | FK NOT NULL | Tham chiếu `orders.id`                            |
+| `user_id`          | UUID         | FK NOT NULL | Tham chiếu `users.id`                             |
+| `action`           | VARCHAR(100) | NOT NULL    | `PAYMENT_CREATED` · `PAYMENT_SUCCESS` · `PAYMENT_FAILED` · `REFUND` |
+| `status`           | VARCHAR(50)  | NOT NULL    | Trạng thái thanh toán tại thời điểm ghi log       |
+| `amount`           | DECIMAL(15,0) | NOT NULL   | Số tiền giao dịch tại thời điểm ghi log           |
+| `occurred_at`      | TIMESTAMP    | NOT NULL    | Thời điểm xảy ra                                  |
+
+### DR-01 · voucher_usage_logs
+
+| Column              | Type         | Constraint  | Mô tả                                           |
+| ------------------- | ------------ | ----------- | ----------------------------------------------- |
+| `id`                | UUID         | PK          |                                                 |
+| `issued_voucher_id` | UUID         | FK NOT NULL | Tham chiếu `issued_vouchers.id`                 |
+| `branch_id`         | UUID         | FK NOT NULL | Tham chiếu `partner_branches.id`                |
+| `staff_id`          | UUID         | FK NOT NULL | Tham chiếu `users.id` của nhân viên xác thực    |
+| `action`            | VARCHAR(100) | NOT NULL    | `REDEEM_SUCCESS` · `REDEEM_FAILED` · `REDEEM_CANCELLED` |
+| `status`            | VARCHAR(50)  | NOT NULL    | Trạng thái ghi nhận việc sử dụng voucher        |
+| `occurred_at`       | TIMESTAMP    | NOT NULL    | Thời điểm xảy ra                                |
 
 ---
 
@@ -882,6 +1125,28 @@ erDiagram
 | `branch_id`          | UUID | FK NOT NULL | Chi nhánh có thể đổi voucher     |
 
 ---
+
+### DR-04 · carts
+
+| Column       | Type      | Constraint         | Mô tả                                                         |
+| ------------ | --------- | ------------------ | ------------------------------------------------------------- |
+| `id`         | UUID      | PK                 | Định danh giỏ hàng                                            |
+| `user_id`    | UUID      | FK UNIQUE NOT NULL | Tham chiếu `users.id`; mỗi buyer có một giỏ hàng hiện hành    |
+| `created_at` | TIMESTAMP | NOT NULL           | Thời điểm tạo                                                 |
+| `updated_at` | TIMESTAMP | NOT NULL           | Thời điểm cập nhật                                            |
+
+### DR-04 · cart_items
+
+| Column               | Type      | Constraint  | Mô tả                                            |
+| -------------------- | --------- | ----------- | ------------------------------------------------ |
+| `id`                 | UUID      | PK          |                                                  |
+| `cart_id`            | UUID      | FK NOT NULL | Tham chiếu `carts.id`                            |
+| `voucher_product_id` | UUID      | FK NOT NULL | Tham chiếu `voucher_products.id`                 |
+| `quantity`           | INT       | NOT NULL    | Số lượng voucher dự định mua                     |
+| `created_at`         | TIMESTAMP | NOT NULL    | Thời điểm thêm vào giỏ                           |
+| `updated_at`         | TIMESTAMP | NOT NULL    | Thời điểm cập nhật số lượng                      |
+
+Gợi ý ràng buộc: UNIQUE (`cart_id`, `voucher_product_id`) để mỗi voucher product chỉ xuất hiện một dòng trong cùng một giỏ hàng.
 
 ### DR-04 · orders
 
@@ -1020,21 +1285,30 @@ erDiagram
 
 ## 5. Enum Reference
 
-| Bảng                  | Field             | Values                                                                                             |
-| --------------------- | ----------------- | -------------------------------------------------------------------------------------------------- |
-| `users`               | `role`            | `buyer` · `partner_manager` · `store_staff` · `admin_content` · `admin_account` · `admin_security` |
-| `users`               | `gender`          | `male` · `female` · `other`                                                                        |
-| `partners`            | `approval_status` | `pending` · `approved` · `rejected`                                                                |
-| `partners`            | `status`          | `active` · `suspended` · `closed`                                                                  |
-| `partners`            | `business_type`   | `restaurant` · `spa` · `entertainment` · `hotel` · `other`                                         |
-| `voucher_products`    | `status`          | `draft` · `active` · `paused` · `sold_out` · `expired`                                             |
-| `voucher_products`    | `approval_status` | `pending` · `approved` · `rejected`                                                                |
-| `orders`              | `payment_method`  | `momo` · `vnpay` · `zalopay` · `bank_transfer`                                                     |
-| `orders`              | `payment_status`  | `pending` · `paid` · `failed` · `refunded`                                                         |
-| `orders`              | `status`          | `pending` · `confirmed` · `completed` · `cancelled`                                                |
-| `payments`            | `status`          | `pending` · `success` · `failed` · `refunded`                                                      |
-| `issued_vouchers`     | `status`          | `active` · `used` · `expired` · `refunded`                                                         |
-| `complaints`          | `reason`          | `not_as_described` · `cannot_redeem` · `expired_early` · `wrong_value` · `other`                   |
-| `complaints`          | `status`          | `open` · `under_review` · `resolved` · `closed`                                                    |
-| `complaints`          | `resolution_type` | `refund` · `reissue` · `no_action` · `partner_penalized`                                           |
-| `complaint_responses` | `responder_role`  | `admin` · `partner` · `user`                                                                       |
+| Bảng                   | Field             | Values                                                                                             |
+| ---------------------- | ----------------- | -------------------------------------------------------------------------------------------------- |
+| `users`                | `role`            | `buyer` · `partner_manager` · `store_staff` · `admin_content` · `admin_account` · `admin_security` |
+| `users`                | `gender`          | `male` · `female` · `other`                                                                        |
+| `authentication_logs`  | `action`          | `LOGIN` · `LOGIN_FAILED` · `LOGOUT` · `CHANGE_PASSWORD` · `RESET_PASSWORD`                         |
+| `authentication_logs`  | `status`          | `success` · `failed`                                                                               |
+| `admin_logs`           | `action`          | `APPROVE_PARTNER` · `REJECT_PARTNER` · `APPROVE_VOUCHER` · `REJECT_VOUCHER` · `LOCK_ACCOUNT` · `CHANGE_ROLE` |
+| `partners`             | `approval_status` | `pending` · `approved` · `rejected`                                                                |
+| `partners`             | `status`          | `active` · `suspended` · `closed`                                                                  |
+| `partners`             | `business_type`   | `restaurant` · `spa` · `entertainment` · `hotel` · `other`                                         |
+| `voucher_products`     | `status`          | `draft` · `active` · `paused` · `sold_out` · `expired`                                             |
+| `voucher_products`     | `approval_status` | `pending` · `approved` · `rejected`                                                                |
+| `orders`               | `payment_method`  | `momo` · `vnpay` · `zalopay` · `bank_transfer`                                                     |
+| `orders`               | `payment_status`  | `pending` · `paid` · `failed` · `refunded`                                                         |
+| `orders`               | `status`          | `pending` · `confirmed` · `completed` · `cancelled`                                                |
+| `order_logs`           | `action`          | `CREATE_ORDER` · `CANCEL_ORDER` · `UPDATE_STATUS`                                                  |
+| `payments`             | `method`          | `momo` · `vnpay` · `zalopay` · `bank_transfer`                                                     |
+| `payments`             | `status`          | `pending` · `success` · `failed` · `refunded`                                                      |
+| `payment_logs`         | `action`          | `PAYMENT_CREATED` · `PAYMENT_SUCCESS` · `PAYMENT_FAILED` · `REFUND`                                |
+| `payment_logs`         | `status`          | `pending` · `success` · `failed` · `refunded`                                                      |
+| `issued_vouchers`      | `status`          | `active` · `used` · `expired` · `refunded`                                                         |
+| `voucher_usage_logs`   | `action`          | `REDEEM_SUCCESS` · `REDEEM_FAILED` · `REDEEM_CANCELLED`                                            |
+| `voucher_usage_logs`   | `status`          | `success` · `failed` · `cancelled`                                                                 |
+| `complaints`           | `reason`          | `not_as_described` · `cannot_redeem` · `expired_early` · `wrong_value` · `other`                   |
+| `complaints`           | `status`          | `open` · `under_review` · `resolved` · `closed`                                                    |
+| `complaints`           | `resolution_type` | `refund` · `reissue` · `no_action` · `partner_penalized`                                           |
+| `complaint_responses`  | `responder_role`  | `admin` · `partner` · `user`                                                                       |
