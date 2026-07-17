@@ -203,20 +203,12 @@ erDiagram
         timestamp occurred_at
     }
 
-    voucher_usage_logs {
-        uuid      id           PK
-        string    action
-        string    status
-        timestamp occurred_at
-    }
-
 %% ══════════════ BUSINESS RELATIONSHIPS ══════════════
 users              ||--o{ authentication_logs    : "authenticates"
 users              ||--o{ admin_logs             : "administers"
 users              ||--o{ admin_logs             : "target user"
 users              ||--o{ order_logs             : "places"
 users              ||--o{ payment_logs           : "pays"
-users              ||--o{ voucher_usage_logs     : "verifies"
 
 partners           ||--|| users                  : "has representative"
 partners           ||--o{ users                  : "employs"
@@ -252,10 +244,8 @@ order_items ||--o{ issued_vouchers    : "generates"
 issued_vouchers    ||--o{ voucher_usages         : "redeemed in"
 issued_vouchers    ||--o{ reviews                : "reviewed in"
 issued_vouchers    ||--o{ complaints             : "results in"
-issued_vouchers    ||--o{ voucher_usage_logs     : "validated by"
 
 partner_branches   ||--o{ voucher_usages         : "redeems at"
-partner_branches   ||--o{ voucher_usage_logs     : "validation at"
 users              ||--o{ voucher_usages         : "verified by"
 
 users              ||--o{ reviews                : "writes"
@@ -502,23 +492,12 @@ erDiagram
         timestamp occurred_at
     }
 
-    voucher_usage_logs {
-        uuid      id                 PK
-        uuid      issued_voucher_id  FK
-        uuid      branch_id          FK
-        uuid      staff_id           FK
-        string    action
-        string    status
-        timestamp occurred_at
-    }
-
     %% ══════════════ QUAN HỆ ══════════════
     users                   ||--o{ authentication_logs      : "auth logs"
     users                   ||--o{ admin_logs               : "admin actions"
     users                   ||--o{ admin_logs               : "target user"
     users                   ||--o{ order_logs               : "order logs"
     users                   ||--o{ payment_logs             : "payment logs"
-    users                   ||--o{ voucher_usage_logs       : "staff logs"
 
     partners                o|--|| users                    : "represented by"
     partner_branches        ||--o{ users                    : "employs"
@@ -556,10 +535,8 @@ erDiagram
     issued_vouchers         ||--o{ voucher_usages             : "used via"
     issued_vouchers         ||--o{ reviews                    : "tied to"
     issued_vouchers         ||--o{ complaints                 : "may trigger"
-    issued_vouchers         ||--o{ voucher_usage_logs         : "validated by"
 
     partner_branches        ||--o{ voucher_usages             : "redeemed at"
-    partner_branches        ||--o{ voucher_usage_logs         : "validation at"
     users                   ||--o{ voucher_usages             : "confirmed by"
 
     users                   ||--o{ reviews                    : "writes"
@@ -642,16 +619,6 @@ erDiagram
         string    action
         string    status
         decimal   amount
-        timestamp occurred_at
-    }
-
-    voucher_usage_logs {
-        uuid      id                 PK
-        uuid      issued_voucher_id  FK
-        uuid      branch_id          FK
-        uuid      staff_id           FK
-        string    action
-        string    status
         timestamp occurred_at
     }
 
@@ -892,7 +859,6 @@ erDiagram
     users                   ||--o{ admin_logs          : "target user"
     users                   ||--o{ order_logs          : "order logs"
     users                   ||--o{ payment_logs        : "payment logs"
-    users                   ||--o{ voucher_usage_logs  : "staff logs"
 
     partners                o|--|| users    : "has"
     partners                ||--o{ partner_branches           : "has"
@@ -928,10 +894,8 @@ erDiagram
     issued_vouchers         ||--o{ voucher_usages             : "used via"
     issued_vouchers         ||--o{ reviews                    : "tied to"
     issued_vouchers         ||--o{ complaints                 : "may trigger"
-    issued_vouchers         ||--o{ voucher_usage_logs         : "validated by"
 
     partner_branches        ||--o{ voucher_usages             : "redeemed at"
-    partner_branches        ||--o{ voucher_usage_logs         : "validation at"
     users        ||--o{ voucher_usages             : "confirmed by"
 
     reviews                 ||--o{ review_responses           : "replied by"
@@ -1014,18 +978,6 @@ Ràng buộc nghiệp vụ: mỗi bản ghi `admin_logs` chỉ có một trong b
 | `status`           | VARCHAR(50)  | NOT NULL    | Trạng thái thanh toán tại thời điểm ghi log       |
 | `amount`           | DECIMAL(15,0) | NOT NULL   | Số tiền giao dịch tại thời điểm ghi log           |
 | `occurred_at`      | TIMESTAMP    | NOT NULL    | Thời điểm xảy ra                                  |
-
-### DR-01 · voucher_usage_logs
-
-| Column              | Type         | Constraint  | Mô tả                                           |
-| ------------------- | ------------ | ----------- | ----------------------------------------------- |
-| `id`                | UUID         | PK          |                                                 |
-| `issued_voucher_id` | UUID         | FK NOT NULL | Tham chiếu `issued_vouchers.id`                 |
-| `branch_id`         | UUID         | FK NOT NULL | Tham chiếu `partner_branches.id`                |
-| `staff_id`          | UUID         | FK NOT NULL | Tham chiếu `users.id` của nhân viên xác thực    |
-| `action`            | VARCHAR(100) | NOT NULL    | `REDEEM_SUCCESS` · `REDEEM_FAILED` · `REDEEM_CANCELLED` |
-| `status`            | VARCHAR(50)  | NOT NULL    | Trạng thái ghi nhận việc sử dụng voucher        |
-| `occurred_at`       | TIMESTAMP    | NOT NULL    | Thời điểm xảy ra                                |
 
 ---
 
@@ -1306,8 +1258,6 @@ Gợi ý ràng buộc: UNIQUE (`cart_id`, `voucher_product_id`) để mỗi vouc
 | `payment_logs`         | `action`          | `PAYMENT_CREATED` · `PAYMENT_SUCCESS` · `PAYMENT_FAILED` · `REFUND`                                |
 | `payment_logs`         | `status`          | `pending` · `success` · `failed` · `refunded`                                                      |
 | `issued_vouchers`      | `status`          | `active` · `used` · `expired` · `refunded`                                                         |
-| `voucher_usage_logs`   | `action`          | `REDEEM_SUCCESS` · `REDEEM_FAILED` · `REDEEM_CANCELLED`                                            |
-| `voucher_usage_logs`   | `status`          | `success` · `failed` · `cancelled`                                                                 |
 | `complaints`           | `reason`          | `not_as_described` · `cannot_redeem` · `expired_early` · `wrong_value` · `other`                   |
 | `complaints`           | `status`          | `open` · `under_review` · `resolved` · `closed`                                                    |
 | `complaints`           | `resolution_type` | `refund` · `reissue` · `no_action` · `partner_penalized`                                           |

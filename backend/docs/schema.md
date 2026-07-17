@@ -86,16 +86,6 @@ erDiagram
         timestamp occurred_at
     }
 
-    voucher_usage_logs {
-        uuid      id                 PK
-        uuid      issued_voucher_id  FK
-        uuid      branch_id          FK
-        uuid      staff_id           FK
-        string    action
-        string    status
-        timestamp occurred_at
-    }
-
     %% ══════════════════════════════════════════
     %% DR-02 · ĐỐI TÁC
     %% ══════════════════════════════════════════
@@ -333,7 +323,6 @@ erDiagram
     users                   ||--o{ admin_logs          : "target user"
     users                   ||--o{ order_logs          : "order logs"
     users                   ||--o{ payment_logs        : "payment logs"
-    users                   ||--o{ voucher_usage_logs  : "staff logs"
 
     partners                o|--|| users    : "has"
     partners                ||--o{ partner_branches           : "has"
@@ -369,10 +358,8 @@ erDiagram
     issued_vouchers         ||--o{ voucher_usages             : "used via"
     issued_vouchers         ||--o{ reviews                    : "tied to"
     issued_vouchers         ||--o{ complaints                 : "may trigger"
-    issued_vouchers         ||--o{ voucher_usage_logs         : "validated by"
 
     partner_branches        ||--o{ voucher_usages             : "redeemed at"
-    partner_branches        ||--o{ voucher_usage_logs         : "validation at"
     users        ||--o{ voucher_usages             : "confirmed by"
 
     reviews                 ||--o{ review_responses           : "replied by"
@@ -455,18 +442,6 @@ Ràng buộc nghiệp vụ: mỗi bản ghi `admin_logs` chỉ có một trong b
 | `status`           | VARCHAR(50)  | NOT NULL    | Trạng thái thanh toán tại thời điểm ghi log       |
 | `amount`           | DECIMAL(15,0) | NOT NULL   | Số tiền giao dịch tại thời điểm ghi log           |
 | `occurred_at`      | TIMESTAMP    | NOT NULL    | Thời điểm xảy ra                                  |
-
-### DR-01 · voucher_usage_logs
-
-| Column              | Type         | Constraint  | Mô tả                                           |
-| ------------------- | ------------ | ----------- | ----------------------------------------------- |
-| `id`                | UUID         | PK          |                                                 |
-| `issued_voucher_id` | UUID         | FK NOT NULL | Tham chiếu `issued_vouchers.id`                 |
-| `branch_id`         | UUID         | FK NOT NULL | Tham chiếu `partner_branches.id`                |
-| `staff_id`          | UUID         | FK NOT NULL | Tham chiếu `users.id` của nhân viên xác thực    |
-| `action`            | VARCHAR(100) | NOT NULL    | `REDEEM_SUCCESS` · `REDEEM_FAILED` · `REDEEM_CANCELLED` |
-| `status`            | VARCHAR(50)  | NOT NULL    | Trạng thái ghi nhận việc sử dụng voucher        |
-| `occurred_at`       | TIMESTAMP    | NOT NULL    | Thời điểm xảy ra                                |
 
 ---
 

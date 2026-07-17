@@ -414,8 +414,6 @@ Không khuyến nghị viết API sửa/xóa `order_items` sau khi đơn đã t�
 | `GET` | `/order-logs/{id}` | `admin_security` | Chi tiết log đơn hàng |
 | `GET` | `/payment-logs` | `admin_security` | Log thanh toán thành công/thất bại, hoàn tiền; lọc payment/order/user/status/date |
 | `GET` | `/payment-logs/{id}` | `admin_security` | Chi tiết log thanh toán |
-| `GET` | `/voucher-usage-logs` | `admin_security` | Log quét/xác thực voucher tại cửa hàng; lọc issued_voucher/branch/staff/action/status/date |
-| `GET` | `/voucher-usage-logs/{id}` | `admin_security` | Chi tiết log xác thực voucher |
 
 ### Nghiệp vụ chính
 
@@ -424,7 +422,7 @@ Không khuyến nghị viết API sửa/xóa `order_items` sau khi đơn đã t�
 - Backend tự ghi `admin_logs` khi admin duyệt partner, duyệt voucher, quản lý tài khoản, xử lý complaint hoặc thực hiện thao tác quản trị khác.
 - Backend tự ghi `order_logs` khi tạo đơn, hủy đơn hoặc thay đổi trạng thái đơn.
 - Backend tự ghi `payment_logs` khi tạo thanh toán, thanh toán thành công/thất bại hoặc hoàn tiền.
-- Backend tự ghi `voucher_usage_logs` khi nhân viên xác thực, redeem thành công/thất bại hoặc hủy redeem voucher tại cửa hàng.
+- Lịch sử xác thực/redeem voucher lưu trong bảng nghiệp vụ `voucher_usages`, không dùng bảng log riêng.
 
 ### Test và điều kiện đạt
 
@@ -432,7 +430,7 @@ Không khuyến nghị viết API sửa/xóa `order_items` sau khi đơn đã t�
 | --- | --- | --- |
 | Admin security xem log xác thực | `GET /authentication-logs` | Trả `200` |
 | Role khác xem log | Buyer hoặc partner gọi API | Trả `403` |
-| Redeem tạo log | Redeem voucher thành công | Có `voucher_usage_logs` action `REDEEM_SUCCESS`, status `success` |
+| Redeem tạo lịch sử sử dụng | Redeem voucher thành công | Có bản ghi `voucher_usages` đúng `issued_voucher_id`, `branch_id`, `staff_id` |
 
 ## 11. Report APIs Cơ Bản
 
@@ -477,7 +475,7 @@ Thực hiện lần lượt các bước sau bằng Postman, Insomnia, REST Clie
 | 11 | Buyer checkout giỏ hàng | Order pending, order_items snapshot giá chính xác, item đã checkout được xóa khỏi giỏ |
 | 12 | Buyer thanh toán mô phỏng thành công | Order paid, payment success, issued voucher được sinh |
 | 13 | Staff validate voucher | Voucher active, đúng chi nhánh áp dụng |
-| 14 | Staff redeem voucher | Voucher thành `used`, có `voucher_usages` và `voucher_usage_logs` action `REDEEM_SUCCESS` |
+| 14 | Staff redeem voucher | Voucher thành `used`, có `voucher_usages` |
 | 15 | Buyer review | Review được tạo với rating 1-5 |
 | 16 | Buyer tạo complaint | Complaint `open`, gắn đúng order/voucher |
 | 17 | Admin resolve complaint | Complaint `resolved`, có ghi chú xử lý |
@@ -492,5 +490,5 @@ Thực hiện lần lượt các bước sau bằng Postman, Insomnia, REST Clie
 - Phân quyền đúng theo role và quyền sở hữu dữ liệu.
 - Không cho thao tác trái nghiệp vụ: mua voucher chưa duyệt, redeem voucher hết hạn, redeem voucher đã dùng, thanh toán lại sinh trùng voucher.
 - Các trường suy diễn được tính ở backend: `discount_rate`, `remaining_quantity`, `subtotal`, `total_amount`, `expired_date`.
-- Tất cả hành động quan trọng có log đúng bảng chuyên biệt.
+- Các hành động auth/admin/order/payment có log đúng bảng chuyên biệt; lịch sử redeem nằm trong `voucher_usages`.
 - Dữ liệu sau mỗi luồng tích hợp nhất quán giữa cart, order, payment, issued voucher, usage, review, complaint và report.
