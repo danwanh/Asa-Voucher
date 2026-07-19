@@ -210,7 +210,7 @@ users              ||--o{ admin_logs             : "target user"
 users              ||--o{ order_logs             : "places"
 users              ||--o{ payment_logs           : "pays"
 
-partners           ||--|| users                  : "has representative"
+partners           o|--|| users                  : "has representative"
 partners           ||--o{ users                  : "employs"
 partners           ||--o{ partner_branches       : "owns"
 partners           ||--o{ voucher_products       : "offers"
@@ -282,6 +282,7 @@ erDiagram
         string  district
         boolean is_active
         boolean is_verified
+        uuid      partner_id               FK
         uuid      partner_branches_id      FK
     }
 
@@ -500,7 +501,8 @@ erDiagram
     users                   ||--o{ payment_logs             : "payment logs"
 
     partners                o|--|| users                    : "represented by"
-    partner_branches        ||--o{ users                    : "employs"
+    partners                ||--o{ users                    : "employs (voucher staff)"
+    partner_branches        ||--o{ users                    : "employs (store staff)"
     users                   ||--o{ partners                 : "approves"
     partners                ||--o{ partner_branches          : "has"
     partners                ||--o{ voucher_products          : "lists"
@@ -575,6 +577,7 @@ erDiagram
         string    district
         boolean   is_active
         boolean   is_verified
+        uuid      partner_id               FK
         uuid      partner_branches_id      FK
         timestamp created_at
         timestamp updated_at
@@ -710,6 +713,7 @@ erDiagram
         uuid    voucher_product_id  FK
         uuid    branch_id           FK
     }
+    %% Gợi ý ràng buộc: UNIQUE (voucher_product_id, branch_id) để mỗi chi nhánh chỉ xuất hiện một lần cho cùng một voucher.
 
     %% ══════════════════════════════════════════
     %% DR-04 · GIỎ HÀNG & ĐƠN HÀNG
@@ -758,6 +762,7 @@ erDiagram
         decimal   subtotal
         timestamp created_at
     }
+    %% Gợi ý ràng buộc: UNIQUE (order_id, voucher_product_id) để mỗi voucher product chỉ xuất hiện một dòng trong cùng một đơn hàng.
 
     payments {
         uuid      id              PK
@@ -860,9 +865,10 @@ erDiagram
     users                   ||--o{ order_logs          : "order logs"
     users                   ||--o{ payment_logs        : "payment logs"
 
-    partners                o|--|| users    : "has"
+    partners                o|--|| users    : "represented by"
     partners                ||--o{ partner_branches           : "has"
-    partners                ||--o{ users           : "has"
+    partners                ||--o{ users           : "employs (voucher staff)"
+    partner_branches        ||--o{ users                     : "employs (store staff)"
     partners                ||--o{ voucher_products           : "lists"
     partners                ||--o{ admin_logs                  : "target partner"
 
@@ -916,7 +922,7 @@ erDiagram
 | `password_hash`       | VARCHAR(255) | NOT NULL        | Mật khẩu đã hash (bcrypt)                             |
 | `full_name`           | VARCHAR(100) | NOT NULL        | Họ tên đầy đủ                                         |
 | `avatar_url`          | TEXT         |                 | URL ảnh đại diện                                      |
-| `role`                | ENUM         | NOT NULL        | `buyer` · `partner_owner` · `partner_staff` · `admin` |
+| `role`                | ENUM         | NOT NULL        | `buyer` · `partner_owner` · `partner_voucher_staff` · `partner_store_staff` · `admin_content` · `admin_account` · `admin_security` |
 | `dob`                 | DATE         |                 | Ngày sinh                                             |
 | `gender`              | ENUM         |                 | `male` · `female` · `other`                           |
 | `address`             | TEXT         |                 | Địa chỉ chi tiết                                      |
@@ -924,7 +930,8 @@ erDiagram
 | `district`            | VARCHAR(100) |                 | Quận/huyện                                            |
 | `is_active`           | BOOLEAN      | DEFAULT true    | Trạng thái tài khoản                                  |
 | `is_verified`         | BOOLEAN      | DEFAULT false   | Đã xác thực email/phone                               |
-| `partner_branches_id` | UUID         |                 | Chi nhánh làm việc nếu là nhân viên                   |
+| `partner_id`          | UUID         | FK NULLABLE     | Đối tác trực thuộc, dùng cho `partner_owner` và `partner_voucher_staff` (không thuộc 1 chi nhánh cụ thể) |
+| `partner_branches_id` | UUID         | FK NULLABLE     | Chi nhánh làm việc, dùng cho `partner_store_staff`    |
 | `created_at`          | TIMESTAMP    | NOT NULL        | Thời điểm tạo                                         |
 | `updated_at`          | TIMESTAMP    | NOT NULL        | Thời điểm cập nhật                                    |
 
@@ -1076,6 +1083,8 @@ Ràng buộc nghiệp vụ: mỗi bản ghi `admin_logs` chỉ có một trong b
 | `voucher_product_id` | UUID | FK NOT NULL | Tham chiếu `voucher_products.id` |
 | `branch_id`          | UUID | FK NOT NULL | Chi nhánh có thể đổi voucher     |
 
+Gợi ý ràng buộc: UNIQUE (`voucher_product_id`, `branch_id`) để mỗi chi nhánh chỉ xuất hiện một lần cho cùng một voucher.
+
 ---
 
 ### DR-04 · carts
@@ -1131,6 +1140,8 @@ Gợi ý ràng buộc: UNIQUE (`cart_id`, `voucher_product_id`) để mỗi vouc
 | `snapped_discount_rate`  | FLOAT         | NOT NULL    | Snapshot % giảm giá _(suy diễn)_                           |
 | `subtotal`               | DECIMAL(15,0) | NOT NULL    | _(suy diễn: `unit_price × quantity`)_                      |
 | `created_at`             | TIMESTAMP     | NOT NULL    |                                                            |
+
+Gợi ý ràng buộc: UNIQUE (`order_id`, `voucher_product_id`) để mỗi voucher product chỉ xuất hiện một dòng trong cùng một đơn hàng.
 
 ### DR-04 · payments
 
@@ -1239,11 +1250,11 @@ Gợi ý ràng buộc: UNIQUE (`cart_id`, `voucher_product_id`) để mỗi vouc
 
 | Bảng                   | Field             | Values                                                                                             |
 | ---------------------- | ----------------- | -------------------------------------------------------------------------------------------------- |
-| `users`                | `role`            | `buyer` · `partner_manager` · `store_staff` · `admin_content` · `admin_account` · `admin_security` |
+| `users`                | `role`            | `buyer` · `partner_owner` · `partner_voucher_staff` · `partner_store_staff` · `admin_content` · `admin_account` · `admin_security` |
 | `users`                | `gender`          | `male` · `female` · `other`                                                                        |
 | `authentication_logs`  | `action`          | `LOGIN` · `LOGIN_FAILED` · `LOGOUT` · `CHANGE_PASSWORD` · `RESET_PASSWORD`                         |
 | `authentication_logs`  | `status`          | `success` · `failed`                                                                               |
-| `admin_logs`           | `action`          | `APPROVE_PARTNER` · `REJECT_PARTNER` · `APPROVE_VOUCHER` · `REJECT_VOUCHER` · `LOCK_ACCOUNT` · `CHANGE_ROLE` |
+| `admin_logs`           | `action`          | `APPROVE_PARTNER` · `REJECT_PARTNER` · `APPROVE_VOUCHER` · `REJECT_VOUCHER` · `LOCK_ACCOUNT` · `CHANGE_ROLE` · `SECURITY_LOCK_ACCOUNT` · `UPDATE_PERMISSIONS` |
 | `partners`             | `approval_status` | `pending` · `approved` · `rejected`                                                                |
 | `partners`             | `status`          | `active` · `suspended` · `closed`                                                                  |
 | `partners`             | `business_type`   | `restaurant` · `spa` · `entertainment` · `hotel` · `other`                                         |
