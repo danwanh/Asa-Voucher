@@ -1,0 +1,33 @@
+meta {
+  name: 17 Create Payment
+  type: http
+  seq: 17
+}
+
+post {
+  url: {{baseUrl}}/orders/{{pendingOrderId}}/payments
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{buyerToken}}
+}
+
+body:json {
+  {
+    "method": "bank_transfer"
+  }
+}
+
+script:post-response {
+  bru.setEnvVar("createdPaymentId", res.body.data.id);
+}
+
+tests {
+  test("buyer creates payment", function () {
+    expect(res.status).to.equal(201);
+    expect(res.body.data.status).to.equal("pending");
+  });
+}

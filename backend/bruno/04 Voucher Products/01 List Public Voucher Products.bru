@@ -1,0 +1,18 @@
+meta {
+  name: 01 List Public Voucher Products
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/voucher-products?page=1&limit=20&search=Coffee
+  body: none
+  auth: none
+}
+
+tests {
+  test("public can list sellable vouchers", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.data.items).to.be.an("array");
+  });
+}

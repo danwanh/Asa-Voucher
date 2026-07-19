@@ -1,0 +1,30 @@
+meta {
+  name: 04 Update Voucher Product
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/voucher-products/{{createdVoucherProductId}}
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{partnerToken}}
+}
+
+body:json {
+  {
+    "description": "Updated by Bruno",
+    "selling_price": 140000
+  }
+}
+
+tests {
+  test("owner updates voucher product", function () {
+    expect(res.status).to.equal(200);
+    expect(Number(res.body.data.selling_price)).to.equal(140000);
+  });
+}

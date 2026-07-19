@@ -1,0 +1,35 @@
+meta {
+  name: 07 Checkout Cart
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/cart/checkout
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{buyerToken}}
+}
+
+body:json {
+  {
+    "cart_item_ids": ["{{checkoutCartItemId}}"],
+    "payment_method": "bank_transfer",
+    "note": "Checkout by Bruno"
+  }
+}
+
+script:post-response {
+  bru.setEnvVar("checkoutOrderId", res.body.data.id);
+}
+
+tests {
+  test("checkout creates order", function () {
+    expect(res.status).to.equal(201);
+    expect(res.body.data.items).to.be.an("array");
+  });
+}

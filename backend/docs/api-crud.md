@@ -13,16 +13,21 @@ Tài liệu này liệt kê các API CRUD cơ bản cần viết cho backend d�
 ### Xác thực
 
 - Các API công khai: xem danh mục, xem voucher đang bán, đăng ký, đăng nhập.
-- Các API còn lại yêu cầu `Authorization: Bearer <access_token>`.
-- Token phải chứa `user_id`, `role` và nếu là partner/staff thì có thông tin liên kết đối tác hoặc chi nhánh.
+- Đăng nhập thành công trả `access_token` trong response body và set `refresh_token` vào cookie `HttpOnly`.
+- Các API private yêu cầu header `Authorization: Bearer <access_token>`.
+- `access_token` có thời gian sống ngắn, dùng để gọi API.
+- `refresh_token` có thời gian sống dài hơn, chỉ lưu trong cookie `HttpOnly`, `Secure` ở production và `SameSite=Lax` hoặc `Strict`.
+- Client không đọc refresh token bằng JavaScript; chỉ gửi cookie tự động khi gọi API refresh/logout.
+- Token phải chứa hoặc tra được `user_id`, `role` và nếu là partner/staff thì có thông tin liên kết đối tác hoặc chi nhánh.
 
 ### Vai trò
 
 | Role | Mô tả |
 | --- | --- |
 | `buyer` | Khách hàng mua voucher |
-| `partner_manager` | Quản lý đối tác, chi nhánh, voucher của đối tác |
-| `store_staff` | Nhân viên chi nhánh, xác thực voucher |
+| `partner_owner` | Chủ đối tác, quản lý hồ sơ đối tác, chi nhánh và voucher |
+| `partner_voucher_staff` | Nhân viên đối tác quản lý voucher sản phẩm |
+| `partner_store_staff` | Nhân viên chi nhánh, xác thực/đổi voucher tại cửa hàng |
 | `admin_content` | Duyệt voucher, quản lý danh mục/nội dung |
 | `admin_account` | Duyệt đối tác, quản lý tài khoản |
 | `admin_security` | Xem log bảo mật, log xác thực và log nghiệp vụ |
@@ -71,8 +76,9 @@ Tài liệu này liệt kê các API CRUD cơ bản cần viết cho backend d�
 | Method | Endpoint | Quyền | Mục đích |
 | --- | --- | --- | --- |
 | `POST` | `/auth/register` | Public | Đăng ký tài khoản khách hàng |
-| `POST` | `/auth/login` | Public | Đăng nhập |
-| `POST` | `/auth/logout` | Authenticated | Đăng xuất |
+| `POST` | `/auth/login` | Public | Đăng nhập, trả `access_token`, set cookie `refresh_token` HttpOnly |
+| `POST` | `/auth/refresh` | Cookie `refresh_token` | Cấp lại `access_token`, có thể xoay vòng refresh token |
+| `POST` | `/auth/logout` | Authenticated hoặc cookie `refresh_token` | Đăng xuất, thu hồi refresh token và clear cookie |
 | `POST` | `/auth/forgot-password` | Public | Yêu cầu đặt lại mật khẩu mô phỏng |
 | `POST` | `/auth/change-password` | Authenticated | Đổi mật khẩu |
 | `GET` | `/auth/me` | Authenticated | Lấy thông tin người dùng hiện tại |
@@ -111,7 +117,7 @@ Tài liệu này liệt kê các API CRUD cơ bản cần viết cho backend d�
 | Method | Endpoint | Quyền | Mục đích |
 | --- | --- | --- | --- |
 | `GET` | `/partners` | `admin_account` | Danh sách đối tác, lọc trạng thái duyệt/trạng thái hoạt động |
-| `POST` | `/partners` | `partner_manager` hoặc `admin_account` | Đăng ký/tạo đối tác |
+| `POST` | `/partners` | `partner_owner` hoặc `admin_account` | Đăng ký/tạo đối tác |
 | `GET` | `/partners/{id}` | Partner owner hoặc `admin_account` | Xem chi tiết đối tác |
 | `PATCH` | `/partners/{id}` | Partner owner hoặc `admin_account` | Cập nhật thông tin đối tác |
 | `DELETE` | `/partners/{id}` | `admin_account` | Đóng hoặc xóa mềm đối tác |
@@ -177,7 +183,7 @@ Tài liệu này liệt kê các API CRUD cơ bản cần viết cho backend d�
 | Method | Endpoint | Quyền | Mục đích |
 | --- | --- | --- | --- |
 | `GET` | `/voucher-products` | Public | Danh sách voucher đang bán, có lọc/search/sort |
-| `POST` | `/voucher-products` | `partner_manager` | Tạo voucher ở trạng thái nháp hoặc chờ duyệt |
+| `POST` | `/voucher-products` | `partner_owner` hoặc `partner_voucher_staff` | Tạo voucher ở trạng thái nháp hoặc chờ duyệt |
 | `GET` | `/voucher-products/{id}` | Public hoặc owner/admin | Chi tiết voucher |
 | `PATCH` | `/voucher-products/{id}` | Owner partner | Cập nhật voucher khi chưa được bán |
 | `DELETE` | `/voucher-products/{id}` | Owner partner hoặc `admin_content` | Xóa mềm/ngừng bán voucher |
@@ -311,8 +317,8 @@ Không khuyến nghị viết API sửa/xóa `order_items` sau khi đơn đã t�
 
 | Method | Endpoint | Quyền | Mục đích |
 | --- | --- | --- | --- |
-| `POST` | `/issued-vouchers/validate` | `store_staff`, partner manager, admin | Kiểm tra voucher code hoặc QR payload |
-| `POST` | `/issued-vouchers/{id}/redeem` | `store_staff`, partner manager | Xác nhận sử dụng voucher |
+| `POST` | `/issued-vouchers/validate` | `partner_store_staff`, `partner_owner`, admin | Kiểm tra voucher code hoặc QR payload |
+| `POST` | `/issued-vouchers/{id}/redeem` | `partner_store_staff`, `partner_owner` | Xác nhận sử dụng voucher |
 | `GET` | `/issued-vouchers/{id}/usages` | Owner, partner liên quan, admin/security | Lịch sử sử dụng voucher |
 | `GET` | `/voucher-usages` | Partner, admin/security | Danh sách log xác thực |
 
@@ -462,7 +468,7 @@ Thực hiện lần lượt các bước sau bằng Postman, Insomnia, REST Clie
 
 | Bước | API cần test | Điều kiện đạt |
 | --- | --- | --- |
-| 1 | Đăng ký buyer và partner manager | Tạo được user đúng role |
+| 1 | Đăng ký buyer và partner owner | Tạo được user đúng role |
 | 2 | Partner tạo hồ sơ đối tác | Partner ở trạng thái `pending` |
 | 3 | Admin duyệt đối tác | Partner thành `approved` và `active` |
 | 4 | Partner tạo chi nhánh | Branch active, thuộc đúng partner |
@@ -492,3 +498,54 @@ Thực hiện lần lượt các bước sau bằng Postman, Insomnia, REST Clie
 - Các trường suy diễn được tính ở backend: `discount_rate`, `remaining_quantity`, `subtotal`, `total_amount`, `expired_date`.
 - Các hành động auth/admin/order/payment có log đúng bảng chuyên biệt; lịch sử redeem nằm trong `voucher_usages`.
 - Dữ liệu sau mỗi luồng tích hợp nhất quán giữa cart, order, payment, issued voucher, usage, review, complaint và report.
+
+## 14. Middleware Cần Viết
+
+Mục này chỉ liệt kê middleware tối giản vừa đủ cho CRUD và các luồng nghiệp vụ chính. Các kiểm tra quá đặc thù nên đặt trong service/use case để tránh middleware phình to và khó tái sử dụng.
+
+### Danh sách middleware tối thiểu
+
+| Middleware | Trạng thái | Dùng cho | Mục đích |
+| --- | --- | --- | --- |
+| `requestLogger` | Đã có | Toàn bộ request | Ghi log request cơ bản; không log password, access token, refresh token |
+| `errorHandler` | Đã có, cần chuẩn hóa response | Cuối pipeline Express | Trả error response chuẩn cho `HttpError`, `ZodError`, lỗi hệ thống |
+| `validateBody(schema)` | Đã có | API tạo/sửa dữ liệu | Validate body bằng Zod |
+| `validateParams(schema)` | Cần viết | API có path params | Validate `{id}`, `{partnerId}`, `{orderId}` |
+| `validateQuery(schema)` | Cần viết | API danh sách/report | Validate pagination, filter, sort, search |
+| `requireAuth` | Đã có stub, cần hoàn thiện | API private | Verify `access_token`, gắn `req.user`, chặn user không active |
+| `requireRole(roles)` | Đã có, cần dùng `req.user.role` | API theo role | Chặn role không được phép; không tin `x-user-role` từ client |
+| `requireOwnerOrRole(checkOwner, roles)` | Cần viết | API owner hoặc admin/partner | Gom kiểm tra owner và role cho user, partner, order, voucher, complaint |
+| `notFoundHandler` | Cần viết | Sau tất cả routes | Trả `404` chuẩn cho route không tồn tại |
+| `rateLimitAuth` | Nên viết | `/auth/login`, `/auth/refresh`, `/auth/forgot-password` | Giới hạn brute force và lạm dụng refresh token |
+
+### Thứ tự gắn middleware khuyến nghị
+
+```text
+helmet/cors/bodyParser/requestLogger
+-> route
+-> validateParams/validateQuery/validateBody
+-> requireAuth
+-> requireRole
+-> requireOwnerOrRole nếu endpoint cần kiểm tra sở hữu dữ liệu
+-> controller
+-> notFoundHandler
+-> errorHandler
+```
+
+Các rule nghiệp vụ như voucher có bán được không, order có thanh toán được không, issued voucher có redeem được không nên đặt trong service/use case để dễ test và dễ dùng lại khi gọi từ nhiều endpoint.
+
+### Điều kiện đạt cho middleware
+
+| Test case | Điều kiện đạt |
+| --- | --- |
+| Request thiếu token vào API private | Trả `401` theo error response chuẩn |
+| Token hợp lệ nhưng user bị khóa | Trả `403` hoặc `401`, không cho đi tiếp controller |
+| Role không đủ quyền | Trả `403` |
+| Owner truy cập dữ liệu của mình | Cho đi tiếp controller |
+| Owner truy cập dữ liệu người khác | Trả `403` hoặc `404` theo chính sách che giấu dữ liệu |
+| Query/body/params sai schema | Trả `400` với details validate |
+| Login thành công | Response có `access_token`, cookie có `refresh_token` với `HttpOnly` |
+| Refresh token hợp lệ | `/auth/refresh` trả `access_token` mới |
+| Refresh token thiếu hoặc hết hạn | `/auth/refresh` trả `401` và không cấp access token |
+| Logout | Thu hồi refresh token và clear cookie |
+| Controller ném lỗi không xử lý | `errorHandler` trả `500` chuẩn, không lộ stack trace |

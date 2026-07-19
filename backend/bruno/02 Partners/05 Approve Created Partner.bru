@@ -1,0 +1,29 @@
+meta {
+  name: 05 Approve Created Partner
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{baseUrl}}/partners/{{createdPartnerId}}/approval
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{adminAccountToken}}
+}
+
+body:json {
+  {
+    "approval_status": "approved"
+  }
+}
+
+tests {
+  test("admin approves partner", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.data.approval_status).to.equal("approved");
+  });
+}

@@ -1,0 +1,32 @@
+meta {
+  name: 05 Forbidden Update Other User
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{baseUrl}}/users/{{adminAccountId}}
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{buyerToken}}
+}
+
+body:json {
+  {
+    "full_name": "Should Not Update"
+  }
+}
+
+vars:pre-request {
+  buyerToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAxIiwiZW1haWwiOiJidXllckBhc2EudGVzdCIsInJvbGUiOiJidXllciIsImlhdCI6MTc4NDQ2OTA4MywiZXhwIjoxNzg0NDY5OTgzfQ.-k3W7f_iEnxSjUpLQVxtViowyh6Ic6Fr65uermnW_cI
+}
+
+tests {
+  test("buyer cannot update another user", function () {
+    expect(res.status).to.equal(403);
+  });
+}

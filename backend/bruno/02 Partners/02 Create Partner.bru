@@ -1,0 +1,44 @@
+meta {
+  name: 02 Create Partner
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/partners
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{adminAccountToken}}
+}
+
+script:pre-request {
+  const suffix = Date.now();
+  bru.setVar("partnerBusinessCode", `BRUNO-BIZ-${suffix}`);
+  bru.setVar("partnerTaxNumber", `BRUNO-TAX-${suffix}`);
+}
+
+body:json {
+  {
+    "representative_user_id": "{{partnerOwnerId}}",
+    "business_name": "Bruno Partner",
+    "business_code": "{{partnerBusinessCode}}",
+    "business_type": "restaurant",
+    "tax_number": "{{partnerTaxNumber}}",
+    "description": "Created by Bruno"
+  }
+}
+
+script:post-response {
+  bru.setEnvVar("createdPartnerId", res.body.data.id);
+}
+
+tests {
+  test("create partner pending", function () {
+    expect(res.status).to.equal(201);
+    expect(res.body.data.approval_status).to.equal("pending");
+  });
+}

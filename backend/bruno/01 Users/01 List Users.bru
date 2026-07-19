@@ -1,0 +1,26 @@
+meta {
+  name: 01 List Users
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/users?role=buyer&page=1&limit=20
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{adminAccountToken}}
+}
+
+vars:pre-request {
+  adminAccountToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDA2IiwiZW1haWwiOiJhZG1pbi5hY2NvdW50QGFzYS50ZXN0Iiwicm9sZSI6ImFkbWluX2FjY291bnQiLCJpYXQiOjE3ODQ0Njg5OTAsImV4cCI6MTc4NDQ2OTg5MH0.5SjDkflJ_GJZHPCH2P9hAMO4pwT4l1hwC0xAOxycPe0
+}
+
+tests {
+  test("admin account can list users", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.data.items).to.be.an("array");
+  });
+}

@@ -4,7 +4,7 @@ import { HttpError } from "../utils/http-error.js";
 
 export function requireRole(allowedRoles: UserRole[]) {
   return (req: Request, _res: Response, next: NextFunction) => {
-    const role = req.header("x-user-role") as UserRole | undefined;
+    const role = req.user?.role;
 
     if (!role || !allowedRoles.includes(role)) {
       next(new HttpError(403, "Insufficient permissions"));

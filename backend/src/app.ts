@@ -3,6 +3,7 @@ import express from "express";
 import helmet from "helmet";
 import { env } from "./config/env.js";
 import { errorHandler } from "./middlewares/error-handler.js";
+import { notFoundHandler } from "./middlewares/not-found.js";
 import { requestLogger } from "./middlewares/request-logger.js";
 import { apiRoutes } from "./routes/index.js";
 
@@ -14,7 +15,9 @@ export function createApp() {
   app.use(express.json());
   app.use(requestLogger);
 
+  app.use("/api/v1", apiRoutes);
   app.use("/api", apiRoutes);
+  app.use(notFoundHandler);
   app.use(errorHandler);
 
   return app;

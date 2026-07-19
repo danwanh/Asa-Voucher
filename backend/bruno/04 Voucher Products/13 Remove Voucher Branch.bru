@@ -1,0 +1,21 @@
+meta {
+  name: 13 Remove Voucher Branch
+  type: http
+  seq: 13
+}
+
+delete {
+  url: {{baseUrl}}/voucher-products/{{createdVoucherProductId}}/branches/{{branchId}}
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{partnerToken}}
+}
+
+tests {
+  test("owner removes branch", function () {
+    expect(res.status).to.equal(204);
+  });
+}

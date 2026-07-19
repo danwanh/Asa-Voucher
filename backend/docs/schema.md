@@ -380,7 +380,7 @@ erDiagram
 | `password_hash`       | VARCHAR(255) | NOT NULL        | Mật khẩu đã hash (bcrypt)                             |
 | `full_name`           | VARCHAR(100) | NOT NULL        | Họ tên đầy đủ                                         |
 | `avatar_url`          | TEXT         |                 | URL ảnh đại diện                                      |
-| `role`                | ENUM         | NOT NULL        | `buyer` · `partner_owner` · `partner_staff` · `admin` |
+| `role`                | ENUM         | NOT NULL        | `buyer` · `partner_owner` · `partner_voucher_staff` · `partner_store_staff` · `admin_content` · `admin_account` · `admin_security` |
 | `dob`                 | DATE         |                 | Ngày sinh                                             |
 | `gender`              | ENUM         |                 | `male` · `female` · `other`                           |
 | `address`             | TEXT         |                 | Địa chỉ chi tiết                                      |
@@ -703,7 +703,7 @@ Gợi ý ràng buộc: UNIQUE (`cart_id`, `voucher_product_id`) để mỗi vouc
 
 | Bảng                  | Field             | Values                                                                                             |
 | --------------------- | ----------------- | -------------------------------------------------------------------------------------------------- |
-| `users`               | `role`            | `buyer` · `partner_manager` · `store_staff` · `admin_content` · `admin_account` · `admin_security` |
+| `users`               | `role`            | `buyer` · `partner_owner` · `partner_voucher_staff` · `partner_store_staff` · `admin_content` · `admin_account` · `admin_security` |
 | `users`               | `gender`          | `male` · `female` · `other`                                                                        |
 | `partners`            | `approval_status` | `pending` · `approved` · `rejected`                                                                |
 | `partners`            | `status`          | `active` · `suspended` · `closed`                                                                  |

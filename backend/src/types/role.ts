@@ -1,7 +1,10 @@
 export type UserRole =
-  | "customer"
-  | "partner_manager"
-  | "partner_staff"
+  | "buyer"
+  | "partner_owner"
+  | "partner_voucher_staff"
+  | "partner_store_staff"
   | "admin_content"
   | "admin_account"
   | "admin_security";
+
+export const adminRoles: UserRole[] = ["admin_content", "admin_account", "admin_security"];

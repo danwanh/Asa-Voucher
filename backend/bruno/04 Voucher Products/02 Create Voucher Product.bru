@@ -1,0 +1,43 @@
+meta {
+  name: 02 Create Voucher Product
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/voucher-products
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{partnerToken}}
+}
+
+body:json {
+  {
+    "category_id": "{{categoryId}}",
+    "name": "Bruno Coffee Voucher",
+    "description": "Created by Bruno",
+    "original_price": 200000,
+    "selling_price": 150000,
+    "applicable_area": "Ho Chi Minh",
+    "total_quantity": 10,
+    "sale_start_date": "2026-01-01",
+    "sale_end_date": "2026-12-31",
+    "validity_days": 30,
+    "status": "draft"
+  }
+}
+
+script:post-response {
+  bru.setEnvVar("createdVoucherProductId", res.body.data.id);
+}
+
+tests {
+  test("partner creates voucher product", function () {
+    expect(res.status).to.equal(201);
+    expect(res.body.data.remaining_quantity).to.equal(10);
+  });
+}

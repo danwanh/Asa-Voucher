@@ -1,0 +1,28 @@
+meta {
+  name: 11 Assign Voucher Branch
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/voucher-products/{{createdVoucherProductId}}/branches
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{partnerToken}}
+}
+
+body:json {
+  {
+    "branch_id": "{{branchId}}"
+  }
+}
+
+tests {
+  test("owner assigns branch", function () {
+    expect(res.status).to.equal(201);
+  });
+}

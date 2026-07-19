@@ -1,0 +1,29 @@
+meta {
+  name: 05 Buyer Cannot Create Category
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/categories
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{buyerToken}}
+}
+
+body:json {
+  {
+    "name": "Forbidden Category",
+    "slug": "forbidden-category"
+  }
+}
+
+tests {
+  test("buyer cannot create category", function () {
+    expect(res.status).to.equal(403);
+  });
+}

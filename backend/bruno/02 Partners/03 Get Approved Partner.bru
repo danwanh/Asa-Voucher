@@ -1,0 +1,22 @@
+meta {
+  name: 03 Get Approved Partner
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/partners/{{approvedPartnerId}}
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{partnerToken}}
+}
+
+tests {
+  test("partner owner can get own partner", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.data.id).to.equal(bru.getVar("approvedPartnerId"));
+  });
+}

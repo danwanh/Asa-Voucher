@@ -1,0 +1,34 @@
+meta {
+  name: 08 Create Voucher Image
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/voucher-products/{{createdVoucherProductId}}/images
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{partnerToken}}
+}
+
+body:json {
+  {
+    "image_url": "https://example.com/bruno-voucher.jpg",
+    "is_primary": false,
+    "sort_order": 3
+  }
+}
+
+script:post-response {
+  bru.setEnvVar("createdVoucherImageId", res.body.data.id);
+}
+
+tests {
+  test("owner creates voucher image", function () {
+    expect(res.status).to.equal(201);
+  });
+}

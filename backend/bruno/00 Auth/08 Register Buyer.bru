@@ -1,0 +1,43 @@
+meta {
+  name: 08 Register Buyer
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/auth/register
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "email": "{{registerEmail}}",
+    "password": "Password123!",
+    "full_name": "Bruno Buyer"
+  }
+}
+
+vars:pre-request {
+  registerEmail: dananh890@gmail.com
+}
+
+script:pre-request {
+  bru.setVar("registerEmail", `bruno.buyer.${Date.now()}@asa.test`);
+}
+
+script:post-response {
+  bru.setEnvVar("createdBuyerId", res.body.data.id);
+}
+
+tests {
+  test("register creates buyer", function () {
+    expect(res.status).to.equal(201);
+    expect(res.body.data.role).to.equal("buyer");
+    expect(res.body.data.password_hash).to.equal(undefined);
+  });
+}

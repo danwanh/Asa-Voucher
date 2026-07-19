@@ -74,6 +74,74 @@ npm run type-check
 - Cấu hình Supabase: dùng `SUPABASE_URL`, `SUPABASE_ANON_KEY`, và chỉ dùng `SUPABASE_SERVICE_ROLE_KEY` ở backend cho tác vụ tin cậy.
 - Row Level Security: bật RLS cho bảng chứa dữ liệu người dùng/đối tác/voucher; policy phải khớp với RBAC backend nếu dùng Supabase Auth trực tiếp.
 
+## Chạy migration và seed
+
+Nếu dùng Supabase hosted project, mở SQL Editor và chạy lần lượt:
+
+1. `supabase/migrations/202607190001_api_sections_2_to_6.sql`
+2. `supabase/migrations/202607190002_update_user_roles.sql`
+3. `supabase/seed/seed.sql`
+
+Nếu dùng Supabase CLI local:
+
+```bash
+supabase start
+supabase db reset
+```
+
+Seed users dùng chung mật khẩu:
+
+```text
+Password123!
+```
+
+Tài khoản seed chính:
+
+| Email | Role |
+| --- | --- |
+| `buyer@asa.test` | `buyer` |
+| `partner.owner@asa.test` | `partner_owner` |
+| `voucher.staff@asa.test` | `partner_voucher_staff` |
+| `store.staff@asa.test` | `partner_store_staff` |
+| `admin.content@asa.test` | `admin_content` |
+| `admin.account@asa.test` | `admin_account` |
+| `admin.security@asa.test` | `admin_security` |
+
+## Chạy API và test nhanh
+
+Chạy backend:
+
+```bash
+npm run dev
+```
+
+Base URL mặc định:
+
+```text
+http://localhost:5000/api/v1
+```
+
+Đăng nhập lấy access token:
+
+```bash
+curl -i -X POST http://localhost:5000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"buyer@asa.test","password":"Password123!"}'
+```
+
+Gọi API private:
+
+```bash
+curl http://localhost:5000/api/v1/cart \
+  -H "Authorization: Bearer <access_token>"
+```
+
+Refresh token được lưu bằng cookie `HttpOnly` từ response login. Khi test bằng Postman/Insomnia, bật cookie jar và gọi:
+
+```bash
+POST http://localhost:5000/api/v1/auth/refresh
+```
+
 ## Kiến trúc backend
 
 - `controllers`: nhận request và trả response.

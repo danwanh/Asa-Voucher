@@ -1,0 +1,35 @@
+meta {
+  name: 15 Invalid Price Negative
+  type: http
+  seq: 15
+}
+
+post {
+  url: {{baseUrl}}/voucher-products
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{partnerToken}}
+}
+
+body:json {
+  {
+    "category_id": "{{categoryId}}",
+    "name": "Invalid Price Voucher",
+    "original_price": 100000,
+    "selling_price": 120000,
+    "total_quantity": 5,
+    "sale_start_date": "2026-01-01",
+    "sale_end_date": "2026-12-31",
+    "validity_days": 30
+  }
+}
+
+tests {
+  test("selling price greater than original price is rejected", function () {
+    expect(res.status).to.equal(400);
+  });
+}

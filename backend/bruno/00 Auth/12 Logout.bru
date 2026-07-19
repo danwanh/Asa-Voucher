@@ -1,0 +1,25 @@
+meta {
+  name: 12 Logout
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{baseUrl}}/auth/logout
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{buyerToken}}
+}
+
+vars:pre-request {
+  buyerToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAxIiwiZW1haWwiOiJidXllckBhc2EudGVzdCIsInJvbGUiOiJidXllciIsImlhdCI6MTc4NDQ2ODI1MywiZXhwIjoxNzg0NDY5MTUzfQ.u9j4wQO6d3jSbF8RQ5jUpgCjJUKAL9dril1NRUpXy1g
+}
+
+tests {
+  test("logout succeeds", function () {
+    expect(res.status).to.equal(200);
+  });
+}
