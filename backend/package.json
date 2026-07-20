@@ -11,6 +11,9 @@
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "prisma:generate": "prisma generate",
+    "prisma:migrate:baseline": "prisma migrate resolve --applied 202607190001_baseline_existing_schema",
+    "prisma:migrate:dev": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio"
   },
   "dependencies": {
