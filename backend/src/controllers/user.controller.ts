@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
+import { prisma } from "../config/prisma.js";
 import { hashPassword } from "../utils/auth.js";
-import { db, requireData, sanitizeUser, throwDbError } from "../utils/db.js";
+import { requireData, sanitizeUser, throwDbError } from "../utils/db.js";
 import { HttpError } from "../utils/http-error.js";
 import { created, noContent, ok } from "../utils/response.js";
 import { rangeFromPagination } from "../validations/common.validation.js";
@@ -8,22 +9,27 @@ import { rangeFromPagination } from "../validations/common.validation.js";
 export async function listUsers(req: Request, res: Response) {
   const { page, limit, role, is_active: isActive } = req.query as Record<string, string | number | boolean>;
   const { from, to } = rangeFromPagination(Number(page), Number(limit));
-  let query = db().from("users").select("*", { count: "exact" }).range(from, to).order("created_at", { ascending: false });
+  const where: Record<string, unknown> = {};
 
-  if (role) query = query.eq("role", role);
-  if (typeof isActive === "boolean") query = query.eq("is_active", isActive);
+  if (role) where.role = role;
+  if (typeof isActive === "boolean") where.is_active = isActive;
 
-  const { data, error, count } = await query;
-  if (error) throwDbError(error);
-  ok(res, { items: (data ?? []).map(sanitizeUser), count, page, limit });
+  const [data, count] = await prisma.$transaction([
+    prisma.user.findMany({ where, skip: from, take: to - from + 1, orderBy: { created_at: "desc" } }),
+    prisma.user.count({ where })
+  ]);
+  ok(res, { items: data.map((user) => sanitizeUser(user as unknown as Record<string, unknown>)), count, page, limit });
 }
 
 export async function createUserByAdmin(req: Request, res: Response) {
   const payload = { ...req.body, password_hash: await hashPassword(req.body.password) };
   delete payload.password;
-  const { data, error } = await db().from("users").insert(payload).select("*").single();
-  if (error) throwDbError(error);
-  created(res, sanitizeUser(requireData<Record<string, unknown>>(data, error)), "User created");
+  try {
+    const user = await prisma.user.create({ data: payload as never });
+    created(res, sanitizeUser(user as unknown as Record<string, unknown>), "User created");
+  } catch (error) {
+    throwDbError(error);
+  }
 }
 
 export async function getUser(req: Request, res: Response) {
@@ -31,8 +37,8 @@ export async function getUser(req: Request, res: Response) {
     throw new HttpError(403, "Insufficient permissions", "FORBIDDEN");
   }
 
-  const { data, error } = await db().from("users").select("*").eq("id", req.params.id).single();
-  ok(res, sanitizeUser(requireData<Record<string, unknown>>(data, error, "User not found")));
+  const user = requireData(await prisma.user.findUnique({ where: { id: req.params.id } }), "User not found");
+  ok(res, sanitizeUser(user as unknown as Record<string, unknown>));
 }
 
 export async function updateUser(req: Request, res: Response) {
@@ -46,17 +52,19 @@ export async function updateUser(req: Request, res: Response) {
     throw new HttpError(403, "Only admin can update account status or role", "FORBIDDEN");
   }
 
-  const { data, error } = await db()
-    .from("users")
-    .update({ ...req.body, updated_at: new Date().toISOString() })
-    .eq("id", req.params.id)
-    .select("*")
-    .single();
-  ok(res, sanitizeUser(requireData<Record<string, unknown>>(data, error, "User not found")), "User updated");
+  try {
+    const user = await prisma.user.update({ where: { id: req.params.id }, data: { ...req.body, updated_at: new Date() } as never });
+    ok(res, sanitizeUser(user as unknown as Record<string, unknown>), "User updated");
+  } catch (error) {
+    throwDbError(error, "User not found");
+  }
 }
 
 export async function deleteUser(req: Request, res: Response) {
-  const { error } = await db().from("users").update({ is_active: false, updated_at: new Date().toISOString() }).eq("id", req.params.id);
-  if (error) throwDbError(error);
+  try {
+    await prisma.user.update({ where: { id: req.params.id }, data: { is_active: false, updated_at: new Date() } });
+  } catch (error) {
+    throwDbError(error, "User not found");
+  }
   noContent(res);
 }

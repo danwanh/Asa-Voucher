@@ -110,6 +110,10 @@ NODE_ENV=development
 PORT=5000
 FRONTEND_URL=http://localhost:3000
 
+# Prisma uses Supabase Postgres directly. Copy this from
+# Supabase Dashboard > Project Settings > Database > Connection string > URI.
+DATABASE_URL="postgresql://postgres:[YOUR-PASSWORD]@db.your-project-ref.supabase.co:5432/postgres"
+
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
@@ -117,6 +121,8 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 JWT_SECRET=your-jwt-secret
 JWT_EXPIRES_IN=7d
 ```
+
+`DATABASE_URL` phải là PostgreSQL connection string bắt đầu bằng `postgresql://`, không phải `SUPABASE_URL` dạng `https://...supabase.co`.
 
 > ⚠️ **Không đưa các secret thật lên Git.** Chỉ commit file `.env.example`.
 

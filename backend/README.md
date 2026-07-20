@@ -30,6 +30,10 @@ NODE_ENV=development
 PORT=5000
 FRONTEND_URL=http://localhost:3000
 
+# Prisma uses Supabase Postgres directly. Copy this from
+# Supabase Dashboard > Project Settings > Database > Connection string > URI.
+DATABASE_URL="postgresql://postgres:[YOUR-PASSWORD]@db.example.supabase.co:5432/postgres"
+
 SUPABASE_URL=https://example.supabase.co
 SUPABASE_ANON_KEY=example-anon-key
 SUPABASE_SERVICE_ROLE_KEY=example-service-role-key
@@ -38,7 +42,9 @@ JWT_SECRET=replace-with-local-development-secret
 JWT_EXPIRES_IN=7d
 ```
 
-Không đưa `SUPABASE_SERVICE_ROLE_KEY`, `JWT_SECRET` hoặc secret thật lên Git.
+`DATABASE_URL` phải là PostgreSQL connection string bắt đầu bằng `postgresql://`, không phải `SUPABASE_URL` dạng `https://...supabase.co`.
+
+Không đưa `DATABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `JWT_SECRET` hoặc secret thật lên Git.
 
 ## Chạy development
 
@@ -68,6 +74,8 @@ npm run type-check
 
 ## Database
 
+- Backend dùng Prisma với Supabase Postgres qua `DATABASE_URL` trong `backend/.env`; không cần cấu hình database local.
+- Prisma schema nằm ở `backend/prisma/schema.prisma` và đang dùng `provider = "postgresql"`, `url = env("DATABASE_URL")`.
 - Migration: đặt file SQL trong `supabase/migrations/`, chạy bằng Supabase CLI hoặc dashboard SQL editor theo môi trường dự án.
 - Seed dữ liệu: đặt script hoặc SQL seed trong `supabase/seed/`, không hard-code secret.
 - Tài khoản admin mẫu: tạo bằng Supabase Auth hoặc seed script riêng, sau đó gán role admin phù hợp trong bảng hồ sơ người dùng.

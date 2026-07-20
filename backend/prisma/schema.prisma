@@ -1,0 +1,359 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email               String    @unique @db.VarChar(255)
+  phone               String?   @unique @db.VarChar(20)
+  password_hash       String    @db.VarChar(255)
+  full_name           String    @db.VarChar(100)
+  avatar_url          String?
+  role                String    @db.VarChar(50)
+  dob                 DateTime? @db.Date
+  gender              String?   @db.VarChar(20)
+  address             String?
+  city                String?   @db.VarChar(100)
+  district            String?   @db.VarChar(100)
+  is_active           Boolean   @default(true)
+  is_verified         Boolean   @default(false)
+  partner_branches_id String?   @db.Uuid
+  created_at          DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
+
+  partner_branches        PartnerBranch?     @relation("UserBranch", fields: [partner_branches_id], references: [id], onDelete: SetNull)
+  refresh_tokens          RefreshToken[]
+  authentication_logs     AuthenticationLog[]
+  admin_logs              AdminLog[]         @relation("AdminLogAdmin")
+  targeted_admin_logs     AdminLog[]         @relation("AdminLogTargetUser")
+  represented_partners    Partner[]          @relation("PartnerRepresentative")
+  approved_partners       Partner[]          @relation("PartnerApprover")
+  approved_vouchers       VoucherProduct[]   @relation("VoucherApprover")
+  carts                   Cart?
+  orders                  Order[]
+  order_logs              OrderLog[]
+  payment_logs            PaymentLog[]
+  issued_vouchers         IssuedVoucher[]
+
+  @@index([role], map: "users_role_idx")
+  @@map("users")
+}
+
+model RefreshToken {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id    String    @db.Uuid
+  token_hash String    @unique
+  expires_at DateTime  @db.Timestamptz(6)
+  revoked_at DateTime? @db.Timestamptz(6)
+  created_at DateTime  @default(now()) @db.Timestamptz(6)
+
+  users User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+model AuthenticationLog {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id     String?  @db.Uuid
+  action      String   @db.VarChar(100)
+  status      String   @db.VarChar(50)
+  ip_address  String?  @db.VarChar(45)
+  user_agent  String?
+  occurred_at DateTime @default(now()) @db.Timestamptz(6)
+
+  users User? @relation(fields: [user_id], references: [id], onDelete: SetNull)
+
+  @@map("authentication_logs")
+}
+
+model AdminLog {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  admin_id          String   @db.Uuid
+  target_user_id    String?  @db.Uuid
+  target_partner_id String?  @db.Uuid
+  target_voucher_id String?  @db.Uuid
+  action            String   @db.VarChar(100)
+  description       String?
+  occurred_at       DateTime @default(now()) @db.Timestamptz(6)
+
+  admin            User            @relation("AdminLogAdmin", fields: [admin_id], references: [id], onDelete: Cascade)
+  target_user      User?           @relation("AdminLogTargetUser", fields: [target_user_id], references: [id], onDelete: SetNull)
+  target_partner   Partner?        @relation(fields: [target_partner_id], references: [id], onDelete: SetNull)
+  target_voucher   VoucherProduct? @relation(fields: [target_voucher_id], references: [id], onDelete: SetNull)
+
+  @@map("admin_logs")
+}
+
+model Partner {
+  id                     String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  representative_user_id String    @db.Uuid
+  business_name          String    @db.VarChar(255)
+  business_code          String    @unique @db.VarChar(50)
+  business_type          String?   @db.VarChar(100)
+  tax_number             String?   @unique @db.VarChar(20)
+  logo_url               String?
+  website_url            String?
+  description            String?
+  approval_status        String    @default("pending") @db.VarChar(20)
+  status                 String    @default("active") @db.VarChar(20)
+  approved_by            String?   @db.Uuid
+  approved_at            DateTime? @db.Timestamptz(6)
+  created_at             DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
+
+  representative_user User              @relation("PartnerRepresentative", fields: [representative_user_id], references: [id], onDelete: Cascade)
+  approver            User?             @relation("PartnerApprover", fields: [approved_by], references: [id], onDelete: SetNull)
+  partner_branches    PartnerBranch[]
+  voucher_products    VoucherProduct[]
+  admin_logs          AdminLog[]
+
+  @@index([representative_user_id], map: "partners_representative_user_id_idx")
+  @@map("partners")
+}
+
+model PartnerBranch {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  partner_id  String   @db.Uuid
+  branch_name String   @db.VarChar(255)
+  address     String
+  city        String   @db.VarChar(100)
+  district    String?  @db.VarChar(100)
+  phone       String?  @db.VarChar(20)
+  latitude    Float?
+  longitude   Float?
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  partners                 Partner                 @relation(fields: [partner_id], references: [id], onDelete: Cascade)
+  users                    User[]                  @relation("UserBranch")
+  voucher_product_branches VoucherProductBranch[]
+
+  @@map("partner_branches")
+}
+
+model Category {
+  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  parent_id   String? @db.Uuid
+  name        String  @db.VarChar(100)
+  slug        String  @unique @db.VarChar(100)
+  description String?
+  sort_order  Int     @default(0)
+
+  parent           Category?        @relation("CategoryTree", fields: [parent_id], references: [id], onDelete: SetNull)
+  children         Category[]       @relation("CategoryTree")
+  voucher_products VoucherProduct[]
+
+  @@map("categories")
+}
+
+model VoucherProduct {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  partner_id           String    @db.Uuid
+  category_id          String    @db.Uuid
+  name                 String    @db.VarChar(255)
+  description          String?
+  thumbnail_url        String?
+  original_price       Decimal   @db.Decimal(15, 0)
+  selling_price        Decimal   @db.Decimal(15, 0)
+  discount_rate        Float     @default(0)
+  applicable_area      String?   @db.VarChar(255)
+  total_quantity       Int
+  remaining_quantity   Int
+  terms_and_conditions Json?
+  usage_instructions   Json?
+  sale_start_date      DateTime  @db.Date
+  sale_end_date        DateTime  @db.Date
+  validity_days        Int
+  status               String    @default("draft") @db.VarChar(20)
+  approval_status      String    @default("pending") @db.VarChar(20)
+  approved_by          String?   @db.Uuid
+  approved_at          DateTime? @db.Timestamptz(6)
+  created_at           DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
+
+  partners                 Partner                 @relation(fields: [partner_id], references: [id], onDelete: Cascade)
+  categories               Category                @relation(fields: [category_id], references: [id], onDelete: Restrict)
+  approver                 User?                   @relation("VoucherApprover", fields: [approved_by], references: [id], onDelete: SetNull)
+  voucher_product_images   VoucherProductImage[]
+  voucher_product_branches VoucherProductBranch[]
+  cart_items               CartItem[]
+  order_items              OrderItem[]
+  issued_vouchers          IssuedVoucher[]
+  admin_logs               AdminLog[]
+
+  @@index([partner_id], map: "voucher_products_partner_id_idx")
+  @@index([approval_status, status, sale_start_date, sale_end_date], map: "voucher_products_public_listing_idx")
+  @@map("voucher_products")
+}
+
+model VoucherProductImage {
+  id                 String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  voucher_product_id String @db.Uuid
+  image_url          String
+  is_primary         Boolean @default(false)
+  sort_order         Int     @default(0)
+
+  voucher_products VoucherProduct @relation(fields: [voucher_product_id], references: [id], onDelete: Cascade)
+
+  @@map("voucher_product_images")
+}
+
+model VoucherProductBranch {
+  id                 String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  voucher_product_id String @db.Uuid
+  branch_id          String @db.Uuid
+
+  voucher_products VoucherProduct @relation(fields: [voucher_product_id], references: [id], onDelete: Cascade)
+  partner_branches PartnerBranch @relation(fields: [branch_id], references: [id], onDelete: Cascade)
+
+  @@unique([voucher_product_id, branch_id])
+  @@map("voucher_product_branches")
+}
+
+model Cart {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id    String   @unique @db.Uuid
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  users      User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  cart_items CartItem[]
+
+  @@map("carts")
+}
+
+model CartItem {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cart_id            String   @db.Uuid
+  voucher_product_id String   @db.Uuid
+  quantity           Int
+  created_at         DateTime @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  carts            Cart           @relation(fields: [cart_id], references: [id], onDelete: Cascade)
+  voucher_products VoucherProduct @relation(fields: [voucher_product_id], references: [id], onDelete: Cascade)
+
+  @@unique([cart_id, voucher_product_id])
+  @@index([cart_id], map: "cart_items_cart_id_idx")
+  @@map("cart_items")
+}
+
+model Order {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  order_code      String   @unique @db.VarChar(30)
+  user_id         String   @db.Uuid
+  subtotal        Decimal  @db.Decimal(15, 0)
+  discount_amount Decimal  @default(0) @db.Decimal(15, 0)
+  total_amount    Decimal  @db.Decimal(15, 0)
+  payment_method  String   @db.VarChar(30)
+  payment_status  String   @default("pending") @db.VarChar(20)
+  status          String   @default("pending") @db.VarChar(20)
+  note            String?
+  created_at      DateTime @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  users        User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  order_items  OrderItem[]
+  payments     Payment[]
+  order_logs   OrderLog[]
+  payment_logs PaymentLog[]
+
+  @@index([user_id], map: "orders_user_id_idx")
+  @@map("orders")
+}
+
+model OrderItem {
+  id                     String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  order_id               String   @db.Uuid
+  voucher_product_id     String   @db.Uuid
+  quantity               Int
+  unit_price             Decimal  @db.Decimal(15, 0)
+  snapped_original_price Decimal  @db.Decimal(15, 0)
+  snapped_selling_price  Decimal  @db.Decimal(15, 0)
+  snapped_discount_rate  Float
+  subtotal               Decimal  @db.Decimal(15, 0)
+  created_at             DateTime @default(now()) @db.Timestamptz(6)
+
+  orders           Order           @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  voucher_products VoucherProduct  @relation(fields: [voucher_product_id], references: [id], onDelete: Restrict)
+  issued_vouchers  IssuedVoucher[]
+
+  @@index([order_id], map: "order_items_order_id_idx")
+  @@map("order_items")
+}
+
+model Payment {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  order_id         String    @db.Uuid
+  method           String    @db.VarChar(30)
+  amount           Decimal   @db.Decimal(15, 0)
+  status           String    @default("pending") @db.VarChar(20)
+  transaction_ref  String?   @db.VarChar(255)
+  gateway_response String?
+  paid_at          DateTime? @db.Timestamptz(6)
+  created_at       DateTime  @default(now()) @db.Timestamptz(6)
+
+  orders       Order        @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  payment_logs PaymentLog[]
+
+  @@index([order_id], map: "payments_order_id_idx")
+  @@map("payments")
+}
+
+model OrderLog {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  order_id    String   @db.Uuid
+  user_id     String   @db.Uuid
+  action      String   @db.VarChar(100)
+  description String?
+  occurred_at DateTime @default(now()) @db.Timestamptz(6)
+
+  orders Order @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  users  User  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("order_logs")
+}
+
+model PaymentLog {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  payment_id  String   @db.Uuid
+  order_id    String   @db.Uuid
+  user_id     String   @db.Uuid
+  action      String   @db.VarChar(100)
+  status      String   @db.VarChar(50)
+  amount      Decimal  @db.Decimal(15, 0)
+  occurred_at DateTime @default(now()) @db.Timestamptz(6)
+
+  payments Payment @relation(fields: [payment_id], references: [id], onDelete: Cascade)
+  orders   Order   @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  users    User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("payment_logs")
+}
+
+model IssuedVoucher {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  voucher_code        String   @unique @db.VarChar(50)
+  qr_code_payload     String   @unique @db.VarChar(255)
+  qr_code_image_url   String?
+  order_item_id       String   @db.Uuid
+  voucher_product_id  String   @db.Uuid
+  owner_id            String   @db.Uuid
+  issued_date         DateTime @default(now()) @db.Date
+  expired_date        DateTime @db.Date
+  status              String   @default("active") @db.VarChar(20)
+  created_at          DateTime @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  order_items      OrderItem      @relation(fields: [order_item_id], references: [id], onDelete: Cascade)
+  voucher_products VoucherProduct @relation(fields: [voucher_product_id], references: [id], onDelete: Restrict)
+  owners           User           @relation(fields: [owner_id], references: [id], onDelete: Cascade)
+
+  @@index([owner_id], map: "issued_vouchers_owner_id_idx")
+  @@map("issued_vouchers")
+}

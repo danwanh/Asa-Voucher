@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
-import { db, requireData } from "../utils/db.js";
+import { prisma } from "../config/prisma.js";
+import { requireData } from "../utils/db.js";
 import { verifyAccessToken } from "../utils/auth.js";
 import { HttpError } from "../utils/http-error.js";
 
@@ -13,12 +14,13 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
 
   try {
     const payload = verifyAccessToken(authorization.slice("Bearer ".length));
-    const { data, error } = await db()
-      .from("users")
-      .select("id,email,role,is_active,partner_branches_id")
-      .eq("id", payload.user_id)
-      .single();
-    const user = requireData<Record<string, unknown>>(data, error, "User not found");
+    const user = requireData(
+      await prisma.user.findUnique({
+        where: { id: payload.user_id },
+        select: { id: true, email: true, role: true, is_active: true, partner_branches_id: true }
+      }),
+      "User not found"
+    );
 
     if (!user.is_active) {
       next(new HttpError(403, "User is inactive", "USER_INACTIVE"));
@@ -26,34 +28,32 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
     }
 
     let partnerId: string | undefined;
-    const { data: partner } = await db()
-      .from("partners")
-      .select("id")
-      .eq("representative_user_id", user.id as string)
-      .maybeSingle();
+    const partner = await prisma.partner.findFirst({
+      where: { representative_user_id: user.id },
+      select: { id: true }
+    });
 
     if (partner?.id) {
-      partnerId = partner.id as string;
+      partnerId = partner.id;
     }
 
     if (!partnerId && user.partner_branches_id) {
-      const { data: branch } = await db()
-        .from("partner_branches")
-        .select("partner_id")
-        .eq("id", user.partner_branches_id as string)
-        .maybeSingle();
+      const branch = await prisma.partnerBranch.findUnique({
+        where: { id: user.partner_branches_id },
+        select: { partner_id: true }
+      });
 
       if (branch?.partner_id) {
-        partnerId = branch.partner_id as string;
+        partnerId = branch.partner_id;
       }
     }
 
     req.user = {
-      id: user.id as string,
-      email: user.email as string,
+      id: user.id,
+      email: user.email,
       role: user.role as never,
       partnerId,
-      branchId: (user.partner_branches_id as string | null) ?? undefined
+      branchId: user.partner_branches_id ?? undefined
     };
 
     next();

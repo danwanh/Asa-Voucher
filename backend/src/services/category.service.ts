@@ -1,36 +1,40 @@
-import { db, requireData, throwDbError } from "../utils/db.js";
+import { prisma } from "../config/prisma.js";
+import { requireData, throwDbError } from "../utils/db.js";
 import { HttpError } from "../utils/http-error.js";
 
 export async function listCategories() {
-  const { data, error } = await db().from("categories").select("*").order("sort_order", { ascending: true }).order("name", { ascending: true });
-  if (error) throwDbError(error);
-  return data ?? [];
+  return prisma.category.findMany({ orderBy: [{ sort_order: "asc" }, { name: "asc" }] });
 }
 
 export async function createCategory(input: Record<string, unknown>) {
-  const { data, error } = await db().from("categories").insert(input).select("*").single();
-  if (error) throwDbError(error);
-  return data;
+  try {
+    return await prisma.category.create({ data: input as never });
+  } catch (error) {
+    throwDbError(error);
+  }
 }
 
 export async function getCategory(id: string) {
-  const { data, error } = await db().from("categories").select("*").eq("id", id).single();
-  return requireData<Record<string, unknown>>(data, error, "Category not found");
+  return requireData(await prisma.category.findUnique({ where: { id } }), "Category not found");
 }
 
 export async function updateCategory(id: string, input: Record<string, unknown>) {
-  const { data, error } = await db().from("categories").update(input).eq("id", id).select("*").single();
-  if (error) throwDbError(error);
-  return data;
+  try {
+    return await prisma.category.update({ where: { id }, data: input as never });
+  } catch (error) {
+    throwDbError(error, "Category not found");
+  }
 }
 
 export async function deleteCategory(id: string) {
-  const { count, error: countError } = await db().from("voucher_products").select("id", { count: "exact", head: true }).eq("category_id", id);
-  if (countError) throwDbError(countError);
-  if ((count ?? 0) > 0) {
+  const count = await prisma.voucherProduct.count({ where: { category_id: id } });
+  if (count > 0) {
     throw new HttpError(409, "Category is used by voucher products", "CATEGORY_IN_USE");
   }
 
-  const { error } = await db().from("categories").delete().eq("id", id);
-  if (error) throwDbError(error);
+  try {
+    await prisma.category.delete({ where: { id } });
+  } catch (error) {
+    throwDbError(error, "Category not found");
+  }
 }
