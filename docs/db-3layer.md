@@ -583,6 +583,15 @@ erDiagram
         timestamp updated_at
     }
 
+    refresh_tokens {
+        uuid      id          PK
+        uuid      user_id     FK
+        string    token_hash
+        timestamp expires_at
+        timestamp revoked_at
+        timestamp created_at
+    }
+
 
     authentication_logs {
         uuid      id          PK
@@ -860,6 +869,7 @@ erDiagram
     %% ══════════════════════════════════════════
 
     users                   ||--o{ authentication_logs : "auth logs"
+    users                   ||--o{ refresh_tokens      : "sessions"
     users                   ||--o{ admin_logs          : "admin actions"
     users                   ||--o{ admin_logs          : "target user"
     users                   ||--o{ order_logs          : "order logs"

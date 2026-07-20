@@ -1,5 +1,6 @@
 import type { UserRole } from "../types/role.js";
-import { db, requireData, throwDbError } from "../utils/db.js";
+import { prisma } from "../config/prisma.js";
+import { requireData, throwDbError } from "../utils/db.js";
 import { HttpError } from "../utils/http-error.js";
 import { rangeFromPagination } from "../validations/common.validation.js";
 
@@ -14,14 +15,11 @@ function todayIsoDate() {
 }
 
 async function getPartnerForUser(userId: string) {
-  const { data, error } = await db().from("partners").select("*").eq("representative_user_id", userId).maybeSingle();
-  if (error) throwDbError(error);
-  return data as Record<string, unknown> | null;
+  return prisma.partner.findFirst({ where: { representative_user_id: userId } }) as unknown as Promise<Record<string, unknown> | null>;
 }
 
 async function getVoucher(id: string) {
-  const { data, error } = await db().from("voucher_products").select("*").eq("id", id).single();
-  return requireData<Record<string, unknown>>(data, error, "Voucher product not found");
+  return requireData<Record<string, unknown>>(await prisma.voucherProduct.findUnique({ where: { id } }) as unknown as Record<string, unknown> | null, "Voucher product not found");
 }
 
 function assertVoucherOwnerOrAdmin(user: CurrentUser | undefined, voucher: Record<string, unknown>, allowAdminContent = true) {
@@ -34,25 +32,24 @@ function assertVoucherOwnerOrAdmin(user: CurrentUser | undefined, voucher: Recor
 export async function listVoucherProducts(queryInput: Record<string, string | number>) {
   const { page, limit, category_id: categoryId, partner_id: partnerId, search } = queryInput;
   const { from, to } = rangeFromPagination(Number(page), Number(limit));
-  const today = todayIsoDate();
-  let query = db()
-    .from("voucher_products")
-    .select("*", { count: "exact" })
-    .eq("approval_status", "approved")
-    .eq("status", "active")
-    .lte("sale_start_date", today)
-    .gte("sale_end_date", today)
-    .gt("remaining_quantity", 0)
-    .range(from, to)
-    .order("created_at", { ascending: false });
+  const today = new Date(todayIsoDate());
+  const where: Record<string, unknown> = {
+    approval_status: "approved",
+    status: "active",
+    sale_start_date: { lte: today },
+    sale_end_date: { gte: today },
+    remaining_quantity: { gt: 0 }
+  };
 
-  if (categoryId) query = query.eq("category_id", categoryId);
-  if (partnerId) query = query.eq("partner_id", partnerId);
-  if (search) query = query.ilike("name", `%${search}%`);
+  if (categoryId) where.category_id = categoryId;
+  if (partnerId) where.partner_id = partnerId;
+  if (search) where.name = { contains: String(search), mode: "insensitive" };
 
-  const { data, error, count } = await query;
-  if (error) throwDbError(error);
-  return { items: data ?? [], count, page, limit };
+  const [items, count] = await prisma.$transaction([
+    prisma.voucherProduct.findMany({ where, skip: from, take: to - from + 1, orderBy: { created_at: "desc" } }),
+    prisma.voucherProduct.count({ where })
+  ]);
+  return { items, count, page, limit };
 }
 
 export async function createVoucherProduct(user: CurrentUser, input: Record<string, unknown>) {
@@ -72,9 +69,11 @@ export async function createVoucherProduct(user: CurrentUser, input: Record<stri
     approval_status: "pending",
     status: input.status ?? "draft"
   };
-  const { data, error } = await db().from("voucher_products").insert(payload).select("*").single();
-  if (error) throwDbError(error);
-  return data;
+  try {
+    return await prisma.voucherProduct.create({ data: payload as never });
+  } catch (error) {
+    throwDbError(error);
+  }
 }
 
 export async function getVoucherProduct(user: CurrentUser | undefined, id: string) {
@@ -93,35 +92,40 @@ export async function updateVoucherProduct(user: CurrentUser, id: string, input:
   }
   const originalPrice = Number(input.original_price ?? voucher.original_price);
   const sellingPrice = Number(input.selling_price ?? voucher.selling_price);
-  const payload = { ...input, discount_rate: calcDiscount(originalPrice, sellingPrice), updated_at: new Date().toISOString() };
-  const { data, error } = await db().from("voucher_products").update(payload).eq("id", id).select("*").single();
-  if (error) throwDbError(error);
-  return data;
+  const payload = { ...input, discount_rate: calcDiscount(originalPrice, sellingPrice), updated_at: new Date() };
+  try {
+    return await prisma.voucherProduct.update({ where: { id }, data: payload as never });
+  } catch (error) {
+    throwDbError(error, "Voucher product not found");
+  }
 }
 
 export async function deleteVoucherProduct(user: CurrentUser, id: string) {
   const voucher = await getVoucher(id);
   assertVoucherOwnerOrAdmin(user, voucher);
-  const { error } = await db().from("voucher_products").update({ status: "paused", updated_at: new Date().toISOString() }).eq("id", id);
-  if (error) throwDbError(error);
+  try {
+    await prisma.voucherProduct.update({ where: { id }, data: { status: "paused", updated_at: new Date() } });
+  } catch (error) {
+    throwDbError(error, "Voucher product not found");
+  }
 }
 
 export async function submitVoucherProduct(user: CurrentUser, id: string) {
   const voucher = await getVoucher(id);
   assertVoucherOwnerOrAdmin(user, voucher, false);
-  const { data, error } = await db().from("voucher_products").update({ approval_status: "pending", updated_at: new Date().toISOString() }).eq("id", id).select("*").single();
-  if (error) throwDbError(error);
-  return data;
+  try {
+    return await prisma.voucherProduct.update({ where: { id }, data: { approval_status: "pending", updated_at: new Date() } });
+  } catch (error) {
+    throwDbError(error, "Voucher product not found");
+  }
 }
 
 export async function approveVoucherProduct(adminId: string, id: string, approvalStatus: string) {
-  const { data, error } = await db()
-    .from("voucher_products")
-    .update({ approval_status: approvalStatus, approved_by: adminId, approved_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-    .eq("id", id)
-    .select("*")
-    .single();
-  return requireData<Record<string, unknown>>(data, error, "Voucher product not found");
+  try {
+    return await prisma.voucherProduct.update({ where: { id }, data: { approval_status: approvalStatus, approved_by: adminId, approved_at: new Date(), updated_at: new Date() } });
+  } catch (error) {
+    throwDbError(error, "Voucher product not found");
+  }
 }
 
 export async function updateVoucherStatus(user: CurrentUser, id: string, status: string) {
@@ -130,59 +134,63 @@ export async function updateVoucherStatus(user: CurrentUser, id: string, status:
   if (status === "active" && voucher.approval_status !== "approved") {
     throw new HttpError(422, "Only approved voucher can be active", "VOUCHER_NOT_APPROVED");
   }
-  const { data, error } = await db().from("voucher_products").update({ status, updated_at: new Date().toISOString() }).eq("id", id).select("*").single();
-  if (error) throwDbError(error);
-  return data;
+  try {
+    return await prisma.voucherProduct.update({ where: { id }, data: { status, updated_at: new Date() } });
+  } catch (error) {
+    throwDbError(error, "Voucher product not found");
+  }
 }
 
 export async function listVoucherImages(id: string) {
-  const { data, error } = await db().from("voucher_product_images").select("*").eq("voucher_product_id", id).order("sort_order");
-  if (error) throwDbError(error);
-  return data ?? [];
+  return prisma.voucherProductImage.findMany({ where: { voucher_product_id: id }, orderBy: { sort_order: "asc" } });
 }
 
 export async function createVoucherImage(user: CurrentUser, id: string, input: Record<string, unknown>) {
   const voucher = await getVoucher(id);
   assertVoucherOwnerOrAdmin(user, voucher, false);
-  const { data, error } = await db().from("voucher_product_images").insert({ ...input, voucher_product_id: id }).select("*").single();
-  if (error) throwDbError(error);
-  return data;
+  try {
+    return await prisma.voucherProductImage.create({ data: { ...input, voucher_product_id: id } as never });
+  } catch (error) {
+    throwDbError(error);
+  }
 }
 
 export async function updateVoucherImage(user: CurrentUser, imageId: string, input: Record<string, unknown>) {
-  const { data: image, error } = await db().from("voucher_product_images").select("*, voucher_products(*)").eq("id", imageId).single();
-  const existing = requireData<Record<string, unknown>>(image, error, "Image not found");
+  const existing = requireData<Record<string, unknown>>(await prisma.voucherProductImage.findUnique({ where: { id: imageId }, include: { voucher_products: true } }) as unknown as Record<string, unknown> | null, "Image not found");
   assertVoucherOwnerOrAdmin(user, existing.voucher_products as Record<string, unknown>, false);
-  const { data, error: updateError } = await db().from("voucher_product_images").update(input).eq("id", imageId).select("*").single();
-  if (updateError) throwDbError(updateError);
-  return data;
+  try {
+    return await prisma.voucherProductImage.update({ where: { id: imageId }, data: input as never });
+  } catch (error) {
+    throwDbError(error, "Image not found");
+  }
 }
 
 export async function deleteVoucherImage(user: CurrentUser, imageId: string) {
-  const { data: image, error } = await db().from("voucher_product_images").select("*, voucher_products(*)").eq("id", imageId).single();
-  const existing = requireData<Record<string, unknown>>(image, error, "Image not found");
+  const existing = requireData<Record<string, unknown>>(await prisma.voucherProductImage.findUnique({ where: { id: imageId }, include: { voucher_products: true } }) as unknown as Record<string, unknown> | null, "Image not found");
   assertVoucherOwnerOrAdmin(user, existing.voucher_products as Record<string, unknown>, false);
-  const { error: deleteError } = await db().from("voucher_product_images").delete().eq("id", imageId);
-  if (deleteError) throwDbError(deleteError);
+  try {
+    await prisma.voucherProductImage.delete({ where: { id: imageId } });
+  } catch (error) {
+    throwDbError(error, "Image not found");
+  }
 }
 
 export async function listVoucherBranches(id: string) {
-  const { data, error } = await db().from("voucher_product_branches").select("*, partner_branches(*)").eq("voucher_product_id", id);
-  if (error) throwDbError(error);
-  return data ?? [];
+  return prisma.voucherProductBranch.findMany({ where: { voucher_product_id: id }, include: { partner_branches: true } });
 }
 
 export async function createVoucherBranch(user: CurrentUser, id: string, branchId: string) {
   const voucher = await getVoucher(id);
   assertVoucherOwnerOrAdmin(user, voucher, false);
-  const { data, error } = await db().from("voucher_product_branches").insert({ voucher_product_id: id, branch_id: branchId }).select("*").single();
-  if (error) throwDbError(error);
-  return data;
+  try {
+    return await prisma.voucherProductBranch.create({ data: { voucher_product_id: id, branch_id: branchId } });
+  } catch (error) {
+    throwDbError(error);
+  }
 }
 
 export async function deleteVoucherBranch(user: CurrentUser, id: string, branchId: string) {
   const voucher = await getVoucher(id);
   assertVoucherOwnerOrAdmin(user, voucher, false);
-  const { error } = await db().from("voucher_product_branches").delete().eq("voucher_product_id", id).eq("branch_id", branchId);
-  if (error) throwDbError(error);
+  await prisma.voucherProductBranch.deleteMany({ where: { voucher_product_id: id, branch_id: branchId } });
 }

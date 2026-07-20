@@ -30,6 +30,14 @@ NODE_ENV=development
 PORT=5000
 FRONTEND_URL=http://localhost:3000
 
+# Runtime connection for Prisma Client. Use Supabase pooler when deploying the app.
+DATABASE_URL="postgresql://postgres.example:[YOUR-PASSWORD]@aws-0-region.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1"
+
+# Direct/session connection for Prisma migrations.
+# Copy from Supabase Dashboard > Project Settings > Database > Connection string > URI,
+# or use Supabase's session pooler if direct db.example.supabase.co is not reachable.
+DIRECT_URL="postgresql://postgres:[YOUR-PASSWORD]@db.example.supabase.co:5432/postgres"
+
 SUPABASE_URL=https://example.supabase.co
 SUPABASE_ANON_KEY=example-anon-key
 SUPABASE_SERVICE_ROLE_KEY=example-service-role-key
@@ -38,7 +46,9 @@ JWT_SECRET=replace-with-local-development-secret
 JWT_EXPIRES_IN=7d
 ```
 
-Không đưa `SUPABASE_SERVICE_ROLE_KEY`, `JWT_SECRET` hoặc secret thật lên Git.
+`DATABASE_URL` và `DIRECT_URL` phải là PostgreSQL connection string bắt đầu bằng `postgresql://`, không phải `SUPABASE_URL` dạng `https://...supabase.co`. Prisma Client dùng `DATABASE_URL`; Prisma migrate dùng `DIRECT_URL`.
+
+Không đưa `DATABASE_URL`, `DIRECT_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `JWT_SECRET` hoặc secret thật lên Git.
 
 ## Chạy development
 
@@ -68,7 +78,10 @@ npm run type-check
 
 ## Database
 
-- Migration: đặt file SQL trong `supabase/migrations/`, chạy bằng Supabase CLI hoặc dashboard SQL editor theo môi trường dự án.
+- Backend dùng Prisma với Supabase Postgres qua `DATABASE_URL` trong `backend/.env`; không cần cấu hình database local.
+- Prisma schema nằm ở `backend/prisma/schema.prisma` và đang dùng `provider = "postgresql"`, `url = env("DATABASE_URL")`, `directUrl = env("DIRECT_URL")`.
+- Migration schema ứng dụng: chỉnh `backend/prisma/schema.prisma`, tạo migration bằng Prisma và deploy lên Supabase bằng `prisma migrate deploy`.
+- Các file SQL trong `supabase/migrations/` là legacy/baseline Supabase SQL; migration mới nên đặt dưới `backend/prisma/migrations/`.
 - Seed dữ liệu: đặt script hoặc SQL seed trong `supabase/seed/`, không hard-code secret.
 - Tài khoản admin mẫu: tạo bằng Supabase Auth hoặc seed script riêng, sau đó gán role admin phù hợp trong bảng hồ sơ người dùng.
 - Cấu hình Supabase: dùng `SUPABASE_URL`, `SUPABASE_ANON_KEY`, và chỉ dùng `SUPABASE_SERVICE_ROLE_KEY` ở backend cho tác vụ tin cậy.
@@ -76,18 +89,28 @@ npm run type-check
 
 ## Chạy migration và seed
 
-Nếu dùng Supabase hosted project, mở SQL Editor và chạy lần lượt:
+Nếu dùng Supabase hosted project với Prisma:
 
-1. `supabase/migrations/202607190001_api_sections_2_to_6.sql`
-2. `supabase/migrations/202607190002_update_user_roles.sql`
-3. `supabase/seed/seed.sql`
-
-Nếu dùng Supabase CLI local:
+Nếu database đã có schema từ SQL/Supabase migration cũ nhưng chưa có bảng `_prisma_migrations`, baseline một lần trước:
 
 ```bash
-supabase start
-supabase db reset
+npm --workspace backend run prisma:migrate:baseline
 ```
+
+Sau đó deploy các migration Prisma còn lại:
+
+```bash
+npm --workspace backend run prisma:migrate:deploy
+```
+
+Để tạo migration mới sau khi chỉnh `prisma/schema.prisma`:
+
+```bash
+npm run prisma:migrate:dev -- --name <migration_name> --create-only
+```
+
+Sau đó review file trong `prisma/migrations/` rồi deploy bằng `npm run prisma:migrate:deploy`.
+
 
 Seed users dùng chung mật khẩu:
 

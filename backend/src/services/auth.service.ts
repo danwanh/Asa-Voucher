@@ -1,8 +1,9 @@
 import type { Response } from "express";
 import { env } from "../config/env.js";
+import { prisma } from "../config/prisma.js";
 import type { UserRole } from "../types/role.js";
 import { addDays, createRefreshToken, hashPassword, hashRefreshToken, signAccessToken, verifyPassword } from "../utils/auth.js";
-import { db, requireData, sanitizeUser, throwDbError } from "../utils/db.js";
+import { requireData, sanitizeUser, throwDbError } from "../utils/db.js";
 import { HttpError } from "../utils/http-error.js";
 
 const refreshCookieName = "refresh_token";
@@ -28,30 +29,36 @@ export async function createUser(input: Record<string, unknown>, role: UserRole)
   const payload = { ...input, password: undefined, password_hash: passwordHash, role };
   delete payload.password;
 
-  const { data, error } = await db().from("users").insert(payload).select("*").single();
-  if (error) throwDbError(error);
-  return sanitizeUser(requireData<Record<string, unknown>>(data, error));
+  try {
+    const user = await prisma.user.create({ data: payload as never });
+    return sanitizeUser(user as unknown as Record<string, unknown>);
+  } catch (error) {
+    throwDbError(error);
+  }
 }
 
 async function getUserByEmail(email: string) {
-  const { data, error } = await db().from("users").select("*").eq("email", email).maybeSingle();
-  if (error) throwDbError(error);
-  return data as UserRow | null;
+  return prisma.user.findUnique({ where: { email } }) as unknown as Promise<UserRow | null>;
 }
 
 async function getPartnerId(userId: string) {
-  const { data } = await db().from("partners").select("id").eq("representative_user_id", userId).maybeSingle();
-  return (data?.id as string | undefined) ?? undefined;
+  const partner = await prisma.partner.findFirst({ where: { representative_user_id: userId }, select: { id: true } });
+  return partner?.id;
 }
 
 async function persistRefreshToken(userId: string, refreshToken: string) {
   const expiresAt = addDays(new Date(), env.JWT_REFRESH_EXPIRES_IN_DAYS);
-  const { error } = await db().from("refresh_tokens").insert({
-    user_id: userId,
-    token_hash: hashRefreshToken(refreshToken),
-    expires_at: expiresAt.toISOString()
-  });
-  if (error) throwDbError(error);
+  try {
+    await prisma.refreshToken.create({
+      data: {
+        user_id: userId,
+        token_hash: hashRefreshToken(refreshToken),
+        expires_at: expiresAt
+      }
+    });
+  } catch (error) {
+    throwDbError(error);
+  }
 }
 
 export async function issueTokens(user: UserRow) {
@@ -93,30 +100,26 @@ export async function refresh(refreshToken: string | undefined) {
   }
 
   const tokenHash = hashRefreshToken(refreshToken);
-  const { data, error } = await db()
-    .from("refresh_tokens")
-    .select("*, users(*)")
-    .eq("token_hash", tokenHash)
-    .is("revoked_at", null)
-    .gt("expires_at", new Date().toISOString())
-    .maybeSingle();
+  const token = await prisma.refreshToken.findFirst({
+    where: { token_hash: tokenHash, revoked_at: null, expires_at: { gt: new Date() } },
+    include: { users: true }
+  });
 
-  if (error) throwDbError(error);
-  if (!data?.users) {
+  if (!token?.users) {
     throw new HttpError(401, "Invalid refresh token", "INVALID_REFRESH_TOKEN");
   }
 
-  await db().from("refresh_tokens").update({ revoked_at: new Date().toISOString() }).eq("id", data.id);
-  const tokens = await issueTokens(data.users as UserRow);
-  return { ...tokens, user: sanitizeUser(data.users as Record<string, unknown>) };
+  await prisma.refreshToken.update({ where: { id: token.id }, data: { revoked_at: new Date() } });
+  const tokens = await issueTokens(token.users as unknown as UserRow);
+  return { ...tokens, user: sanitizeUser(token.users as unknown as Record<string, unknown>) };
 }
 
 export async function logout(refreshToken: string | undefined, userId?: string) {
   if (refreshToken) {
-    await db()
-      .from("refresh_tokens")
-      .update({ revoked_at: new Date().toISOString() })
-      .eq("token_hash", hashRefreshToken(refreshToken));
+    await prisma.refreshToken.updateMany({
+      where: { token_hash: hashRefreshToken(refreshToken) },
+      data: { revoked_at: new Date() }
+    });
   }
 
   if (userId) {
@@ -125,27 +128,28 @@ export async function logout(refreshToken: string | undefined, userId?: string) 
 }
 
 export async function changePassword(userId: string, currentPassword: string, newPassword: string) {
-  const { data, error } = await db().from("users").select("*").eq("id", userId).single();
-  const user = requireData<UserRow>(data, error, "User not found");
+  const user = requireData<UserRow>(await prisma.user.findUnique({ where: { id: userId } }) as unknown as UserRow | null, "User not found");
 
   if (!(await verifyPassword(currentPassword, user.password_hash))) {
     throw new HttpError(401, "Current password is invalid", "INVALID_CURRENT_PASSWORD");
   }
 
-  const { error: updateError } = await db()
-    .from("users")
-    .update({ password_hash: await hashPassword(newPassword), updated_at: new Date().toISOString() })
-    .eq("id", userId);
-  if (updateError) throwDbError(updateError);
+  try {
+    await prisma.user.update({ where: { id: userId }, data: { password_hash: await hashPassword(newPassword), updated_at: new Date() } });
+  } catch (error) {
+    throwDbError(error);
+  }
   await writeAuthLog(userId, "CHANGE_PASSWORD", "success", {});
 }
 
 export async function writeAuthLog(userId: string | undefined, action: string, status: string, metadata: { ip?: string; userAgent?: string }) {
-  await db().from("authentication_logs").insert({
-    user_id: userId ?? null,
-    action,
-    status,
-    ip_address: metadata.ip,
-    user_agent: metadata.userAgent
+  await prisma.authenticationLog.create({
+    data: {
+      user_id: userId ?? null,
+      action,
+      status,
+      ip_address: metadata.ip,
+      user_agent: metadata.userAgent
+    }
   });
 }

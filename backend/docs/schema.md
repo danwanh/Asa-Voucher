@@ -44,6 +44,15 @@ erDiagram
         timestamp updated_at
     }
 
+    refresh_tokens {
+        uuid      id          PK
+        uuid      user_id     FK
+        string    token_hash
+        timestamp expires_at
+        timestamp revoked_at
+        timestamp created_at
+    }
+
 
     authentication_logs {
         uuid      id          PK
@@ -319,6 +328,7 @@ erDiagram
     %% ══════════════════════════════════════════
 
     users                   ||--o{ authentication_logs : "auth logs"
+    users                   ||--o{ refresh_tokens      : "sessions"
     users                   ||--o{ admin_logs          : "admin actions"
     users                   ||--o{ admin_logs          : "target user"
     users                   ||--o{ order_logs          : "order logs"
@@ -391,6 +401,17 @@ erDiagram
 | `partner_branches_id` | UUID         |                 | Chi nhánh làm việc nếu là nhân viên                   |
 | `created_at`          | TIMESTAMP    | NOT NULL        | Thời điểm tạo                                         |
 | `updated_at`          | TIMESTAMP    | NOT NULL        | Thời điểm cập nhật                                    |
+
+### DR-01 · refresh_tokens
+
+| Column       | Type      | Constraint      | Mô tả                                                       |
+| ------------ | --------- | --------------- | ----------------------------------------------------------- |
+| `id`         | UUID      | PK              | Định danh refresh token                                     |
+| `user_id`    | UUID      | FK NOT NULL     | Tham chiếu `users.id`                                       |
+| `token_hash` | TEXT      | UNIQUE NOT NULL | Hash SHA-256 của refresh token; không lưu raw token         |
+| `expires_at` | TIMESTAMP | NOT NULL        | Thời điểm hết hạn                                           |
+| `revoked_at` | TIMESTAMP |                 | Thời điểm thu hồi token; null nếu token còn hiệu lực        |
+| `created_at` | TIMESTAMP | NOT NULL        | Thời điểm tạo                                               |
 
 ### DR-01 · authentication_logs
 

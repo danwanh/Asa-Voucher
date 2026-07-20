@@ -1,35 +1,24 @@
-import { supabase } from "../config/supabase.js";
+import { Prisma } from "@prisma/client";
 import { HttpError } from "./http-error.js";
 
-export function db() {
-  if (!supabase) {
-    throw new HttpError(500, "Supabase is not configured", "DATABASE_NOT_CONFIGURED");
-  }
-
-  return supabase;
-}
-
-export function throwDbError(error: { message: string; code?: string } | null, fallback = "Database error"): never {
+export function throwDbError(error: unknown, fallback = "Database error"): never {
   if (!error) {
     throw new HttpError(500, fallback, "DATABASE_ERROR");
   }
 
-  if (error.code === "23505") {
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
     throw new HttpError(409, error.message, "CONFLICT");
   }
 
-  throw new HttpError(500, error.message || fallback, "DATABASE_ERROR");
-}
-
-export function requireData<T>(data: T | null, error: { message: string; code?: string } | null, message = "Not found") {
-  if (error) {
-    if (error.code === "PGRST116") {
-      throw new HttpError(404, message, "NOT_FOUND");
-    }
-
-    throwDbError(error);
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+    throw new HttpError(404, fallback, "NOT_FOUND");
   }
 
+  const message = error instanceof Error ? error.message : fallback;
+  throw new HttpError(500, message || fallback, "DATABASE_ERROR");
+}
+
+export function requireData<T>(data: T | null | undefined, message = "Not found") {
   if (!data) {
     throw new HttpError(404, message, "NOT_FOUND");
   }
