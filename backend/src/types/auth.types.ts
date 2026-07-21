@@ -27,3 +27,7 @@ export const PARTNER_STAFF_ROLES: AppRole[] = [
 export function isAdminRole(role: AppRole): boolean {
   return ADMIN_ROLES.includes(role);
 }
+
+export type UserRole = AppRole;
+export const adminRoles = ADMIN_ROLES;
+export const partnerStaffRoles = PARTNER_STAFF_ROLES;

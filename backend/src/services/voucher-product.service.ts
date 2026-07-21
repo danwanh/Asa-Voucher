@@ -1,4 +1,4 @@
-import type { UserRole } from "../types/role.js";
+import type { UserRole } from "../types/auth.types.js";
 import { prisma } from "../config/prisma.js";
 import { requireData, throwDbError } from "../utils/db.js";
 import { HttpError } from "../utils/http-error.js";

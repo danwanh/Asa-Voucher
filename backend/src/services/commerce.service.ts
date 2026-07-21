@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { prisma } from "../config/prisma.js";
-import { adminRoles, type UserRole } from "../types/role.js";
+import { adminRoles, type UserRole } from "../types/auth.types.js";
 import { requireData } from "../utils/db.js";
 import { HttpError } from "../utils/http-error.js";
 

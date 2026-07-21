@@ -1,7 +1,7 @@
 import type { Response } from "express";
 import { env } from "../config/env.js";
 import { prisma } from "../config/prisma.js";
-import type { UserRole } from "../types/role.js";
+import type { UserRole } from "../types/auth.types.js";
 import { addDays, createRefreshToken, hashPassword, hashRefreshToken, signAccessToken, verifyPassword } from "../utils/auth.js";
 import { requireData, sanitizeUser, throwDbError } from "../utils/db.js";
 import { HttpError } from "../utils/http-error.js";

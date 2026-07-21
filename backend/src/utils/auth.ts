@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import { promisify } from "node:util";
 import jwt, { type SignOptions } from "jsonwebtoken";
 import { env } from "../config/env.js";
-import type { UserRole } from "../types/role.js";
+import type { UserRole } from "../types/auth.types.js";
 import { HttpError } from "./http-error.js";
 
 const scrypt = promisify(crypto.scrypt);

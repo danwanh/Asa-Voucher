@@ -1,4 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("../repositories/health.repository.js", () => ({
+  getDatabaseStatus: vi.fn(async () => ({ configured: true })),
+}));
+
 import { getHealthStatus } from "../services/health.service.js";
 
 describe("getHealthStatus", () => {
