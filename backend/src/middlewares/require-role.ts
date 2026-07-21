@@ -9,9 +9,7 @@ export function requireRole(...roles: AppRole[]) {
       return;
     }
 
-    const user = req.user;
-
-    if (!roles.some((role) => role === user.role)) {
+    if (!roles.includes(req.user.role)) {
       next(new HttpError(403, "Bạn không có quyền thực hiện thao tác này"));
       return;
     }
