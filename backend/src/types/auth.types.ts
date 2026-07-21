@@ -1,5 +1,5 @@
 export type AppRole =
-  | "customer"
+  | "buyer"
   | "partner_owner"
   | "partner_voucher_staff"
   | "partner_store_staff"
