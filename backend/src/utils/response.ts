@@ -1,13 +1,13 @@
 import type { Response } from "express";
 
-export function ok(res: Response, data: unknown, message = "OK") {
-  res.json({ success: true, data, message });
+export function sendSuccess<T>(res: Response, data: T, message = "OK", statusCode = 200) {
+  res.status(statusCode).json({ success: true, data, message });
 }
 
-export function created(res: Response, data: unknown, message = "Created") {
-  res.status(201).json({ success: true, data, message });
+export function sendCreated<T>(res: Response, data: T, message = "Created") {
+  sendSuccess(res, data, message, 201);
 }
 
-export function noContent(res: Response) {
+export function sendNoContent(res: Response) {
   res.status(204).send();
 }

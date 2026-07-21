@@ -1,13 +1,18 @@
 import type { NextFunction, Request, Response } from "express";
-import type { UserRole } from "../types/role.js";
 import { HttpError } from "../utils/http-error.js";
+import type { AppRole } from "../types/auth.types.js";
 
-export function requireRole(allowedRoles: UserRole[]) {
+export function requireRole(...roles: AppRole[]) {
   return (req: Request, _res: Response, next: NextFunction) => {
-    const role = req.user?.role;
+    if (!req.user) {
+      next(new HttpError(401, "Authentication required"));
+      return;
+    }
 
-    if (!role || !allowedRoles.includes(role)) {
-      next(new HttpError(403, "Insufficient permissions"));
+    const user = req.user;
+
+    if (!roles.some((role) => role === user.role)) {
+      next(new HttpError(403, "Bạn không có quyền thực hiện thao tác này"));
       return;
     }
 
