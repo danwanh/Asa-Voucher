@@ -1,32 +1,26 @@
-const roles = [
-  "Khach hang",
-  "Nhan vien quan ly doi tac",
-  "Nhan vien cua hang",
-  "Admin noi dung",
-  "Admin tai khoan",
-  "Admin log va bao mat"
-];
+"use client";
 
-export default function HomePage() {
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuthStore } from "@/stores/useAuthStore";
+import { ROLE_HOME_PATH } from "@/services/auth.service";
+
+export default function RootPage() {
+  const router = useRouter();
+  const status = useAuthStore((s) => s.status);
+  const user = useAuthStore((s) => s.user);
+
+  useEffect(() => {
+    if (status === "authenticated" && user) {
+      router.replace(ROLE_HOME_PATH[user.role]);
+    } else if (status === "guest") {
+      router.replace("/login");
+    }
+  }, [status, user, router]);
+
   return (
-    <main className="mx-auto flex min-h-screen max-w-5xl flex-col gap-8 px-6 py-16">
-      <section className="rounded-3xl bg-white p-8 shadow-sm ring-1 ring-slate-200">
-        <p className="text-sm font-semibold uppercase tracking-[0.3em] text-blue-600">Asa Voucher</p>
-        <h1 className="mt-4 text-4xl font-bold tracking-tight text-slate-950 md:text-6xl">
-          Nen tang thuong mai dien tu voucher dien tu
-        </h1>
-        <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600">
-          Scaffold ban dau cho frontend Next.js App Router. Cac nghiep vu bao ve nhu thanh toan mo phong, phat hanh voucher va xac thuc voucher se di qua backend Express.js.
-        </p>
-      </section>
-
-      <section className="grid gap-3 md:grid-cols-3">
-        {roles.map((role) => (
-          <div key={role} className="rounded-2xl border border-slate-200 bg-white p-4 text-sm font-medium text-slate-700">
-            {role}
-          </div>
-        ))}
-      </section>
-    </main>
+    <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
+      Đang tải...
+    </div>
   );
 }
