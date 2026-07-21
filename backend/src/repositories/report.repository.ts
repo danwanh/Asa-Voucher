@@ -1,4 +1,4 @@
-import { supabase } from "../config/supabase.js";
+import { prisma } from "../config/prisma.js";
 
 export interface PaidOrderRow {
   id: string;
@@ -16,29 +16,19 @@ export interface PartnerScopedOrderItemRow {
   voucher_products: { partner_id: string } | null;
 }
 
-function applyDateRange<T extends { gte: (...args: unknown[]) => T; lte: (...args: unknown[]) => T }>(
-  query: T,
-  column: string,
-  dateFrom?: string,
-  dateTo?: string,
-): T {
-  let q = query;
-  if (dateFrom) q = q.gte(column, dateFrom);
-  if (dateTo) q = q.lte(column, dateTo);
-  return q;
+function dateRangeFilter(column: string, dateFrom?: string, dateTo?: string) {
+  const range: Record<string, Date> = {};
+  if (dateFrom) range.gte = new Date(dateFrom);
+  if (dateTo) range.lte = new Date(dateTo);
+  return Object.keys(range).length ? { [column]: range } : {};
 }
 
 /** Toàn bộ đơn đã thanh toán thành công trong khoảng thời gian (dùng khi không lọc theo partner). */
 export async function listPaidOrders(dateFrom?: string, dateTo?: string): Promise<PaidOrderRow[]> {
-  let query = supabase
-    .from("orders")
-    .select("id, total_amount, status, payment_status, created_at")
-    .eq("payment_status", "paid");
-  query = applyDateRange(query, "created_at", dateFrom, dateTo);
-
-  const { data, error } = await query;
-  if (error) throw error;
-  return (data ?? []) as unknown as PaidOrderRow[];
+  return prisma.order.findMany({
+    where: { payment_status: "paid", ...dateRangeFilter("created_at", dateFrom, dateTo) },
+    select: { id: true, total_amount: true, status: true, payment_status: true, created_at: true },
+  }) as Promise<PaidOrderRow[]>;
 }
 
 /** order_items thuộc voucher của một partner cụ thể, kèm trạng thái đơn hàng, dùng để tính doanh thu/đơn theo partner. */
@@ -47,27 +37,27 @@ export async function listOrderItemsForPartner(
   dateFrom?: string,
   dateTo?: string,
 ): Promise<PartnerScopedOrderItemRow[]> {
-  let query = supabase
-    .from("order_items")
-    .select(
-      "order_id, subtotal, created_at, orders!inner(payment_status, status, created_at), voucher_products!inner(partner_id)",
-    )
-    .eq("voucher_products.partner_id", partnerId);
-  query = applyDateRange(query, "orders.created_at", dateFrom, dateTo);
-
-  const { data, error } = await query;
-  if (error) throw error;
-  return (data ?? []) as unknown as PartnerScopedOrderItemRow[];
+  return prisma.orderItem.findMany({
+    where: {
+      voucher_products: { partner_id: partnerId },
+      orders: { ...dateRangeFilter("created_at", dateFrom, dateTo) },
+    },
+    select: {
+      order_id: true,
+      subtotal: true,
+      created_at: true,
+      orders: { select: { payment_status: true, status: true, created_at: true } },
+      voucher_products: { select: { partner_id: true } },
+    },
+  }) as Promise<PartnerScopedOrderItemRow[]>;
 }
 
 /** Toàn bộ đơn hàng (mọi trạng thái thanh toán) trong khoảng thời gian, dùng cho thống kê đơn hàng. */
 export async function listAllOrders(dateFrom?: string, dateTo?: string): Promise<PaidOrderRow[]> {
-  let query = supabase.from("orders").select("id, total_amount, status, payment_status, created_at");
-  query = applyDateRange(query, "created_at", dateFrom, dateTo);
-
-  const { data, error } = await query;
-  if (error) throw error;
-  return (data ?? []) as unknown as PaidOrderRow[];
+  return prisma.order.findMany({
+    where: dateRangeFilter("created_at", dateFrom, dateTo),
+    select: { id: true, total_amount: true, status: true, payment_status: true, created_at: true },
+  }) as Promise<PaidOrderRow[]>;
 }
 
 /** order_items thuộc voucher của một partner, không lọc payment_status, dùng cho thống kê đơn hàng theo partner. */
@@ -76,17 +66,19 @@ export async function listAllOrderItemsForPartner(
   dateFrom?: string,
   dateTo?: string,
 ): Promise<PartnerScopedOrderItemRow[]> {
-  let query = supabase
-    .from("order_items")
-    .select(
-      "order_id, subtotal, created_at, orders!inner(payment_status, status, created_at), voucher_products!inner(partner_id)",
-    )
-    .eq("voucher_products.partner_id", partnerId);
-  query = applyDateRange(query, "orders.created_at", dateFrom, dateTo);
-
-  const { data, error } = await query;
-  if (error) throw error;
-  return (data ?? []) as unknown as PartnerScopedOrderItemRow[];
+  return prisma.orderItem.findMany({
+    where: {
+      voucher_products: { partner_id: partnerId },
+      orders: { ...dateRangeFilter("created_at", dateFrom, dateTo) },
+    },
+    select: {
+      order_id: true,
+      subtotal: true,
+      created_at: true,
+      orders: { select: { payment_status: true, status: true, created_at: true } },
+      voucher_products: { select: { partner_id: true } },
+    },
+  }) as Promise<PartnerScopedOrderItemRow[]>;
 }
 
 export interface VoucherProductStatsRow {
@@ -98,12 +90,10 @@ export interface VoucherProductStatsRow {
 }
 
 export async function listVoucherProductStats(partnerId?: string): Promise<VoucherProductStatsRow[]> {
-  let query = supabase.from("voucher_products").select("id, name, partner_id, total_quantity, remaining_quantity");
-  if (partnerId) query = query.eq("partner_id", partnerId);
-
-  const { data, error } = await query;
-  if (error) throw error;
-  return (data ?? []) as unknown as VoucherProductStatsRow[];
+  return prisma.voucherProduct.findMany({
+    where: partnerId ? { partner_id: partnerId } : undefined,
+    select: { id: true, name: true, partner_id: true, total_quantity: true, remaining_quantity: true },
+  }) as Promise<VoucherProductStatsRow[]>;
 }
 
 export async function countUsedIssuedVouchersByProduct(
@@ -111,16 +101,15 @@ export async function countUsedIssuedVouchersByProduct(
 ): Promise<Record<string, number>> {
   if (voucherProductIds.length === 0) return {};
 
-  const { data, error } = await supabase
-    .from("issued_vouchers")
-    .select("voucher_product_id")
-    .eq("status", "used")
-    .in("voucher_product_id", voucherProductIds);
-  if (error) throw error;
+  const rows = await prisma.issuedVoucher.groupBy({
+    by: ["voucher_product_id"],
+    where: { status: "used", voucher_product_id: { in: voucherProductIds } },
+    _count: true,
+  });
 
   const counts: Record<string, number> = {};
-  for (const row of (data ?? []) as { voucher_product_id: string }[]) {
-    counts[row.voucher_product_id] = (counts[row.voucher_product_id] ?? 0) + 1;
+  for (const row of rows) {
+    counts[row.voucher_product_id] = row._count;
   }
   return counts;
 }
@@ -131,18 +120,19 @@ export interface PartnerRow {
 }
 
 export async function listPartners(): Promise<PartnerRow[]> {
-  const { data, error } = await supabase.from("partners").select("id, business_name");
-  if (error) throw error;
-  return (data ?? []) as unknown as PartnerRow[];
+  return prisma.partner.findMany({
+    select: { id: true, business_name: true },
+  }) as Promise<PartnerRow[]>;
 }
 
 export async function countVoucherProductsByPartner(): Promise<Record<string, number>> {
-  const { data, error } = await supabase.from("voucher_products").select("partner_id");
-  if (error) throw error;
+  const rows = await prisma.voucherProduct.groupBy({
+    by: ["partner_id"],
+  });
 
   const counts: Record<string, number> = {};
-  for (const row of (data ?? []) as { partner_id: string }[]) {
-    counts[row.partner_id] = (counts[row.partner_id] ?? 0) + 1;
+  for (const row of rows) {
+    counts[row.partner_id] = row._count;
   }
   return counts;
 }

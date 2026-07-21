@@ -1,71 +1,55 @@
-import { supabase } from "../config/supabase.js";
-import { toRange } from "../utils/pagination.js";
+import { prisma } from "../config/prisma.js";
 import type { ReviewListFilter, ReviewRow } from "../types/review.types.js";
 import type { CreateReviewInput, UpdateReviewInput } from "../validations/review.validation.js";
 
-const BASE_SELECT = "*, voucher_products(id, name, partner_id)";
+const INCLUDE = {
+  voucher_products: { select: { id: true, name: true, partner_id: true } },
+} as const;
 
 export async function listReviews(
   filter: ReviewListFilter,
 ): Promise<{ rows: ReviewRow[]; total: number }> {
-  let query = supabase
-    .from("reviews")
-    .select(BASE_SELECT, { count: "exact" })
-    .order("created_at", { ascending: false });
+  const where: Record<string, unknown> = {};
+  if (filter.voucherProductId) where.voucher_product_id = filter.voucherProductId;
+  if (filter.onlyPublished) where.is_published = true;
 
-  if (filter.voucherProductId) query = query.eq("voucher_product_id", filter.voucherProductId);
-  if (filter.onlyPublished) query = query.eq("is_published", true);
+  const skip = (filter.page - 1) * filter.limit;
+  const take = filter.limit;
 
-  const [from, to] = toRange(filter);
-  query = query.range(from, to);
+  const [rows, total] = await Promise.all([
+    prisma.review.findMany({ where, include: INCLUDE, orderBy: { created_at: "desc" }, skip, take }),
+    prisma.review.count({ where }),
+  ]);
 
-  const { data, error, count } = await query;
-  if (error) throw error;
-  return { rows: (data ?? []) as unknown as ReviewRow[], total: count ?? 0 };
+  return { rows: rows as unknown as ReviewRow[], total };
 }
 
 export async function findReviewById(id: string) {
-  const { data, error } = await supabase.from("reviews").select(BASE_SELECT).eq("id", id).maybeSingle();
-  if (error) throw error;
-  return data as unknown as (ReviewRow & { voucher_products: { partner_id: string } }) | null;
+  return prisma.review.findUnique({ where: { id }, include: INCLUDE }) as Promise<(ReviewRow & { voucher_products: { partner_id: string } }) | null>;
 }
 
 export async function findReviewByIssuedVoucherId(issuedVoucherId: string) {
-  const { data, error } = await supabase
-    .from("reviews")
-    .select("id")
-    .eq("issued_voucher_id", issuedVoucherId)
-    .maybeSingle();
-  if (error) throw error;
-  return data;
+  return prisma.review.findUnique({ where: { issued_voucher_id: issuedVoucherId }, select: { id: true } });
 }
 
 export async function createReview(userId: string, voucherProductId: string, input: CreateReviewInput) {
-  const { data, error } = await supabase
-    .from("reviews")
-    .insert({
+  return prisma.review.create({
+    data: {
       voucher_product_id: voucherProductId,
       user_id: userId,
       issued_voucher_id: input.issued_voucher_id,
       rating: input.rating,
       comment: input.comment ?? null,
-      media_urls: input.media_urls ?? null,
-    })
-    .select()
-    .single();
-  if (error) throw error;
-  return data as unknown as ReviewRow;
+      media_urls: input.media_urls ?? undefined,
+    },
+  }) as Promise<ReviewRow>;
 }
 
 export async function updateReview(id: string, input: UpdateReviewInput) {
-  const { data, error } = await supabase
-    .from("reviews")
-    .update({ ...input, updated_at: new Date().toISOString() })
-    .eq("id", id)
-    .select()
-    .single();
-  if (error) throw error;
-  return data as unknown as ReviewRow;
+  return prisma.review.update({
+    where: { id },
+    data: { ...input, updated_at: new Date() },
+  }) as Promise<ReviewRow>;
 }
 
 export async function setReviewPublished(id: string, isPublished: boolean) {

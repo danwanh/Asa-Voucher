@@ -1,5 +1,5 @@
-import { supabase } from "../config/supabase.js";
-import { toRange, type PaginationParams } from "../utils/pagination.js";
+import { prisma } from "../config/prisma.js";
+import { PaginationParams } from "../utils/pagination.js";
 import type {
   AdminLogRow,
   AuthenticationLogRow,
@@ -12,47 +12,35 @@ interface DateRangeFilter extends PaginationParams {
   date_to?: string;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function applyDateRange<T extends { gte: any; lte: any }>(
-  query: T,
-  filter: DateRangeFilter,
-  column = "occurred_at",
-): T {
-  let q = query;
-  if (filter.date_from) q = q.gte(column, filter.date_from);
-  if (filter.date_to) q = q.lte(column, filter.date_to);
-  return q;
+function toDateRange(filter: DateRangeFilter, column = "occurred_at") {
+  const range: Record<string, Date> = {};
+  if (filter.date_from) range.gte = new Date(filter.date_from);
+  if (filter.date_to) range.lte = new Date(filter.date_to);
+  return Object.keys(range).length ? { [column]: range } : {};
 }
 
 export async function listAuthenticationLogs(
   filter: DateRangeFilter & { user_id?: string; action?: string; status?: string },
 ): Promise<{ rows: AuthenticationLogRow[]; total: number }> {
-  let query = supabase
-    .from("authentication_logs")
-    .select("*", { count: "exact" })
-    .order("occurred_at", { ascending: false });
+  const where: Record<string, unknown> = {};
+  if (filter.user_id) where.user_id = filter.user_id;
+  if (filter.action) where.action = filter.action;
+  if (filter.status) where.status = filter.status;
+  Object.assign(where, toDateRange(filter));
 
-  if (filter.user_id) query = query.eq("user_id", filter.user_id);
-  if (filter.action) query = query.eq("action", filter.action);
-  if (filter.status) query = query.eq("status", filter.status);
-  query = applyDateRange(query, filter);
+  const skip = (filter.page - 1) * filter.limit;
+  const take = filter.limit;
 
-  const [from, to] = toRange(filter);
-  query = query.range(from, to);
+  const [rows, total] = await Promise.all([
+    prisma.authenticationLog.findMany({ where, orderBy: { occurred_at: "desc" }, skip, take }),
+    prisma.authenticationLog.count({ where }),
+  ]);
 
-  const { data, error, count } = await query;
-  if (error) throw error;
-  return { rows: (data ?? []) as unknown as AuthenticationLogRow[], total: count ?? 0 };
+  return { rows: rows as unknown as AuthenticationLogRow[], total };
 }
 
 export async function findAuthenticationLogById(id: string) {
-  const { data, error } = await supabase
-    .from("authentication_logs")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
-  if (error) throw error;
-  return data as unknown as AuthenticationLogRow | null;
+  return prisma.authenticationLog.findUnique({ where: { id } }) as Promise<AuthenticationLogRow | null>;
 }
 
 export async function listAdminLogs(
@@ -64,83 +52,74 @@ export async function listAdminLogs(
     action?: string;
   },
 ): Promise<{ rows: AdminLogRow[]; total: number }> {
-  let query = supabase
-    .from("admin_logs")
-    .select("*", { count: "exact" })
-    .order("occurred_at", { ascending: false });
+  const where: Record<string, unknown> = {};
+  if (filter.admin_id) where.admin_id = filter.admin_id;
+  if (filter.target_user_id) where.target_user_id = filter.target_user_id;
+  if (filter.target_partner_id) where.target_partner_id = filter.target_partner_id;
+  if (filter.target_voucher_id) where.target_voucher_id = filter.target_voucher_id;
+  if (filter.action) where.action = filter.action;
+  Object.assign(where, toDateRange(filter));
 
-  if (filter.admin_id) query = query.eq("admin_id", filter.admin_id);
-  if (filter.target_user_id) query = query.eq("target_user_id", filter.target_user_id);
-  if (filter.target_partner_id) query = query.eq("target_partner_id", filter.target_partner_id);
-  if (filter.target_voucher_id) query = query.eq("target_voucher_id", filter.target_voucher_id);
-  if (filter.action) query = query.eq("action", filter.action);
-  query = applyDateRange(query, filter);
+  const skip = (filter.page - 1) * filter.limit;
+  const take = filter.limit;
 
-  const [from, to] = toRange(filter);
-  query = query.range(from, to);
+  const [rows, total] = await Promise.all([
+    prisma.adminLog.findMany({ where, orderBy: { occurred_at: "desc" }, skip, take }),
+    prisma.adminLog.count({ where }),
+  ]);
 
-  const { data, error, count } = await query;
-  if (error) throw error;
-  return { rows: (data ?? []) as unknown as AdminLogRow[], total: count ?? 0 };
+  return { rows: rows as unknown as AdminLogRow[], total };
 }
 
 export async function findAdminLogById(id: string) {
-  const { data, error } = await supabase.from("admin_logs").select("*").eq("id", id).maybeSingle();
-  if (error) throw error;
-  return data as unknown as AdminLogRow | null;
+  return prisma.adminLog.findUnique({ where: { id } }) as Promise<AdminLogRow | null>;
 }
 
 export async function listOrderLogs(
   filter: DateRangeFilter & { order_id?: string; user_id?: string; action?: string },
 ): Promise<{ rows: OrderLogRow[]; total: number }> {
-  let query = supabase
-    .from("order_logs")
-    .select("*", { count: "exact" })
-    .order("occurred_at", { ascending: false });
+  const where: Record<string, unknown> = {};
+  if (filter.order_id) where.order_id = filter.order_id;
+  if (filter.user_id) where.user_id = filter.user_id;
+  if (filter.action) where.action = filter.action;
+  Object.assign(where, toDateRange(filter));
 
-  if (filter.order_id) query = query.eq("order_id", filter.order_id);
-  if (filter.user_id) query = query.eq("user_id", filter.user_id);
-  if (filter.action) query = query.eq("action", filter.action);
-  query = applyDateRange(query, filter);
+  const skip = (filter.page - 1) * filter.limit;
+  const take = filter.limit;
 
-  const [from, to] = toRange(filter);
-  query = query.range(from, to);
+  const [rows, total] = await Promise.all([
+    prisma.orderLog.findMany({ where, orderBy: { occurred_at: "desc" }, skip, take }),
+    prisma.orderLog.count({ where }),
+  ]);
 
-  const { data, error, count } = await query;
-  if (error) throw error;
-  return { rows: (data ?? []) as unknown as OrderLogRow[], total: count ?? 0 };
+  return { rows: rows as unknown as OrderLogRow[], total };
 }
 
 export async function findOrderLogById(id: string) {
-  const { data, error } = await supabase.from("order_logs").select("*").eq("id", id).maybeSingle();
-  if (error) throw error;
-  return data as unknown as OrderLogRow | null;
+  return prisma.orderLog.findUnique({ where: { id } }) as Promise<OrderLogRow | null>;
 }
 
 export async function listPaymentLogs(
   filter: DateRangeFilter & { payment_id?: string; order_id?: string; user_id?: string; status?: string },
 ): Promise<{ rows: PaymentLogRow[]; total: number }> {
-  let query = supabase
-    .from("payment_logs")
-    .select("*", { count: "exact" })
-    .order("occurred_at", { ascending: false });
+  const where: Record<string, unknown> = {};
+  if (filter.payment_id) where.payment_id = filter.payment_id;
+  if (filter.order_id) where.order_id = filter.order_id;
+  if (filter.user_id) where.user_id = filter.user_id;
+  if (filter.status) where.status = filter.status;
+  Object.assign(where, toDateRange(filter));
 
-  if (filter.payment_id) query = query.eq("payment_id", filter.payment_id);
-  if (filter.order_id) query = query.eq("order_id", filter.order_id);
-  if (filter.user_id) query = query.eq("user_id", filter.user_id);
-  if (filter.status) query = query.eq("status", filter.status);
-  query = applyDateRange(query, filter);
+  const skip = (filter.page - 1) * filter.limit;
+  const take = filter.limit;
 
-  const [from, to] = toRange(filter);
-  query = query.range(from, to);
+  const [rows, total] = await Promise.all([
+    prisma.paymentLog.findMany({ where, orderBy: { occurred_at: "desc" }, skip, take }),
+    prisma.paymentLog.count({ where }),
+  ]);
 
-  const { data, error, count } = await query;
-  if (error) throw error;
-  return { rows: (data ?? []) as unknown as PaymentLogRow[], total: count ?? 0 };
+  return { rows: rows as unknown as PaymentLogRow[], total };
 }
 
 export async function findPaymentLogById(id: string) {
-  const { data, error } = await supabase.from("payment_logs").select("*").eq("id", id).maybeSingle();
-  if (error) throw error;
-  return data as unknown as PaymentLogRow | null;
+  return prisma.paymentLog.findUnique({ where: { id } }) as Promise<PaymentLogRow | null>;
 }

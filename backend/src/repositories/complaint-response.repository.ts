@@ -1,14 +1,11 @@
-import { supabase } from "../config/supabase.js";
+import { prisma } from "../config/prisma.js";
 import type { ComplaintResponderRole, ComplaintResponseRow } from "../types/complaint.types.js";
 
 export async function listResponsesByComplaint(complaintId: string): Promise<ComplaintResponseRow[]> {
-  const { data, error } = await supabase
-    .from("complaint_responses")
-    .select("*")
-    .eq("complaint_id", complaintId)
-    .order("created_at", { ascending: true });
-  if (error) throw error;
-  return (data ?? []) as unknown as ComplaintResponseRow[];
+  return prisma.complaintResponse.findMany({
+    where: { complaint_id: complaintId },
+    orderBy: { created_at: "asc" },
+  }) as Promise<ComplaintResponseRow[]>;
 }
 
 export async function createComplaintResponse(
@@ -17,16 +14,12 @@ export async function createComplaintResponse(
   responderRole: ComplaintResponderRole,
   content: string,
 ): Promise<ComplaintResponseRow> {
-  const { data, error } = await supabase
-    .from("complaint_responses")
-    .insert({
+  return prisma.complaintResponse.create({
+    data: {
       complaint_id: complaintId,
       responded_by: respondedBy,
       responder_role: responderRole,
       content,
-    })
-    .select()
-    .single();
-  if (error) throw error;
-  return data as unknown as ComplaintResponseRow;
+    },
+  }) as Promise<ComplaintResponseRow>;
 }
