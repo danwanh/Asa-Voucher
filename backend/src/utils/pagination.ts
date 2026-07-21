@@ -13,12 +13,6 @@ export interface PaginatedResult<T> {
   };
 }
 
-export function toRange({ page, limit }: PaginationParams): [number, number] {
-  const from = (page - 1) * limit;
-  const to = from + limit - 1;
-  return [from, to];
-}
-
 export function buildPaginatedResult<T>(
   items: T[],
   total: number,
