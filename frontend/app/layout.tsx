@@ -1,16 +1,15 @@
-import type { Metadata } from "next";
-import type { ReactNode } from "react";
-import "./globals.css";
+import type { Metadata } from "next"
+import "@/styles/index.css"
 
 export const metadata: Metadata = {
-  title: "Asa Voucher",
-  description: "Electronic voucher commerce platform"
-};
+  title: "Asa Vouchers",
+  description: "Nền tảng mua bán voucher ưu đãi",
+}
 
-export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="vi">
       <body>{children}</body>
     </html>
-  );
+  )
 }
