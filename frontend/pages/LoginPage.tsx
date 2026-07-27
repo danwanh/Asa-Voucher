@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
 import { AlertCircle, Eye, EyeOff, Building2, User as UserIcon } from "lucide-react"
 import { C } from "@/utils/constants"
-import type { AppUser, Role, AdminSubRole } from "@/types"
+import type { AppUser, Role } from "@/types"
 
 type AuthPage = "login" | "register" | "forgot"
 
@@ -16,22 +16,21 @@ interface DemoAccount {
   hint: string
   role: Role
   color: string
-  adminSubRole?: AdminSubRole
 }
 
 // Row 1: end-users
 const USER_ACCOUNTS: DemoAccount[] = [
-  { label: "Khách hàng",         email: "customer@asa.vn",      hint: "Nguyễn Thị Mai",      role: "customer",      color: C.teal },
-  { label: "🏢 Đối tác chủ TK", email: "partner@asa.vn",       hint: "Pizza Hut Vietnam",   role: "partner",       color: C.peach },
-  { label: "🏷️ NV Tạo Voucher", email: "voucher-staff@asa.vn", hint: "Nguyễn Văn Hùng",     role: "voucher-staff", color: "#F2CC8F" },
-  { label: "🔖 NV Cửa hàng",   email: "staff@asa.vn",          hint: "Trần Văn Nam",         role: "staff",         color: C.apricot },
+  { label: "Khách hàng",         email: "customer@asa.vn",      hint: "Nguyễn Thị Mai",      role: "buyer",                   color: C.teal },
+  { label: "🏢 Đối tác chủ TK", email: "partner@asa.vn",       hint: "Pizza Hut Vietnam",   role: "partner_owner",          color: C.peach },
+  { label: "🏷️ NV Tạo Voucher", email: "voucher-staff@asa.vn", hint: "Nguyễn Văn Hùng",     role: "partner_voucher_staff",  color: "#F2CC8F" },
+  { label: "🔖 NV Cửa hàng",   email: "staff@asa.vn",          hint: "Trần Văn Nam",         role: "partner_store_staff",    color: C.apricot },
 ]
 
 // Row 2: admin roles
 const ADMIN_ACCOUNTS: DemoAccount[] = [
-  { label: "📝 Admin Nội dung",  email: "admin-content@asa.vn",  hint: "Duyệt voucher & nội dung", role: "admin", color: "#81B29A", adminSubRole: "content" },
-  { label: "👤 Admin Tài khoản", email: "admin-account@asa.vn",  hint: "Người dùng & đối tác",     role: "admin", color: "#3D405B", adminSubRole: "account" },
-  { label: "🔐 Admin Bảo mật",  email: "admin-security@asa.vn", hint: "Nhật ký & phân quyền",     role: "admin", color: "#E07A5F", adminSubRole: "security" },
+  { label: "📝 Admin Nội dung",  email: "admin-content@asa.vn",  hint: "Duyệt voucher & nội dung", role: "admin_content", color: "#81B29A" },
+  { label: "👤 Admin Tài khoản", email: "admin-account@asa.vn",  hint: "Người dùng & đối tác",     role: "admin_account", color: "#3D405B" },
+  { label: "🔐 Admin Bảo mật",  email: "admin-security@asa.vn", hint: "Nhật ký & phân quyền",     role: "admin_security", color: "#E07A5F" },
 ]
 
 const ALL_ACCOUNTS = [...USER_ACCOUNTS, ...ADMIN_ACCOUNTS]
@@ -101,10 +100,9 @@ function LoginForm({ onLogin, onNavigate }: { onLogin: (u: AppUser) => void; onN
     const found = ALL_ACCOUNTS.find((a) => a.email === email)
     if (found && password === "123456") {
       const extras: Partial<AppUser> = {}
-      if (found.role === "partner")       extras.partnerId = "p1"
-      if (found.role === "staff")         { extras.partnerId = "p1"; extras.branchId = "b1" }
-      if (found.role === "voucher-staff") { extras.partnerId = "p1" }
-      if (found.adminSubRole)             extras.adminSubRole = found.adminSubRole
+      if (found.role === "partner_owner")         extras.partnerId = "p1"
+      if (found.role === "partner_store_staff")   { extras.partnerId = "p1"; extras.branchId = "b1" }
+      if (found.role === "partner_voucher_staff") { extras.partnerId = "p1" }
       onLogin({ id: found.role + "-1", name: found.hint, email: found.email, role: found.role, ...extras })
     } else {
       setGeneralErr("Email hoặc mật khẩu không đúng. Mật khẩu demo: 123456")
