@@ -11,8 +11,6 @@ Asa Voucher là nền tảng thương mại điện tử chuyên bán **voucher 
 | Frontend | Next.js 14+, React, TypeScript, Tailwind CSS |
 | Backend | Node.js, Express.js, TypeScript |
 | Database | Supabase PostgreSQL |
-| Auth | Supabase Auth / JWT |
-| Storage | Supabase Storage |
 
 ---
 
@@ -20,9 +18,10 @@ Asa Voucher là nền tảng thương mại điện tử chuyên bán **voucher 
 
 | Vai trò | Mô tả |
 |---|---|
-| `customer` | Khách hàng mua voucher |
-| `partner_manager` | Nhân viên quản lý của đối tác |
-| `partner_staff` | Nhân viên cửa hàng xác thực voucher |
+| `buyer` | Khách hàng mua voucher |
+| `partner_owner` | Chủ sở hữu đối tác |
+| `partner_voucher_staff` | Nhân viên đối tác tạo/quản lý voucher |
+| `partner_store_staff` | Nhân viên cửa hàng xác thực voucher |
 | `admin_content` | Quản trị nội dung và duyệt voucher |
 | `admin_account` | Quản trị tài khoản và đối tác |
 | `admin_security` | Quản trị log và bảo mật |
