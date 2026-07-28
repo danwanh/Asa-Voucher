@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { createCategory, deleteCategory, getCategory, listCategories, updateCategory } from "../controllers/category.controller.js";
 import { requireAuth } from "../middlewares/auth.js";
-import { requireRole } from "../middlewares/rbac.js";
+import { requireRole } from "../middlewares/require-role.js";
 import { validateBody, validateParams } from "../middlewares/validate.js";
 import { asyncHandler } from "../utils/async-handler.js";
 import { createCategorySchema, updateCategorySchema } from "../validations/category.validation.js";

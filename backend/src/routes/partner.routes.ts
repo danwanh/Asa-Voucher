@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { createBranch, createPartner, deleteBranch, deletePartner, getBranchController, getPartnerController, listBranches, listPartners, updateBranch, updatePartner, updatePartnerApproval, updatePartnerStatus } from "../controllers/partner.controller.js";
 import { requireAuth } from "../middlewares/auth.js";
-import { requireRole } from "../middlewares/rbac.js";
+import { requireRole } from "../middlewares/require-role.js";
 import { validateBody, validateParams, validateQuery } from "../middlewares/validate.js";
 import { asyncHandler } from "../utils/async-handler.js";
 import { idParamSchema, partnerIdParamSchema } from "../validations/common.validation.js";

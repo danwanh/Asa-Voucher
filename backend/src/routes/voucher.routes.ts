@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { approveVoucherProduct, createVoucherBranch, createVoucherImage, createVoucherProduct, deleteVoucherBranch, deleteVoucherImage, deleteVoucherProduct, getVoucherProduct, listVoucherBranches, listVoucherImages, listVoucherProducts, submitVoucherProduct, updateVoucherImage, updateVoucherProduct, updateVoucherStatus } from "../controllers/voucher-product.controller.js";
 import { optionalAuth, requireAuth } from "../middlewares/auth.js";
-import { requireRole } from "../middlewares/rbac.js";
+import { requireRole } from "../middlewares/require-role.js";
 import { validateBody, validateParams, validateQuery } from "../middlewares/validate.js";
 import { asyncHandler } from "../utils/async-handler.js";
 import { branchMappingParamSchema, idParamSchema, imageIdParamSchema } from "../validations/common.validation.js";

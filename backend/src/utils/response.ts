@@ -11,3 +11,7 @@ export function sendCreated<T>(res: Response, data: T, message = "Created") {
 export function sendNoContent(res: Response) {
   res.status(204).send();
 }
+
+export const ok = sendSuccess;
+export const created = sendCreated;
+export const noContent = sendNoContent;

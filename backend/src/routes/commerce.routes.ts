@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { addCartItem, cancelOrder, checkout, clearCart, createOrder, createPayment, deleteCartItem, deleteOrder, getCart, getOrderController, getOrderItem, getPaymentController, listOrderItems, listOrders, listPayments, simulatePaymentFailed, simulatePaymentSuccess, updateCartItem, updateOrder } from "../controllers/commerce.controller.js";
 import { requireAuth } from "../middlewares/auth.js";
-import { requireRole } from "../middlewares/rbac.js";
+import { requireRole } from "../middlewares/require-role.js";
 import { validateBody, validateParams } from "../middlewares/validate.js";
 import { asyncHandler } from "../utils/async-handler.js";
 import { checkoutSchema, createOrderSchema, createPaymentSchema, cartItemSchema, updateCartItemSchema, updateOrderSchema } from "../validations/commerce.validation.js";
