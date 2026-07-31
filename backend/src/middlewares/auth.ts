@@ -17,7 +17,7 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
     const user = requireData(
       await prisma.user.findUnique({
         where: { id: payload.user_id },
-        select: { id: true, email: true, role: true, is_active: true, partner_branches_id: true }
+        select: { id: true, email: true, full_name: true, role: true, is_active: true, partner_branches_id: true }
       }),
       "User not found"
     );
@@ -51,6 +51,7 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
     req.user = {
       id: user.id,
       email: user.email,
+      name: user.full_name,
       role: user.role as never,
       partnerId,
       branchId: user.partner_branches_id ?? undefined

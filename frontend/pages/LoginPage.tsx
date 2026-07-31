@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react"
-import { AlertCircle, Eye, EyeOff, Building2, User as UserIcon } from "lucide-react"
+import { AlertCircle, Eye, EyeOff, Building2, User as UserIcon, Loader2 } from "lucide-react"
 import { C } from "@/utils/constants"
 import type { AppUser, Role } from "@/types"
+import { useAuthStore } from "@/stores/authStore"
 
 type AuthPage = "login" | "register" | "forgot"
 
@@ -32,8 +33,6 @@ const ADMIN_ACCOUNTS: DemoAccount[] = [
   { label: "👤 Admin Tài khoản", email: "admin-account@asa.vn",  hint: "Người dùng & đối tác",     role: "admin_account", color: "#3D405B" },
   { label: "🔐 Admin Bảo mật",  email: "admin-security@asa.vn", hint: "Nhật ký & phân quyền",     role: "admin_security", color: "#E07A5F" },
 ]
-
-const ALL_ACCOUNTS = [...USER_ACCOUNTS, ...ADMIN_ACCOUNTS]
 
 function LeftPanel() {
   return (
@@ -74,10 +73,12 @@ function LoginForm({ onLogin, onNavigate }: { onLogin: (u: AppUser) => void; onN
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPw, setShowPw] = useState(false)
-  const [remember, setRemember] = useState(false)
   const [emailErr, setEmailErr] = useState("")
   const [pwErr, setPwErr] = useState("")
   const [generalErr, setGeneralErr] = useState("")
+
+  const storeLogin = useAuthStore((s) => s.login)
+  const isLoading = useAuthStore((s) => s.isLoading)
 
   const selectDemo = (a: DemoAccount) => {
     setEmail(a.email)
@@ -95,17 +96,15 @@ function LoginForm({ onLogin, onNavigate }: { onLogin: (u: AppUser) => void; onN
     return ok
   }
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (!validate()) return
-    const found = ALL_ACCOUNTS.find((a) => a.email === email)
-    if (found && password === "123456") {
-      const extras: Partial<AppUser> = {}
-      if (found.role === "partner_owner")         extras.partnerId = "p1"
-      if (found.role === "partner_store_staff")   { extras.partnerId = "p1"; extras.branchId = "b1" }
-      if (found.role === "partner_voucher_staff") { extras.partnerId = "p1" }
-      onLogin({ id: found.role + "-1", name: found.hint, email: found.email, role: found.role, ...extras })
-    } else {
-      setGeneralErr("Email hoặc mật khẩu không đúng. Mật khẩu demo: 123456")
+    try {
+      await storeLogin(email, password)
+      const user = useAuthStore.getState().user
+      if (user) onLogin(user)
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { error?: { message?: string } } } }
+      setGeneralErr(err?.response?.data?.error?.message ?? "Đăng nhập thất bại")
     }
   }
 
@@ -137,12 +136,10 @@ function LoginForm({ onLogin, onNavigate }: { onLogin: (u: AppUser) => void; onN
       <h2 className="text-2xl font-black mb-1" style={{ color: C.indigo }}>Đăng nhập</h2>
       <p className="text-sm mb-4" style={{ color: "#8A8DA8" }}>Chọn tài khoản demo để trải nghiệm nhanh</p>
 
-      {/* User accounts: 2×2 grid */}
       <div className="grid grid-cols-2 gap-2 mb-2">
         {USER_ACCOUNTS.map(DemoBtn)}
       </div>
 
-      {/* Admin accounts — visually grouped */}
       <div className="mb-5">
         <div className="flex items-center gap-2 mb-2">
           <div className="flex-1 h-px" style={{ backgroundColor: "#E2DFC8" }} />
@@ -176,6 +173,7 @@ function LoginForm({ onLogin, onNavigate }: { onLogin: (u: AppUser) => void; onN
             placeholder="email@domain.vn"
             value={email}
             onChange={(e) => { setEmail(e.target.value); setEmailErr("") }}
+            disabled={isLoading}
           />
           {emailErr && <p className="text-xs mt-1" style={{ color: C.peach }}>{emailErr}</p>}
         </div>
@@ -190,6 +188,7 @@ function LoginForm({ onLogin, onNavigate }: { onLogin: (u: AppUser) => void; onN
               value={password}
               onChange={(e) => { setPassword(e.target.value); setPwErr("") }}
               onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+              disabled={isLoading}
             />
             <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 p-1" style={{ color: "#8A8DA8" }} onClick={() => setShowPw(!showPw)}>
               {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -200,10 +199,7 @@ function LoginForm({ onLogin, onNavigate }: { onLogin: (u: AppUser) => void; onN
       </div>
 
       <div className="flex items-center justify-between mt-3">
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="rounded" />
-          <span className="text-sm" style={{ color: C.indigo }}>Ghi nhớ đăng nhập</span>
-        </label>
+        <div />
         <button className="text-sm font-semibold transition-opacity hover:opacity-70" style={{ color: C.peach }} onClick={() => onNavigate("forgot")}>
           Quên mật khẩu?
         </button>
@@ -215,8 +211,13 @@ function LoginForm({ onLogin, onNavigate }: { onLogin: (u: AppUser) => void; onN
         </div>
       )}
 
-      <button onClick={handleLogin} className="mt-6 w-full py-3.5 rounded-2xl font-bold text-white transition-all hover:opacity-90 active:scale-95" style={{ backgroundColor: C.peach }}>
-        Đăng nhập
+      <button
+        onClick={handleLogin}
+        disabled={isLoading}
+        className="mt-6 w-full py-3.5 rounded-2xl font-bold text-white transition-all hover:opacity-90 active:scale-95 disabled:opacity-60 flex items-center justify-center gap-2"
+        style={{ backgroundColor: C.peach }}
+      >
+        {isLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Đang đăng nhập...</> : "Đăng nhập"}
       </button>
 
       <p className="text-center text-sm mt-6" style={{ color: "#8A8DA8" }}>
@@ -229,7 +230,7 @@ function LoginForm({ onLogin, onNavigate }: { onLogin: (u: AppUser) => void; onN
   )
 }
 
-type RegStep = "role" | "form" | "otp" | "partner-pending"
+type RegStep = "role" | "form" | "success" | "partner-pending"
 
 function RegisterForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
   const [step, setStep] = useState<RegStep>("role")
@@ -241,32 +242,10 @@ function RegisterForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [showPw, setShowPw] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
+  const [generalErr, setGeneralErr] = useState("")
 
-  // OTP state
-  const [otp, setOtp] = useState("")
-  const [otpError, setOtpError] = useState("")
-  const [timeLeft, setTimeLeft] = useState(300)
-  const [expired, setExpired] = useState(false)
-  const [resendTick, setResendTick] = useState(0)
-  const MOCK_OTP = "123456"
-
-  useEffect(() => {
-    if (step !== "otp") return
-    setTimeLeft(300)
-    setExpired(false)
-    const id = setInterval(() => {
-      setTimeLeft((t) => {
-        if (t <= 1) { clearInterval(id); setExpired(true); return 0 }
-        return t - 1
-      })
-    }, 1000)
-    return () => clearInterval(id)
-  }, [step, resendTick])
-
-  const fmtTime = (s: number) =>
-    `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`
-
-  const EXISTING_EMAILS = ALL_ACCOUNTS.map((a) => a.email)
+  const storeRegister = useAuthStore((s) => s.register)
+  const isLoading = useAuthStore((s) => s.isLoading)
 
   const set = (k: string, v: string | boolean) => {
     setForm((f) => ({ ...f, [k]: v }))
@@ -277,7 +256,6 @@ function RegisterForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
     const errs: Record<string, string> = {}
     if (!form.name.trim()) errs.name = "Vui lòng nhập họ tên"
     if (!form.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = "Email không hợp lệ"
-    else if (EXISTING_EMAILS.includes(form.email)) errs.email = "Email này đã được đăng ký"
     if (!form.phone || !/^(0|\+84)[0-9]{8,9}$/.test(form.phone.replace(/\s/g, ""))) errs.phone = "Số điện thoại không hợp lệ"
     if (form.password.length < 8) errs.password = "Mật khẩu tối thiểu 8 ký tự"
     if (form.password !== form.confirm) errs.confirm = "Mật khẩu xác nhận không khớp"
@@ -290,31 +268,30 @@ function RegisterForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
     return Object.keys(errs).length === 0
   }
 
-  const handleFormSubmit = () => {
+  const handleFormSubmit = async () => {
     if (!validateForm()) return
-    setOtp(""); setOtpError("")
-    setStep("otp")
-  }
-
-  const handleOtpVerify = () => {
-    if (expired) { setOtpError("Mã OTP đã hết hạn. Vui lòng yêu cầu mã mới."); return }
-    if (otp !== MOCK_OTP) { setOtpError("Mã OTP không đúng. Vui lòng nhập lại."); return }
-    if (regRole === "customer") {
-      onNavigate("login")
-    } else {
-      setStep("partner-pending")
+    setGeneralErr("")
+    try {
+      await storeRegister({
+        email: form.email,
+        password: form.password,
+        full_name: form.name,
+        phone: form.phone
+      })
+      if (regRole === "customer") {
+        setStep("success")
+      } else {
+        setStep("partner-pending")
+      }
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { error?: { message?: string } } } }
+      setGeneralErr(err?.response?.data?.error?.message ?? "Đăng ký thất bại")
     }
-  }
-
-  const handleResend = () => {
-    setOtp(""); setOtpError("")
-    setResendTick((n) => n + 1)
   }
 
   const inputCls = "w-full px-4 py-3 rounded-2xl border text-sm outline-none"
   const inputStyle = { backgroundColor: "white", fontFamily: "'Inter', sans-serif" }
 
-  // ── Step: Role selection ──────────────────────────────────────────────────
   if (step === "role") {
     return (
       <div className="w-full max-w-md">
@@ -347,75 +324,28 @@ function RegisterForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
     )
   }
 
-  // ── Step: OTP ─────────────────────────────────────────────────────────────
-  if (step === "otp") {
+  if (step === "success") {
     return (
-      <div className="w-full max-w-md">
-        <button onClick={() => setStep("form")} className="flex items-center gap-1 text-sm font-semibold mb-6 hover:underline" style={{ color: C.indigo }}>
-          ← Quay lại
-        </button>
-        <div className="text-center mb-6">
-          <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl mx-auto mb-4" style={{ backgroundColor: C.teal + "25" }}>📱</div>
-          <h2 className="text-2xl font-black mb-1" style={{ color: C.indigo }}>Xác minh OTP</h2>
-          <p className="text-sm" style={{ color: "#8A8DA8" }}>
-            Mã xác minh đã gửi đến <strong>{form.email}</strong>
-          </p>
-          <p className="text-xs mt-1 px-3 py-1 rounded-full inline-block" style={{ backgroundColor: C.apricot + "25", color: "#7C5E10" }}>
-            Demo: nhập <strong>123456</strong>
-          </p>
-        </div>
-
-        <div className="mb-4">
-          <label className="text-sm font-bold block mb-2" style={{ color: C.indigo }}>Mã OTP (6 chữ số)</label>
-          <input
-            className={inputCls + " text-center text-2xl font-black"}
-            style={{ ...inputStyle, borderColor: otpError ? C.peach : "#E2DFC8", letterSpacing: "0.4em" }}
-            maxLength={6}
-            placeholder="------"
-            value={otp}
-            onChange={(e) => { setOtp(e.target.value.replace(/\D/g, "")); setOtpError("") }}
-          />
-          {otpError && (
-            <div className="mt-2 p-2.5 rounded-xl flex items-center gap-2 text-xs" style={{ backgroundColor: "#FCEAEA", color: "#C0392B" }}>
-              <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {otpError}
-            </div>
-          )}
-        </div>
-
-        <div className="text-center mb-5">
-          {!expired ? (
-            <span className="text-sm" style={{ color: "#8A8DA8" }}>
-              Mã hết hạn sau:{" "}
-              <strong style={{ color: timeLeft < 60 ? C.peach : C.indigo }}>{fmtTime(timeLeft)}</strong>
-            </span>
-          ) : (
-            <div className="p-2 rounded-xl text-xs font-semibold" style={{ backgroundColor: "#FCEAEA", color: "#C0392B" }}>
-              Mã OTP đã hết hạn
-            </div>
-          )}
-        </div>
-
+      <div className="w-full max-w-md text-center">
+        <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl mx-auto mb-6" style={{ backgroundColor: C.teal + "20" }}>✅</div>
+        <h2 className="text-2xl font-black mb-2" style={{ color: C.indigo }}>Đăng ký thành công</h2>
+        <p className="mb-2" style={{ color: "#8A8DA8" }}>
+          Tài khoản <strong>{form.email}</strong> đã được tạo thành công.
+        </p>
+        <p className="mb-6 text-sm" style={{ color: "#8A8DA8" }}>
+          Vui lòng đăng nhập để tiếp tục.
+        </p>
         <button
-          onClick={handleOtpVerify}
-          disabled={otp.length !== 6}
-          className="w-full py-3.5 rounded-2xl font-bold text-white mb-3 transition-all hover:opacity-90"
-          style={{ backgroundColor: otp.length === 6 ? C.peach : "#D1D5DB" }}
+          onClick={() => onNavigate("login")}
+          className="w-full py-3.5 rounded-2xl font-bold text-white hover:opacity-90 transition-all"
+          style={{ backgroundColor: C.peach }}
         >
-          Xác minh OTP
-        </button>
-
-        <button
-          onClick={handleResend}
-          className="w-full py-3 rounded-2xl font-bold text-sm border transition-all hover:bg-muted"
-          style={{ borderColor: "#E2DFC8", color: C.indigo }}
-        >
-          Gửi lại mã OTP
+          Đăng nhập ngay
         </button>
       </div>
     )
   }
 
-  // ── Step: Partner Pending Approval ────────────────────────────────────────
   if (step === "partner-pending") {
     return (
       <div className="w-full max-w-md text-center">
@@ -444,7 +374,6 @@ function RegisterForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
     )
   }
 
-  // ── Step: Registration Form ───────────────────────────────────────────────
   return (
     <div className="w-full max-w-md">
       <button onClick={() => setStep("role")} className="flex items-center gap-1 text-sm font-semibold mb-4 hover:underline" style={{ color: C.indigo }}>
@@ -547,12 +476,19 @@ function RegisterForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
         </div>
       </div>
 
+      {generalErr && (
+        <div className="mt-3 p-3 rounded-2xl text-sm flex items-center gap-2" style={{ backgroundColor: "#FCEAEA", color: "#C0392B" }}>
+          <AlertCircle className="w-4 h-4 shrink-0" />{generalErr}
+        </div>
+      )}
+
       <button
         onClick={handleFormSubmit}
-        className="mt-5 w-full py-3.5 rounded-2xl font-bold text-white hover:opacity-90 active:scale-95 transition-all"
+        disabled={isLoading}
+        className="mt-5 w-full py-3.5 rounded-2xl font-bold text-white hover:opacity-90 active:scale-95 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
         style={{ backgroundColor: C.peach }}
       >
-        Tiếp tục → Xác minh OTP
+        {isLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Đang xử lý...</> : "Đăng ký"}
       </button>
       <p className="text-center text-sm mt-5" style={{ color: "#8A8DA8" }}>
         Đã có tài khoản?{" "}

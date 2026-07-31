@@ -10,6 +10,7 @@ export type AppRole =
 export interface AuthUser {
   id: string;
   email: string;
+  name?: string | null;
   role: AppRole;
   /** Đối tác trực thuộc: dùng cho partner_owner, partner_voucher_staff */
   partnerId?: string | null;
