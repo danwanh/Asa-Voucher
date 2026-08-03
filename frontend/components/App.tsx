@@ -12,6 +12,22 @@ import { AdminApp } from "@/routes/AdminApp"
 import { useCart } from "@/hooks/useCart"
 import { useAuthStore } from "@/stores/authStore"
 import type { AppUser } from "@/types"
+import { toast } from "sonner"
+
+function LogoutConfirmDialog({ onCancel, onConfirm }: { onCancel: () => void; onConfirm: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="presentation">
+      <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="logout-dialog-title">
+        <h2 id="logout-dialog-title" className="text-lg font-black" style={{ color: "#3D405B" }}>Đăng xuất?</h2>
+        <p className="mt-2 text-sm" style={{ color: "#8A8DA8" }}>Bạn có chắc muốn đăng xuất khỏi tài khoản không?</p>
+        <div className="mt-6 flex gap-3">
+          <button onClick={onCancel} className="flex-1 rounded-2xl border-2 py-3 font-bold" style={{ borderColor: "#E2DFC8", color: "#3D405B" }}>Hủy</button>
+          <button onClick={onConfirm} className="flex-1 rounded-2xl py-3 font-bold text-white" style={{ backgroundColor: "#E07A5F" }}>Đăng xuất</button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function App() {
   const user = useAuthStore((s) => s.user)
@@ -22,6 +38,7 @@ export default function App() {
 
   const [showLogin, setShowLogin] = useState(false)
   const [pendingCheckout, setPendingCheckout] = useState(false)
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
   const { cart, add, remove, update, clear, total, count } = useCart()
 
@@ -46,15 +63,24 @@ export default function App() {
     setPendingCheckout(false)
   }
 
-  const handleLogout = async () => {
-    if (!window.confirm("Bạn có chắc muốn đăng xuất không?")) return
+  const handleLogout = () => setShowLogoutConfirm(true)
+
+  const confirmLogout = async () => {
+    setShowLogoutConfirm(false)
     try {
       await logout()
       clear()
     } catch {
-      window.alert("Đăng xuất thất bại. Vui lòng thử lại.")
+      toast.error("Đăng xuất thất bại. Vui lòng thử lại.")
     }
   }
+
+  const withLogoutDialog = (content: React.ReactNode) => (
+    <>
+      {content}
+      {showLogoutConfirm && <LogoutConfirmDialog onCancel={() => setShowLogoutConfirm(false)} onConfirm={confirmLogout} />}
+    </>
+  )
 
   if (!isInitialized) {
     return (
@@ -81,7 +107,7 @@ export default function App() {
     />
   )
 
-  if (user.role === "buyer") return (
+  if (user.role === "buyer") return withLogoutDialog(
     <CustomerApp
       user={user}
       onLogout={handleLogout}
@@ -97,10 +123,10 @@ export default function App() {
     />
   )
 
-  if (user.role === "partner_owner")         return <PartnerApp user={user} onLogout={handleLogout} />
-  if (user.role === "partner_voucher_staff") return <VoucherStaffApp user={user} onLogout={handleLogout} />
-  if (user.role === "partner_store_staff")   return <StaffApp user={user} onLogout={handleLogout} />
+  if (user.role === "partner_owner")         return withLogoutDialog(<PartnerApp user={user} onLogout={handleLogout} />)
+  if (user.role === "partner_voucher_staff") return withLogoutDialog(<VoucherStaffApp user={user} onLogout={handleLogout} />)
+  if (user.role === "partner_store_staff")   return withLogoutDialog(<StaffApp user={user} onLogout={handleLogout} />)
   if (user.role === "admin_content" || user.role === "admin_operations" || user.role === "admin_security")
-    return <AdminApp user={user} onLogout={handleLogout} />
+    return withLogoutDialog(<AdminApp user={user} onLogout={handleLogout} />)
   return null
 }
