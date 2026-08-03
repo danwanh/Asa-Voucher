@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { LogOut, Menu, X, ChevronRight, ArrowLeft, Tag } from "lucide-react"
 import { C } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
@@ -34,6 +35,7 @@ interface Props {
 
 export function SubAdminLayout({ user, role, page, navItems, onNavigate, onLogout, onSwitchRole, children }: Props) {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const router = useRouter()
 
   const pageLabel = navItems.find((n) => n.pg === page)?.label ?? "—"
 
@@ -79,7 +81,7 @@ export function SubAdminLayout({ user, role, page, navItems, onNavigate, onLogou
           return (
             <button
               key={n.pg}
-              onClick={() => { onNavigate(n.pg); setMobileOpen(false) }}
+              onClick={() => { n.pg === "profile" ? router.push(`/${user.role}/profile`) : onNavigate(n.pg); setMobileOpen(false) }}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-left transition-all"
               style={{
                 backgroundColor: active ? role.accent : "transparent",

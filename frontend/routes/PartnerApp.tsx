@@ -10,6 +10,7 @@ import { PartnerRevenuePage } from "@/pages/partner/PartnerRevenuePage"
 import { BranchManagementPage } from "@/pages/partner/BranchManagementPage"
 import { StaffManagementPage } from "@/pages/partner/StaffManagementPage"
 import { BusinessProfilePage } from "@/pages/partner/BusinessProfilePage"
+import { PersonalProfilePage } from "@/components/PersonalProfilePage"
 import { PartnerSettingsPage } from "@/pages/partner/PartnerSettingsPage"
 import { C } from "@/utils/constants"
 import type { AppUser, Voucher } from "@/types"
@@ -17,10 +18,11 @@ import type { AppUser, Voucher } from "@/types"
 interface Props {
   user: AppUser
   onLogout: () => void
+  initialPage?: "profile"
 }
 
-export function PartnerApp({ user, onLogout }: Props) {
-  const [page, setPage] = useState<PartnerPage>("dashboard")
+export function PartnerApp({ user, onLogout, initialPage }: Props) {
+  const [page, setPage] = useState<PartnerPage>(initialPage ?? "dashboard")
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null)
   // Drafts created in this session (cleared on logout); persists across page nav within the session
   const [sessionDrafts, setSessionDrafts] = useState<Voucher[]>([])
@@ -79,7 +81,12 @@ export function PartnerApp({ user, onLogout }: Props) {
       {page === "revenue" && <PartnerRevenuePage />}
       {page === "branches" && <BranchManagementPage />}
       {page === "staff" && <StaffManagementPage />}
-      {page === "profile" && <BusinessProfilePage />}
+      {page === "profile" && (
+        <>
+          <BusinessProfilePage />
+          <PersonalProfilePage user={user} onLogout={onLogout} />
+        </>
+      )}
       {page === "notifications" && (
         <div className="p-6 max-w-xl mx-auto">
           <h1 className="text-2xl font-black mb-4" style={{ color: C.indigo, fontFamily: "'Nunito', sans-serif" }}>Thông báo</h1>

@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { ShoppingCart, Search, Menu, Home, Tag, Package, User, Bell, Grid3x3, LogOut } from "lucide-react"
 import { C } from "@/utils/constants"
 import type { AppUser } from "@/types"
@@ -37,6 +38,7 @@ const MOBILE_NAV: { label: string; pg: CustomerPage; icon: React.ReactNode }[] =
 
 export function CustomerLayout({ user, page, cartCount, notifCount = 0, onNavigate, onLogout, children }: Props) {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const router = useRouter()
 
   return (
     <div className="min-h-screen pb-16 md:pb-0" style={{ backgroundColor: C.content, fontFamily: "'Nunito', sans-serif" }}>
@@ -70,7 +72,7 @@ export function CustomerLayout({ user, page, cartCount, notifCount = 0, onNaviga
             {DESKTOP_NAV.map((n) => (
               <button
                 key={n.pg}
-                onClick={() => onNavigate(n.pg)}
+                onClick={() => n.pg === "profile" ? router.push(`/${user.role}/profile`) : onNavigate(n.pg)}
                 className="px-3 py-2 rounded-xl text-sm font-semibold flex items-center gap-1.5 transition-colors"
                 style={{
                   color: page === n.pg ? C.apricot : "rgba(244,241,222,0.75)",
@@ -127,7 +129,7 @@ export function CustomerLayout({ user, page, cartCount, notifCount = 0, onNaviga
             {DESKTOP_NAV.map((n) => (
               <button
                 key={n.pg}
-                onClick={() => { onNavigate(n.pg); setMobileOpen(false) }}
+                onClick={() => { n.pg === "profile" ? router.push(`/${user.role}/profile`) : onNavigate(n.pg); setMobileOpen(false) }}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold"
                 style={{ backgroundColor: page === n.pg ? C.peach : "rgba(255,255,255,0.1)", color: "white" }}
               >
@@ -156,7 +158,7 @@ export function CustomerLayout({ user, page, cartCount, notifCount = 0, onNaviga
           return (
             <button
               key={n.pg}
-              onClick={() => onNavigate(n.pg)}
+              onClick={() => n.pg === "profile" ? router.push(`/${user.role}/profile`) : onNavigate(n.pg)}
               className="flex flex-col items-center gap-0.5 px-3 py-2 relative"
               style={{ color: isActive ? C.peach : "#8A8DA8" }}
             >

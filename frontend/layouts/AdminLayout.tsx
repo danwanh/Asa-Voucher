@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Home, Users, Store, Package, FileText, LogOut, Menu, BadgeCheck, Grid3x3, MessageSquare, BarChart2, ChevronRight } from "lucide-react"
 import { C } from "@/utils/constants"
 import type { AppUser } from "@/types"
@@ -24,6 +25,7 @@ interface Props {
 }
 
 function SidebarContent({ user, page, pendingVouchers, onNavigate, onLogout, onClose }: Props & { onClose?: () => void }) {
+  const router = useRouter()
   const navItems: NavItem[] = [
     { label: "Tổng quan", pg: "dashboard", icon: <Home className="w-4 h-4" /> },
     { label: "Người dùng", pg: "users", icon: <Users className="w-4 h-4" /> },
@@ -61,7 +63,7 @@ function SidebarContent({ user, page, pendingVouchers, onNavigate, onLogout, onC
         {navItems.map((n) => (
           <button
             key={n.pg}
-            onClick={() => { onNavigate(n.pg); onClose?.() }}
+            onClick={() => { n.pg === "profile" ? router.push(`/${user.role}/profile`) : onNavigate(n.pg); onClose?.() }}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-left transition-all"
             style={{ backgroundColor: page === n.pg ? C.peach : "transparent", color: page === n.pg ? "white" : "rgba(244,241,222,0.7)" }}
           >

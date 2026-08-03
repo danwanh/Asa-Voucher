@@ -29,7 +29,7 @@ function LogoutConfirmDialog({ onCancel, onConfirm }: { onCancel: () => void; on
   )
 }
 
-export default function App() {
+export default function App({ initialPage }: { initialPage?: "profile" } = {}) {
   const user = useAuthStore((s) => s.user)
   const isInitialized = useAuthStore((s) => s.isInitialized)
   const initialize = useAuthStore((s) => s.initialize)
@@ -90,7 +90,7 @@ export default function App() {
     )
   }
 
-  if (!user && !showLogin) return (
+  if (!user && !showLogin && !initialPage) return (
     <GuestApp
       onLogin={handleRequestLogin}
       onRegister={handleRequestRegister}
@@ -118,15 +118,15 @@ export default function App() {
       remove={remove}
       update={update}
       clear={clear}
-      initialPage={pendingCheckout ? "create-order" : undefined}
+       initialPage={pendingCheckout ? "create-order" : initialPage}
       onInitialPageConsumed={() => setPendingCheckout(false)}
     />
   )
 
-  if (user.role === "partner_owner")         return withLogoutDialog(<PartnerApp user={user} onLogout={handleLogout} />)
-  if (user.role === "partner_voucher_staff") return withLogoutDialog(<VoucherStaffApp user={user} onLogout={handleLogout} />)
-  if (user.role === "partner_store_staff")   return withLogoutDialog(<StaffApp user={user} onLogout={handleLogout} />)
+  if (user.role === "partner_owner")         return withLogoutDialog(<PartnerApp user={user} onLogout={handleLogout} initialPage={initialPage} />)
+  if (user.role === "partner_voucher_staff") return withLogoutDialog(<VoucherStaffApp user={user} onLogout={handleLogout} initialPage={initialPage} />)
+  if (user.role === "partner_store_staff")   return withLogoutDialog(<StaffApp user={user} onLogout={handleLogout} initialPage={initialPage} />)
   if (user.role === "admin_content" || user.role === "admin_operations" || user.role === "admin_security")
-    return withLogoutDialog(<AdminApp user={user} onLogout={handleLogout} />)
+    return withLogoutDialog(<AdminApp user={user} onLogout={handleLogout} initialPage={initialPage} />)
   return null
 }

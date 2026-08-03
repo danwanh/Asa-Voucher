@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { CheckCircle, Camera, Eye, EyeOff, AlertCircle, ClipboardList, Clock, BadgeCheck } from "lucide-react"
+import { CheckCircle, Camera, ClipboardList, Clock, BadgeCheck } from "lucide-react"
 import { C } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 
@@ -31,25 +31,8 @@ export function BusinessProfilePage() {
   })
   const [onboardErrors, setOnboardErrors] = useState<Record<string, string>>({})
 
-  const [oldPw, setOldPw] = useState("")
-  const [newPw, setNewPw] = useState("")
-  const [confirmPw, setConfirmPw] = useState("")
-  const [showOld, setShowOld] = useState(false)
-  const [showNew, setShowNew] = useState(false)
-  const [pwError, setPwError] = useState("")
-  const [pwSaved, setPwSaved] = useState(false)
-
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }))
   const saveProfile = () => { setSaved(true); setTimeout(() => setSaved(false), 2000) }
-
-  const changePassword = () => {
-    setPwError("")
-    if (!oldPw) { setPwError("Vui lòng nhập mật khẩu hiện tại"); return }
-    if (newPw.length < 8) { setPwError("Mật khẩu mới tối thiểu 8 ký tự"); return }
-    if (newPw !== confirmPw) { setPwError("Mật khẩu xác nhận không khớp"); return }
-    setPwSaved(true); setOldPw(""); setNewPw(""); setConfirmPw("")
-    setTimeout(() => setPwSaved(false), 2000)
-  }
 
   const validateOnboard = () => {
     const errs: Record<string, string> = {}
@@ -235,41 +218,6 @@ export function BusinessProfilePage() {
             </button>
           </div>
 
-          <div className="bg-white rounded-2xl p-6 shadow-sm">
-            <h2 className="text-lg font-black mb-5" style={{ color: C.indigo }}>Đổi mật khẩu</h2>
-            <div className="space-y-4">
-              {[
-                { label: "Mật khẩu hiện tại", val: oldPw, set: setOldPw, show: showOld, toggle: () => setShowOld(!showOld) },
-                { label: "Mật khẩu mới", val: newPw, set: setNewPw, show: showNew, toggle: () => setShowNew(!showNew) },
-                { label: "Xác nhận mật khẩu", val: confirmPw, set: setConfirmPw, show: false, toggle: () => {} },
-              ].map((f) => (
-                <div key={f.label}>
-                  <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>{f.label}</label>
-                  <div className="relative">
-                    <input type={f.show ? "text" : "password"} className={inputCls + " pr-11"} style={inputStyle} value={f.val} onChange={(e) => f.set(e.target.value)} placeholder="••••••••" />
-                    {f.label !== "Xác nhận mật khẩu" && (
-                      <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 p-1" style={{ color: "#8A8DA8" }} onClick={f.toggle}>
-                        {f.show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-            {pwError && (
-              <div className="mt-4 p-3 rounded-xl flex items-center gap-2 text-sm" style={{ backgroundColor: "#FCEAEA", color: "#C0392B" }}>
-                <AlertCircle className="w-4 h-4" /> {pwError}
-              </div>
-            )}
-            {pwSaved && (
-              <div className="mt-4 p-3 rounded-xl flex items-center gap-2 text-sm" style={{ backgroundColor: C.teal + "20", color: "#2D7A52" }}>
-                <CheckCircle className="w-4 h-4" /> Đổi mật khẩu thành công
-              </div>
-            )}
-            <button onClick={changePassword} className="mt-6 w-full py-3 rounded-xl font-bold text-white" style={{ backgroundColor: C.indigo }}>
-              Cập nhật mật khẩu
-            </button>
-          </div>
         </>
       )}
     </div>

@@ -11,10 +11,11 @@ import type { AppUser } from "@/types"
 interface Props {
   user: AppUser
   onLogout: () => void
+  initialPage?: "profile"
 }
 
-export function StaffApp({ user, onLogout }: Props) {
-  const [page, setPage] = useState<StaffPage>("dashboard")
+export function StaffApp({ user, onLogout, initialPage }: Props) {
+  const [page, setPage] = useState<StaffPage>(initialPage ?? "dashboard")
   const [pendingCode, setPendingCode] = useState("")
 
   const handleQRFound = (code: string) => {

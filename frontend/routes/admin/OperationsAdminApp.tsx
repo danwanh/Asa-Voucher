@@ -28,10 +28,10 @@ const NAV: SubAdminNavItem[] = [
   { label: "Hồ sơ",        pg: "profile",   icon: <User className="w-4 h-4" /> },
 ]
 
-interface Props { user: AppUser; onLogout: () => void; onSwitchRole: () => void }
+interface Props { user: AppUser; onLogout: () => void; onSwitchRole: () => void; initialPage?: "profile" }
 
-export function OperationsAdminApp({ user, onLogout, onSwitchRole }: Props) {
-  const [page, setPage] = useState<Page>("dashboard")
+export function OperationsAdminApp({ user, onLogout, onSwitchRole, initialPage }: Props) {
+  const [page, setPage] = useState<Page>(initialPage ?? "dashboard")
 
   return (
     <SubAdminLayout user={user} role={ROLE} page={page} navItems={NAV}

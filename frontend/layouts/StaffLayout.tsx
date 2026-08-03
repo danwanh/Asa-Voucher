@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Home, QrCode, History, User, LogOut, Menu, ChevronRight, Scan, Bell } from "lucide-react"
 import { C } from "@/utils/constants"
 import type { AppUser } from "@/types"
@@ -23,6 +24,7 @@ interface Props {
 }
 
 function SidebarContent({ user, page, onNavigate, onLogout, onClose }: Props & { onClose?: () => void }) {
+  const router = useRouter()
   return (
     <div className="flex flex-col h-full">
       <div className="p-5 border-b" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
@@ -48,7 +50,7 @@ function SidebarContent({ user, page, onNavigate, onLogout, onClose }: Props & {
         {NAV_ITEMS.map((n) => (
           <button
             key={n.pg}
-            onClick={() => { onNavigate(n.pg); onClose?.() }}
+            onClick={() => { n.pg === "profile" ? router.push(`/${user.role}/profile`) : onNavigate(n.pg); onClose?.() }}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-left transition-all"
             style={{
               backgroundColor: page === n.pg ? C.apricot : "transparent",

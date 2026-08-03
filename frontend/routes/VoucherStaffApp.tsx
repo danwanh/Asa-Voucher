@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Tag, PlusCircle, BarChart2, User, LogOut, Menu, ChevronRight } from "lucide-react"
 import { C } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
@@ -15,6 +16,7 @@ type Page = "vouchers" | "create" | "edit" | "voucher-detail" | "reports" | "pro
 interface Props {
   user: AppUser
   onLogout: () => void
+  initialPage?: "profile"
 }
 
 const NAV = [
@@ -33,8 +35,9 @@ const PAGE_LABELS: Record<Page, string> = {
   profile: "Hồ sơ cá nhân",
 }
 
-export function VoucherStaffApp({ user, onLogout }: Props) {
-  const [page, setPage] = useState<Page>("vouchers")
+export function VoucherStaffApp({ user, onLogout, initialPage }: Props) {
+  const router = useRouter()
+  const [page, setPage] = useState<Page>(initialPage ?? "vouchers")
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null)
   const [mobileOpen, setMobileOpen] = useState(false)
 
@@ -80,7 +83,7 @@ export function VoucherStaffApp({ user, onLogout }: Props) {
           return (
             <button
               key={n.pg}
-              onClick={() => { setPage(n.pg); setMobileOpen(false) }}
+              onClick={() => { n.pg === "profile" ? router.push(`/${user.role}/profile`) : setPage(n.pg); setMobileOpen(false) }}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-left transition-all"
               style={{
                 backgroundColor: active ? ACCENT : "transparent",
