@@ -8,7 +8,7 @@
 
 **Mô tả:** Cho phép Khách hàng, Đối tác (chủ tài khoản), Nhân viên tạo voucher, Nhân viên cửa hàng và các nhóm quản trị viên đăng nhập bằng email/số điện thoại cùng mật khẩu tương ứng.
 
-**Tác nhân:** Khách hàng; Đối tác (chủ tài khoản); Nhân viên tạo voucher; Nhân viên cửa hàng; Admin quản lý nội dung; Admin quản lý tài khoản; Admin quản lý log & bảo mật
+**Tác nhân:** Khách hàng; Đối tác (chủ tài khoản); Nhân viên tạo voucher; Nhân viên cửa hàng; Admin quản lý nội dung; Admin vận hành; Admin quản lý log & bảo mật
 
 **Sự kiện kích hoạt:** Người dùng chọn chức năng _Đăng nhập_ trên giao diện hệ thống.
 
@@ -161,7 +161,7 @@ _Activity diagram chức năng Đăng nhập_
 
 **Tiền điều kiện:** Người dùng chưa có tài khoản được đăng ký trong hệ thống.
 
-**Kết quả mong đợi (Expected result):** Tài khoản khách hàng được kích hoạt sau khi xác thực; hồ sơ đối tác được tạo ở trạng thái “Chờ duyệt” để Admin quản lý tài khoản thẩm định.
+**Kết quả mong đợi (Expected result):** Tài khoản khách hàng được kích hoạt sau khi xác thực; hồ sơ đối tác được tạo ở trạng thái “Chờ duyệt” để Admin vận hành thẩm định.
 
 **Luồng sự kiện chính:**
 

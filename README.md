@@ -23,7 +23,7 @@ Asa Voucher là nền tảng thương mại điện tử chuyên bán **voucher 
 | `partner_voucher_staff` | Nhân viên đối tác tạo/quản lý voucher |
 | `partner_store_staff` | Nhân viên cửa hàng xác thực voucher |
 | `admin_content` | Quản trị nội dung và duyệt voucher |
-| `admin_account` | Quản trị tài khoản và đối tác |
+| `admin_operations` | Quản trị vận hành, tài khoản và đối tác |
 | `admin_security` | Quản trị log và bảo mật |
 
 ---

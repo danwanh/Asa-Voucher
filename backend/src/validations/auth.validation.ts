@@ -45,7 +45,7 @@ export const createUserSchema = z.object({
   email: z.string().trim().email().toLowerCase(),
   password: z.string().min(8).max(64).regex(/[A-Z]/).regex(/[a-z]/).regex(/[0-9]/).regex(/[^A-Za-z0-9]/),
   full_name: z.string().trim().min(1).max(100),
-  role: z.enum(["buyer", "partner_owner", "partner_voucher_staff", "partner_store_staff", "admin_content", "admin_account", "admin_security"]),
+  role: z.enum(["buyer", "partner_owner", "partner_voucher_staff", "partner_store_staff", "admin_content", "admin_operations", "admin_security"]),
   phone: z.string().trim().regex(/^(0|\+84)[0-9]{8,9}$/).optional(),
   partner_branches_id: z.string().uuid().optional()
 });
@@ -59,14 +59,14 @@ export const updateUserSchema = z.object({
   address: z.string().nullable().optional(),
   city: z.string().nullable().optional(),
   district: z.string().nullable().optional(),
-  role: z.enum(["buyer", "partner_owner", "partner_voucher_staff", "partner_store_staff", "admin_content", "admin_account", "admin_security"]).optional(),
+  role: z.enum(["buyer", "partner_owner", "partner_voucher_staff", "partner_store_staff", "admin_content", "admin_operations", "admin_security"]).optional(),
   is_active: z.boolean().optional(),
   is_verified: z.boolean().optional(),
   partner_branches_id: z.string().uuid().nullable().optional()
 });
 
 export const userQuerySchema = z.object({
-  role: z.enum(["buyer", "partner_owner", "partner_voucher_staff", "partner_store_staff", "admin_content", "admin_account", "admin_security"]).optional(),
+  role: z.enum(["buyer", "partner_owner", "partner_voucher_staff", "partner_store_staff", "admin_content", "admin_operations", "admin_security"]).optional(),
   is_active: z.coerce.boolean().optional(),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20)

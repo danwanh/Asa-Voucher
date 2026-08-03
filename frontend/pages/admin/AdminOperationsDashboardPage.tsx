@@ -11,7 +11,7 @@ const PARTNER_MONTHLY = [
   { month: "T7", new: 7 },
 ]
 
-export function AdminAccountDashboardPage() {
+export function AdminOperationsDashboardPage() {
   const uid = useId().replace(/:/g, "")
 
   const kpis = [
@@ -24,7 +24,7 @@ export function AdminAccountDashboardPage() {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-black" style={{ color: C.indigo, fontFamily: "'Nunito', sans-serif" }}>Dashboard Tài khoản</h1>
+        <h1 className="text-2xl font-black" style={{ color: C.indigo, fontFamily: "'Nunito', sans-serif" }}>Dashboard Vận hành</h1>
         <p className="text-sm mt-1" style={{ color: "#8A8DA8" }}>Tổng quan người dùng, đối tác, đơn hàng và doanh thu toàn hệ thống</p>
       </div>
 

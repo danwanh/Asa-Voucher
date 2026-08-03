@@ -33,7 +33,7 @@ const USER_ACCOUNTS: DemoAccount[] = [
 // Row 2: admin roles
 const ADMIN_ACCOUNTS: DemoAccount[] = [
   { label: "Admin Nội dung",  email: "admin-content@asa.vn",  hint: "Duyệt voucher & nội dung", role: "admin_content", color: "#81B29A" },
-  { label: "Admin Tài khoản", email: "admin-account@asa.vn",  hint: "Người dùng & đối tác",     role: "admin_account", color: "#3D405B" },
+  { label: "Admin Vận hành", email: "admin-operations@asa.vn",  hint: "Người dùng & đối tác",     role: "admin_operations", color: "#3D405B" },
   { label: "Admin Bảo mật",  email: "admin-security@asa.vn", hint: "Nhật ký & phân quyền",     role: "admin_security", color: "#E07A5F" },
 ]
 

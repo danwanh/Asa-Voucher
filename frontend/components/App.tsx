@@ -100,7 +100,7 @@ export default function App() {
   if (user.role === "partner_owner")         return <PartnerApp user={user} onLogout={handleLogout} />
   if (user.role === "partner_voucher_staff") return <VoucherStaffApp user={user} onLogout={handleLogout} />
   if (user.role === "partner_store_staff")   return <StaffApp user={user} onLogout={handleLogout} />
-  if (user.role === "admin_content" || user.role === "admin_account" || user.role === "admin_security")
+  if (user.role === "admin_content" || user.role === "admin_operations" || user.role === "admin_security")
     return <AdminApp user={user} onLogout={handleLogout} />
   return null
 }

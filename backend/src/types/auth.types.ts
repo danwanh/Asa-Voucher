@@ -4,7 +4,7 @@ export type AppRole =
   | "partner_voucher_staff"
   | "partner_store_staff"
   | "admin_content"
-  | "admin_account"
+  | "admin_operations"
   | "admin_security";
 
 export interface AuthUser {
@@ -18,7 +18,7 @@ export interface AuthUser {
   branchId?: string | null;
 }
 
-export const ADMIN_ROLES: AppRole[] = ["admin_content", "admin_account", "admin_security"];
+export const ADMIN_ROLES: AppRole[] = ["admin_content", "admin_operations", "admin_security"];
 export const PARTNER_STAFF_ROLES: AppRole[] = [
   "partner_owner",
   "partner_voucher_staff",

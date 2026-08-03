@@ -5,7 +5,7 @@ export type Role =
   | "partner_voucher_staff"
   | "partner_store_staff"
   | "admin_content"
-  | "admin_account"
+  | "admin_operations"
   | "admin_security"
 export type VoucherStatus =
   | "draft"
@@ -22,9 +22,9 @@ export type VoucherStatus =
 export type OrderStatus = "pending" | "completed" | "cancelled" | "used"
 
 // Kept for pages that still reference the old admin sub-role concept;
-// no longer used on AppUser (admin_content/admin_account/admin_security are
+// no longer used on AppUser (admin_content/admin_operations/admin_security are
 // full Role values now).
-export type AdminSubRole = "content" | "account" | "security"
+export type AdminSubRole = "content" | "operations" | "security"
 
 export interface AppUser {
   id: string

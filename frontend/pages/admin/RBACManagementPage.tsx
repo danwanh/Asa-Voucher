@@ -55,7 +55,7 @@ const INITIAL_ROLES: RoleConfig[] = [
     permissions: new Set(["content.view","content.create","content.edit","content.delete","voucher.view","voucher.approve","voucher.reject"]),
   },
   {
-    id: "admin-account", name: "Admin Tài khoản", icon: "user", color: "#3D405B",
+    id: "admin-operations", name: "Admin Vận hành", icon: "user", color: "#3D405B",
     permissions: new Set(["user.view","user.lock","user.edit","partner.view","partner.approve","partner.lock","order.view","order.cancel","order.refund","voucher.view"]),
   },
   {

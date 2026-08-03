@@ -9,8 +9,8 @@ import { createUserSchema, updateUserSchema, userQuerySchema } from "../validati
 
 export const userRoutes = Router();
 
-userRoutes.get("/users", requireAuth, requireRole(["admin_account"]), validateQuery(userQuerySchema), asyncHandler(listUsers));
-userRoutes.post("/users", requireAuth, requireRole(["admin_account"]), validateBody(createUserSchema), asyncHandler(createUserByAdmin));
+userRoutes.get("/users", requireAuth, requireRole(["admin_operations"]), validateQuery(userQuerySchema), asyncHandler(listUsers));
+userRoutes.post("/users", requireAuth, requireRole(["admin_operations"]), validateBody(createUserSchema), asyncHandler(createUserByAdmin));
 userRoutes.get("/users/:id", requireAuth, validateParams(idParamSchema), asyncHandler(getUser));
 userRoutes.patch("/users/:id", requireAuth, validateParams(idParamSchema), validateBody(updateUserSchema), asyncHandler(updateUser));
-userRoutes.delete("/users/:id", requireAuth, requireRole(["admin_account"]), validateParams(idParamSchema), asyncHandler(deleteUser));
+userRoutes.delete("/users/:id", requireAuth, requireRole(["admin_operations"]), validateParams(idParamSchema), asyncHandler(deleteUser));
