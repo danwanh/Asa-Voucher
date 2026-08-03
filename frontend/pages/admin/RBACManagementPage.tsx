@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { Shield, Check, Minus, Save, AlertTriangle } from "lucide-react"
+import { toast } from "sonner"
 import { C } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 
@@ -89,7 +90,7 @@ export function RBACManagementPage() {
       const secRole = roles.find((r) => r.id === "admin-security")!
       const othersHaveRbac = roles.some((r) => r.id !== "admin-security" && r.permissions.has("rbac.manage"))
       if (!othersHaveRbac && secRole.permissions.has("rbac.manage")) {
-        alert("Không thể gỡ bỏ quyền quản lý phân quyền cuối cùng trong hệ thống!")
+        toast.error("Không thể gỡ bỏ quyền quản lý phân quyền cuối cùng trong hệ thống!")
         return
       }
     }

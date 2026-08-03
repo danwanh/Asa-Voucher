@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react"
 import { AlertCircle, Eye, EyeOff, Building2, User as UserIcon, Loader2 } from "lucide-react"
+import { toast } from "sonner"
 import { C } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import type { AppUser, Role } from "@/types"
@@ -79,9 +80,18 @@ function LoginForm({ onLogin, onNavigate }: { onLogin: (u: AppUser) => void; onN
   const [emailErr, setEmailErr] = useState("")
   const [pwErr, setPwErr] = useState("")
   const [generalErr, setGeneralErr] = useState("")
+  const [canResendVerification, setCanResendVerification] = useState(false)
+  const [resendLoading, setResendLoading] = useState(false)
+  const [resendCooldown, setResendCooldown] = useState(0)
 
   const storeLogin = useAuthStore((s) => s.login)
   const isLoading = useAuthStore((s) => s.isLoading)
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return
+    const timer = window.setInterval(() => setResendCooldown((value) => Math.max(value - 1, 0)), 1000)
+    return () => window.clearInterval(timer)
+  }, [resendCooldown])
 
   const selectDemo = (a: DemoAccount) => {
     setEmail(a.email)
@@ -92,6 +102,7 @@ function LoginForm({ onLogin, onNavigate }: { onLogin: (u: AppUser) => void; onN
   const validate = () => {
     let ok = true
     setEmailErr(""); setPwErr(""); setGeneralErr("")
+    setCanResendVerification(false)
     if (!email) { setEmailErr("Vui lòng nhập email"); ok = false }
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setEmailErr("Email không đúng định dạng"); ok = false }
     if (!password) { setPwErr("Vui lòng nhập mật khẩu"); ok = false }
@@ -108,6 +119,7 @@ function LoginForm({ onLogin, onNavigate }: { onLogin: (u: AppUser) => void; onN
     } catch (error: unknown) {
       const err = error as { response?: { data?: { error?: { code?: string; message?: string } } } }
       const code = err?.response?.data?.error?.code
+      setCanResendVerification(code === "EMAIL_NOT_VERIFIED")
       const messages: Record<string, string> = {
         ACCOUNT_NOT_FOUND: "Sai tên đăng nhập hoặc không tồn tại tài khoản, vui lòng đăng ký phù hợp",
         INVALID_PASSWORD: "Sai mật khẩu",
@@ -118,6 +130,23 @@ function LoginForm({ onLogin, onNavigate }: { onLogin: (u: AppUser) => void; onN
         PARTNER_INACTIVE: "Hồ sơ đối tác đang tạm ngưng hoạt động.",
       }
       setGeneralErr(messages[code ?? ""] ?? err?.response?.data?.error?.message ?? "Đăng nhập thất bại")
+    }
+  }
+
+  const handleResendVerification = async () => {
+    if (resendLoading || resendCooldown > 0) return
+    setResendLoading(true)
+    try {
+      await authService.resendVerification(email)
+      setResendCooldown(60)
+      toast.success("Đã gửi lại email xác thực. Vui lòng kiểm tra hộp thư.")
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { error?: { message?: string; details?: { cooldown_seconds?: number } } } } }
+      const retryAfter = err?.response?.data?.error?.details?.cooldown_seconds
+      if (typeof retryAfter === "number") setResendCooldown(retryAfter)
+      toast.error(err?.response?.data?.error?.message ?? "Không thể gửi lại email xác thực")
+    } finally {
+      setResendLoading(false)
     }
   }
 
@@ -221,6 +250,16 @@ function LoginForm({ onLogin, onNavigate }: { onLogin: (u: AppUser) => void; onN
       {generalErr && (
         <div className="mt-4 p-3 rounded-2xl text-sm flex items-center gap-2" style={{ backgroundColor: "#FCEAEA", color: "#C0392B" }}>
           <AlertCircle className="w-4 h-4 shrink-0" />{generalErr}
+          {canResendVerification && (
+            <button
+              type="button"
+              disabled={resendLoading || resendCooldown > 0}
+              onClick={handleResendVerification}
+              className="ml-auto shrink-0 font-bold underline disabled:opacity-60"
+            >
+              {resendLoading ? "Đang gửi" : resendCooldown > 0 ? `Gửi lại sau ${resendCooldown}s` : "Gửi lại email xác thực"}
+            </button>
+          )}
         </div>
       )}
 
@@ -398,7 +437,7 @@ function RegisterForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
           className="w-full py-3.5 mb-3 rounded-2xl font-bold text-white hover:opacity-90 transition-all disabled:opacity-60"
           style={{ backgroundColor: C.teal }}
         >
-          {resendLoading ? "Đang gửi..." : resendCooldown > 0 ? `Gửi lại sau ${resendCooldown}s` : "Gửi lại email"}
+          {resendLoading ? "Đang gửi email xác thực..." : resendCooldown > 0 ? `Gửi lại sau ${resendCooldown}s` : "Gửi lại email xác thực"}
         </button>
         <button
           onClick={() => onNavigate("login")}
@@ -435,7 +474,7 @@ function RegisterForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
           className="w-full py-3.5 mb-3 rounded-2xl font-bold text-white hover:opacity-90 transition-all disabled:opacity-60"
           style={{ backgroundColor: C.teal }}
         >
-          {resendLoading ? "Đang gửi..." : resendCooldown > 0 ? `Gửi lại sau ${resendCooldown}s` : "Gửi lại email"}
+          {resendLoading ? "Đang gửi email xác thực..." : resendCooldown > 0 ? `Gửi lại sau ${resendCooldown}s` : "Gửi lại email xác thực"}
         </button>
         <button
           onClick={() => onNavigate("login")}
