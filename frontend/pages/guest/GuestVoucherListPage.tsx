@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react"
 import { Search, SlidersHorizontal, Star, X, ChevronDown } from "lucide-react"
 import { C, fmt } from "@/utils/constants"
+import { AppIcon } from "@/components/AppIcon"
 import { VOUCHERS } from "@/data/mock"
 import type { Voucher } from "@/types"
 
@@ -12,12 +13,12 @@ interface Props {
 
 const CATEGORIES = [
   { value: "all", label: "Tất cả" },
-  { value: "food", label: "🍜 Ẩm thực" },
-  { value: "beauty", label: "💅 Làm đẹp" },
-  { value: "travel", label: "✈️ Du lịch" },
-  { value: "entertainment", label: "🎬 Giải trí" },
-  { value: "sport", label: "⚽ Thể thao" },
-  { value: "education", label: "📚 Giáo dục" },
+  { value: "food", label: "Ẩm thực" },
+  { value: "beauty", label: "Làm đẹp" },
+  { value: "travel", label: "Du lịch" },
+  { value: "entertainment", label: "Giải trí" },
+  { value: "sport", label: "Thể thao" },
+  { value: "education", label: "Giáo dục" },
 ]
 
 const SORT_OPTIONS = [
@@ -176,7 +177,7 @@ export function GuestVoucherListPage({ onDetail, onLogin, onAddToCart }: Props) 
       {/* Grid */}
       {paged.length === 0 ? (
         <div className="text-center py-20 bg-white rounded-2xl">
-          <div className="text-5xl mb-3">🔍</div>
+          <AppIcon name="search" className="w-14 h-14 mb-3 mx-auto" />
           <div className="font-bold text-lg" style={{ color: C.indigo }}>Không tìm thấy voucher</div>
           <div className="text-sm mt-2" style={{ color: "#6B7280" }}>Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm</div>
         </div>

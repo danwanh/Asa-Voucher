@@ -8,7 +8,7 @@ interface Props {
 
 export function PublicLayout({ children }: Props) {
   return (
-    <div className="min-h-screen" style={{ backgroundColor: C.eggshell, fontFamily: "'Nunito', sans-serif" }}>
+    <div className="min-h-screen" style={{ backgroundColor: C.content, fontFamily: "'Nunito', sans-serif" }}>
       {children}
     </div>
   )

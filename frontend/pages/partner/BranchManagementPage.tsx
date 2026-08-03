@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { Plus, Search, Edit2, Trash2, MapPin, Phone, Clock, X, CheckCircle } from "lucide-react"
 import { C, STATUS_LABEL, statusColor } from "@/utils/constants"
+import { AppIcon } from "@/components/AppIcon"
 import type { Branch } from "@/types"
 
 const MOCK_BRANCHES: Branch[] = [
@@ -103,7 +104,7 @@ export function BranchManagementPage() {
       </div>
 
       {filtered.length === 0 && (
-        <div className="text-center py-16"><div className="text-4xl mb-3">🏢</div><div className="font-bold" style={{ color: C.indigo }}>Không tìm thấy chi nhánh</div></div>
+        <div className="text-center py-16"><AppIcon name="building" className="w-10 h-10 mb-3 mx-auto" /><div className="font-bold" style={{ color: C.indigo }}>Không tìm thấy chi nhánh</div></div>
       )}
 
       {/* Form Modal */}

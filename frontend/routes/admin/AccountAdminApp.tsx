@@ -14,7 +14,7 @@ const ROLE: SubAdminRole = {
   id: "account",
   name: "Admin Tài khoản",
   subtitle: "Quản lý người dùng, đối tác & đơn hàng",
-  emoji: "👤",
+  icon: "user",
   accent: "#3D405B",
   accentBg: "#ECEEF5",
   sidebarBg: "#2D2F45",

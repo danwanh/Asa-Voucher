@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { AppIcon } from "@/components/AppIcon"
 import { toast } from "sonner"
 import { CustomerLayout, type CustomerPage } from "@/layouts/CustomerLayout"
 import { HomePage } from "@/pages/customer/HomePage"
@@ -136,7 +137,7 @@ export function CustomerApp({
       )}
       {page === "payment" && !pendingOrder && (
         <div className="max-w-md mx-auto px-4 py-20 text-center">
-          <div className="text-5xl mb-4">🛒</div>
+           <AppIcon name="shoppingCart" className="w-14 h-14 mb-4 mx-auto" />
           <p className="font-bold" style={{ color: C.indigo }}>Không có đơn hàng đang chờ thanh toán.</p>
           <button onClick={() => navigate("orders")} className="mt-4 px-6 py-3 rounded-xl font-bold text-white" style={{ backgroundColor: C.peach }}>
             Xem đơn hàng
@@ -171,7 +172,7 @@ export function CustomerApp({
         <div className="max-w-4xl mx-auto px-4 py-8">
           <h1 className="text-2xl font-black mb-6" style={{ color: C.indigo, fontFamily: "'Nunito', sans-serif" }}>Yêu thích</h1>
           <div className="text-center py-20 bg-white rounded-2xl">
-            <div className="text-5xl mb-4">❤️</div>
+             <AppIcon name="heart" className="w-14 h-14 mb-4 mx-auto" />
             <div className="font-bold text-lg" style={{ color: C.indigo }}>Chưa có voucher yêu thích</div>
             <div className="text-sm mt-2" style={{ color: "#8A8DA8" }}>Nhấn biểu tượng trái tim để lưu voucher</div>
           </div>
@@ -182,17 +183,17 @@ export function CustomerApp({
           <h1 className="text-2xl font-black mb-6" style={{ color: C.indigo, fontFamily: "'Nunito', sans-serif" }}>Danh mục</h1>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {[
-              { icon: "🍜", name: "Ẩm thực", count: 45, color: "#FDEBD0" },
-              { icon: "💅", name: "Làm đẹp", count: 32, color: "#FCE4EC" },
-              { icon: "✈️", name: "Du lịch", count: 28, color: "#E3F2FD" },
-              { icon: "🎬", name: "Giải trí", count: 21, color: "#EDE7F6" },
-              { icon: "⚽", name: "Thể thao", count: 8, color: "#E8F5E9" },
-              { icon: "📚", name: "Giáo dục", count: 5, color: "#FFF8E1" },
-              { icon: "🏥", name: "Sức khỏe", count: 14, color: "#E0F7FA" },
-              { icon: "🛍️", name: "Mua sắm", count: 19, color: "#F3E5F5" },
+               { icon: "gift", name: "Ẩm thực", count: 45, color: "#FDEBD0" },
+               { icon: "heart", name: "Làm đẹp", count: 32, color: "#FCE4EC" },
+               { icon: "location", name: "Du lịch", count: 28, color: "#E3F2FD" },
+               { icon: "ticket", name: "Giải trí", count: 21, color: "#EDE7F6" },
+               { icon: "shield", name: "Thể thao", count: 8, color: "#E8F5E9" },
+               { icon: "document", name: "Giáo dục", count: 5, color: "#FFF8E1" },
+               { icon: "shield", name: "Sức khỏe", count: 14, color: "#E0F7FA" },
+               { icon: "shoppingCart", name: "Mua sắm", count: 19, color: "#F3E5F5" },
             ].map((cat) => (
               <button key={cat.name} onClick={() => navigate("vouchers")} className="flex flex-col items-center gap-2 p-5 rounded-2xl hover:shadow-md transition-all" style={{ backgroundColor: cat.color }}>
-                <div className="text-4xl">{cat.icon}</div>
+                <AppIcon name={cat.icon} className="w-10 h-10" />
                 <div className="font-black text-sm" style={{ color: C.indigo }}>{cat.name}</div>
                 <div className="text-xs" style={{ color: "#8A8DA8" }}>{cat.count} voucher</div>
               </button>

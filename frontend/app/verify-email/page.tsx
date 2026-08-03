@@ -18,7 +18,7 @@ function VerifyEmailContent() {
   }, [params])
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-[#F4F1DE] p-6">
+    <main className="min-h-screen flex items-center justify-center bg-[#F3F4F6] p-6">
       <section className="max-w-md w-full rounded-3xl bg-white p-8 text-center shadow-sm">
         {state === "loading" && <p>Đang xác thực email...</p>}
         {state === "success" && <><h1 className="text-2xl font-black text-[#3D405B]">Xác thực thành công</h1><p className="mt-3 text-[#6B7280]">Bạn có thể quay lại trang đăng nhập.</p><a className="mt-6 inline-block rounded-2xl bg-[#E07A5F] px-5 py-3 font-bold text-white" href="/">Đăng nhập</a></>}

@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { Plus, Search, Edit2, Lock, Unlock, Key, X, CheckCircle } from "lucide-react"
 import { C, STATUS_LABEL, statusColor } from "@/utils/constants"
+import { AppIcon } from "@/components/AppIcon"
 import type { StaffMember } from "@/types"
 
 const BRANCHES_LIST = [
@@ -10,8 +11,8 @@ const BRANCHES_LIST = [
 ]
 
 const STAFF_ROLES: { value: "voucher-creator" | "store-staff"; label: string; icon: string; desc: string }[] = [
-  { value: "voucher-creator", label: "NV Tạo Voucher", icon: "🏷️", desc: "Tạo & quản lý voucher" },
-  { value: "store-staff",     label: "NV Cửa hàng",   icon: "🔖", desc: "Xác thực voucher KH" },
+  { value: "voucher-creator", label: "NV Tạo Voucher", icon: "tag", desc: "Tạo & quản lý voucher" },
+  { value: "store-staff",     label: "NV Cửa hàng",   icon: "ticket", desc: "Xác thực voucher KH" },
 ]
 
 const MOCK_STAFF: StaffMember[] = [
@@ -215,7 +216,7 @@ export function StaffManagementPage() {
           </tbody>
         </table>
         {filtered.length === 0 && (
-          <div className="text-center py-12"><div className="text-3xl mb-2">👥</div><div className="font-bold text-sm" style={{ color: C.indigo }}>Không tìm thấy nhân viên</div></div>
+          <div className="text-center py-12"><AppIcon name="users" className="w-8 h-8 mb-2 mx-auto" /><div className="font-bold text-sm" style={{ color: C.indigo }}>Không tìm thấy nhân viên</div></div>
         )}
       </div>
 

@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { Search, Star, MessageSquare } from "lucide-react"
 import { C, fmt, fmtDate } from "@/utils/constants"
+import { AppIcon } from "@/components/AppIcon"
 import { StatusBadge } from "@/components/StatusBadge"
 import { VOUCHERS } from "@/data/mock"
 import type { Order, OrderStatus } from "@/types"
@@ -207,7 +208,7 @@ export function OrderHistoryPage({ orders, pendingOrderId, onDetail, onReview }:
 
         {filtered.length === 0 && (
           <div className="text-center py-16 bg-white rounded-2xl">
-            <div className="text-4xl mb-3">📦</div>
+            <AppIcon name="package" className="w-10 h-10 mb-3 mx-auto" />
             <div className="font-bold" style={{ color: C.indigo }}>
               {search ? "Không tìm thấy đơn hàng phù hợp" : "Chưa có đơn hàng nào"}
             </div>

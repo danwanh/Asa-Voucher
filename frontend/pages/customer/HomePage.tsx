@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { ChevronRight } from "lucide-react"
 import { C } from "@/utils/constants"
+import { AppIcon } from "@/components/AppIcon"
 import { VoucherCard } from "@/components/VoucherCard"
 import { VOUCHERS } from "@/data/mock"
 import type { Voucher } from "@/types"
@@ -13,11 +14,11 @@ interface Props {
 }
 
 const CATS = [
-  { id: "all", label: "Tất cả", icon: "✨" },
-  { id: "food", label: "Ẩm thực", icon: "🍽️" },
-  { id: "beauty", label: "Làm đẹp", icon: "💄" },
-  { id: "travel", label: "Du lịch", icon: "✈️" },
-  { id: "entertainment", label: "Giải trí", icon: "🎭" },
+  { id: "all", label: "Tất cả", icon: "gift" },
+  { id: "food", label: "Ẩm thực", icon: "gift" },
+  { id: "beauty", label: "Làm đẹp", icon: "heart" },
+  { id: "travel", label: "Du lịch", icon: "location" },
+  { id: "entertainment", label: "Giải trí", icon: "ticket" },
 ]
 
 export function HomePage({ onBuy, onDetail, onNavigate }: Props) {
@@ -72,7 +73,7 @@ export function HomePage({ onBuy, onDetail, onNavigate }: Props) {
                 color: activeCat === c.id ? "white" : C.indigo,
               }}
             >
-              <span>{c.icon}</span>{c.label}
+              <AppIcon name={c.icon} className="w-4 h-4" />{c.label}
             </button>
           ))}
         </div>
@@ -93,7 +94,7 @@ export function HomePage({ onBuy, onDetail, onNavigate }: Props) {
 
         {featured.length === 0 ? (
           <div className="text-center py-16">
-            <div className="text-4xl mb-3">🔍</div>
+            <AppIcon name="search" className="w-10 h-10 mb-3 mx-auto" />
             <div className="font-bold" style={{ color: C.indigo }}>Không có voucher trong danh mục này</div>
           </div>
         ) : (
@@ -109,12 +110,12 @@ export function HomePage({ onBuy, onDetail, onNavigate }: Props) {
       <div className="max-w-6xl mx-auto px-4 pb-12">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
-            { icon: "🛡️", title: "Cam kết hoàn tiền", desc: "Hoàn tiền 100% nếu không sử dụng được" },
-            { icon: "⚡", title: "Giao mã tức thì", desc: "Nhận mã voucher ngay sau khi thanh toán" },
-            { icon: "💎", title: "Đối tác uy tín", desc: "124 đối tác được xác thực chất lượng" },
+            { icon: "shield", title: "Cam kết hoàn tiền", desc: "Hoàn tiền 100% nếu không sử dụng được" },
+            { icon: "zap", title: "Giao mã tức thì", desc: "Nhận mã voucher ngay sau khi thanh toán" },
+            { icon: "shield", title: "Đối tác uy tín", desc: "124 đối tác được xác thực chất lượng" },
           ].map((b) => (
             <div key={b.title} className="bg-card rounded-2xl p-5 flex items-start gap-4 shadow-sm">
-              <span className="text-3xl">{b.icon}</span>
+              <AppIcon name={b.icon} className="w-8 h-8" />
               <div>
                 <div className="font-bold text-sm" style={{ color: C.indigo }}>{b.title}</div>
                 <div className="text-xs mt-0.5" style={{ color: "#8A8DA8" }}>{b.desc}</div>

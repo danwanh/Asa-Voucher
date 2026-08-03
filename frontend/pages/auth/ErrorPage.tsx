@@ -1,5 +1,6 @@
 import { Home, RefreshCw, ArrowLeft } from "lucide-react"
 import { C } from "@/utils/constants"
+import { AppIcon } from "@/components/AppIcon"
 
 type ErrorCode = 401 | 403 | 404 | 500
 
@@ -9,24 +10,24 @@ interface Props {
   onHome?: () => void
 }
 
-const ERROR_CONFIG: Record<ErrorCode, { title: string; description: string; emoji: string }> = {
+const ERROR_CONFIG: Record<ErrorCode, { title: string; description: string; icon: string }> = {
   401: {
-    emoji: "🔐",
+    icon: "lock",
     title: "Chưa đăng nhập",
     description: "Bạn cần đăng nhập để truy cập trang này. Vui lòng đăng nhập và thử lại.",
   },
   403: {
-    emoji: "🚫",
+    icon: "alert",
     title: "Không có quyền truy cập",
     description: "Tài khoản của bạn không có quyền xem trang này. Liên hệ quản trị viên nếu cần hỗ trợ.",
   },
   404: {
-    emoji: "🔍",
+    icon: "search",
     title: "Trang không tìm thấy",
     description: "Trang bạn đang tìm kiếm không tồn tại hoặc đã bị xóa. Hãy kiểm tra lại đường dẫn.",
   },
   500: {
-    emoji: "⚙️",
+    icon: "settings",
     title: "Lỗi máy chủ",
     description: "Đã có sự cố xảy ra phía máy chủ. Chúng tôi đang khắc phục. Vui lòng thử lại sau.",
   },
@@ -38,10 +39,10 @@ export function ErrorPage({ code = 404, onBack, onHome }: Props) {
   return (
     <div
       className="min-h-screen flex items-center justify-center p-4"
-      style={{ backgroundColor: C.eggshell, fontFamily: "'Nunito', sans-serif" }}
+      style={{ backgroundColor: C.content, fontFamily: "'Nunito', sans-serif" }}
     >
       <div className="text-center max-w-md">
-        <div className="text-8xl mb-4">{config.emoji}</div>
+        <AppIcon name={config.icon} className="w-20 h-20 mb-4 mx-auto" strokeWidth={1.5} />
         <div className="text-7xl font-black mb-3" style={{ color: C.indigo, opacity: 0.15 }}>{code}</div>
         <h1 className="text-2xl font-black mb-3" style={{ color: C.indigo }}>{config.title}</h1>
         <p className="text-sm leading-relaxed mb-8" style={{ color: "#6B7280" }}>{config.description}</p>

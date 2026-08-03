@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
 import { AlertCircle, Eye, EyeOff, Building2, User as UserIcon, Loader2 } from "lucide-react"
 import { C } from "@/utils/constants"
+import { AppIcon } from "@/components/AppIcon"
 import type { AppUser, Role } from "@/types"
 import { useAuthStore } from "@/stores/authStore"
 import { authService } from "@/services/authService"
@@ -10,6 +11,7 @@ type AuthPage = "login" | "register" | "forgot"
 interface Props {
   onLogin: (u: AppUser) => void
   onBack?: () => void
+  initialPage?: AuthPage
 }
 
 interface DemoAccount {
@@ -23,16 +25,16 @@ interface DemoAccount {
 // Row 1: end-users
 const USER_ACCOUNTS: DemoAccount[] = [
   { label: "Khách hàng",         email: "customer@asa.vn",      hint: "Nguyễn Thị Mai",      role: "buyer",                   color: C.teal },
-  { label: "🏢 Đối tác chủ TK", email: "partner@asa.vn",       hint: "Pizza Hut Vietnam",   role: "partner_owner",          color: C.peach },
-  { label: "🏷️ NV Tạo Voucher", email: "voucher-staff@asa.vn", hint: "Nguyễn Văn Hùng",     role: "partner_voucher_staff",  color: "#F2CC8F" },
-  { label: "🔖 NV Cửa hàng",   email: "staff@asa.vn",          hint: "Trần Văn Nam",         role: "partner_store_staff",    color: C.apricot },
+  { label: "Đối tác chủ TK", email: "partner@asa.vn",       hint: "Pizza Hut Vietnam",   role: "partner_owner",          color: C.peach },
+  { label: "NV Tạo Voucher", email: "voucher-staff@asa.vn", hint: "Nguyễn Văn Hùng",     role: "partner_voucher_staff",  color: "#F2CC8F" },
+  { label: "NV Cửa hàng",   email: "staff@asa.vn",          hint: "Trần Văn Nam",         role: "partner_store_staff",    color: C.apricot },
 ]
 
 // Row 2: admin roles
 const ADMIN_ACCOUNTS: DemoAccount[] = [
-  { label: "📝 Admin Nội dung",  email: "admin-content@asa.vn",  hint: "Duyệt voucher & nội dung", role: "admin_content", color: "#81B29A" },
-  { label: "👤 Admin Tài khoản", email: "admin-account@asa.vn",  hint: "Người dùng & đối tác",     role: "admin_account", color: "#3D405B" },
-  { label: "🔐 Admin Bảo mật",  email: "admin-security@asa.vn", hint: "Nhật ký & phân quyền",     role: "admin_security", color: "#E07A5F" },
+  { label: "Admin Nội dung",  email: "admin-content@asa.vn",  hint: "Duyệt voucher & nội dung", role: "admin_content", color: "#81B29A" },
+  { label: "Admin Tài khoản", email: "admin-account@asa.vn",  hint: "Người dùng & đối tác",     role: "admin_account", color: "#3D405B" },
+  { label: "Admin Bảo mật",  email: "admin-security@asa.vn", hint: "Nhật ký & phân quyền",     role: "admin_security", color: "#E07A5F" },
 ]
 
 function LeftPanel() {
@@ -144,8 +146,8 @@ function LoginForm({ onLogin, onNavigate }: { onLogin: (u: AppUser) => void; onN
         <span className="text-2xl font-black" style={{ color: C.indigo }}>Asa Vouchers</span>
       </div>
 
-      <h2 className="text-2xl font-black mb-1" style={{ color: C.indigo }}>Đăng nhập</h2>
-      <p className="text-sm mb-4" style={{ color: "#8A8DA8" }}>Chọn tài khoản demo để trải nghiệm nhanh</p>
+      <h2 className="text-2xl font-black mb-4" style={{ color: C.indigo }}>Đăng nhập</h2>
+      {/* <p className="text-sm mb-4" style={{ color: "#8A8DA8" }}>Chọn tài khoản demo để trải nghiệm nhanh</p>
 
       <div className="grid grid-cols-2 gap-2 mb-2">
         {USER_ACCOUNTS.map(DemoBtn)}
@@ -173,7 +175,7 @@ function LoginForm({ onLogin, onNavigate }: { onLogin: (u: AppUser) => void; onN
             </button>
           ))}
         </div>
-      </div>
+      </div> */}
 
       <div className="space-y-4">
         <div>
@@ -381,7 +383,7 @@ function RegisterForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
   if (step === "success") {
     return (
       <div className="w-full max-w-md text-center">
-        <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl mx-auto mb-6" style={{ backgroundColor: C.teal + "20" }}>✅</div>
+        <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6" style={{ backgroundColor: C.teal + "20" }}><AppIcon name="check" className="w-10 h-10" /></div>
         <h2 className="text-2xl font-black mb-2" style={{ color: C.indigo }}>Đăng ký thành công</h2>
         <p className="mb-2" style={{ color: "#8A8DA8" }}>
           Tài khoản <strong>{form.email}</strong> đã được tạo. Vui lòng kiểm tra email để xác thực.
@@ -424,7 +426,7 @@ function RegisterForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
         <div className="rounded-2xl p-4 mb-6 text-left" style={{ backgroundColor: C.apricot + "15", border: `1.5px solid ${C.apricot}` }}>
           <div className="text-sm font-bold mb-1" style={{ color: C.indigo }}>Hồ sơ đối tác</div>
           <div className="text-xs" style={{ color: "#6B7280" }}>{form.businessName} • MST: {form.taxCode}</div>
-          <div className="text-xs mt-1.5 font-bold" style={{ color: "#D97706" }}>🟡 Chờ phê duyệt</div>
+          <div className="text-xs mt-1.5 font-bold flex items-center gap-1" style={{ color: "#D97706" }}><AppIcon name="help" className="w-3.5 h-3.5" /> Chờ phê duyệt</div>
         </div>
         {resendMessage && <p className="mb-4 text-sm" style={{ color: C.teal }}>{resendMessage}</p>}
         <button
@@ -612,7 +614,7 @@ function ForgotForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
   if (sent) {
     return (
       <div className="w-full max-w-md text-center">
-        <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl mx-auto mb-6" style={{ backgroundColor: C.teal + "20" }}>📧</div>
+        <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6" style={{ backgroundColor: C.teal + "20" }}><AppIcon name="mail" className="w-10 h-10" /></div>
         <h2 className="text-2xl font-black mb-2" style={{ color: C.indigo }}>Kiểm tra email</h2>
         <p className="mb-6" style={{ color: "#8A8DA8" }}>
           Chúng tôi đã gửi link đặt lại mật khẩu đến <strong>{email}</strong>
@@ -661,11 +663,11 @@ function ForgotForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
   )
 }
 
-export function LoginPage({ onLogin, onBack }: Props) {
-  const [authPage, setAuthPage] = useState<AuthPage>("login")
+export function LoginPage({ onLogin, onBack, initialPage = "login" }: Props) {
+  const [authPage, setAuthPage] = useState<AuthPage>(initialPage)
 
   return (
-    <div className="min-h-screen flex" style={{ backgroundColor: C.eggshell, fontFamily: "'Nunito', sans-serif" }}>
+    <div className="min-h-screen flex" style={{ backgroundColor: C.content, fontFamily: "'Nunito', sans-serif" }}>
       <LeftPanel />
       <div className="flex-1 flex items-center justify-center p-6 overflow-y-auto relative">
         {onBack && (

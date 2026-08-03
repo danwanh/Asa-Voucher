@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { Camera, Eye, EyeOff, Save, CheckCircle2 } from "lucide-react"
 import { C } from "@/utils/constants"
+import { AppIcon } from "@/components/AppIcon"
 import type { AppUser } from "@/types"
 
 interface Props {
@@ -49,7 +50,7 @@ export function AdminProfilePage({ user, onLogout }: Props) {
           <div className="font-black text-lg" style={{ color: C.indigo, fontFamily: "'Nunito', sans-serif" }}>{user.name}</div>
           <div className="text-sm" style={{ color: "#6B7280" }}>{user.email}</div>
           <div className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-lg text-xs font-bold" style={{ backgroundColor: `${C.indigo}15`, color: C.indigo }}>
-            🛡️ Quản trị viên hệ thống
+            <AppIcon name="shield" className="w-4 h-4 inline-block mr-1" /> Quản trị viên hệ thống
           </div>
         </div>
       </div>

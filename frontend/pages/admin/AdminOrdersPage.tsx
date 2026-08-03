@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { C, fmt, fmtDate } from "@/utils/constants"
+import { AppIcon } from "@/components/AppIcon"
 import { StatusBadge } from "@/components/StatusBadge"
 import { ORDERS, USERS } from "@/data/mock"
 
@@ -73,7 +74,7 @@ export function AdminOrdersPage() {
 
         {filtered.length === 0 && (
           <div className="text-center py-16">
-            <div className="text-4xl mb-3">📦</div>
+            <AppIcon name="package" className="w-10 h-10 mb-3 mx-auto" />
             <div className="font-bold" style={{ color: C.indigo }}>Không có đơn hàng</div>
           </div>
         )}

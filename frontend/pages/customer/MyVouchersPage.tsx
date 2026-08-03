@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { Search, QrCode, ExternalLink } from "lucide-react"
 import { C, fmt, fmtDate } from "@/utils/constants"
+import { AppIcon } from "@/components/AppIcon"
 import { StatusBadge } from "@/components/StatusBadge"
 import { MockQR } from "@/components/MockQR"
 import type { Order } from "@/types"
@@ -73,7 +74,7 @@ export function MyVouchersPage({ orders }: Props) {
 
       {filtered.length === 0 ? (
         <div className="text-center py-20">
-          <div className="text-5xl mb-4">🎟️</div>
+          <AppIcon name="ticket" className="w-14 h-14 mb-4 mx-auto" />
           <div className="font-bold text-lg" style={{ color: C.indigo }}>
             {search ? "Không tìm thấy voucher" : `Không có voucher ${currentTab.label.toLowerCase()}`}
           </div>

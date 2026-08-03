@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { AppIcon } from "@/components/AppIcon"
 import { PartnerLayout, type PartnerPage } from "@/layouts/PartnerLayout"
 import { PartnerDashboardPage } from "@/pages/partner/PartnerDashboardPage"
 import { PartnerVouchersPage } from "@/pages/partner/PartnerVouchersPage"
@@ -83,7 +84,7 @@ export function PartnerApp({ user, onLogout }: Props) {
         <div className="p-6 max-w-xl mx-auto">
           <h1 className="text-2xl font-black mb-4" style={{ color: C.indigo, fontFamily: "'Nunito', sans-serif" }}>Thông báo</h1>
           <div className="text-center py-16 bg-white rounded-2xl">
-            <div className="text-4xl mb-3">🔔</div>
+            <AppIcon name="bell" className="w-10 h-10 mb-3 mx-auto" />
             <div className="font-bold" style={{ color: C.indigo }}>Không có thông báo mới</div>
           </div>
         </div>

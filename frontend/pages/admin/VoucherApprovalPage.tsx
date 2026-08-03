@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { Check, X, Eye } from "lucide-react"
 import { C, fmt, fmtDate } from "@/utils/constants"
+import { AppIcon } from "@/components/AppIcon"
 import { StatusBadge } from "@/components/StatusBadge"
 import { VOUCHERS } from "@/data/mock"
 import type { VoucherStatus } from "@/types"
@@ -30,7 +31,7 @@ export function VoucherApprovalPage() {
 
       {pending.length === 0 ? (
         <div className="text-center py-20">
-          <div className="text-5xl mb-4">✅</div>
+          <AppIcon name="check" className="w-14 h-14 mb-4 mx-auto" />
           <div className="font-bold text-lg" style={{ color: C.indigo }}>Không có voucher nào chờ duyệt</div>
           <div className="text-sm mt-2" style={{ color: "#8A8DA8" }}>Tất cả voucher đã được xử lý</div>
         </div>

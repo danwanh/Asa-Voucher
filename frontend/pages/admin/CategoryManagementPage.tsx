@@ -1,15 +1,16 @@
 import { useState } from "react"
 import { Plus, Edit2, Trash2, X, CheckCircle } from "lucide-react"
 import { C, STATUS_LABEL, statusColor } from "@/utils/constants"
+import { AppIcon } from "@/components/AppIcon"
 import type { Category } from "@/types"
 
 const MOCK_CATEGORIES: Category[] = [
-  { id: "cat1", name: "Ẩm thực", icon: "🍜", description: "Nhà hàng, quán ăn, cafe", status: "active", voucherCount: 45 },
-  { id: "cat2", name: "Làm đẹp", icon: "💅", description: "Spa, salon, chăm sóc sắc đẹp", status: "active", voucherCount: 32 },
-  { id: "cat3", name: "Du lịch", icon: "✈️", description: "Khách sạn, resort, tour du lịch", status: "active", voucherCount: 28 },
-  { id: "cat4", name: "Giải trí", icon: "🎬", description: "Rạp chiếu phim, khu vui chơi", status: "active", voucherCount: 21 },
-  { id: "cat5", name: "Thể thao", icon: "⚽", description: "Gym, sân bóng, bể bơi", status: "inactive", voucherCount: 8 },
-  { id: "cat6", name: "Giáo dục", icon: "📚", description: "Trung tâm, khóa học", status: "inactive", voucherCount: 5 },
+  { id: "cat1", name: "Ẩm thực", icon: "gift", description: "Nhà hàng, quán ăn, cafe", status: "active", voucherCount: 45 },
+  { id: "cat2", name: "Làm đẹp", icon: "heart", description: "Spa, salon, chăm sóc sắc đẹp", status: "active", voucherCount: 32 },
+  { id: "cat3", name: "Du lịch", icon: "location", description: "Khách sạn, resort, tour du lịch", status: "active", voucherCount: 28 },
+  { id: "cat4", name: "Giải trí", icon: "ticket", description: "Rạp chiếu phim, khu vui chơi", status: "active", voucherCount: 21 },
+  { id: "cat5", name: "Thể thao", icon: "shield", description: "Gym, sân bóng, bể bơi", status: "inactive", voucherCount: 8 },
+  { id: "cat6", name: "Giáo dục", icon: "document", description: "Trung tâm, khóa học", status: "inactive", voucherCount: 5 },
 ]
 
 const EMPTY: Omit<Category, "id" | "voucherCount"> = { name: "", icon: "", description: "", status: "active" }
@@ -78,7 +79,7 @@ export function CategoryManagementPage() {
                 <tr key={c.id} className="border-t hover:bg-muted/20" style={{ borderColor: "#F0EDD8" }}>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <span className="text-xl">{c.icon}</span>
+                       <AppIcon name={c.icon} className="w-5 h-5" />
                       <span className="font-bold text-sm" style={{ color: C.indigo }}>{c.name}</span>
                     </div>
                   </td>
@@ -117,7 +118,7 @@ export function CategoryManagementPage() {
               </div>
               <div>
                 <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Biểu tượng (emoji)</label>
-                <input className="w-full px-4 py-2.5 rounded-xl border text-sm outline-none" style={{ borderColor: "#E2DFC8" }} value={form.icon} onChange={(e) => set("icon", e.target.value)} placeholder="🎯" />
+                 <input className="w-full px-4 py-2.5 rounded-xl border text-sm outline-none" style={{ borderColor: "#E2DFC8" }} value={form.icon} onChange={(e) => set("icon", e.target.value)} placeholder="tag" />
               </div>
               <div>
                 <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Mô tả</label>

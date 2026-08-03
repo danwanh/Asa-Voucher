@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { ArrowLeft, Copy, CheckCircle2, QrCode, Download, Star, MessageSquare } from "lucide-react"
 import { C, fmt, fmtDate, STATUS_LABEL, statusColor } from "@/utils/constants"
+import { AppIcon } from "@/components/AppIcon"
 import type { Order } from "@/types"
 import { VOUCHERS } from "@/data/mock"
 
@@ -83,7 +84,7 @@ export function OrderDetailPage({ order, onBack, onReview }: Props) {
             </div>
             <div className="flex-1">
               <div className="font-bold text-sm mb-1" style={{ color: C.indigo }}>{voucher.title}</div>
-              <div className="text-xs mb-2" style={{ color: "#6B7280" }}>{voucher.partnerLogo} {voucher.partnerName}</div>
+              <div className="text-xs mb-2 flex items-center gap-1" style={{ color: "#6B7280" }}><AppIcon name={voucher.partnerLogo} className="w-3.5 h-3.5" /> {voucher.partnerName}</div>
               <div className="font-black" style={{ color: C.peach }}>{fmt(order.amount)}</div>
             </div>
           </div>

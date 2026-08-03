@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { Plus, Edit, FileEdit } from "lucide-react"
 import { C, fmt, fmtDate, statusColor, STATUS_LABEL } from "@/utils/constants"
+import { AppIcon } from "@/components/AppIcon"
 import { StatusBadge } from "@/components/StatusBadge"
 import { VOUCHERS } from "@/data/mock"
 import type { Voucher } from "@/types"
@@ -19,7 +20,7 @@ const BASE_VOUCHERS = VOUCHERS.filter((v) => v.partnerId === "p1")
 // Pre-seeded demo draft — shows lifecycle before any in-session draft is created
 const DEMO_DRAFT: Voucher = {
   id: "draft-demo-1",
-  partnerId: "p1", partnerName: "Pizza Hut Vietnam", partnerLogo: "🍕",
+  partnerId: "p1", partnerName: "Pizza Hut Vietnam", partnerLogo: "gift",
   title: "Combo Tết - Giảm 25% đơn trên 400k",
   category: "food",
   discount: 25, discountType: "percent", minOrder: 400000,
@@ -82,7 +83,7 @@ export function PartnerVouchersPage({ onCreateNew, onEdit, onDetail, sessionDraf
           style={{ backgroundColor: C.apricot + "25", color: "#6B4F00" }}
           onClick={() => setTab("draft")}
         >
-          <span className="text-base">📋</span>
+          <AppIcon name="document" className="w-4 h-4" />
           <span>
             {draftCount} voucher đang ở trạng thái <strong>Bản nháp</strong> — chưa được gửi duyệt.
           </span>
@@ -212,7 +213,7 @@ export function PartnerVouchersPage({ onCreateNew, onEdit, onDetail, sessionDraf
           </table>
           {visibleVouchers.length === 0 && (
             <div className="text-center py-12">
-              <div className="text-3xl mb-2">📄</div>
+              <AppIcon name="document" className="w-8 h-8 mb-2 mx-auto" />
               <div className="font-bold text-sm" style={{ color: C.indigo }}>Không có voucher nào</div>
               <p className="text-xs mt-1" style={{ color: "#8A8DA8" }}>Thử chọn tab khác hoặc tạo voucher mới</p>
             </div>

@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Bell, Globe, Moon, Shield, Trash2, LogOut, ChevronRight } from "lucide-react"
+import { Bell, Globe, Moon, Shield, Sun, Trash2, LogOut, ChevronRight, Settings } from "lucide-react"
 import { C } from "@/utils/constants"
 
 interface Props {
@@ -60,7 +60,7 @@ export function CustomerSettingsPage({ onLogout }: Props) {
       {/* Theme */}
       <Section title="Giao diện" icon={<Moon className="w-4 h-4" />}>
         <div className="flex gap-2 py-2">
-          {[{ value: "light", label: "☀️ Sáng" }, { value: "dark", label: "🌙 Tối" }, { value: "auto", label: "⚙️ Tự động" }].map((t) => (
+          {[{ value: "light", label: "Sáng", icon: <Sun className="w-4 h-4" /> }, { value: "dark", label: "Tối", icon: <Moon className="w-4 h-4" /> }, { value: "auto", label: "Tự động", icon: <Settings className="w-4 h-4" /> }].map((t) => (
             <button
               key={t.value}
               onClick={() => setTheme(t.value)}
@@ -71,7 +71,7 @@ export function CustomerSettingsPage({ onLogout }: Props) {
                 borderColor: theme === t.value ? C.indigo : "#E5E7EB",
               }}
             >
-              {t.label}
+              <span className="inline-flex items-center gap-1.5">{t.icon}{t.label}</span>
             </button>
           ))}
         </div>

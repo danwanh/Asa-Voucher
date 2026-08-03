@@ -1,6 +1,7 @@
 import { useState, useRef } from "react"
 import { Camera, X, Zap, CheckCircle2, AlertCircle, RotateCcw } from "lucide-react"
 import { C } from "@/utils/constants"
+import { AppIcon } from "@/components/AppIcon"
 
 interface Props {
   onVoucherFound: (code: string) => void
@@ -188,7 +189,7 @@ export function QRScanPage({ onVoucherFound }: Props) {
 
       {/* Tips */}
       <div className="mt-5 p-4 rounded-2xl" style={{ backgroundColor: "#EEF2FF" }}>
-        <div className="text-xs font-bold mb-2" style={{ color: "#4338CA" }}>💡 Hướng dẫn quét</div>
+        <div className="text-xs font-bold mb-2 flex items-center gap-1" style={{ color: "#4338CA" }}><AppIcon name="help" className="w-3.5 h-3.5" /> Hướng dẫn quét</div>
         <ul className="space-y-1 text-xs" style={{ color: "#6366F1" }}>
           <li>• Giữ camera cách mã QR 15-20cm</li>
           <li>• Đảm bảo ánh sáng đủ, tránh bóng che</li>

@@ -14,7 +14,7 @@ const ROLE: SubAdminRole = {
   id: "content",
   name: "Admin Nội dung",
   subtitle: "Quản lý nội dung & duyệt voucher",
-  emoji: "📝",
+  icon: "document",
   accent: "#81B29A",
   accentBg: "#EBF5F0",
   sidebarBg: "#253830",

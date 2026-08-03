@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { ArrowLeft, CheckCircle, Save, FileEdit } from "lucide-react"
 import { C, fmt, fmtDate, STATUS_LABEL, statusColor } from "@/utils/constants"
+import { AppIcon } from "@/components/AppIcon"
 import type { Voucher, VoucherStatus } from "@/types"
 
 interface Props {
@@ -10,12 +11,12 @@ interface Props {
 }
 
 const CATEGORIES = [
-  { value: "food", label: "🍜 Ẩm thực" },
-  { value: "beauty", label: "💅 Làm đẹp" },
-  { value: "travel", label: "✈️ Du lịch" },
-  { value: "entertainment", label: "🎬 Giải trí" },
-  { value: "sport", label: "⚽ Thể thao" },
-  { value: "education", label: "📚 Giáo dục" },
+  { value: "food", label: "Ẩm thực" },
+  { value: "beauty", label: "Làm đẹp" },
+  { value: "travel", label: "Du lịch" },
+  { value: "entertainment", label: "Giải trí" },
+  { value: "sport", label: "Thể thao" },
+  { value: "education", label: "Giáo dục" },
 ]
 
 export function EditVoucherPage({ voucher, onBack, onSave }: Props) {
@@ -228,7 +229,7 @@ export function EditVoucherPage({ voucher, onBack, onSave }: Props) {
                 className="flex-1 py-3 rounded-2xl font-bold text-sm text-white"
                 style={{ backgroundColor: C.peach }}
               >
-                🚀 Gửi duyệt
+                 <AppIcon name="send" className="w-4 h-4" /> Gửi duyệt
               </button>
             </>
           ) : (
@@ -246,7 +247,7 @@ export function EditVoucherPage({ voucher, onBack, onSave }: Props) {
                   className="flex-1 py-3 rounded-2xl font-bold text-sm text-white"
                   style={{ backgroundColor: C.teal }}
                 >
-                  🚀 Gửi duyệt lại
+                   <AppIcon name="send" className="w-4 h-4" /> Gửi duyệt lại
                 </button>
               )}
             </>

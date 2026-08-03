@@ -68,7 +68,7 @@ export function PartnerSettingsPage({ onLogout }: { onLogout: () => void }) {
           <h2 className="font-black" style={{ color: C.indigo }}>Giao diện</h2>
         </div>
         <div className="grid grid-cols-3 gap-2">
-          {[{ v: "light", l: "Sáng ☀️" }, { v: "dark", l: "Tối 🌙" }, { v: "system", l: "Hệ thống 💻" }].map((t) => (
+          {[{ v: "light", l: "Sáng" }, { v: "dark", l: "Tối" }, { v: "system", l: "Hệ thống" }].map((t) => (
             <button key={t.v} className="py-2.5 rounded-xl font-semibold text-sm" style={{ backgroundColor: t.v === "light" ? C.peach : C.eggshell, color: t.v === "light" ? "white" : C.indigo }}>
               {t.l}
             </button>

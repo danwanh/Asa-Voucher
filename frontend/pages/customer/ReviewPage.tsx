@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { ArrowLeft, Star } from "lucide-react"
 import { C, fmt } from "@/utils/constants"
+import { AppIcon } from "@/components/AppIcon"
 import type { Order } from "@/types"
 import { VOUCHERS } from "@/data/mock"
 
@@ -63,7 +64,7 @@ export function ReviewPage({ order, existingReview, onBack, onSubmit }: Props) {
       </h1>
       {isEdit && (
         <div className="mb-5 p-3 rounded-xl flex items-center gap-2 text-sm" style={{ backgroundColor: C.teal + "15", color: C.teal }}>
-          ✏️ Bạn đang chỉnh sửa đánh giá đã gửi trước đó.
+          <AppIcon name="edit" className="w-4 h-4 inline-block mr-1" /> Bạn đang chỉnh sửa đánh giá đã gửi trước đó.
         </div>
       )}
 
@@ -148,7 +149,7 @@ export function ReviewPage({ order, existingReview, onBack, onSubmit }: Props) {
             className="border-2 border-dashed rounded-xl p-4 text-center cursor-pointer hover:border-opacity-60 transition-colors"
             style={{ borderColor: "#D1D5DB" }}
           >
-            <div className="text-2xl mb-1">📷</div>
+            <AppIcon name="camera" className="w-6 h-6 mb-1 mx-auto" />
             <div className="text-xs" style={{ color: "#9CA3AF" }}>Nhấn để thêm ảnh (tối đa 3 ảnh)</div>
           </div>
         </div>

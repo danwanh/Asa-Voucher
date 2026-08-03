@@ -2,6 +2,7 @@ import { useState } from "react"
 import { Plus, Minus, Trash2, AlertTriangle, ShoppingBag } from "lucide-react"
 import { toast } from "sonner"
 import { C, fmt } from "@/utils/constants"
+import { AppIcon } from "@/components/AppIcon"
 import type { CartItem } from "@/types"
 
 const FALLBACK = "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=200&h=150&fit=crop"
@@ -36,7 +37,7 @@ export function CartPage({ cart, total, onRemove, onUpdate, onCheckout, onContin
   if (cart.length === 0) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-20 text-center">
-        <div className="text-6xl mb-4">🛒</div>
+        <AppIcon name="shoppingCart" className="w-16 h-16 mb-4 mx-auto" />
         <h2 className="text-xl font-black mb-2" style={{ color: C.indigo }}>Giỏ hàng trống</h2>
         <p className="text-sm mb-6" style={{ color: "#8A8DA8" }}>Hãy khám phá và thêm voucher bạn yêu thích vào giỏ hàng</p>
         <button onClick={onContinue} className="px-6 py-3 rounded-2xl font-bold text-white" style={{ backgroundColor: C.peach }}>

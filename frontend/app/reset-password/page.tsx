@@ -42,7 +42,7 @@ function ResetPasswordContent() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-[#F4F1DE] p-6">
+      <main className="min-h-screen flex items-center justify-center bg-[#F3F4F6] p-6">
       <form onSubmit={submit} className="max-w-md w-full rounded-3xl bg-white p-8 shadow-sm">
         <h1 className="text-2xl font-black text-[#3D405B]">Đặt lại mật khẩu</h1>
         <p className="mt-2 text-sm text-[#6B7280]">Mật khẩu mới phải gồm chữ hoa, chữ thường, số và ký tự đặc biệt.</p>

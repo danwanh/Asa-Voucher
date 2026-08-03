@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { GuestApp } from "@/routes/GuestApp"
 import { LoginPage } from "@/pages/LoginPage"
 import { CustomerApp } from "@/routes/CustomerApp"
@@ -17,6 +18,7 @@ export default function App() {
   const isInitialized = useAuthStore((s) => s.isInitialized)
   const initialize = useAuthStore((s) => s.initialize)
   const logout = useAuthStore((s) => s.logout)
+  const router = useRouter()
 
   const [showLogin, setShowLogin] = useState(false)
   const [pendingCheckout, setPendingCheckout] = useState(false)
@@ -27,7 +29,8 @@ export default function App() {
     initialize()
   }, [initialize])
 
-  const handleRequestLogin = () => setShowLogin(true)
+  const handleRequestLogin = () => router.push("/login")
+  const handleRequestRegister = () => router.push("/signup")
 
   const handleCheckoutAsGuest = () => {
     setPendingCheckout(true)
@@ -64,6 +67,7 @@ export default function App() {
   if (!user && !showLogin) return (
     <GuestApp
       onLogin={handleRequestLogin}
+      onRegister={handleRequestRegister}
       onCheckout={handleCheckoutAsGuest}
       cartAdd={add}
       cartCount={count}

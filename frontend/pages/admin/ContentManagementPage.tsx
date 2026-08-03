@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { Plus, Edit2, Trash2, X, Eye, EyeOff, Image, FileText, Megaphone, ChevronDown } from "lucide-react"
 import { C, fmtDate, STATUS_LABEL, statusColor } from "@/utils/constants"
+import { AppIcon } from "@/components/AppIcon"
 
 type ContentType = "banner" | "announcement" | "policy"
 
@@ -207,7 +208,7 @@ export function ContentManagementPage() {
                   </div>
                 ) : (
                   <div className="w-16 h-16 rounded-xl flex items-center justify-center flex-shrink-0 text-2xl" style={{ backgroundColor: tc.bg }}>
-                    {item.type === "announcement" ? "📢" : item.type === "policy" ? "📋" : "🖼️"}
+                    <AppIcon name={item.type === "announcement" ? "bell" : item.type === "policy" ? "document" : "image"} className="w-5 h-5" />
                   </div>
                 )}
 
@@ -273,7 +274,7 @@ export function ContentManagementPage() {
 
         {filtered.length === 0 && (
           <div className="text-center py-16 bg-white rounded-2xl border border-black/5">
-            <div className="text-4xl mb-2">📭</div>
+            <AppIcon name="package" className="w-10 h-10 mb-2 mx-auto" />
             <div className="font-bold text-sm" style={{ color: C.indigo }}>Không có nội dung</div>
             <div className="text-xs mt-1" style={{ color: "#9CA3AF" }}>Nhấn "Tạo nội dung" để bắt đầu</div>
           </div>
@@ -310,7 +311,7 @@ export function ContentManagementPage() {
                           color: form.type === t ? tc.color : "#6B7280",
                         }}
                       >
-                        <span className="text-xl">{t === "banner" ? "🖼️" : t === "announcement" ? "📢" : "📋"}</span>
+                        <AppIcon name={t === "banner" ? "image" : t === "announcement" ? "bell" : "document"} className="w-5 h-5" />
                         {tc.label}
                       </button>
                     )
@@ -477,7 +478,7 @@ export function ContentManagementPage() {
       {deleteId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: "rgba(0,0,0,0.45)" }}>
           <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl text-center">
-            <div className="text-4xl mb-3">🗑️</div>
+            <AppIcon name="trash" className="w-10 h-10 mb-3 mx-auto" />
             <h3 className="font-black text-lg mb-2" style={{ color: C.indigo, fontFamily: "'Nunito', sans-serif" }}>Xóa nội dung?</h3>
             <p className="text-sm mb-4" style={{ color: "#6B7280" }}>Hành động này không thể hoàn tác.</p>
             <div className="flex gap-3">
