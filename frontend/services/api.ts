@@ -1,10 +1,20 @@
-import axios from "axios"
+import axios, { type AxiosRequestConfig } from "axios"
+
+type PendingRequest = {
+  resolve: (value: unknown) => void
+  reject: (reason?: unknown) => void
+  config: AxiosRequestConfig
+}
 
 export const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5000/api"
 
 let accessToken: string | null = null
 let isRefreshing = false
-let pendingRequests: Array<(token: string) => void> = []
+let pendingRequests: PendingRequest[] = []
+
+function isAuthEndpoint(url?: string) {
+  return Boolean(url && /\/auth\/(login|register|register-partner|refresh|logout|forgot-password|reset-password|verify-email|resend-verification)/.test(url))
+}
 
 export function setAccessToken(token: string | null) {
   accessToken = token
@@ -32,16 +42,13 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config
 
-    if (error.response?.status !== 401 || originalRequest._retry) {
+    if (error.response?.status !== 401 || originalRequest._retry || isAuthEndpoint(originalRequest.url)) {
       return Promise.reject(error)
     }
 
     if (isRefreshing) {
-      return new Promise((resolve) => {
-        pendingRequests.push((token: string) => {
-          originalRequest.headers.Authorization = `Bearer ${token}`
-          resolve(api(originalRequest))
-        })
+      return new Promise((resolve, reject) => {
+        pendingRequests.push({ resolve, reject, config: originalRequest })
       })
     }
 
@@ -56,12 +63,16 @@ api.interceptors.response.use(
       )
       const newToken = data.data.access_token
       setAccessToken(newToken)
-      pendingRequests.forEach((cb) => cb(newToken))
+      pendingRequests.forEach(({ resolve, config }) => {
+        config.headers = { ...config.headers, Authorization: `Bearer ${newToken}` }
+        resolve(api(config))
+      })
       pendingRequests = []
       originalRequest.headers.Authorization = `Bearer ${newToken}`
       return api(originalRequest)
     } catch (refreshError) {
       setAccessToken(null)
+      pendingRequests.forEach(({ reject }) => reject(refreshError))
       pendingRequests = []
       return Promise.reject(refreshError)
     } finally {

@@ -17,13 +17,23 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
     const user = requireData(
       await prisma.user.findUnique({
         where: { id: payload.user_id },
-        select: { id: true, email: true, full_name: true, role: true, is_active: true, partner_branches_id: true }
+        select: { id: true, email: true, full_name: true, role: true, is_active: true, is_verified: true, auth_version: true, partner_branches_id: true }
       }),
       "User not found"
     );
 
     if (!user.is_active) {
       next(new HttpError(403, "User is inactive", "USER_INACTIVE"));
+      return;
+    }
+
+    if (!user.is_verified) {
+      next(new HttpError(403, "Email verification required", "EMAIL_NOT_VERIFIED"));
+      return;
+    }
+
+    if ((payload.auth_version ?? 0) !== user.auth_version) {
+      next(new HttpError(401, "Session has expired", "SESSION_REVOKED"));
       return;
     }
 

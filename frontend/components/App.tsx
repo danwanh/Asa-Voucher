@@ -44,8 +44,13 @@ export default function App() {
   }
 
   const handleLogout = async () => {
-    await logout()
-    clear()
+    if (!window.confirm("Bạn có chắc muốn đăng xuất không?")) return
+    try {
+      await logout()
+      clear()
+    } catch {
+      window.alert("Đăng xuất thất bại. Vui lòng thử lại.")
+    }
   }
 
   if (!isInitialized) {

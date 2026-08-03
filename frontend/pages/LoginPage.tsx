@@ -3,6 +3,7 @@ import { AlertCircle, Eye, EyeOff, Building2, User as UserIcon, Loader2 } from "
 import { C } from "@/utils/constants"
 import type { AppUser, Role } from "@/types"
 import { useAuthStore } from "@/stores/authStore"
+import { authService } from "@/services/authService"
 
 type AuthPage = "login" | "register" | "forgot"
 
@@ -60,7 +61,7 @@ function LeftPanel() {
           <div key={s.label} className="rounded-2xl p-4" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}>
             <div className="text-2xl font-black text-white">{s.value}</div>
             <div className="text-sm" style={{ color: "rgba(244,241,222,0.6)" }}>{s.label}</div>
-          </div>
+        </div>
         ))}
       </div>
       <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full opacity-10" style={{ backgroundColor: C.peach }} />
@@ -92,7 +93,7 @@ function LoginForm({ onLogin, onNavigate }: { onLogin: (u: AppUser) => void; onN
     if (!email) { setEmailErr("Vui lòng nhập email"); ok = false }
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setEmailErr("Email không đúng định dạng"); ok = false }
     if (!password) { setPwErr("Vui lòng nhập mật khẩu"); ok = false }
-    else if (password.length < 6) { setPwErr("Mật khẩu tối thiểu 6 ký tự"); ok = false }
+    else if (password.length < 8) { setPwErr("Mật khẩu tối thiểu 8 ký tự"); ok = false }
     return ok
   }
 
@@ -103,8 +104,18 @@ function LoginForm({ onLogin, onNavigate }: { onLogin: (u: AppUser) => void; onN
       const user = useAuthStore.getState().user
       if (user) onLogin(user)
     } catch (error: unknown) {
-      const err = error as { response?: { data?: { error?: { message?: string } } } }
-      setGeneralErr(err?.response?.data?.error?.message ?? "Đăng nhập thất bại")
+      const err = error as { response?: { data?: { error?: { code?: string; message?: string } } } }
+      const code = err?.response?.data?.error?.code
+      const messages: Record<string, string> = {
+        ACCOUNT_NOT_FOUND: "Sai tên đăng nhập hoặc không tồn tại tài khoản, vui lòng đăng ký phù hợp",
+        INVALID_PASSWORD: "Sai mật khẩu",
+        ACCOUNT_LOCKED: "Tài khoản đang bị khóa. Vui lòng thử lại sau 15 phút.",
+        EMAIL_NOT_VERIFIED: "Vui lòng xác thực email trước khi đăng nhập.",
+        PARTNER_PENDING: "Hồ sơ đối tác đang chờ quản trị viên phê duyệt.",
+        PARTNER_REJECTED: "Hồ sơ đối tác đã bị từ chối. Vui lòng liên hệ hỗ trợ.",
+        PARTNER_INACTIVE: "Hồ sơ đối tác đang tạm ngưng hoạt động.",
+      }
+      setGeneralErr(messages[code ?? ""] ?? err?.response?.data?.error?.message ?? "Đăng nhập thất bại")
     }
   }
 
@@ -243,9 +254,19 @@ function RegisterForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
   const [showPw, setShowPw] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [generalErr, setGeneralErr] = useState("")
+  const [resendLoading, setResendLoading] = useState(false)
+  const [resendCooldown, setResendCooldown] = useState(0)
+  const [resendMessage, setResendMessage] = useState("")
 
   const storeRegister = useAuthStore((s) => s.register)
+  const storeRegisterPartner = authService.registerPartner
   const isLoading = useAuthStore((s) => s.isLoading)
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return
+    const timer = window.setInterval(() => setResendCooldown((value) => Math.max(0, value - 1)), 1000)
+    return () => window.clearInterval(timer)
+  }, [resendCooldown])
 
   const set = (k: string, v: string | boolean) => {
     setForm((f) => ({ ...f, [k]: v }))
@@ -257,7 +278,7 @@ function RegisterForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
     if (!form.name.trim()) errs.name = "Vui lòng nhập họ tên"
     if (!form.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = "Email không hợp lệ"
     if (!form.phone || !/^(0|\+84)[0-9]{8,9}$/.test(form.phone.replace(/\s/g, ""))) errs.phone = "Số điện thoại không hợp lệ"
-    if (form.password.length < 8) errs.password = "Mật khẩu tối thiểu 8 ký tự"
+    if (form.password.length < 8 || form.password.length > 64 || !/[A-Z]/.test(form.password) || !/[a-z]/.test(form.password) || !/[0-9]/.test(form.password) || !/[^A-Za-z0-9]/.test(form.password)) errs.password = "Mật khẩu 8-64 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt"
     if (form.password !== form.confirm) errs.confirm = "Mật khẩu xác nhận không khớp"
     if (regRole === "partner") {
       if (!form.businessName.trim()) errs.businessName = "Vui lòng nhập tên doanh nghiệp"
@@ -272,20 +293,53 @@ function RegisterForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
     if (!validateForm()) return
     setGeneralErr("")
     try {
-      await storeRegister({
-        email: form.email,
-        password: form.password,
-        full_name: form.name,
-        phone: form.phone
-      })
+      if (regRole === "partner") {
+        await storeRegisterPartner({
+          email: form.email,
+          password: form.password,
+          confirm_password: form.confirm,
+          full_name: form.name,
+          phone: form.phone,
+          business_name: form.businessName,
+          tax_number: form.taxCode,
+        })
+      } else {
+        await storeRegister({
+          email: form.email,
+          password: form.password,
+          confirm_password: form.confirm,
+          full_name: form.name,
+          phone: form.phone
+        })
+      }
       if (regRole === "customer") {
         setStep("success")
       } else {
         setStep("partner-pending")
       }
+      setResendCooldown(60)
+      setResendMessage("")
     } catch (error: unknown) {
       const err = error as { response?: { data?: { error?: { message?: string } } } }
       setGeneralErr(err?.response?.data?.error?.message ?? "Đăng ký thất bại")
+    }
+  }
+
+  const handleResendVerification = async () => {
+    if (resendLoading || resendCooldown > 0) return
+    setResendLoading(true)
+    setResendMessage("")
+    try {
+      await authService.resendVerification(form.email)
+      setResendMessage("Đã gửi lại email xác thực. Vui lòng kiểm tra hộp thư.")
+      setResendCooldown(60)
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { error?: { message?: string; details?: { cooldown_seconds?: number } } } } }
+      const retryAfter = err?.response?.data?.error?.details?.cooldown_seconds
+      if (typeof retryAfter === "number") setResendCooldown(retryAfter)
+      setResendMessage(err?.response?.data?.error?.message ?? "Không thể gửi lại email xác thực")
+    } finally {
+      setResendLoading(false)
     }
   }
 
@@ -330,11 +384,20 @@ function RegisterForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
         <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl mx-auto mb-6" style={{ backgroundColor: C.teal + "20" }}>✅</div>
         <h2 className="text-2xl font-black mb-2" style={{ color: C.indigo }}>Đăng ký thành công</h2>
         <p className="mb-2" style={{ color: "#8A8DA8" }}>
-          Tài khoản <strong>{form.email}</strong> đã được tạo thành công.
+          Tài khoản <strong>{form.email}</strong> đã được tạo. Vui lòng kiểm tra email để xác thực.
         </p>
         <p className="mb-6 text-sm" style={{ color: "#8A8DA8" }}>
-          Vui lòng đăng nhập để tiếp tục.
+          Sau khi xác thực email, bạn có thể quay lại đăng nhập.
         </p>
+        {resendMessage && <p className="mb-4 text-sm" style={{ color: C.teal }}>{resendMessage}</p>}
+        <button
+          disabled={resendLoading || resendCooldown > 0}
+          onClick={handleResendVerification}
+          className="w-full py-3.5 mb-3 rounded-2xl font-bold text-white hover:opacity-90 transition-all disabled:opacity-60"
+          style={{ backgroundColor: C.teal }}
+        >
+          {resendLoading ? "Đang gửi..." : resendCooldown > 0 ? `Gửi lại sau ${resendCooldown}s` : "Gửi lại email"}
+        </button>
         <button
           onClick={() => onNavigate("login")}
           className="w-full py-3.5 rounded-2xl font-bold text-white hover:opacity-90 transition-all"
@@ -352,10 +415,10 @@ function RegisterForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
         <div className="w-24 h-24 rounded-full flex items-center justify-center text-5xl mx-auto mb-6" style={{ backgroundColor: C.apricot + "20" }}>⏳</div>
         <h2 className="text-2xl font-black mb-3" style={{ color: C.indigo }}>Đang chờ phê duyệt</h2>
         <p className="text-sm mb-2" style={{ color: "#8A8DA8" }}>
-          Tài khoản đối tác <strong>{form.businessName}</strong> đã được đăng ký thành công.
+           Hồ sơ đối tác <strong>{form.businessName}</strong> đã được tạo. Vui lòng xác thực email trước.
         </p>
         <p className="text-sm mb-6" style={{ color: "#8A8DA8" }}>
-          Quản trị viên sẽ xem xét trong <strong>1–3 ngày làm việc</strong>. Thông báo gửi về{" "}
+           Sau khi xác thực email, quản trị viên sẽ xem xét trong <strong>1–3 ngày làm việc</strong>. Thông báo gửi về{" "}
           <strong>{form.email}</strong>.
         </p>
         <div className="rounded-2xl p-4 mb-6 text-left" style={{ backgroundColor: C.apricot + "15", border: `1.5px solid ${C.apricot}` }}>
@@ -363,6 +426,15 @@ function RegisterForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
           <div className="text-xs" style={{ color: "#6B7280" }}>{form.businessName} • MST: {form.taxCode}</div>
           <div className="text-xs mt-1.5 font-bold" style={{ color: "#D97706" }}>🟡 Chờ phê duyệt</div>
         </div>
+        {resendMessage && <p className="mb-4 text-sm" style={{ color: C.teal }}>{resendMessage}</p>}
+        <button
+          disabled={resendLoading || resendCooldown > 0}
+          onClick={handleResendVerification}
+          className="w-full py-3.5 mb-3 rounded-2xl font-bold text-white hover:opacity-90 transition-all disabled:opacity-60"
+          style={{ backgroundColor: C.teal }}
+        >
+          {resendLoading ? "Đang gửi..." : resendCooldown > 0 ? `Gửi lại sau ${resendCooldown}s` : "Gửi lại email"}
+        </button>
         <button
           onClick={() => onNavigate("login")}
           className="w-full py-3.5 rounded-2xl font-bold text-white hover:opacity-90"
@@ -504,12 +576,37 @@ function ForgotForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
   const [email, setEmail] = useState("")
   const [emailErr, setEmailErr] = useState("")
   const [sent, setSent] = useState(false)
+  const [cooldown, setCooldown] = useState(0)
+  const [loading, setLoading] = useState(false)
+  const [generalErr, setGeneralErr] = useState("")
 
-  const handleSend = () => {
+  useEffect(() => {
+    if (cooldown <= 0) return
+    const timer = window.setInterval(() => {
+      setCooldown((seconds) => Math.max(seconds - 1, 0))
+    }, 1000)
+    return () => window.clearInterval(timer)
+  }, [cooldown])
+
+  const handleSend = async () => {
+    if (cooldown > 0 || loading) return
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setEmailErr("Vui lòng nhập email hợp lệ"); return
     }
-    setSent(true)
+    setLoading(true)
+    setGeneralErr("")
+    try {
+      await authService.forgotPassword(email)
+      setSent(true)
+      setCooldown(60)
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { error?: { message?: string; details?: { cooldown_seconds?: number } } } } }
+      const retryAfter = err?.response?.data?.error?.details?.cooldown_seconds
+      if (typeof retryAfter === "number") setCooldown(retryAfter)
+      setGeneralErr(err?.response?.data?.error?.message ?? "Không thể gửi email, vui lòng thử lại")
+    } finally {
+      setLoading(false)
+    }
   }
 
   if (sent) {
@@ -520,8 +617,16 @@ function ForgotForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
         <p className="mb-6" style={{ color: "#8A8DA8" }}>
           Chúng tôi đã gửi link đặt lại mật khẩu đến <strong>{email}</strong>
         </p>
+        <button
+          disabled={cooldown > 0 || loading}
+          onClick={handleSend}
+          className="w-full py-3.5 rounded-2xl font-bold text-white hover:opacity-90 transition-all disabled:opacity-60"
+          style={{ backgroundColor: C.peach }}
+        >
+          {cooldown > 0 ? `Gửi lại sau ${cooldown}s` : "Gửi lại email"}
+        </button>
         <button className="font-bold text-sm hover:opacity-70 transition-opacity" style={{ color: C.peach }} onClick={() => onNavigate("login")}>
-          Quay lại đăng nhập
+          <span className="inline-block mt-5">Quay lại đăng nhập</span>
         </button>
       </div>
     )
@@ -543,8 +648,9 @@ function ForgotForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
         />
         {emailErr && <p className="text-xs mt-1" style={{ color: C.peach }}>{emailErr}</p>}
       </div>
-      <button onClick={handleSend} className="mt-6 w-full py-3.5 rounded-2xl font-bold text-white hover:opacity-90 transition-all" style={{ backgroundColor: C.peach }}>
-        Gửi Email đặt lại
+      {generalErr && <p className="mt-3 text-sm" style={{ color: C.peach }}>{generalErr}</p>}
+      <button disabled={loading || cooldown > 0} onClick={handleSend} className="mt-6 w-full py-3.5 rounded-2xl font-bold text-white hover:opacity-90 transition-all disabled:opacity-60" style={{ backgroundColor: C.peach }}>
+        {loading ? "Đang gửi..." : cooldown > 0 ? `Gửi lại sau ${cooldown}s` : "Gửi Email đặt lại"}
       </button>
       <p className="text-center text-sm mt-6" style={{ color: "#8A8DA8" }}>
         <button className="font-bold hover:opacity-70 transition-opacity" style={{ color: C.peach }} onClick={() => onNavigate("login")}>

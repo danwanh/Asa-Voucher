@@ -2,7 +2,9 @@ import { create } from "zustand"
 import { persist } from "zustand/middleware"
 import type { AppUser } from "@/types"
 import { authService } from "@/services/authService"
-import { getAccessToken } from "@/services/api"
+import { getAccessToken, setAccessToken } from "@/services/api"
+
+let initializePromise: Promise<void> | null = null
 
 interface AuthState {
   user: AppUser | null
@@ -11,7 +13,7 @@ interface AuthState {
   isInitialized: boolean
 
   login: (email: string, password: string) => Promise<void>
-  register: (body: { email: string; password: string; full_name: string; phone?: string }) => Promise<AppUser>
+  register: (body: { email: string; password: string; confirm_password: string; full_name: string; phone?: string }) => Promise<AppUser>
   logout: () => Promise<void>
   initialize: () => Promise<void>
   setUser: (user: AppUser) => void
@@ -58,21 +60,34 @@ export const useAuthStore = create<AuthState>()(
       },
 
       initialize: async () => {
-        const token = getAccessToken()
-        if (!token) {
-          set({ isInitialized: true })
-          return
-        }
-        try {
-          const user = await authService.getMe()
-          set({ user, accessToken: token, isInitialized: true })
-        } catch {
-          try {
-            const result = await authService.refresh()
-            set({ user: result.user, accessToken: result.accessToken, isInitialized: true })
-          } catch {
-            set({ user: null, accessToken: null, isInitialized: true })
+        if (get().isInitialized) return
+        if (initializePromise) return initializePromise
+
+        initializePromise = (async () => {
+          const token = getAccessToken() ?? get().accessToken
+          if (!token) {
+            set({ isInitialized: true })
+            return
           }
+          setAccessToken(token)
+          try {
+            const user = await authService.getMe()
+            set({ user, accessToken: token, isInitialized: true })
+          } catch {
+            try {
+              const result = await authService.refresh()
+              set({ user: result.user, accessToken: result.accessToken, isInitialized: true })
+            } catch {
+              set({ user: null, accessToken: null, isInitialized: true })
+              setAccessToken(null)
+            }
+          }
+        })()
+
+        try {
+          await initializePromise
+        } finally {
+          initializePromise = null
         }
       },
 

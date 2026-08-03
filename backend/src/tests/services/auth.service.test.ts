@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { mockPrisma } = vi.hoisted(() => ({
+  const { mockPrisma } = vi.hoisted(() => ({
   mockPrisma: {
     user: {
       findUnique: vi.fn(),
+      findFirst: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
     },
@@ -15,6 +16,12 @@ const { mockPrisma } = vi.hoisted(() => ({
       findFirst: vi.fn(),
       update: vi.fn(),
       updateMany: vi.fn(),
+    },
+    $transaction: vi.fn(async (operations: unknown[]) => Promise.all(operations as Promise<unknown>[])),
+    authToken: {
+      updateMany: vi.fn(),
+      create: vi.fn(),
+      findFirst: vi.fn(),
     },
     authenticationLog: {
       create: vi.fn(),
@@ -62,8 +69,8 @@ describe("Auth Service", () => {
 
   describe("login", () => {
     it("returns tokens on correct credentials", async () => {
-      vi.mocked(prisma.user.findUnique).mockResolvedValue({
-        id: "u1", email: "test@test.com", role: "buyer", password_hash: "hashed:pass", is_active: true,
+      vi.mocked(prisma.user.findFirst).mockResolvedValue({
+        id: "u1", email: "test@test.com", role: "buyer", password_hash: "hashed:pass", is_active: true, is_verified: true,
       } as any);
       vi.mocked(prisma.partner.findFirst).mockResolvedValue(null);
       vi.mocked(prisma.refreshToken.create).mockResolvedValue({} as any);
@@ -75,8 +82,8 @@ describe("Auth Service", () => {
     });
 
     it("throws 401 on wrong password", async () => {
-      vi.mocked(prisma.user.findUnique).mockResolvedValue({
-        id: "u1", email: "test@test.com", role: "buyer", password_hash: "hashed:wrong", is_active: true,
+      vi.mocked(prisma.user.findFirst).mockResolvedValue({
+        id: "u1", email: "test@test.com", role: "buyer", password_hash: "hashed:wrong", is_active: true, is_verified: true,
       } as any);
       vi.mocked(prisma.authenticationLog.create).mockResolvedValue({} as any);
 
@@ -84,15 +91,15 @@ describe("Auth Service", () => {
     });
 
     it("throws 401 on non-existent email", async () => {
-      vi.mocked(prisma.user.findUnique).mockResolvedValue(null);
+      vi.mocked(prisma.user.findFirst).mockResolvedValue(null);
       vi.mocked(prisma.authenticationLog.create).mockResolvedValue({} as any);
 
       await expect(authService.login("no@test.com", "pass", {})).rejects.toThrow();
     });
 
     it("throws 403 on inactive user", async () => {
-      vi.mocked(prisma.user.findUnique).mockResolvedValue({
-        id: "u1", email: "test@test.com", role: "buyer", password_hash: "hashed:pass", is_active: false,
+      vi.mocked(prisma.user.findFirst).mockResolvedValue({
+        id: "u1", email: "test@test.com", role: "buyer", password_hash: "hashed:pass", is_active: false, is_verified: true,
       } as any);
       vi.mocked(prisma.authenticationLog.create).mockResolvedValue({} as any);
 
@@ -104,7 +111,7 @@ describe("Auth Service", () => {
     it("returns new tokens on valid refresh token", async () => {
       vi.mocked(prisma.refreshToken.findFirst).mockResolvedValue({
         id: "rt1", users: {
-          id: "u1", email: "test@test.com", role: "buyer", password_hash: "h", is_active: true,
+          id: "u1", email: "test@test.com", role: "buyer", password_hash: "h", is_active: true, is_verified: true,
           partner_branches_id: null,
         },
       } as any);
@@ -178,7 +185,7 @@ describe("Auth Service", () => {
     it("clearRefreshCookie clears cookie", () => {
       const res = { cookie: vi.fn(), clearCookie: vi.fn() } as any;
       authService.clearRefreshCookie(res);
-      expect(res.clearCookie).toHaveBeenCalledWith("refresh_token", { path: "/api/v1/auth" });
+      expect(res.clearCookie).toHaveBeenCalledWith("refresh_token", { path: "/api" });
     });
   });
 });

@@ -28,17 +28,66 @@ function extractData<T>(response: { data: { success: boolean; data: T } }): T {
 }
 
 export const authService = {
-  async login(email: string, password: string) {
-    const res = await api.post("/auth/login", { email, password })
+  async login(identifier: string, password: string) {
+    const res = await api.post("/auth/login", { identifier, password })
     const data = extractData<{ access_token: string; user: BackendUser }>(res)
     setAccessToken(data.access_token)
     return { accessToken: data.access_token, user: mapUser(data.user) }
   },
 
-  async register(body: { email: string; password: string; full_name: string; phone?: string }) {
+  async register(body: { email: string; password: string; confirm_password: string; full_name: string; phone?: string }) {
     const res = await api.post("/auth/register", body)
     const user = extractData<BackendUser>(res)
     return mapUser(user)
+  },
+
+  async registerPartner(body: {
+    email: string; password: string; confirm_password: string; full_name: string; phone?: string
+    business_name: string; business_type?: string; tax_number: string; website_url?: string; description?: string
+  }) {
+    const res = await api.post("/auth/register-partner", body)
+    const data = extractData<{ user: BackendUser; partner: Record<string, unknown> }>(res)
+    return { user: mapUser(data.user), partner: data.partner }
+  },
+
+  async verifyEmail(token: string) {
+    await api.post("/auth/verify-email", { token })
+  },
+
+  async resendVerification(email: string) {
+    await api.post("/auth/resend-verification", { email })
+  },
+
+  async forgotPassword(identifier: string) {
+    await api.post("/auth/forgot-password", { identifier })
+  },
+
+  async resetPassword(token: string, newPassword: string, confirmPassword: string) {
+    await api.post("/auth/reset-password", { token, new_password: newPassword, confirm_password: confirmPassword })
+  },
+
+  async getProfile(id: string) {
+    const res = await api.get(`/users/${id}`)
+    return extractData<BackendUser & Record<string, unknown>>(res)
+  },
+
+  async updateProfile(id: string, body: Record<string, unknown>) {
+    const res = await api.patch(`/users/${id}`, body)
+    return extractData<BackendUser & Record<string, unknown>>(res)
+  },
+
+  async getPartner(id: string) {
+    const res = await api.get(`/partners/${id}`)
+    return extractData<Record<string, any>>(res)
+  },
+
+  async updatePartner(id: string, body: Record<string, unknown>) {
+    const res = await api.patch(`/partners/${id}`, body)
+    return extractData<Record<string, any>>(res)
+  },
+
+  async changePassword(currentPassword: string, newPassword: string, confirmPassword: string) {
+    await api.post("/auth/change-password", { current_password: currentPassword, new_password: newPassword, confirm_password: confirmPassword })
   },
 
   async logout() {

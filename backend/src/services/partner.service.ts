@@ -77,7 +77,12 @@ export async function deletePartner(id: string) {
 
 export async function updatePartnerApproval(adminId: string, id: string, approvalStatus: string) {
   try {
-    return await prisma.partner.update({ where: { id }, data: { approval_status: approvalStatus, approved_by: adminId, approved_at: new Date(), updated_at: new Date() } });
+    const updatedPartner = await prisma.partner.update({ where: { id }, data: { approval_status: approvalStatus, approved_by: adminId, approved_at: new Date(), updated_at: new Date() } });
+    const representativeUserId = (updatedPartner as { representative_user_id?: string }).representative_user_id;
+    if (representativeUserId) {
+      await prisma.user.update({ where: { id: representativeUserId }, data: { is_active: approvalStatus === "approved", auth_version: { increment: 1 } } });
+    }
+    return updatedPartner;
   } catch (error) {
     throwDbError(error, "Partner not found");
   }
