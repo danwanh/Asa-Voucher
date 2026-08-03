@@ -25,7 +25,7 @@ export function GuestLayout({ page, onNavigate, onLogin, onRegister, cartCount =
   const [mobileOpen, setMobileOpen] = useState(false)
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: C.eggshell, fontFamily: "'Inter', sans-serif" }}>
+    <div className="min-h-screen flex flex-col" style={{ backgroundColor: C.content, fontFamily: "'Inter', sans-serif" }}>
       {/* Header */}
       <header className="sticky top-0 z-50 shadow-sm border-b border-black/5" style={{ backgroundColor: "rgba(244,241,222,0.96)", backdropFilter: "blur(8px)" }}>
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -113,7 +113,7 @@ export function GuestLayout({ page, onNavigate, onLogin, onRegister, cartCount =
 
         {/* Mobile menu */}
         {mobileOpen && (
-          <div className="md:hidden border-t border-black/5 py-3 px-4 flex flex-col gap-1" style={{ backgroundColor: C.eggshell }}>
+          <div className="md:hidden border-t border-black/5 py-3 px-4 flex flex-col gap-1" style={{ backgroundColor: "white" }}>
             {NAV.map((n) => (
               <button
                 key={n.value}
@@ -137,7 +137,7 @@ export function GuestLayout({ page, onNavigate, onLogin, onRegister, cartCount =
       </header>
 
       {/* Content */}
-      <main className="flex-1">{children}</main>
+      <main className="flex-1" style={{ backgroundColor: C.content }}>{children}</main>
 
       {/* Footer */}
       <footer className="border-t border-black/8 py-12" style={{ backgroundColor: C.indigo }}>

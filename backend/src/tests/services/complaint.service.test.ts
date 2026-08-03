@@ -27,7 +27,7 @@ import * as complaintService from "../../services/complaint.service.js";
 const BUYER: AuthUser = { id: "u-buyer", email: "b@test.com", role: "buyer" };
 const OTHER_BUYER: AuthUser = { id: "u-other", email: "o@test.com", role: "buyer" };
 const PARTNER_OWNER: AuthUser = { id: "u-partner", email: "p@test.com", role: "partner_owner", partnerId: "partner-1" };
-const ADMIN: AuthUser = { id: "u-admin", email: "a@test.com", role: "admin_account" };
+const ADMIN: AuthUser = { id: "u-admin", email: "a@test.com", role: "admin_operations" };
 
 function makeComplaint(overrides: Record<string, unknown> = {}) {
   return {

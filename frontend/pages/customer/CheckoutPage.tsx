@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { ArrowLeft, CheckCircle2 } from "lucide-react"
 import { C, fmt } from "@/utils/constants"
+import { AppIcon } from "@/components/AppIcon"
 import type { CartItem } from "@/types"
 
 interface Props {
@@ -13,11 +14,11 @@ interface Props {
 type PaymentMethod = "vnpay" | "momo" | "zalopay" | "bank" | "qr"
 
 const PAYMENT_METHODS = [
-  { id: "vnpay" as PaymentMethod, label: "VNPay", icon: "💳", desc: "Thẻ ATM / Internet Banking" },
-  { id: "momo" as PaymentMethod, label: "MoMo", icon: "🟣", desc: "Ví điện tử MoMo" },
-  { id: "zalopay" as PaymentMethod, label: "ZaloPay", icon: "🔵", desc: "Ví điện tử ZaloPay" },
-  { id: "bank" as PaymentMethod, label: "Thẻ ngân hàng", icon: "🏦", desc: "Visa / Mastercard / JCB" },
-  { id: "qr" as PaymentMethod, label: "QR Banking", icon: "📱", desc: "Quét mã QR ngân hàng" },
+  { id: "vnpay" as PaymentMethod, label: "VNPay", icon: "creditCard", desc: "Thẻ ATM / Internet Banking" },
+  { id: "momo" as PaymentMethod, label: "MoMo", icon: "wallet", desc: "Ví điện tử MoMo" },
+  { id: "zalopay" as PaymentMethod, label: "ZaloPay", icon: "wallet", desc: "Ví điện tử ZaloPay" },
+  { id: "bank" as PaymentMethod, label: "Thẻ ngân hàng", icon: "building", desc: "Visa / Mastercard / JCB" },
+  { id: "qr" as PaymentMethod, label: "QR Banking", icon: "smartphone", desc: "Quét mã QR ngân hàng" },
 ]
 
 export function CheckoutPage({ cart, total, onSuccess, onBack }: Props) {
@@ -166,7 +167,7 @@ export function CheckoutPage({ cart, total, onSuccess, onBack }: Props) {
                       backgroundColor: payment === pm.id ? `${C.peach}10` : "white",
                     }}
                   >
-                    <div className="text-2xl">{pm.icon}</div>
+                    <AppIcon name={pm.icon} className="w-7 h-7" />
                     <div>
                       <div className="font-bold text-sm" style={{ color: C.indigo }}>{pm.label}</div>
                       <div className="text-xs" style={{ color: "#6B7280" }}>{pm.desc}</div>

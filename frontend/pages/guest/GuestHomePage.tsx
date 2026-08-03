@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { Search, Star, ChevronRight, Zap, ShieldCheck, Smartphone, TrendingUp, ChevronDown } from "lucide-react"
 import { C, fmt } from "@/utils/constants"
+import { AppIcon } from "@/components/AppIcon"
 import { VOUCHERS, PARTNERS } from "@/data/mock"
 import type { Voucher } from "@/types"
 
@@ -12,20 +13,20 @@ interface Props {
 }
 
 const CATEGORIES = [
-  { icon: "🍜", name: "Ẩm thực", count: 45, color: "#FDEBD0" },
-  { icon: "💅", name: "Làm đẹp", count: 32, color: "#FCE4EC" },
-  { icon: "✈️", name: "Du lịch", count: 28, color: "#E3F2FD" },
-  { icon: "🎬", name: "Giải trí", count: 21, color: "#EDE7F6" },
-  { icon: "⚽", name: "Thể thao", count: 8, color: "#E8F5E9" },
-  { icon: "📚", name: "Giáo dục", count: 5, color: "#FFF8E1" },
-  { icon: "🏥", name: "Sức khỏe", count: 14, color: "#E0F7FA" },
-  { icon: "🛍️", name: "Mua sắm", count: 19, color: "#F3E5F5" },
+  { icon: "gift", name: "Ẩm thực", count: 45, color: "#FDEBD0" },
+  { icon: "heart", name: "Làm đẹp", count: 32, color: "#FCE4EC" },
+  { icon: "location", name: "Du lịch", count: 28, color: "#E3F2FD" },
+  { icon: "ticket", name: "Giải trí", count: 21, color: "#EDE7F6" },
+  { icon: "shield", name: "Thể thao", count: 8, color: "#E8F5E9" },
+  { icon: "document", name: "Giáo dục", count: 5, color: "#FFF8E1" },
+  { icon: "shield", name: "Sức khỏe", count: 14, color: "#E0F7FA" },
+  { icon: "shoppingCart", name: "Mua sắm", count: 19, color: "#F3E5F5" },
 ]
 
 const REVIEWS = [
-  { name: "Nguyễn Thị Lan", avatar: "👩", rating: 5, text: "Dịch vụ tuyệt vời! Mua voucher rất dễ dàng, tiết kiệm được nhiều tiền.", date: "05/07/2026" },
-  { name: "Trần Văn Hùng", avatar: "👨", rating: 5, text: "Nhiều voucher hấp dẫn, giá tốt. Sẽ tiếp tục sử dụng ASA Voucher!", date: "03/07/2026" },
-  { name: "Phạm Minh Châu", avatar: "🧑", rating: 4, text: "App dễ dùng, tìm voucher nhanh. Chăm sóc khách hàng nhiệt tình.", date: "01/07/2026" },
+  { name: "Nguyễn Thị Lan", avatar: "user", rating: 5, text: "Dịch vụ tuyệt vời! Mua voucher rất dễ dàng, tiết kiệm được nhiều tiền.", date: "05/07/2026" },
+  { name: "Trần Văn Hùng", avatar: "user", rating: 5, text: "Nhiều voucher hấp dẫn, giá tốt. Sẽ tiếp tục sử dụng ASA Voucher!", date: "03/07/2026" },
+  { name: "Phạm Minh Châu", avatar: "user", rating: 4, text: "App dễ dùng, tìm voucher nhanh. Chăm sóc khách hàng nhiệt tình.", date: "01/07/2026" },
 ]
 
 const FAQ = [
@@ -121,7 +122,7 @@ export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCar
                 className="flex flex-col items-center gap-2 p-3 rounded-2xl hover:shadow-md transition-all group"
                 style={{ backgroundColor: cat.color }}
               >
-                <div className="text-3xl group-hover:scale-110 transition-transform">{cat.icon}</div>
+                <AppIcon name={cat.icon} className="w-8 h-8 group-hover:scale-110 transition-transform" />
                 <div className="text-xs font-bold text-center leading-tight" style={{ color: C.indigo }}>{cat.name}</div>
                 <div className="text-[10px]" style={{ color: "#6B7280" }}>{cat.count}</div>
               </button>
@@ -201,7 +202,7 @@ export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCar
             {REVIEWS.map((r, i) => (
               <div key={i} className="bg-white rounded-2xl p-5 shadow-sm border border-black/4">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-xl">{r.avatar}</div>
+                  <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center"><AppIcon name={r.avatar} className="w-5 h-5" /></div>
                   <div>
                     <div className="font-bold text-sm" style={{ color: C.indigo }}>{r.name}</div>
                     <div className="flex gap-0.5 mt-0.5">
@@ -272,7 +273,7 @@ function VoucherCard({ voucher: v, onDetail, onBuy, isGuest }: { voucher: Vouche
         </div>
       </div>
       <div className="p-4">
-        <div className="text-xs font-semibold mb-1" style={{ color: C.teal }}>{v.partnerLogo} {v.partnerName}</div>
+        <div className="text-xs font-semibold mb-1 flex items-center gap-1" style={{ color: C.teal }}><AppIcon name={v.partnerLogo} className="w-3.5 h-3.5" /> {v.partnerName}</div>
         <div className="font-bold text-sm mb-2 line-clamp-2 leading-snug" style={{ color: C.indigo }}>{v.title}</div>
         <div className="flex items-center gap-2 mb-3">
           <span className="font-black text-base" style={{ color: C.peach }}>{fmt(v.price)}</span>

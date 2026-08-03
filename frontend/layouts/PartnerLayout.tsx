@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { Home, Tag, GitBranch, Users, BarChart2, Bell, Building2, Settings, LogOut, Menu, ChevronRight } from "lucide-react"
 import { C } from "@/utils/constants"
+import { AppIcon } from "@/components/AppIcon"
 import type { AppUser } from "@/types"
 
 export type PartnerPage =
@@ -45,7 +46,7 @@ function SidebarContent({ user, page, onNavigate, onLogout, onClose }: Props & {
           </div>
         </div>
         <div className="flex items-center gap-3 p-3 rounded-2xl" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}>
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0" style={{ backgroundColor: "rgba(255,255,255,0.1)" }}>🍕</div>
+           <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "rgba(255,255,255,0.1)" }}><AppIcon name="gift" className="w-5 h-5 text-white" /></div>
           <div className="min-w-0">
             <div className="text-sm font-bold text-white truncate">Pizza Hut Vietnam</div>
             <div className="text-xs flex items-center gap-1" style={{ color: "#81B29A" }}>
@@ -127,7 +128,7 @@ export function PartnerLayout({ user, page, onNavigate, onLogout, children }: Pr
           </div>
         </header>
 
-        <main className="flex-1 overflow-auto" style={{ backgroundColor: C.eggshell }}>
+        <main className="flex-1 overflow-auto" style={{ backgroundColor: C.content }}>
           {children}
         </main>
       </div>

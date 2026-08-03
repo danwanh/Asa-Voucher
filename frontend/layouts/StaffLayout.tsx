@@ -100,7 +100,7 @@ export function StaffLayout({ user, page, onNavigate, onLogout, children }: Prop
           </div>
           <div className="text-sm font-semibold" style={{ color: "#8A8DA8" }}>{user.name}</div>
         </header>
-        <main className="flex-1 overflow-auto" style={{ backgroundColor: C.eggshell }}>
+        <main className="flex-1 overflow-auto" style={{ backgroundColor: C.content }}>
           {children}
         </main>
       </div>

@@ -29,7 +29,7 @@ Tài liệu này liệt kê các API CRUD cơ bản cần viết cho backend d�
 | `partner_voucher_staff` | Nhân viên đối tác quản lý voucher sản phẩm |
 | `partner_store_staff` | Nhân viên chi nhánh, xác thực/đổi voucher tại cửa hàng |
 | `admin_content` | Duyệt voucher, quản lý danh mục/nội dung |
-| `admin_account` | Duyệt đối tác, quản lý tài khoản |
+| `admin_operations` | Duyệt đối tác, quản lý tài khoản và vận hành |
 | `admin_security` | Xem log bảo mật, log xác thực và log nghiệp vụ |
 
 ### Response chuẩn
@@ -87,11 +87,11 @@ Tài liệu này liệt kê các API CRUD cơ bản cần viết cho backend d�
 
 | Method | Endpoint | Quyền | Mục đích |
 | --- | --- | --- | --- |
-| `GET` | `/users` | `admin_account` | Danh sách người dùng, lọc theo role/trạng thái |
-| `POST` | `/users` | `admin_account` | Tạo tài khoản nội bộ hoặc tài khoản đối tác |
-| `GET` | `/users/{id}` | Owner hoặc `admin_account` | Xem chi tiết người dùng |
-| `PATCH` | `/users/{id}` | Owner hoặc `admin_account` | Cập nhật hồ sơ, trạng thái, role |
-| `DELETE` | `/users/{id}` | `admin_account` | Khóa/xóa mềm tài khoản |
+| `GET` | `/users` | `admin_operations` | Danh sách người dùng, lọc theo role/trạng thái |
+| `POST` | `/users` | `admin_operations` | Tạo tài khoản nội bộ hoặc tài khoản đối tác |
+| `GET` | `/users/{id}` | Owner hoặc `admin_operations` | Xem chi tiết người dùng |
+| `PATCH` | `/users/{id}` | Owner hoặc `admin_operations` | Cập nhật hồ sơ, trạng thái, role |
+| `DELETE` | `/users/{id}` | `admin_operations` | Khóa/xóa mềm tài khoản |
 
 ### Nghiệp vụ chính
 
@@ -116,28 +116,28 @@ Tài liệu này liệt kê các API CRUD cơ bản cần viết cho backend d�
 
 | Method | Endpoint | Quyền | Mục đích |
 | --- | --- | --- | --- |
-| `GET` | `/partners` | `admin_account` | Danh sách đối tác, lọc trạng thái duyệt/trạng thái hoạt động |
-| `POST` | `/partners` | `partner_owner` hoặc `admin_account` | Đăng ký/tạo đối tác |
-| `GET` | `/partners/{id}` | Partner owner hoặc `admin_account` | Xem chi tiết đối tác |
-| `PATCH` | `/partners/{id}` | Partner owner hoặc `admin_account` | Cập nhật thông tin đối tác |
-| `DELETE` | `/partners/{id}` | `admin_account` | Đóng hoặc xóa mềm đối tác |
-| `PATCH` | `/partners/{id}/approval` | `admin_account` | Duyệt hoặc từ chối đối tác |
-| `PATCH` | `/partners/{id}/status` | `admin_account` | Kích hoạt, tạm khóa hoặc đóng đối tác |
+| `GET` | `/partners` | `admin_operations` | Danh sách đối tác, lọc trạng thái duyệt/trạng thái hoạt động |
+| `POST` | `/partners` | `partner_owner` hoặc `admin_operations` | Đăng ký/tạo đối tác |
+| `GET` | `/partners/{id}` | Partner owner hoặc `admin_operations` | Xem chi tiết đối tác |
+| `PATCH` | `/partners/{id}` | Partner owner hoặc `admin_operations` | Cập nhật thông tin đối tác |
+| `DELETE` | `/partners/{id}` | `admin_operations` | Đóng hoặc xóa mềm đối tác |
+| `PATCH` | `/partners/{id}/approval` | `admin_operations` | Duyệt hoặc từ chối đối tác |
+| `PATCH` | `/partners/{id}/status` | `admin_operations` | Kích hoạt, tạm khóa hoặc đóng đối tác |
 
 ### Partner branches
 
 | Method | Endpoint | Quyền | Mục đích |
 | --- | --- | --- | --- |
 | `GET` | `/partners/{partnerId}/branches` | Partner owner, staff, admin | Danh sách chi nhánh |
-| `POST` | `/partners/{partnerId}/branches` | Partner owner hoặc `admin_account` | Tạo chi nhánh |
+| `POST` | `/partners/{partnerId}/branches` | Partner owner hoặc `admin_operations` | Tạo chi nhánh |
 | `GET` | `/branches/{id}` | Partner owner, staff, admin | Chi tiết chi nhánh |
-| `PATCH` | `/branches/{id}` | Partner owner hoặc `admin_account` | Cập nhật chi nhánh |
-| `DELETE` | `/branches/{id}` | Partner owner hoặc `admin_account` | Xóa mềm/tắt hoạt động chi nhánh |
+| `PATCH` | `/branches/{id}` | Partner owner hoặc `admin_operations` | Cập nhật chi nhánh |
+| `DELETE` | `/branches/{id}` | Partner owner hoặc `admin_operations` | Xóa mềm/tắt hoạt động chi nhánh |
 
 ### Nghiệp vụ chính
 
 - Đối tác mới mặc định `approval_status = pending`.
-- Chỉ `admin_account` được duyệt đối tác.
+- Chỉ `admin_operations` được duyệt đối tác.
 - Đối tác bị `suspended` hoặc `closed` không được tạo voucher mới.
 - Partner chỉ được quản lý dữ liệu thuộc đối tác của mình.
 

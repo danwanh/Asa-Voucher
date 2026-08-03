@@ -2,7 +2,7 @@ import type { Voucher } from "@/types"
 
 export const VOUCHERS: Voucher[] = [
   {
-    id: "v01", partnerId: "p1", partnerName: "Pizza Hut Vietnam", partnerLogo: "🍕",
+    id: "v01", partnerId: "p1", partnerName: "Pizza Hut Vietnam", partnerLogo: "gift",
     title: "Giảm 30% tất cả pizza size L", category: "food",
     discount: 30, discountType: "percent", minOrder: 250000,
     price: 49000, originalPrice: 70000,
@@ -13,7 +13,7 @@ export const VOUCHERS: Voucher[] = [
     tags: ["pizza", "fast food", "giảm giá"],
   },
   {
-    id: "v02", partnerId: "p1", partnerName: "Pizza Hut Vietnam", partnerLogo: "🍕",
+    id: "v02", partnerId: "p1", partnerName: "Pizza Hut Vietnam", partnerLogo: "gift",
     title: "Mua 1 tặng 1 pizza cuối tuần", category: "food",
     discount: 50, discountType: "percent", minOrder: 300000,
     price: 89000, originalPrice: 130000,
@@ -24,7 +24,7 @@ export const VOUCHERS: Voucher[] = [
     tags: ["pizza", "cuối tuần", "1+1"],
   },
   {
-    id: "v03", partnerId: "p3", partnerName: "CGV Cinemas", partnerLogo: "🎬",
+    id: "v03", partnerId: "p3", partnerName: "CGV Cinemas", partnerLogo: "ticket",
     title: "Vé xem phim 2D giá ưu đãi", category: "entertainment",
     discount: 40000, discountType: "fixed", minOrder: 0,
     price: 59000, originalPrice: 100000,
@@ -35,7 +35,7 @@ export const VOUCHERS: Voucher[] = [
     tags: ["cinema", "phim", "giải trí"],
   },
   {
-    id: "v04", partnerId: "p3", partnerName: "CGV Cinemas", partnerLogo: "🎬",
+    id: "v04", partnerId: "p3", partnerName: "CGV Cinemas", partnerLogo: "ticket",
     title: "Combo bắp nước + vé phim", category: "entertainment",
     discount: 35, discountType: "percent", minOrder: 150000,
     price: 79000, originalPrice: 120000,
@@ -46,7 +46,7 @@ export const VOUCHERS: Voucher[] = [
     tags: ["cinema", "combo", "bắp nước"],
   },
   {
-    id: "v05", partnerId: "p4", partnerName: "Calla Spa & Beauty", partnerLogo: "💅",
+    id: "v05", partnerId: "p4", partnerName: "Calla Spa & Beauty", partnerLogo: "heart",
     title: "Massage thư giãn 60 phút", category: "beauty",
     discount: 50, discountType: "percent", minOrder: 0,
     price: 149000, originalPrice: 299000,
@@ -57,7 +57,7 @@ export const VOUCHERS: Voucher[] = [
     tags: ["spa", "massage", "thư giãn"],
   },
   {
-    id: "v06", partnerId: "p4", partnerName: "Calla Spa & Beauty", partnerLogo: "💅",
+    id: "v06", partnerId: "p4", partnerName: "Calla Spa & Beauty", partnerLogo: "heart",
     title: "Chăm sóc da mặt chuyên sâu", category: "beauty",
     discount: 200000, discountType: "fixed", minOrder: 0,
     price: 199000, originalPrice: 399000,
@@ -68,7 +68,7 @@ export const VOUCHERS: Voucher[] = [
     tags: ["da mặt", "skincare", "làm đẹp"],
   },
   {
-    id: "v07", partnerId: "p2", partnerName: "Vietjet Air", partnerLogo: "✈️",
+    id: "v07", partnerId: "p2", partnerName: "Vietjet Air", partnerLogo: "location",
     title: "Giảm 500K vé bay nội địa", category: "travel",
     discount: 500000, discountType: "fixed", minOrder: 1000000,
     price: 199000, originalPrice: 350000,
@@ -79,7 +79,7 @@ export const VOUCHERS: Voucher[] = [
     tags: ["máy bay", "du lịch", "nội địa"],
   },
   {
-    id: "v08", partnerId: "p5", partnerName: "Vinpearl Resort", partnerLogo: "🏖️",
+    id: "v08", partnerId: "p5", partnerName: "Vinpearl Resort", partnerLogo: "location",
     title: "Nghỉ dưỡng 2N1Đ Nha Trang", category: "travel",
     discount: 30, discountType: "percent", minOrder: 2000000,
     price: 899000, originalPrice: 1290000,
@@ -90,7 +90,7 @@ export const VOUCHERS: Voucher[] = [
     tags: ["resort", "nghỉ dưỡng", "Nha Trang"],
   },
   {
-    id: "v09", partnerId: "p5", partnerName: "Vinpearl Resort", partnerLogo: "🏖️",
+    id: "v09", partnerId: "p5", partnerName: "Vinpearl Resort", partnerLogo: "location",
     title: "Vé vui chơi Vinpearl Land", category: "entertainment",
     discount: 40, discountType: "percent", minOrder: 0,
     price: 299000, originalPrice: 500000,
@@ -101,7 +101,7 @@ export const VOUCHERS: Voucher[] = [
     tags: ["vui chơi", "giải trí", "gia đình"],
   },
   {
-    id: "v10", partnerId: "p1", partnerName: "Pizza Hut Vietnam", partnerLogo: "🍕",
+    id: "v10", partnerId: "p1", partnerName: "Pizza Hut Vietnam", partnerLogo: "gift",
     title: "Combo pizza + nước ngọt tháng 6", category: "food",
     discount: 25, discountType: "percent", minOrder: 200000,
     price: 35000, originalPrice: 50000,
@@ -112,7 +112,7 @@ export const VOUCHERS: Voucher[] = [
     tags: ["combo", "pizza", "nước ngọt"],
   },
   {
-    id: "v11", partnerId: "p2", partnerName: "Vietjet Air", partnerLogo: "✈️",
+    id: "v11", partnerId: "p2", partnerName: "Vietjet Air", partnerLogo: "location",
     title: "Bay quốc tế giảm 800K", category: "travel",
     discount: 800000, discountType: "fixed", minOrder: 2000000,
     price: 399000, originalPrice: 580000,
@@ -123,7 +123,7 @@ export const VOUCHERS: Voucher[] = [
     tags: ["quốc tế", "bay", "ASEAN"],
   },
   {
-    id: "v12", partnerId: "p4", partnerName: "Calla Spa & Beauty", partnerLogo: "💅",
+    id: "v12", partnerId: "p4", partnerName: "Calla Spa & Beauty", partnerLogo: "heart",
     title: "Làm nail nghệ thuật", category: "beauty",
     discount: 150000, discountType: "fixed", minOrder: 0,
     price: 129000, originalPrice: 280000,

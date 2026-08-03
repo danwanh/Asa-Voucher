@@ -1,12 +1,13 @@
 import { Users, TrendingUp, FileText, Tag, ArrowRight, ShieldCheck } from "lucide-react"
 import { C } from "@/utils/constants"
+import { AppIcon } from "@/components/AppIcon"
 import type { AppUser, AdminSubRole } from "@/types"
 
 export type { AdminSubRole }
 
 interface RoleCard {
   id: AdminSubRole
-  emoji: string
+  icon: string
   name: string
   subtitle: string
   description: string
@@ -18,7 +19,7 @@ interface RoleCard {
 const ROLES: RoleCard[] = [
   {
     id: "system-hr",
-    emoji: "🛡️",
+    icon: "shield",
     name: "System & HR Admin",
     subtitle: "Quản trị Hệ thống & Nhân sự",
     description: "Kiểm soát tài khoản người dùng, xét duyệt đối tác mới, quản lý nhân viên toàn hệ thống.",
@@ -32,7 +33,7 @@ const ROLES: RoleCard[] = [
   },
   {
     id: "biz-ops",
-    emoji: "📊",
+    icon: "dashboard",
     name: "Business Operations Admin",
     subtitle: "Quản trị Vận hành Kinh doanh",
     description: "Theo dõi doanh thu tài chính, xét duyệt voucher, quản lý toàn bộ đơn hàng giao dịch.",
@@ -46,7 +47,7 @@ const ROLES: RoleCard[] = [
   },
   {
     id: "content-tech",
-    emoji: "🛠️",
+    icon: "toolbox",
     name: "Content & Tech Admin",
     subtitle: "Quản trị Nội dung & Kỹ thuật",
     description: "Quản lý banner, thông báo, chính sách hiển thị. Giám sát nhật ký bảo mật hệ thống.",
@@ -107,7 +108,7 @@ export function AdminRolePicker({ user, onSelect, onLogout }: Props) {
               className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl mb-4 transition-transform group-hover:scale-110"
               style={{ backgroundColor: role.accentLight }}
             >
-              {role.emoji}
+              <AppIcon name={role.icon} className="w-7 h-7" strokeWidth={1.5} />
             </div>
 
             {/* Title */}
@@ -151,7 +152,7 @@ export function AdminRolePicker({ user, onSelect, onLogout }: Props) {
           {ROLES.map((r) => (
             <div key={r.id} className="flex items-center gap-1 text-xs font-semibold" style={{ color: "#9CA3AF" }}>
               <div className="w-2 h-2 rounded-full" style={{ backgroundColor: r.accent }} />
-              {r.emoji}
+              <AppIcon name={r.icon} className="w-4 h-4" />
             </div>
           ))}
         </div>

@@ -1,5 +1,6 @@
 import { ArrowLeft, MapPin, Star, PenLine } from "lucide-react"
 import { C, fmt, fmtDate } from "@/utils/constants"
+import { AppIcon } from "@/components/AppIcon"
 import { StatusBadge } from "@/components/StatusBadge"
 import type { Voucher } from "@/types"
 
@@ -94,7 +95,7 @@ export function VoucherDetailPage({ voucher: v, onBuy, onBuyNow, onBack, onWrite
             </div>
             {pct > 80 && (
               <div className="text-xs font-semibold mt-1" style={{ color: C.peach }}>
-                🔥 Sắp hết! Chỉ còn {v.quantity - v.sold} voucher
+                <AppIcon name="flame" className="w-4 h-4 inline-block mr-1" /> Sắp hết! Chỉ còn {v.quantity - v.sold} voucher
               </div>
             )}
           </div>

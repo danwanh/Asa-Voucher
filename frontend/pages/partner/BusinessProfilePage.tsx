@@ -1,13 +1,14 @@
 import { useState } from "react"
 import { CheckCircle, Camera, Eye, EyeOff, AlertCircle, ClipboardList, Clock, BadgeCheck } from "lucide-react"
 import { C } from "@/utils/constants"
+import { AppIcon } from "@/components/AppIcon"
 
 type ProfileStatus = "unsubmitted" | "pending" | "approved"
 
 const STATUS_OPTIONS: { value: ProfileStatus; label: string; icon: string; color: string }[] = [
-  { value: "unsubmitted", label: "Chưa nộp hồ sơ", icon: "📝", color: "#6B7280" },
-  { value: "pending", label: "Chờ phê duyệt", icon: "⏳", color: "#D97706" },
-  { value: "approved", label: "Đã được duyệt", icon: "✅", color: "#2D7A52" },
+  { value: "unsubmitted", label: "Chưa nộp hồ sơ", icon: "document", color: "#6B7280" },
+  { value: "pending", label: "Chờ phê duyệt", icon: "help", color: "#D97706" },
+  { value: "approved", label: "Đã được duyệt", icon: "check", color: "#2D7A52" },
 ]
 
 export function BusinessProfilePage() {
@@ -76,7 +77,7 @@ export function BusinessProfilePage() {
 
       {/* Demo profile status switcher */}
       <div className="rounded-2xl p-3 border" style={{ backgroundColor: C.indigo + "08", borderColor: C.indigo + "20" }}>
-        <p className="text-xs font-bold mb-2" style={{ color: C.indigo }}>🎮 Demo — Chọn trạng thái hồ sơ để xem flow:</p>
+        <p className="text-xs font-bold mb-2 flex items-center gap-1" style={{ color: C.indigo }}><AppIcon name="settings" className="w-3.5 h-3.5" /> Demo — Chọn trạng thái hồ sơ để xem flow:</p>
         <div className="flex flex-wrap gap-2">
           {STATUS_OPTIONS.map((s) => (
             <button
@@ -89,7 +90,7 @@ export function BusinessProfilePage() {
                 color: profileStatus === s.value ? s.color : "#8A8DA8",
               }}
             >
-              {s.icon} {s.label}
+              <AppIcon name={s.icon} className="w-4 h-4" /> {s.label}
             </button>
           ))}
         </div>
@@ -169,7 +170,7 @@ export function BusinessProfilePage() {
                     color: step.done || step.active ? "white" : "#8A8DA8",
                   }}
                 >
-                  {step.done ? "✓" : i + 1}
+                  {step.done ? <AppIcon name="check" className="w-4 h-4" /> : i + 1}
                 </div>
                 <span className="text-xs font-semibold" style={{ color: step.active ? C.apricot : step.done ? C.teal : "#8A8DA8" }}>
                   {step.label}
@@ -178,7 +179,7 @@ export function BusinessProfilePage() {
             ))}
           </div>
           <div className="p-3 rounded-xl text-xs font-semibold" style={{ backgroundColor: C.apricot + "18", color: "#D97706" }}>
-            🟡 Trạng thái: Chờ phê duyệt
+            <AppIcon name="help" className="w-4 h-4 inline-block mr-1" /> Trạng thái: Chờ phê duyệt
           </div>
         </div>
       )}
@@ -189,7 +190,7 @@ export function BusinessProfilePage() {
           <div className="bg-white rounded-2xl p-6 shadow-sm">
             <div className="flex items-center gap-5 mb-6 pb-6 border-b" style={{ borderColor: "#F0EDD8" }}>
               <div className="relative">
-                <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-4xl" style={{ backgroundColor: C.peach + "15" }}>🍕</div>
+                <div className="w-20 h-20 rounded-2xl flex items-center justify-center" style={{ backgroundColor: C.peach + "15" }}><AppIcon name="gift" className="w-10 h-10" /></div>
                 <button className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full flex items-center justify-center" style={{ backgroundColor: C.peach, color: "white" }}>
                   <Camera className="w-3.5 h-3.5" />
                 </button>

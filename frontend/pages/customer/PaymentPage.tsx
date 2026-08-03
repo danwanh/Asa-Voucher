@@ -1,16 +1,17 @@
 import { useState } from "react"
 import { ArrowLeft, CheckCircle2 } from "lucide-react"
 import { C, fmt } from "@/utils/constants"
+import { AppIcon } from "@/components/AppIcon"
 import type { CartItem } from "@/types"
 
 type PaymentMethod = "vnpay" | "momo" | "zalopay" | "bank" | "qr"
 
 const PAYMENT_METHODS: { id: PaymentMethod; label: string; icon: string; desc: string }[] = [
-  { id: "vnpay", label: "VNPay", icon: "💳", desc: "Thẻ ATM / Internet Banking" },
-  { id: "momo", label: "MoMo", icon: "🟣", desc: "Ví điện tử MoMo" },
-  { id: "zalopay", label: "ZaloPay", icon: "🔵", desc: "Ví điện tử ZaloPay" },
-  { id: "bank", label: "Thẻ ngân hàng", icon: "🏦", desc: "Visa / Mastercard / JCB" },
-  { id: "qr", label: "QR Banking", icon: "📱", desc: "Quét mã QR ngân hàng" },
+  { id: "vnpay", label: "VNPay", icon: "creditCard", desc: "Thẻ ATM / Internet Banking" },
+  { id: "momo", label: "MoMo", icon: "wallet", desc: "Ví điện tử MoMo" },
+  { id: "zalopay", label: "ZaloPay", icon: "wallet", desc: "Ví điện tử ZaloPay" },
+  { id: "bank", label: "Thẻ ngân hàng", icon: "building", desc: "Visa / Mastercard / JCB" },
+  { id: "qr", label: "QR Banking", icon: "smartphone", desc: "Quét mã QR ngân hàng" },
 ]
 
 interface Props {
@@ -74,7 +75,7 @@ export function PaymentPage({ cart, total, orderId, onSuccess, onBack }: Props) 
         className="mb-5 p-4 rounded-2xl border-2 flex items-center gap-3"
         style={{ borderColor: C.apricot, backgroundColor: C.apricot + "18" }}
       >
-        <div className="text-xl">🕐</div>
+        <AppIcon name="clock" className="w-5 h-5" />
         <div>
           <div className="text-sm font-bold" style={{ color: C.indigo }}>Mã đơn hàng: #{orderId}</div>
           <div className="text-xs mt-0.5 font-semibold" style={{ color: "#D97706" }}>
@@ -107,7 +108,7 @@ export function PaymentPage({ cart, total, orderId, onSuccess, onBack }: Props) 
                     backgroundColor: payment === pm.id ? `${C.peach}10` : "white",
                   }}
                 >
-                  <div className="text-2xl">{pm.icon}</div>
+                  <AppIcon name={pm.icon} className="w-7 h-7" />
                   <div>
                     <div className="font-bold text-sm" style={{ color: C.indigo }}>{pm.label}</div>
                     <div className="text-xs" style={{ color: "#6B7280" }}>{pm.desc}</div>

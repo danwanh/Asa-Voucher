@@ -23,12 +23,16 @@ model User {
   district            String?   @db.VarChar(100)
   is_active           Boolean   @default(true)
   is_verified         Boolean   @default(false)
+  failed_login_attempts Int      @default(0)
+  locked_until        DateTime? @db.Timestamptz(6)
+  auth_version        Int       @default(0)
   partner_branches_id String?   @db.Uuid
   created_at          DateTime  @default(now()) @db.Timestamptz(6)
   updated_at          DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
 
   partner_branches     PartnerBranch?      @relation("UserBranch", fields: [partner_branches_id], references: [id], onDelete: SetNull)
   refresh_tokens       RefreshToken[]
+  auth_tokens          AuthToken[]
   authentication_logs  AuthenticationLog[]
   admin_logs           AdminLog[]          @relation("AdminLogAdmin")
   targeted_admin_logs  AdminLog[]          @relation("AdminLogTargetUser")
@@ -62,6 +66,21 @@ model RefreshToken {
   users User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@map("refresh_tokens")
+}
+
+model AuthToken {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id    String    @db.Uuid
+  token_hash String    @unique
+  type       String    @db.VarChar(30)
+  expires_at DateTime  @db.Timestamptz(6)
+  used_at    DateTime? @db.Timestamptz(6)
+  created_at DateTime  @default(now()) @db.Timestamptz(6)
+
+  users User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, type, expires_at], map: "auth_tokens_lookup_idx")
+  @@map("auth_tokens")
 }
 
 model AuthenticationLog {

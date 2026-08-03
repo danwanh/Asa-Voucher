@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { ArrowLeft, CheckCircle, FileEdit } from "lucide-react"
 import { C } from "@/utils/constants"
+import { AppIcon } from "@/components/AppIcon"
 import type { Voucher } from "@/types"
 
 interface Props {
@@ -12,10 +13,10 @@ type SubmitMode = "draft" | "publish"
 type PageState = "form" | "success-draft" | "success-publish"
 
 const CATEGORIES = [
-  { value: "food",          label: "🍜 Ẩm thực" },
-  { value: "beauty",        label: "💅 Làm đẹp" },
-  { value: "travel",        label: "✈️ Du lịch" },
-  { value: "entertainment", label: "🎬 Giải trí" },
+  { value: "food",          label: "Ẩm thực" },
+  { value: "beauty",        label: "Làm đẹp" },
+  { value: "travel",        label: "Du lịch" },
+  { value: "entertainment", label: "Giải trí" },
 ]
 
 export function CreateVoucherPage({ onBack, onSaveDraft }: Props) {
@@ -42,7 +43,7 @@ export function CreateVoucherPage({ onBack, onSaveDraft }: Props) {
     id: "draft-" + Date.now(),
     partnerId: "p1",
     partnerName: "Pizza Hut Vietnam",
-    partnerLogo: "🍕",
+    partnerLogo: "gift",
     title: form.title || "Voucher chưa đặt tên",
     category: form.category,
     discount: Number(form.discount) || 0,
@@ -147,7 +148,7 @@ export function CreateVoucherPage({ onBack, onSaveDraft }: Props) {
 
       {/* Draft lifecycle reminder */}
       <div className="flex items-center gap-3 mb-5 px-4 py-3 rounded-xl text-xs font-semibold" style={{ backgroundColor: C.apricot + "20", color: "#6B4F00" }}>
-        <span className="text-base">📋</span>
+         <AppIcon name="document" className="w-4 h-4" />
         <span>Luồng: <strong>Bản nháp</strong> → Chỉnh sửa → <strong>Gửi duyệt</strong> → Được duyệt → Đang bán</span>
       </div>
 
@@ -247,14 +248,14 @@ export function CreateVoucherPage({ onBack, onSaveDraft }: Props) {
             className="flex-1 py-3 rounded-2xl font-bold text-sm border-2 transition-all hover:opacity-90"
             style={{ borderColor: C.apricot, color: "#856404", backgroundColor: C.apricot + "20" }}
           >
-            💾 Lưu nháp
+             <AppIcon name="save" className="w-4 h-4" /> Lưu nháp
           </button>
           <button
             onClick={handlePublish}
             className="flex-1 py-3 rounded-2xl font-bold text-white text-sm transition-all hover:opacity-90 active:scale-95"
             style={{ backgroundColor: C.peach }}
           >
-            🚀 Gửi duyệt
+             <AppIcon name="send" className="w-4 h-4" /> Gửi duyệt
           </button>
         </div>
         <p className="text-xs text-center" style={{ color: "#8A8DA8" }}>

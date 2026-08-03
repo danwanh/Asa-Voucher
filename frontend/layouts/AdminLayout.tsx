@@ -119,7 +119,7 @@ export function AdminLayout({ user, page, pendingVouchers, onNavigate, onLogout,
           <div className="text-sm font-semibold" style={{ color: "#8A8DA8" }}>{new Date().toLocaleDateString("vi-VN")}</div>
         </header>
 
-        <main className="flex-1 overflow-auto" style={{ backgroundColor: C.eggshell }}>
+        <main className="flex-1 overflow-auto" style={{ backgroundColor: C.content }}>
           {children}
         </main>
       </div>

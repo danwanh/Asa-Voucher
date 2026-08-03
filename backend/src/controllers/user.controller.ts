@@ -33,7 +33,7 @@ export async function createUserByAdmin(req: Request, res: Response) {
 }
 
 export async function getUser(req: Request, res: Response) {
-  if (req.user!.role !== "admin_account" && req.user!.id !== req.params.id) {
+  if (req.user!.role !== "admin_operations" && req.user!.id !== req.params.id) {
     throw new HttpError(403, "Insufficient permissions", "FORBIDDEN");
   }
 
@@ -42,7 +42,7 @@ export async function getUser(req: Request, res: Response) {
 }
 
 export async function updateUser(req: Request, res: Response) {
-  const isAdmin = req.user!.role === "admin_account";
+  const isAdmin = req.user!.role === "admin_operations";
   if (!isAdmin && req.user!.id !== req.params.id) {
     throw new HttpError(403, "Insufficient permissions", "FORBIDDEN");
   }

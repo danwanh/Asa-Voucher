@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { ArrowLeft, Edit2, Calendar, Users, AlertTriangle } from "lucide-react"
 import { C, fmt, fmtDate, STATUS_LABEL, statusColor } from "@/utils/constants"
+import { AppIcon } from "@/components/AppIcon"
 import type { Voucher, VoucherStatus } from "@/types"
 
 interface Props {
@@ -75,7 +76,7 @@ export function PartnerVoucherDetailPage({ voucher: initialVoucher, onBack, onEd
             </div>
             <div className="p-5">
               <div className="text-xs font-semibold mb-1" style={{ color: C.teal }}>
-                {voucher.partnerLogo} {voucher.partnerName}
+                <span className="inline-flex items-center gap-1"><AppIcon name={voucher.partnerLogo} className="w-4 h-4" /> {voucher.partnerName}</span>
               </div>
               <h2 className="text-xl font-black mb-3" style={{ color: C.indigo, fontFamily: "'Nunito', sans-serif" }}>{voucher.title}</h2>
               <div className="flex items-center gap-3 flex-wrap">
@@ -101,13 +102,13 @@ export function PartnerVoucherDetailPage({ voucher: initialVoucher, onBack, onEd
             <h3 className="font-bold text-sm mb-4" style={{ color: C.indigo }}>Hiệu suất</h3>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
-                { label: "Lượt xem", value: MOCK_STATS.views.toLocaleString(), icon: "👁️" },
-                { label: "Nhấn vào", value: MOCK_STATS.clicks.toLocaleString(), icon: "🖱️" },
-                { label: "Đã bán", value: voucher.sold.toLocaleString(), icon: "🛒" },
-                { label: "Doanh thu", value: fmt(MOCK_STATS.revenue), icon: "💰" },
+                 { label: "Lượt xem", value: MOCK_STATS.views.toLocaleString(), icon: "eye" },
+                 { label: "Nhấn vào", value: MOCK_STATS.clicks.toLocaleString(), icon: "mouse" },
+                { label: "Đã bán", value: voucher.sold.toLocaleString(), icon: "shoppingCart" },
+                 { label: "Doanh thu", value: fmt(MOCK_STATS.revenue), icon: "dollarSign" },
               ].map((s) => (
                 <div key={s.label} className="text-center p-3 rounded-xl" style={{ backgroundColor: C.eggshell }}>
-                  <div className="text-xl mb-1">{s.icon}</div>
+                  <AppIcon name={s.icon} className="w-5 h-5 mb-1 mx-auto" />
                   <div className="font-black text-sm" style={{ color: C.indigo }}>{s.value}</div>
                   <div className="text-xs" style={{ color: "#6B7280" }}>{s.label}</div>
                 </div>

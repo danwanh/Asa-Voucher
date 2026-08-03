@@ -6,6 +6,7 @@ export const C = {
   apricot: "#F2CC8F",
   indigoLight: "#4D5170",
   muted: "#EDE9D0",
+  content: "#F3F4F6",
 }
 
 export const fmt = (n: number) =>

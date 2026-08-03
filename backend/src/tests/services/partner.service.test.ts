@@ -30,7 +30,7 @@ import type { UserRole } from "../../types/auth.types.js";
 
 type CurrentUser = { id: string; role: UserRole; partnerId?: string; branchId?: string };
 
-const ADMIN: CurrentUser = { id: "u-admin", role: "admin_account" };
+const ADMIN: CurrentUser = { id: "u-admin", role: "admin_operations" };
 const PARTNER_OWNER: CurrentUser = { id: "u-owner", role: "partner_owner", partnerId: "p1" };
 const STAFF: CurrentUser = { id: "u-staff", role: "partner_store_staff", partnerId: "p1", branchId: "b1" };
 const BUYER: CurrentUser = { id: "u-buyer", role: "buyer" };

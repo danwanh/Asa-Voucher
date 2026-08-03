@@ -39,7 +39,7 @@ export function CustomerLayout({ user, page, cartCount, notifCount = 0, onNaviga
   const [mobileOpen, setMobileOpen] = useState(false)
 
   return (
-    <div className="min-h-screen pb-16 md:pb-0" style={{ backgroundColor: C.eggshell, fontFamily: "'Nunito', sans-serif" }}>
+    <div className="min-h-screen pb-16 md:pb-0" style={{ backgroundColor: C.content, fontFamily: "'Nunito', sans-serif" }}>
       <header className="sticky top-0 z-50 shadow-sm" style={{ backgroundColor: C.indigo }}>
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center gap-4">
           {/* Logo */}

@@ -1,13 +1,17 @@
 import { useState, useEffect } from "react"
-import { AlertCircle, Eye, EyeOff, Building2, User as UserIcon } from "lucide-react"
+import { AlertCircle, Eye, EyeOff, Building2, User as UserIcon, Loader2 } from "lucide-react"
 import { C } from "@/utils/constants"
+import { AppIcon } from "@/components/AppIcon"
 import type { AppUser, Role } from "@/types"
+import { useAuthStore } from "@/stores/authStore"
+import { authService } from "@/services/authService"
 
 type AuthPage = "login" | "register" | "forgot"
 
 interface Props {
   onLogin: (u: AppUser) => void
   onBack?: () => void
+  initialPage?: AuthPage
 }
 
 interface DemoAccount {
@@ -21,19 +25,17 @@ interface DemoAccount {
 // Row 1: end-users
 const USER_ACCOUNTS: DemoAccount[] = [
   { label: "Khách hàng",         email: "customer@asa.vn",      hint: "Nguyễn Thị Mai",      role: "buyer",                   color: C.teal },
-  { label: "🏢 Đối tác chủ TK", email: "partner@asa.vn",       hint: "Pizza Hut Vietnam",   role: "partner_owner",          color: C.peach },
-  { label: "🏷️ NV Tạo Voucher", email: "voucher-staff@asa.vn", hint: "Nguyễn Văn Hùng",     role: "partner_voucher_staff",  color: "#F2CC8F" },
-  { label: "🔖 NV Cửa hàng",   email: "staff@asa.vn",          hint: "Trần Văn Nam",         role: "partner_store_staff",    color: C.apricot },
+  { label: "Đối tác chủ TK", email: "partner@asa.vn",       hint: "Pizza Hut Vietnam",   role: "partner_owner",          color: C.peach },
+  { label: "NV Tạo Voucher", email: "voucher-staff@asa.vn", hint: "Nguyễn Văn Hùng",     role: "partner_voucher_staff",  color: "#F2CC8F" },
+  { label: "NV Cửa hàng",   email: "staff@asa.vn",          hint: "Trần Văn Nam",         role: "partner_store_staff",    color: C.apricot },
 ]
 
 // Row 2: admin roles
 const ADMIN_ACCOUNTS: DemoAccount[] = [
-  { label: "📝 Admin Nội dung",  email: "admin-content@asa.vn",  hint: "Duyệt voucher & nội dung", role: "admin_content", color: "#81B29A" },
-  { label: "👤 Admin Tài khoản", email: "admin-account@asa.vn",  hint: "Người dùng & đối tác",     role: "admin_account", color: "#3D405B" },
-  { label: "🔐 Admin Bảo mật",  email: "admin-security@asa.vn", hint: "Nhật ký & phân quyền",     role: "admin_security", color: "#E07A5F" },
+  { label: "Admin Nội dung",  email: "admin-content@asa.vn",  hint: "Duyệt voucher & nội dung", role: "admin_content", color: "#81B29A" },
+  { label: "Admin Vận hành", email: "admin-operations@asa.vn",  hint: "Người dùng & đối tác",     role: "admin_operations", color: "#3D405B" },
+  { label: "Admin Bảo mật",  email: "admin-security@asa.vn", hint: "Nhật ký & phân quyền",     role: "admin_security", color: "#E07A5F" },
 ]
-
-const ALL_ACCOUNTS = [...USER_ACCOUNTS, ...ADMIN_ACCOUNTS]
 
 function LeftPanel() {
   return (
@@ -61,7 +63,7 @@ function LeftPanel() {
           <div key={s.label} className="rounded-2xl p-4" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}>
             <div className="text-2xl font-black text-white">{s.value}</div>
             <div className="text-sm" style={{ color: "rgba(244,241,222,0.6)" }}>{s.label}</div>
-          </div>
+        </div>
         ))}
       </div>
       <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full opacity-10" style={{ backgroundColor: C.peach }} />
@@ -74,10 +76,12 @@ function LoginForm({ onLogin, onNavigate }: { onLogin: (u: AppUser) => void; onN
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPw, setShowPw] = useState(false)
-  const [remember, setRemember] = useState(false)
   const [emailErr, setEmailErr] = useState("")
   const [pwErr, setPwErr] = useState("")
   const [generalErr, setGeneralErr] = useState("")
+
+  const storeLogin = useAuthStore((s) => s.login)
+  const isLoading = useAuthStore((s) => s.isLoading)
 
   const selectDemo = (a: DemoAccount) => {
     setEmail(a.email)
@@ -91,21 +95,29 @@ function LoginForm({ onLogin, onNavigate }: { onLogin: (u: AppUser) => void; onN
     if (!email) { setEmailErr("Vui lòng nhập email"); ok = false }
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setEmailErr("Email không đúng định dạng"); ok = false }
     if (!password) { setPwErr("Vui lòng nhập mật khẩu"); ok = false }
-    else if (password.length < 6) { setPwErr("Mật khẩu tối thiểu 6 ký tự"); ok = false }
+    else if (password.length < 8) { setPwErr("Mật khẩu tối thiểu 8 ký tự"); ok = false }
     return ok
   }
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (!validate()) return
-    const found = ALL_ACCOUNTS.find((a) => a.email === email)
-    if (found && password === "123456") {
-      const extras: Partial<AppUser> = {}
-      if (found.role === "partner_owner")         extras.partnerId = "p1"
-      if (found.role === "partner_store_staff")   { extras.partnerId = "p1"; extras.branchId = "b1" }
-      if (found.role === "partner_voucher_staff") { extras.partnerId = "p1" }
-      onLogin({ id: found.role + "-1", name: found.hint, email: found.email, role: found.role, ...extras })
-    } else {
-      setGeneralErr("Email hoặc mật khẩu không đúng. Mật khẩu demo: 123456")
+    try {
+      await storeLogin(email, password)
+      const user = useAuthStore.getState().user
+      if (user) onLogin(user)
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { error?: { code?: string; message?: string } } } }
+      const code = err?.response?.data?.error?.code
+      const messages: Record<string, string> = {
+        ACCOUNT_NOT_FOUND: "Sai tên đăng nhập hoặc không tồn tại tài khoản, vui lòng đăng ký phù hợp",
+        INVALID_PASSWORD: "Sai mật khẩu",
+        ACCOUNT_LOCKED: "Tài khoản đang bị khóa. Vui lòng thử lại sau 15 phút.",
+        EMAIL_NOT_VERIFIED: "Vui lòng xác thực email trước khi đăng nhập.",
+        PARTNER_PENDING: "Hồ sơ đối tác đang chờ quản trị viên phê duyệt.",
+        PARTNER_REJECTED: "Hồ sơ đối tác đã bị từ chối. Vui lòng liên hệ hỗ trợ.",
+        PARTNER_INACTIVE: "Hồ sơ đối tác đang tạm ngưng hoạt động.",
+      }
+      setGeneralErr(messages[code ?? ""] ?? err?.response?.data?.error?.message ?? "Đăng nhập thất bại")
     }
   }
 
@@ -134,15 +146,13 @@ function LoginForm({ onLogin, onNavigate }: { onLogin: (u: AppUser) => void; onN
         <span className="text-2xl font-black" style={{ color: C.indigo }}>Asa Vouchers</span>
       </div>
 
-      <h2 className="text-2xl font-black mb-1" style={{ color: C.indigo }}>Đăng nhập</h2>
-      <p className="text-sm mb-4" style={{ color: "#8A8DA8" }}>Chọn tài khoản demo để trải nghiệm nhanh</p>
+      <h2 className="text-2xl font-black mb-4" style={{ color: C.indigo }}>Đăng nhập</h2>
+      {/* <p className="text-sm mb-4" style={{ color: "#8A8DA8" }}>Chọn tài khoản demo để trải nghiệm nhanh</p>
 
-      {/* User accounts: 2×2 grid */}
       <div className="grid grid-cols-2 gap-2 mb-2">
         {USER_ACCOUNTS.map(DemoBtn)}
       </div>
 
-      {/* Admin accounts — visually grouped */}
       <div className="mb-5">
         <div className="flex items-center gap-2 mb-2">
           <div className="flex-1 h-px" style={{ backgroundColor: "#E2DFC8" }} />
@@ -165,7 +175,7 @@ function LoginForm({ onLogin, onNavigate }: { onLogin: (u: AppUser) => void; onN
             </button>
           ))}
         </div>
-      </div>
+      </div> */}
 
       <div className="space-y-4">
         <div>
@@ -176,6 +186,7 @@ function LoginForm({ onLogin, onNavigate }: { onLogin: (u: AppUser) => void; onN
             placeholder="email@domain.vn"
             value={email}
             onChange={(e) => { setEmail(e.target.value); setEmailErr("") }}
+            disabled={isLoading}
           />
           {emailErr && <p className="text-xs mt-1" style={{ color: C.peach }}>{emailErr}</p>}
         </div>
@@ -190,6 +201,7 @@ function LoginForm({ onLogin, onNavigate }: { onLogin: (u: AppUser) => void; onN
               value={password}
               onChange={(e) => { setPassword(e.target.value); setPwErr("") }}
               onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+              disabled={isLoading}
             />
             <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 p-1" style={{ color: "#8A8DA8" }} onClick={() => setShowPw(!showPw)}>
               {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -200,10 +212,7 @@ function LoginForm({ onLogin, onNavigate }: { onLogin: (u: AppUser) => void; onN
       </div>
 
       <div className="flex items-center justify-between mt-3">
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="rounded" />
-          <span className="text-sm" style={{ color: C.indigo }}>Ghi nhớ đăng nhập</span>
-        </label>
+        <div />
         <button className="text-sm font-semibold transition-opacity hover:opacity-70" style={{ color: C.peach }} onClick={() => onNavigate("forgot")}>
           Quên mật khẩu?
         </button>
@@ -215,8 +224,13 @@ function LoginForm({ onLogin, onNavigate }: { onLogin: (u: AppUser) => void; onN
         </div>
       )}
 
-      <button onClick={handleLogin} className="mt-6 w-full py-3.5 rounded-2xl font-bold text-white transition-all hover:opacity-90 active:scale-95" style={{ backgroundColor: C.peach }}>
-        Đăng nhập
+      <button
+        onClick={handleLogin}
+        disabled={isLoading}
+        className="mt-6 w-full py-3.5 rounded-2xl font-bold text-white transition-all hover:opacity-90 active:scale-95 disabled:opacity-60 flex items-center justify-center gap-2"
+        style={{ backgroundColor: C.peach }}
+      >
+        {isLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Đang đăng nhập...</> : "Đăng nhập"}
       </button>
 
       <p className="text-center text-sm mt-6" style={{ color: "#8A8DA8" }}>
@@ -229,7 +243,7 @@ function LoginForm({ onLogin, onNavigate }: { onLogin: (u: AppUser) => void; onN
   )
 }
 
-type RegStep = "role" | "form" | "otp" | "partner-pending"
+type RegStep = "role" | "form" | "success" | "partner-pending"
 
 function RegisterForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
   const [step, setStep] = useState<RegStep>("role")
@@ -241,32 +255,20 @@ function RegisterForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [showPw, setShowPw] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
+  const [generalErr, setGeneralErr] = useState("")
+  const [resendLoading, setResendLoading] = useState(false)
+  const [resendCooldown, setResendCooldown] = useState(0)
+  const [resendMessage, setResendMessage] = useState("")
 
-  // OTP state
-  const [otp, setOtp] = useState("")
-  const [otpError, setOtpError] = useState("")
-  const [timeLeft, setTimeLeft] = useState(300)
-  const [expired, setExpired] = useState(false)
-  const [resendTick, setResendTick] = useState(0)
-  const MOCK_OTP = "123456"
+  const storeRegister = useAuthStore((s) => s.register)
+  const storeRegisterPartner = authService.registerPartner
+  const isLoading = useAuthStore((s) => s.isLoading)
 
   useEffect(() => {
-    if (step !== "otp") return
-    setTimeLeft(300)
-    setExpired(false)
-    const id = setInterval(() => {
-      setTimeLeft((t) => {
-        if (t <= 1) { clearInterval(id); setExpired(true); return 0 }
-        return t - 1
-      })
-    }, 1000)
-    return () => clearInterval(id)
-  }, [step, resendTick])
-
-  const fmtTime = (s: number) =>
-    `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`
-
-  const EXISTING_EMAILS = ALL_ACCOUNTS.map((a) => a.email)
+    if (resendCooldown <= 0) return
+    const timer = window.setInterval(() => setResendCooldown((value) => Math.max(0, value - 1)), 1000)
+    return () => window.clearInterval(timer)
+  }, [resendCooldown])
 
   const set = (k: string, v: string | boolean) => {
     setForm((f) => ({ ...f, [k]: v }))
@@ -277,9 +279,8 @@ function RegisterForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
     const errs: Record<string, string> = {}
     if (!form.name.trim()) errs.name = "Vui lòng nhập họ tên"
     if (!form.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = "Email không hợp lệ"
-    else if (EXISTING_EMAILS.includes(form.email)) errs.email = "Email này đã được đăng ký"
     if (!form.phone || !/^(0|\+84)[0-9]{8,9}$/.test(form.phone.replace(/\s/g, ""))) errs.phone = "Số điện thoại không hợp lệ"
-    if (form.password.length < 8) errs.password = "Mật khẩu tối thiểu 8 ký tự"
+    if (form.password.length < 8 || form.password.length > 64 || !/[A-Z]/.test(form.password) || !/[a-z]/.test(form.password) || !/[0-9]/.test(form.password) || !/[^A-Za-z0-9]/.test(form.password)) errs.password = "Mật khẩu 8-64 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt"
     if (form.password !== form.confirm) errs.confirm = "Mật khẩu xác nhận không khớp"
     if (regRole === "partner") {
       if (!form.businessName.trim()) errs.businessName = "Vui lòng nhập tên doanh nghiệp"
@@ -290,31 +291,63 @@ function RegisterForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
     return Object.keys(errs).length === 0
   }
 
-  const handleFormSubmit = () => {
+  const handleFormSubmit = async () => {
     if (!validateForm()) return
-    setOtp(""); setOtpError("")
-    setStep("otp")
-  }
-
-  const handleOtpVerify = () => {
-    if (expired) { setOtpError("Mã OTP đã hết hạn. Vui lòng yêu cầu mã mới."); return }
-    if (otp !== MOCK_OTP) { setOtpError("Mã OTP không đúng. Vui lòng nhập lại."); return }
-    if (regRole === "customer") {
-      onNavigate("login")
-    } else {
-      setStep("partner-pending")
+    setGeneralErr("")
+    try {
+      if (regRole === "partner") {
+        await storeRegisterPartner({
+          email: form.email,
+          password: form.password,
+          confirm_password: form.confirm,
+          full_name: form.name,
+          phone: form.phone,
+          business_name: form.businessName,
+          tax_number: form.taxCode,
+        })
+      } else {
+        await storeRegister({
+          email: form.email,
+          password: form.password,
+          confirm_password: form.confirm,
+          full_name: form.name,
+          phone: form.phone
+        })
+      }
+      if (regRole === "customer") {
+        setStep("success")
+      } else {
+        setStep("partner-pending")
+      }
+      setResendCooldown(60)
+      setResendMessage("")
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { error?: { message?: string } } } }
+      setGeneralErr(err?.response?.data?.error?.message ?? "Đăng ký thất bại")
     }
   }
 
-  const handleResend = () => {
-    setOtp(""); setOtpError("")
-    setResendTick((n) => n + 1)
+  const handleResendVerification = async () => {
+    if (resendLoading || resendCooldown > 0) return
+    setResendLoading(true)
+    setResendMessage("")
+    try {
+      await authService.resendVerification(form.email)
+      setResendMessage("Đã gửi lại email xác thực. Vui lòng kiểm tra hộp thư.")
+      setResendCooldown(60)
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { error?: { message?: string; details?: { cooldown_seconds?: number } } } } }
+      const retryAfter = err?.response?.data?.error?.details?.cooldown_seconds
+      if (typeof retryAfter === "number") setResendCooldown(retryAfter)
+      setResendMessage(err?.response?.data?.error?.message ?? "Không thể gửi lại email xác thực")
+    } finally {
+      setResendLoading(false)
+    }
   }
 
   const inputCls = "w-full px-4 py-3 rounded-2xl border text-sm outline-none"
   const inputStyle = { backgroundColor: "white", fontFamily: "'Inter', sans-serif" }
 
-  // ── Step: Role selection ──────────────────────────────────────────────────
   if (step === "role") {
     return (
       <div className="w-full max-w-md">
@@ -347,92 +380,63 @@ function RegisterForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
     )
   }
 
-  // ── Step: OTP ─────────────────────────────────────────────────────────────
-  if (step === "otp") {
+  if (step === "success") {
     return (
-      <div className="w-full max-w-md">
-        <button onClick={() => setStep("form")} className="flex items-center gap-1 text-sm font-semibold mb-6 hover:underline" style={{ color: C.indigo }}>
-          ← Quay lại
-        </button>
-        <div className="text-center mb-6">
-          <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl mx-auto mb-4" style={{ backgroundColor: C.teal + "25" }}>📱</div>
-          <h2 className="text-2xl font-black mb-1" style={{ color: C.indigo }}>Xác minh OTP</h2>
-          <p className="text-sm" style={{ color: "#8A8DA8" }}>
-            Mã xác minh đã gửi đến <strong>{form.email}</strong>
-          </p>
-          <p className="text-xs mt-1 px-3 py-1 rounded-full inline-block" style={{ backgroundColor: C.apricot + "25", color: "#7C5E10" }}>
-            Demo: nhập <strong>123456</strong>
-          </p>
-        </div>
-
-        <div className="mb-4">
-          <label className="text-sm font-bold block mb-2" style={{ color: C.indigo }}>Mã OTP (6 chữ số)</label>
-          <input
-            className={inputCls + " text-center text-2xl font-black"}
-            style={{ ...inputStyle, borderColor: otpError ? C.peach : "#E2DFC8", letterSpacing: "0.4em" }}
-            maxLength={6}
-            placeholder="------"
-            value={otp}
-            onChange={(e) => { setOtp(e.target.value.replace(/\D/g, "")); setOtpError("") }}
-          />
-          {otpError && (
-            <div className="mt-2 p-2.5 rounded-xl flex items-center gap-2 text-xs" style={{ backgroundColor: "#FCEAEA", color: "#C0392B" }}>
-              <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {otpError}
-            </div>
-          )}
-        </div>
-
-        <div className="text-center mb-5">
-          {!expired ? (
-            <span className="text-sm" style={{ color: "#8A8DA8" }}>
-              Mã hết hạn sau:{" "}
-              <strong style={{ color: timeLeft < 60 ? C.peach : C.indigo }}>{fmtTime(timeLeft)}</strong>
-            </span>
-          ) : (
-            <div className="p-2 rounded-xl text-xs font-semibold" style={{ backgroundColor: "#FCEAEA", color: "#C0392B" }}>
-              Mã OTP đã hết hạn
-            </div>
-          )}
-        </div>
-
+      <div className="w-full max-w-md text-center">
+        <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6" style={{ backgroundColor: C.teal + "20" }}><AppIcon name="check" className="w-10 h-10" /></div>
+        <h2 className="text-2xl font-black mb-2" style={{ color: C.indigo }}>Đăng ký thành công</h2>
+        <p className="mb-2" style={{ color: "#8A8DA8" }}>
+          Tài khoản <strong>{form.email}</strong> đã được tạo. Vui lòng kiểm tra email để xác thực.
+        </p>
+        <p className="mb-6 text-sm" style={{ color: "#8A8DA8" }}>
+          Sau khi xác thực email, bạn có thể quay lại đăng nhập.
+        </p>
+        {resendMessage && <p className="mb-4 text-sm" style={{ color: C.teal }}>{resendMessage}</p>}
         <button
-          onClick={handleOtpVerify}
-          disabled={otp.length !== 6}
-          className="w-full py-3.5 rounded-2xl font-bold text-white mb-3 transition-all hover:opacity-90"
-          style={{ backgroundColor: otp.length === 6 ? C.peach : "#D1D5DB" }}
+          disabled={resendLoading || resendCooldown > 0}
+          onClick={handleResendVerification}
+          className="w-full py-3.5 mb-3 rounded-2xl font-bold text-white hover:opacity-90 transition-all disabled:opacity-60"
+          style={{ backgroundColor: C.teal }}
         >
-          Xác minh OTP
+          {resendLoading ? "Đang gửi..." : resendCooldown > 0 ? `Gửi lại sau ${resendCooldown}s` : "Gửi lại email"}
         </button>
-
         <button
-          onClick={handleResend}
-          className="w-full py-3 rounded-2xl font-bold text-sm border transition-all hover:bg-muted"
-          style={{ borderColor: "#E2DFC8", color: C.indigo }}
+          onClick={() => onNavigate("login")}
+          className="w-full py-3.5 rounded-2xl font-bold text-white hover:opacity-90 transition-all"
+          style={{ backgroundColor: C.peach }}
         >
-          Gửi lại mã OTP
+          Đăng nhập ngay
         </button>
       </div>
     )
   }
 
-  // ── Step: Partner Pending Approval ────────────────────────────────────────
   if (step === "partner-pending") {
     return (
       <div className="w-full max-w-md text-center">
         <div className="w-24 h-24 rounded-full flex items-center justify-center text-5xl mx-auto mb-6" style={{ backgroundColor: C.apricot + "20" }}>⏳</div>
         <h2 className="text-2xl font-black mb-3" style={{ color: C.indigo }}>Đang chờ phê duyệt</h2>
         <p className="text-sm mb-2" style={{ color: "#8A8DA8" }}>
-          Tài khoản đối tác <strong>{form.businessName}</strong> đã được đăng ký thành công.
+           Hồ sơ đối tác <strong>{form.businessName}</strong> đã được tạo. Vui lòng xác thực email trước.
         </p>
         <p className="text-sm mb-6" style={{ color: "#8A8DA8" }}>
-          Quản trị viên sẽ xem xét trong <strong>1–3 ngày làm việc</strong>. Thông báo gửi về{" "}
+           Sau khi xác thực email, quản trị viên sẽ xem xét trong <strong>1–3 ngày làm việc</strong>. Thông báo gửi về{" "}
           <strong>{form.email}</strong>.
         </p>
         <div className="rounded-2xl p-4 mb-6 text-left" style={{ backgroundColor: C.apricot + "15", border: `1.5px solid ${C.apricot}` }}>
           <div className="text-sm font-bold mb-1" style={{ color: C.indigo }}>Hồ sơ đối tác</div>
           <div className="text-xs" style={{ color: "#6B7280" }}>{form.businessName} • MST: {form.taxCode}</div>
-          <div className="text-xs mt-1.5 font-bold" style={{ color: "#D97706" }}>🟡 Chờ phê duyệt</div>
+          <div className="text-xs mt-1.5 font-bold flex items-center gap-1" style={{ color: "#D97706" }}><AppIcon name="help" className="w-3.5 h-3.5" /> Chờ phê duyệt</div>
         </div>
+        {resendMessage && <p className="mb-4 text-sm" style={{ color: C.teal }}>{resendMessage}</p>}
+        <button
+          disabled={resendLoading || resendCooldown > 0}
+          onClick={handleResendVerification}
+          className="w-full py-3.5 mb-3 rounded-2xl font-bold text-white hover:opacity-90 transition-all disabled:opacity-60"
+          style={{ backgroundColor: C.teal }}
+        >
+          {resendLoading ? "Đang gửi..." : resendCooldown > 0 ? `Gửi lại sau ${resendCooldown}s` : "Gửi lại email"}
+        </button>
         <button
           onClick={() => onNavigate("login")}
           className="w-full py-3.5 rounded-2xl font-bold text-white hover:opacity-90"
@@ -444,7 +448,6 @@ function RegisterForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
     )
   }
 
-  // ── Step: Registration Form ───────────────────────────────────────────────
   return (
     <div className="w-full max-w-md">
       <button onClick={() => setStep("role")} className="flex items-center gap-1 text-sm font-semibold mb-4 hover:underline" style={{ color: C.indigo }}>
@@ -547,12 +550,19 @@ function RegisterForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
         </div>
       </div>
 
+      {generalErr && (
+        <div className="mt-3 p-3 rounded-2xl text-sm flex items-center gap-2" style={{ backgroundColor: "#FCEAEA", color: "#C0392B" }}>
+          <AlertCircle className="w-4 h-4 shrink-0" />{generalErr}
+        </div>
+      )}
+
       <button
         onClick={handleFormSubmit}
-        className="mt-5 w-full py-3.5 rounded-2xl font-bold text-white hover:opacity-90 active:scale-95 transition-all"
+        disabled={isLoading}
+        className="mt-5 w-full py-3.5 rounded-2xl font-bold text-white hover:opacity-90 active:scale-95 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
         style={{ backgroundColor: C.peach }}
       >
-        Tiếp tục → Xác minh OTP
+        {isLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Đang xử lý...</> : "Đăng ký"}
       </button>
       <p className="text-center text-sm mt-5" style={{ color: "#8A8DA8" }}>
         Đã có tài khoản?{" "}
@@ -568,24 +578,57 @@ function ForgotForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
   const [email, setEmail] = useState("")
   const [emailErr, setEmailErr] = useState("")
   const [sent, setSent] = useState(false)
+  const [cooldown, setCooldown] = useState(0)
+  const [loading, setLoading] = useState(false)
+  const [generalErr, setGeneralErr] = useState("")
 
-  const handleSend = () => {
+  useEffect(() => {
+    if (cooldown <= 0) return
+    const timer = window.setInterval(() => {
+      setCooldown((seconds) => Math.max(seconds - 1, 0))
+    }, 1000)
+    return () => window.clearInterval(timer)
+  }, [cooldown])
+
+  const handleSend = async () => {
+    if (cooldown > 0 || loading) return
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setEmailErr("Vui lòng nhập email hợp lệ"); return
     }
-    setSent(true)
+    setLoading(true)
+    setGeneralErr("")
+    try {
+      await authService.forgotPassword(email)
+      setSent(true)
+      setCooldown(60)
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { error?: { message?: string; details?: { cooldown_seconds?: number } } } } }
+      const retryAfter = err?.response?.data?.error?.details?.cooldown_seconds
+      if (typeof retryAfter === "number") setCooldown(retryAfter)
+      setGeneralErr(err?.response?.data?.error?.message ?? "Không thể gửi email, vui lòng thử lại")
+    } finally {
+      setLoading(false)
+    }
   }
 
   if (sent) {
     return (
       <div className="w-full max-w-md text-center">
-        <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl mx-auto mb-6" style={{ backgroundColor: C.teal + "20" }}>📧</div>
+        <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6" style={{ backgroundColor: C.teal + "20" }}><AppIcon name="mail" className="w-10 h-10" /></div>
         <h2 className="text-2xl font-black mb-2" style={{ color: C.indigo }}>Kiểm tra email</h2>
         <p className="mb-6" style={{ color: "#8A8DA8" }}>
           Chúng tôi đã gửi link đặt lại mật khẩu đến <strong>{email}</strong>
         </p>
+        <button
+          disabled={cooldown > 0 || loading}
+          onClick={handleSend}
+          className="w-full py-3.5 rounded-2xl font-bold text-white hover:opacity-90 transition-all disabled:opacity-60"
+          style={{ backgroundColor: C.peach }}
+        >
+          {cooldown > 0 ? `Gửi lại sau ${cooldown}s` : "Gửi lại email"}
+        </button>
         <button className="font-bold text-sm hover:opacity-70 transition-opacity" style={{ color: C.peach }} onClick={() => onNavigate("login")}>
-          Quay lại đăng nhập
+          <span className="inline-block mt-5">Quay lại đăng nhập</span>
         </button>
       </div>
     )
@@ -607,8 +650,9 @@ function ForgotForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
         />
         {emailErr && <p className="text-xs mt-1" style={{ color: C.peach }}>{emailErr}</p>}
       </div>
-      <button onClick={handleSend} className="mt-6 w-full py-3.5 rounded-2xl font-bold text-white hover:opacity-90 transition-all" style={{ backgroundColor: C.peach }}>
-        Gửi Email đặt lại
+      {generalErr && <p className="mt-3 text-sm" style={{ color: C.peach }}>{generalErr}</p>}
+      <button disabled={loading || cooldown > 0} onClick={handleSend} className="mt-6 w-full py-3.5 rounded-2xl font-bold text-white hover:opacity-90 transition-all disabled:opacity-60" style={{ backgroundColor: C.peach }}>
+        {loading ? "Đang gửi..." : cooldown > 0 ? `Gửi lại sau ${cooldown}s` : "Gửi Email đặt lại"}
       </button>
       <p className="text-center text-sm mt-6" style={{ color: "#8A8DA8" }}>
         <button className="font-bold hover:opacity-70 transition-opacity" style={{ color: C.peach }} onClick={() => onNavigate("login")}>
@@ -619,11 +663,11 @@ function ForgotForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
   )
 }
 
-export function LoginPage({ onLogin, onBack }: Props) {
-  const [authPage, setAuthPage] = useState<AuthPage>("login")
+export function LoginPage({ onLogin, onBack, initialPage = "login" }: Props) {
+  const [authPage, setAuthPage] = useState<AuthPage>(initialPage)
 
   return (
-    <div className="min-h-screen flex" style={{ backgroundColor: C.eggshell, fontFamily: "'Nunito', sans-serif" }}>
+    <div className="min-h-screen flex" style={{ backgroundColor: C.content, fontFamily: "'Nunito', sans-serif" }}>
       <LeftPanel />
       <div className="flex-1 flex items-center justify-center p-6 overflow-y-auto relative">
         {onBack && (

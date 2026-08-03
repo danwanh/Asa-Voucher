@@ -9,13 +9,13 @@ import { createBranchSchema, createPartnerSchema, partnerApprovalSchema, partner
 
 export const partnerRoutes = Router();
 
-partnerRoutes.get("/partners", requireAuth, requireRole(["admin_account"]), validateQuery(partnerQuerySchema), asyncHandler(listPartners));
-partnerRoutes.post("/partners", requireAuth, requireRole(["partner_owner", "admin_account"]), validateBody(createPartnerSchema), asyncHandler(createPartner));
+partnerRoutes.get("/partners", requireAuth, requireRole(["admin_operations"]), validateQuery(partnerQuerySchema), asyncHandler(listPartners));
+partnerRoutes.post("/partners", requireAuth, requireRole(["partner_owner", "admin_operations"]), validateBody(createPartnerSchema), asyncHandler(createPartner));
 partnerRoutes.get("/partners/:id", requireAuth, validateParams(idParamSchema), asyncHandler(getPartnerController));
 partnerRoutes.patch("/partners/:id", requireAuth, validateParams(idParamSchema), validateBody(updatePartnerSchema), asyncHandler(updatePartner));
-partnerRoutes.delete("/partners/:id", requireAuth, requireRole(["admin_account"]), validateParams(idParamSchema), asyncHandler(deletePartner));
-partnerRoutes.patch("/partners/:id/approval", requireAuth, requireRole(["admin_account"]), validateParams(idParamSchema), validateBody(partnerApprovalSchema), asyncHandler(updatePartnerApproval));
-partnerRoutes.patch("/partners/:id/status", requireAuth, requireRole(["admin_account"]), validateParams(idParamSchema), validateBody(partnerStatusSchema), asyncHandler(updatePartnerStatus));
+partnerRoutes.delete("/partners/:id", requireAuth, requireRole(["admin_operations"]), validateParams(idParamSchema), asyncHandler(deletePartner));
+partnerRoutes.patch("/partners/:id/approval", requireAuth, requireRole(["admin_operations"]), validateParams(idParamSchema), validateBody(partnerApprovalSchema), asyncHandler(updatePartnerApproval));
+partnerRoutes.patch("/partners/:id/status", requireAuth, requireRole(["admin_operations"]), validateParams(idParamSchema), validateBody(partnerStatusSchema), asyncHandler(updatePartnerStatus));
 partnerRoutes.get("/partners/:partnerId/branches", requireAuth, validateParams(partnerIdParamSchema), asyncHandler(listBranches));
 partnerRoutes.post("/partners/:partnerId/branches", requireAuth, validateParams(partnerIdParamSchema), validateBody(createBranchSchema), asyncHandler(createBranch));
 partnerRoutes.get("/branches/:id", requireAuth, validateParams(idParamSchema), asyncHandler(getBranchController));

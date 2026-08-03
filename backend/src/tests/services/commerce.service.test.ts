@@ -55,7 +55,7 @@ import type { UserRole } from "../../types/auth.types.js";
 type CurrentUser = { id: string; role: UserRole; partnerId?: string };
 
 const BUYER: CurrentUser = { id: "u-buyer", role: "buyer" };
-const ADMIN: CurrentUser = { id: "u-admin", role: "admin_account" };
+const ADMIN: CurrentUser = { id: "u-admin", role: "admin_operations" };
 const PARTNER: CurrentUser = { id: "u-partner", role: "partner_owner", partnerId: "p1" };
 
 function makeVoucher(overrides: Record<string, unknown> = {}) {

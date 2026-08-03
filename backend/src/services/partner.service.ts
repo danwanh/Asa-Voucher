@@ -6,8 +6,8 @@ import { rangeFromPagination } from "../validations/common.validation.js";
 
 type CurrentUser = { id: string; role: UserRole; partnerId?: string; branchId?: string };
 
-function isAdminAccount(user: CurrentUser) {
-  return user.role === "admin_account";
+function isAdminOperations(user: CurrentUser) {
+  return user.role === "admin_operations";
 }
 
 function isAnyAdmin(user: CurrentUser) {
@@ -19,7 +19,7 @@ async function getPartner(id: string) {
 }
 
 function assertPartnerOwnerOrAdmin(user: CurrentUser, partner: Record<string, unknown>) {
-  if (!isAdminAccount(user) && partner.representative_user_id !== user.id) {
+  if (!isAdminOperations(user) && partner.representative_user_id !== user.id) {
     throw new HttpError(403, "Insufficient permissions", "FORBIDDEN");
   }
 }
@@ -43,7 +43,7 @@ export async function listPartners(queryInput: Record<string, string | number>) 
 }
 
 export async function createPartner(user: CurrentUser, input: Record<string, unknown>) {
-  const representativeUserId = isAdminAccount(user) && input.representative_user_id ? input.representative_user_id : user.id;
+  const representativeUserId = isAdminOperations(user) && input.representative_user_id ? input.representative_user_id : user.id;
   try {
     return await prisma.partner.create({ data: { ...input, representative_user_id: representativeUserId, approval_status: "pending", status: "active" } as never });
   } catch (error) {
@@ -77,7 +77,12 @@ export async function deletePartner(id: string) {
 
 export async function updatePartnerApproval(adminId: string, id: string, approvalStatus: string) {
   try {
-    return await prisma.partner.update({ where: { id }, data: { approval_status: approvalStatus, approved_by: adminId, approved_at: new Date(), updated_at: new Date() } });
+    const updatedPartner = await prisma.partner.update({ where: { id }, data: { approval_status: approvalStatus, approved_by: adminId, approved_at: new Date(), updated_at: new Date() } });
+    const representativeUserId = (updatedPartner as { representative_user_id?: string }).representative_user_id;
+    if (representativeUserId) {
+      await prisma.user.update({ where: { id: representativeUserId }, data: { is_active: approvalStatus === "approved", auth_version: { increment: 1 } } });
+    }
+    return updatedPartner;
   } catch (error) {
     throwDbError(error, "Partner not found");
   }

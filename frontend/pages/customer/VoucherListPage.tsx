@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react"
 import { Search, SlidersHorizontal, X, ChevronDown } from "lucide-react"
 import { C } from "@/utils/constants"
+import { AppIcon } from "@/components/AppIcon"
 import { VoucherCard } from "@/components/VoucherCard"
 import { VOUCHERS, BUSINESS_LOCATIONS, LOCATABLE_PARTNERS } from "@/data/mock"
 import type { Voucher } from "@/types"
@@ -282,7 +283,7 @@ export function VoucherListPage({ onBuy, onDetail }: Props) {
 
       {filtered.length === 0 ? (
         <div className="text-center py-20">
-          <div className="text-5xl mb-4">🔍</div>
+          <AppIcon name="search" className="w-14 h-14 mb-4 mx-auto" />
           <div className="font-bold text-lg" style={{ color: C.indigo }}>Không tìm thấy voucher</div>
           <div className="text-sm mt-2" style={{ color: "#8A8DA8" }}>Thử thay đổi từ khóa hoặc bộ lọc</div>
           {hasActiveFilters && (

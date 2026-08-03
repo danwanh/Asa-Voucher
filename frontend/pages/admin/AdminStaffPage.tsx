@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { Search, Plus, X, Lock, Unlock, RefreshCw, UserCheck, ChevronDown } from "lucide-react"
 import { C, fmtDate, STATUS_LABEL, statusColor } from "@/utils/constants"
+import { AppIcon } from "@/components/AppIcon"
 import { PARTNERS } from "@/data/mock"
 import type { StaffMember } from "@/types"
 
@@ -220,7 +221,7 @@ export function AdminStaffPage() {
       {showConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
           <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl text-center">
-            <div className="text-3xl mb-3">{showConfirm.type === "lock" ? "🔒" : showConfirm.type === "unlock" ? "🔓" : "🔑"}</div>
+            <AppIcon name={showConfirm.type === "lock" ? "lock" : showConfirm.type === "unlock" ? "shield" : "key"} className="w-8 h-8 mb-3 mx-auto" />
             <h3 className="font-black text-lg mb-2" style={{ color: C.indigo, fontFamily: "'Nunito', sans-serif" }}>
               {showConfirm.type === "lock" ? "Khóa tài khoản?" : showConfirm.type === "unlock" ? "Mở khóa tài khoản?" : "Reset mật khẩu?"}
             </h3>

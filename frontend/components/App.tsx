@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { GuestApp } from "@/routes/GuestApp"
 import { LoginPage } from "@/pages/LoginPage"
 import { CustomerApp } from "@/routes/CustomerApp"
@@ -9,26 +10,34 @@ import { VoucherStaffApp } from "@/routes/VoucherStaffApp"
 import { StaffApp } from "@/routes/StaffApp"
 import { AdminApp } from "@/routes/AdminApp"
 import { useCart } from "@/hooks/useCart"
+import { useAuthStore } from "@/stores/authStore"
 import type { AppUser } from "@/types"
 
 export default function App() {
-  const [user, setUser] = useState<AppUser | null>(null)
+  const user = useAuthStore((s) => s.user)
+  const isInitialized = useAuthStore((s) => s.isInitialized)
+  const initialize = useAuthStore((s) => s.initialize)
+  const logout = useAuthStore((s) => s.logout)
+  const router = useRouter()
+
   const [showLogin, setShowLogin] = useState(false)
-  // When true, CustomerApp starts at create-order after login
   const [pendingCheckout, setPendingCheckout] = useState(false)
 
-  // Cart is lifted here so it persists across the guest → authenticated transition
   const { cart, add, remove, update, clear, total, count } = useCart()
 
-  const handleRequestLogin = () => setShowLogin(true)
+  useEffect(() => {
+    initialize()
+  }, [initialize])
+
+  const handleRequestLogin = () => router.push("/login")
+  const handleRequestRegister = () => router.push("/signup")
 
   const handleCheckoutAsGuest = () => {
     setPendingCheckout(true)
     setShowLogin(true)
   }
 
-  const handleLoginSuccess = (u: AppUser) => {
-    setUser(u)
+  const handleLoginSuccess = (_u: AppUser) => {
     setShowLogin(false)
   }
 
@@ -37,9 +46,28 @@ export default function App() {
     setPendingCheckout(false)
   }
 
+  const handleLogout = async () => {
+    if (!window.confirm("Bạn có chắc muốn đăng xuất không?")) return
+    try {
+      await logout()
+      clear()
+    } catch {
+      window.alert("Đăng xuất thất bại. Vui lòng thử lại.")
+    }
+  }
+
+  if (!isInitialized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#F4F1DE" }}>
+        <div className="w-10 h-10 rounded-2xl flex items-center justify-center font-black text-lg animate-pulse" style={{ backgroundColor: "#E07A5F", color: "white" }}>A</div>
+      </div>
+    )
+  }
+
   if (!user && !showLogin) return (
     <GuestApp
       onLogin={handleRequestLogin}
+      onRegister={handleRequestRegister}
       onCheckout={handleCheckoutAsGuest}
       cartAdd={add}
       cartCount={count}
@@ -56,7 +84,7 @@ export default function App() {
   if (user.role === "buyer") return (
     <CustomerApp
       user={user}
-      onLogout={() => { setUser(null); clear() }}
+      onLogout={handleLogout}
       cart={cart}
       total={total}
       count={count}
@@ -69,10 +97,10 @@ export default function App() {
     />
   )
 
-  if (user.role === "partner_owner")         return <PartnerApp user={user} onLogout={() => setUser(null)} />
-  if (user.role === "partner_voucher_staff") return <VoucherStaffApp user={user} onLogout={() => setUser(null)} />
-  if (user.role === "partner_store_staff")   return <StaffApp user={user} onLogout={() => setUser(null)} />
-  if (user.role === "admin_content" || user.role === "admin_account" || user.role === "admin_security")
-    return <AdminApp user={user} onLogout={() => setUser(null)} />
+  if (user.role === "partner_owner")         return <PartnerApp user={user} onLogout={handleLogout} />
+  if (user.role === "partner_voucher_staff") return <VoucherStaffApp user={user} onLogout={handleLogout} />
+  if (user.role === "partner_store_staff")   return <StaffApp user={user} onLogout={handleLogout} />
+  if (user.role === "admin_content" || user.role === "admin_operations" || user.role === "admin_security")
+    return <AdminApp user={user} onLogout={handleLogout} />
   return null
 }

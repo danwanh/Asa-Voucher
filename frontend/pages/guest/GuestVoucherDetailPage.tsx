@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { ArrowLeft, Star, MapPin, Calendar, Tag, Users, Heart, Share2, CheckCircle2 } from "lucide-react"
 import { C, fmt, fmtDate } from "@/utils/constants"
+import { AppIcon } from "@/components/AppIcon"
 import { VOUCHERS } from "@/data/mock"
 import type { Voucher } from "@/types"
 
@@ -55,7 +56,7 @@ export function GuestVoucherDetailPage({ voucher: v, onBack, onLogin, onDetail, 
         {/* Right: Info */}
         <div>
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-2xl">{v.partnerLogo}</span>
+            <AppIcon name={v.partnerLogo} className="w-6 h-6" />
             <span className="text-sm font-semibold" style={{ color: C.teal }}>{v.partnerName}</span>
           </div>
           <h1 className="text-2xl font-black mb-3 leading-tight" style={{ color: C.indigo, fontFamily: "'Nunito', sans-serif" }}>{v.title}</h1>

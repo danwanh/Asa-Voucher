@@ -13,7 +13,7 @@ const ROLE: SubAdminRole = {
   id: "security",
   name: "Admin Bảo mật",
   subtitle: "Nhật ký & phân quyền hệ thống",
-  emoji: "🔐",
+  icon: "lock",
   accent: "#E07A5F",
   accentBg: "#FDF0EC",
   sidebarBg: "#3D2820",

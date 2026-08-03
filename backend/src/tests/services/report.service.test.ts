@@ -18,7 +18,7 @@ import * as reportService from "../../services/report.service.js";
 
 const BUYER: AuthUser = { id: "u-buyer", email: "b@test.com", role: "buyer" };
 const PARTNER_OWNER: AuthUser = { id: "u-partner", email: "p@test.com", role: "partner_owner", partnerId: "partner-1" };
-const ADMIN: AuthUser = { id: "u-admin", email: "a@test.com", role: "admin_account" };
+const ADMIN: AuthUser = { id: "u-admin", email: "a@test.com", role: "admin_operations" };
 const ADMIN_SECURITY: AuthUser = { id: "u-sec", email: "sec@test.com", role: "admin_security" };
 
 describe("Report Service", () => {
