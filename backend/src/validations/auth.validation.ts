@@ -51,14 +51,14 @@ export const createUserSchema = z.object({
 });
 
 export const updateUserSchema = z.object({
-  phone: z.string().trim().nullable().optional(),
+  phone: z.string().trim().regex(/^(0|\+84)[0-9]{8,9}$/).nullable().optional(),
   full_name: z.string().trim().min(1).max(100).optional(),
   avatar_url: z.string().url().nullable().optional(),
   dob: z.string().date().nullable().optional(),
   gender: z.enum(["male", "female", "other"]).nullable().optional(),
-  address: z.string().nullable().optional(),
-  city: z.string().nullable().optional(),
-  district: z.string().nullable().optional(),
+  address: z.string().trim().max(255).nullable().optional(),
+  city: z.string().trim().max(100).nullable().optional(),
+  district: z.string().trim().max(100).nullable().optional(),
   role: z.enum(["buyer", "partner_owner", "partner_voucher_staff", "partner_store_staff", "admin_content", "admin_operations", "admin_security"]).optional(),
   is_active: z.boolean().optional(),
   is_verified: z.boolean().optional(),

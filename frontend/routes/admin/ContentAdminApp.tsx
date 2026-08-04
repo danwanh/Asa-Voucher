@@ -20,10 +20,10 @@ const ROLE: SubAdminRole = {
   sidebarBg: "#253830",
 }
 
-interface Props { user: AppUser; onLogout: () => void; onSwitchRole: () => void }
+interface Props { user: AppUser; onLogout: () => void; onSwitchRole: () => void; initialPage?: "profile" }
 
-export function ContentAdminApp({ user, onLogout, onSwitchRole }: Props) {
-  const [page, setPage] = useState<Page>("dashboard")
+export function ContentAdminApp({ user, onLogout, onSwitchRole, initialPage }: Props) {
+  const [page, setPage] = useState<Page>(initialPage ?? "dashboard")
   const pendingCount = VOUCHERS.filter((v) => v.status === "pending").length
 
   const NAV: SubAdminNavItem[] = [

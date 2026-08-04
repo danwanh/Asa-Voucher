@@ -15,6 +15,7 @@ interface AuthState {
   login: (email: string, password: string) => Promise<void>
   register: (body: { email: string; password: string; confirm_password: string; full_name: string; phone?: string }) => Promise<AppUser>
   logout: () => Promise<void>
+  clearSession: () => void
   initialize: () => Promise<void>
   setUser: (user: AppUser) => void
 }
@@ -56,6 +57,11 @@ export const useAuthStore = create<AuthState>()(
 
       logout: async () => {
         await authService.logout()
+        set({ user: null, accessToken: null })
+      },
+
+      clearSession: () => {
+        setAccessToken(null)
         set({ user: null, accessToken: null })
       },
 
