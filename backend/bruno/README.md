@@ -11,7 +11,7 @@ Collection này test các API trong `backend/docs/api-crud.md` mục 2-6.
 5. Chạy folder `00 Auth` trước để lấy token vào environment variables.
 6. Sau đó có thể chạy toàn bộ collection theo thứ tự folder.
 
-Seed password cho tất cả user: `Password123!`.
+Seed password cho tất cả user: `User12345@`.
 
 ## Biến chính
 

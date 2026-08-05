@@ -113,7 +113,7 @@ Không chỉnh sửa migration đã được apply. Nếu migration thất bại
 Seed users dùng chung mật khẩu:
 
 ```text
-Password123!
+User12345@
 ```
 
 Tài khoản seed chính:
@@ -147,7 +147,7 @@ http://localhost:5000/api/v1
 ```bash
 curl -i -X POST http://localhost:5000/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"buyer@asa.test","password":"Password123!"}'
+  -d '{"email":"buyer@asa.test","password":"User12345@"}'
 ```
 
 Gọi API private:

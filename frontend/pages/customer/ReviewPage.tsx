@@ -3,7 +3,6 @@ import { ArrowLeft, Star } from "lucide-react"
 import { C, fmt } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import type { Order } from "@/types"
-import { VOUCHERS } from "@/data/mock"
 
 interface Props {
   order: Order
@@ -19,8 +18,6 @@ export function ReviewPage({ order, existingReview, onBack, onSubmit }: Props) {
   const [content, setContent] = useState(existingReview?.content ?? "")
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState("")
-
-  const voucher = VOUCHERS.find((v) => v.id === order.voucherId)
 
   const LABELS = ["", "Rất tệ", "Tệ", "Bình thường", "Tốt", "Tuyệt vời"]
   const SUGGESTIONS = ["Voucher chất lượng", "Dịch vụ tốt", "Nhân viên thân thiện", "Giá tốt", "Sẽ sử dụng lại"]
@@ -68,18 +65,15 @@ export function ReviewPage({ order, existingReview, onBack, onSubmit }: Props) {
         </div>
       )}
 
-      {/* Voucher info */}
-      {voucher && (
-        <div className="bg-white rounded-2xl p-4 border border-black/5 mb-5 flex items-center gap-4">
-          <div className="w-16 h-12 rounded-xl overflow-hidden flex-shrink-0">
-            <img src={voucher.image} alt="" className="w-full h-full object-cover" />
-          </div>
-          <div>
-            <div className="font-bold text-sm" style={{ color: C.indigo }}>{voucher.title}</div>
-            <div className="text-xs" style={{ color: "#6B7280" }}>{voucher.partnerName} • {fmt(order.amount)}</div>
-          </div>
+      <div className="bg-white rounded-2xl p-4 border border-black/5 mb-5 flex items-center gap-4">
+        <div className="w-16 h-12 rounded-xl flex-shrink-0 flex items-center justify-center" style={{ backgroundColor: C.eggshell }}>
+          <AppIcon name="gift" className="w-5 h-5" />
         </div>
-      )}
+        <div>
+          <div className="font-bold text-sm" style={{ color: C.indigo }}>{order.voucherTitle}</div>
+          <div className="text-xs" style={{ color: "#6B7280" }}>{order.partnerName} • {fmt(order.amount)}</div>
+        </div>
+      </div>
 
       <div className="bg-white rounded-2xl p-6 border border-black/5">
         {/* Star rating */}
