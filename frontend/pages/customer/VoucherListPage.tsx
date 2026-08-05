@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
-import { Search, SlidersHorizontal, X, ChevronDown } from "lucide-react"
-import { C } from "@/utils/constants"
+import { SlidersHorizontal, X, ChevronDown } from "lucide-react"
+import { C, formatCategoryLabel } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import { VoucherCard } from "@/components/VoucherCard"
 import type { Voucher } from "@/types"
@@ -9,6 +9,23 @@ import { voucherService } from "@/services/voucherService"
 interface Props {
   onBuy: (v: Voucher) => void
   onDetail: (v: Voucher) => void
+  searchQuery: string
+  filters: {
+    categoryId: string
+    partnerId: string
+    area: string
+    priceRange: string
+    discountRange: string
+    effectiveStatus: string
+  }
+  onFiltersChange: (next: {
+    categoryId: string
+    partnerId: string
+    area: string
+    priceRange: string
+    discountRange: string
+    effectiveStatus: string
+  }) => void
 }
 
 const PRICE_RANGES = [
@@ -28,15 +45,79 @@ function inPriceRange(price: number, range: string): boolean {
   return true
 }
 
-export function VoucherListPage({ onBuy, onDetail }: Props) {
-  const [search, setSearch] = useState("")
-  const [cat, setCat] = useState("all")
+const DISCOUNT_RANGES = [
+  { id: "all", label: "Tất cả mức giảm" },
+  { id: "0-10", label: "Dưới 10%" },
+  { id: "10-20", label: "10% - 20%" },
+  { id: "20-30", label: "20% - 30%" },
+  { id: "30+", label: "Từ 30%" },
+]
+
+function inDiscountRange(discount: number, range: string): boolean {
+  if (range === "all") return true
+  if (range === "0-10") return discount < 10
+  if (range === "10-20") return discount >= 10 && discount < 20
+  if (range === "20-30") return discount >= 20 && discount < 30
+  if (range === "30+") return discount >= 30
+  return true
+}
+
+const EFFECTIVE_STATUS_OPTIONS = [
+  { id: "all", label: "Tất cả trạng thái" },
+  { id: "effective", label: "Đang hiệu lực" },
+  { id: "expiring_7_days", label: "Sắp hết hạn (7 ngày)" },
+]
+
+function inEffectiveStatus(voucher: Voucher, status: string): boolean {
+  if (status === "all") return true
+
+  const now = new Date()
+  const validFrom = new Date(voucher.validFrom)
+  const validTo = new Date(voucher.validTo)
+  const isEffective = validFrom <= now && validTo >= now && voucher.status === "active" && voucher.quantity > voucher.sold
+
+  if (status === "effective") return isEffective
+  if (status === "expiring_7_days") {
+    const sevenDaysFromNow = new Date(now)
+    sevenDaysFromNow.setDate(now.getDate() + 7)
+    return isEffective && validTo <= sevenDaysFromNow
+  }
+
+  return true
+}
+
+export function VoucherListPage({ onBuy, onDetail, searchQuery, filters, onFiltersChange }: Props) {
   const [sort, setSort] = useState("popular")
   const [showFilters, setShowFilters] = useState(false)
   const [source, setSource] = useState<Voucher[]>([])
+  const [catalog, setCatalog] = useState<Voucher[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [priceRange, setPriceRange] = useState("all")
+
+  const updateFilters = (patch: Partial<Props["filters"]>) => {
+    onFiltersChange({ ...filters, ...patch })
+  }
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadCatalog() {
+      try {
+        const items = await voucherService.listPublicVouchers({ limit: 100 })
+        if (!isMounted) return
+        setCatalog(items)
+      } catch {
+        if (!isMounted) return
+        setCatalog([])
+      }
+    }
+
+    loadCatalog()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   useEffect(() => {
     let isMounted = true
@@ -45,7 +126,15 @@ export function VoucherListPage({ onBuy, onDetail }: Props) {
       setIsLoading(true)
       setLoadError(null)
       try {
-        const items = await voucherService.listPublicVouchers({ limit: 100 })
+        const items = await voucherService.listPublicVouchers({
+          limit: 100,
+          search: searchQuery.trim() || undefined,
+          categoryId: filters.categoryId !== "all" ? filters.categoryId : undefined,
+          partnerId: filters.partnerId !== "all" ? filters.partnerId : undefined,
+        })
+
+        // TODO(backend): add server-side filters for area/price/discount/effective_status
+        // in GET /voucher-products to avoid client-side filtering for large datasets.
         if (!isMounted) return
         setSource(items)
       } catch {
@@ -61,62 +150,73 @@ export function VoucherListPage({ onBuy, onDetail }: Props) {
     return () => {
       isMounted = false
     }
-  }, [])
+  }, [searchQuery, filters.categoryId, filters.partnerId])
 
-  const categories = useMemo(
-    () => [
-      { id: "all", label: "Tất cả" },
-      ...Array.from(new Set(source.map((voucher) => voucher.category))).map((slug) => ({
-        id: slug,
-        label: slug
-          .split("-")
-          .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-          .join(" ")
-      }))
-    ],
-    [source]
-  )
+  const categoryOptions = useMemo(() => {
+    const map = new Map<string, { id: string; label: string }>()
 
-  const hasActiveFilters = priceRange !== "all"
+    for (const voucher of catalog) {
+      const categoryId = voucher.categoryId ?? voucher.category
+      if (map.has(categoryId)) continue
+      const label = formatCategoryLabel(voucher.category)
+      map.set(categoryId, { id: categoryId, label })
+    }
+
+    return [{ id: "all", label: "Tất cả" }, ...Array.from(map.values())]
+  }, [catalog])
+
+  const partnerOptions = useMemo(() => {
+    const map = new Map<string, { id: string; label: string }>()
+    for (const voucher of catalog) {
+      if (!map.has(voucher.partnerId)) {
+        map.set(voucher.partnerId, { id: voucher.partnerId, label: voucher.partnerName || voucher.partnerId })
+      }
+    }
+    return [{ id: "all", label: "Tất cả đối tác" }, ...Array.from(map.values())]
+  }, [catalog])
+
+  const areaOptions = useMemo(() => {
+    const values = Array.from(new Set(catalog.map((voucher) => voucher.applicableArea).filter(Boolean)))
+    return ["all", ...values] as string[]
+  }, [catalog])
+
+  const hasActiveFilters =
+    filters.categoryId !== "all" ||
+    filters.partnerId !== "all" ||
+    filters.area !== "all" ||
+    filters.priceRange !== "all" ||
+    filters.discountRange !== "all" ||
+    filters.effectiveStatus !== "all"
 
   const clearFilters = () => {
-    setPriceRange("all")
+    onFiltersChange({
+      categoryId: "all",
+      partnerId: "all",
+      area: "all",
+      priceRange: "all",
+      discountRange: "all",
+      effectiveStatus: "all"
+    })
   }
 
   const filtered = useMemo(() => {
-    let list = source.filter((v) => v.status === "active")
-
-    if (search) {
-      const q = search.toLowerCase()
-      list = list.filter((v) =>
-        v.title.toLowerCase().includes(q) || v.partnerName.toLowerCase().includes(q)
-      )
-    }
-    if (cat !== "all") list = list.filter((v) => v.category === cat)
-    list = list.filter((v) => inPriceRange(v.price, priceRange))
+    let list = source
+    if (filters.area !== "all") list = list.filter((v) => (v.applicableArea ?? "") === filters.area)
+    list = list.filter((v) => inPriceRange(v.price, filters.priceRange))
+    list = list.filter((v) => inDiscountRange(v.discount, filters.discountRange))
+    list = list.filter((v) => inEffectiveStatus(v, filters.effectiveStatus))
 
     return [...list].sort((a, b) =>
       sort === "popular" ? b.sold - a.sold :
       sort === "price-asc" ? a.price - b.price :
       b.price - a.price
     )
-  }, [source, search, cat, priceRange, sort])
+  }, [source, filters.area, filters.priceRange, filters.discountRange, filters.effectiveStatus, sort])
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       {/* Search row */}
       <div className="flex flex-wrap gap-3 mb-4">
-        <div className="relative flex-1 min-w-48">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "#8A8DA8" }} />
-          <input
-            className="w-full pl-9 pr-4 py-3 rounded-2xl border text-sm outline-none"
-            style={{ borderColor: "#E2DFC8", backgroundColor: "white", fontFamily: "'Inter', sans-serif" }}
-            placeholder="Tìm kiếm voucher, thương hiệu..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-
         <button
           onClick={() => setShowFilters(!showFilters)}
           className="flex items-center gap-2 px-4 py-3 rounded-2xl border text-sm font-bold transition-all"
@@ -166,16 +266,55 @@ export function VoucherListPage({ onBuy, onDetail }: Props) {
               <select
                 className="px-3 py-2.5 rounded-xl border text-sm outline-none font-semibold cursor-pointer w-full"
                 style={{ borderColor: "#E2DFC8", backgroundColor: "white", color: C.indigo, fontFamily: "'Nunito', sans-serif" }}
-                value={priceRange}
-                onChange={(e) => setPriceRange(e.target.value)}
+                value={filters.priceRange}
+                onChange={(e) => updateFilters({ priceRange: e.target.value })}
               >
                 {PRICE_RANGES.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
               </select>
             </div>
             <div>
-              <div className="text-xs" style={{ color: "#8A8DA8" }}>
-                Dữ liệu voucher được lấy trực tiếp từ backend.
-              </div>
+              <label className="text-xs font-bold block mb-1.5" style={{ color: C.indigo }}>Mức giảm</label>
+              <select
+                className="px-3 py-2.5 rounded-xl border text-sm outline-none font-semibold cursor-pointer w-full"
+                style={{ borderColor: "#E2DFC8", backgroundColor: "white", color: C.indigo, fontFamily: "'Nunito', sans-serif" }}
+                value={filters.discountRange}
+                onChange={(e) => updateFilters({ discountRange: e.target.value })}
+              >
+                {DISCOUNT_RANGES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-bold block mb-1.5" style={{ color: C.indigo }}>Đối tác</label>
+              <select
+                className="px-3 py-2.5 rounded-xl border text-sm outline-none font-semibold cursor-pointer w-full"
+                style={{ borderColor: "#E2DFC8", backgroundColor: "white", color: C.indigo, fontFamily: "'Nunito', sans-serif" }}
+                value={filters.partnerId}
+                onChange={(e) => updateFilters({ partnerId: e.target.value })}
+              >
+                {partnerOptions.map((partner) => <option key={partner.id} value={partner.id}>{partner.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-bold block mb-1.5" style={{ color: C.indigo }}>Khu vực</label>
+              <select
+                className="px-3 py-2.5 rounded-xl border text-sm outline-none font-semibold cursor-pointer w-full"
+                style={{ borderColor: "#E2DFC8", backgroundColor: "white", color: C.indigo, fontFamily: "'Nunito', sans-serif" }}
+                value={filters.area}
+                onChange={(e) => updateFilters({ area: e.target.value })}
+              >
+                {areaOptions.map((area) => <option key={area} value={area}>{area === "all" ? "Tất cả khu vực" : area}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-bold block mb-1.5" style={{ color: C.indigo }}>Hiệu lực</label>
+              <select
+                className="px-3 py-2.5 rounded-xl border text-sm outline-none font-semibold cursor-pointer w-full"
+                style={{ borderColor: "#E2DFC8", backgroundColor: "white", color: C.indigo, fontFamily: "'Nunito', sans-serif" }}
+                value={filters.effectiveStatus}
+                onChange={(e) => updateFilters({ effectiveStatus: e.target.value })}
+              >
+                {EFFECTIVE_STATUS_OPTIONS.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+              </select>
             </div>
           </div>
         </div>
@@ -183,15 +322,15 @@ export function VoucherListPage({ onBuy, onDetail }: Props) {
 
       {/* Category tabs */}
       <div className="flex flex-wrap gap-2 mb-8">
-        {categories.map((c) => (
+        {categoryOptions.map((c) => (
           <button
             key={c.id}
-            onClick={() => setCat(c.id)}
+            onClick={() => updateFilters({ categoryId: c.id })}
             className="px-4 py-2 rounded-2xl text-sm font-bold transition-all"
             style={{
-              backgroundColor: cat === c.id ? C.indigo : "white",
-              color:           cat === c.id ? "white"  : C.indigo,
-              border:          `2px solid ${cat === c.id ? C.indigo : "#E2DFC8"}`,
+              backgroundColor: filters.categoryId === c.id ? C.indigo : "white",
+              color:           filters.categoryId === c.id ? "white"  : C.indigo,
+              border:          `2px solid ${filters.categoryId === c.id ? C.indigo : "#E2DFC8"}`,
             }}
           >
             {c.label}

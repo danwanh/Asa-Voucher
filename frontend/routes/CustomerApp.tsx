@@ -41,6 +41,24 @@ interface PendingOrder {
   recipient: RecipientInfo
 }
 
+type VoucherListFilters = {
+  categoryId: string
+  partnerId: string
+  area: string
+  priceRange: string
+  discountRange: string
+  effectiveStatus: string
+}
+
+const DEFAULT_VOUCHER_FILTERS: VoucherListFilters = {
+  categoryId: "all",
+  partnerId: "all",
+  area: "all",
+  priceRange: "all",
+  discountRange: "all",
+  effectiveStatus: "all"
+}
+
 export function CustomerApp({
   user, onLogout,
   cart, total, count, add, remove, update, clear,
@@ -53,10 +71,21 @@ export function CustomerApp({
   const [reviewExisting, setReviewExisting] = useState<{ rating: number; content: string } | undefined>()
   const [lastCode, setLastCode] = useState("")
   const [pendingOrder, setPendingOrder] = useState<PendingOrder | null>(null)
+  const [voucherSearch, setVoucherSearch] = useState("")
+  const [voucherFilters, setVoucherFilters] = useState<VoucherListFilters>(DEFAULT_VOUCHER_FILTERS)
 
   const navigate = (p: CustomerPage) => {
     setPage(p)
     onInitialPageConsumed?.()
+  }
+
+  const handleVoucherSearchChange = (value: string) => {
+    setVoucherSearch(value)
+    if (page !== "vouchers") setPage("vouchers")
+  }
+
+  const handleVoucherSearchFocus = () => {
+    if (page !== "vouchers") setPage("vouchers")
   }
 
   const goDetail = (v: Voucher) => { setSelectedVoucher(v); navigate("detail") }
@@ -94,9 +123,26 @@ export function CustomerApp({
   const myOrders = ORDERS.filter((o) => o.userId === "u01")
 
   return (
-    <CustomerLayout user={user} page={page} cartCount={count} onNavigate={navigate} onLogout={onLogout}>
+    <CustomerLayout
+      user={user}
+      page={page}
+      cartCount={count}
+      voucherSearch={voucherSearch}
+      onVoucherSearchChange={handleVoucherSearchChange}
+      onVoucherSearchFocus={handleVoucherSearchFocus}
+      onNavigate={navigate}
+      onLogout={onLogout}
+    >
       {page === "home" && <HomePage onBuy={add} onDetail={goDetail} onNavigate={navigate} />}
-      {page === "vouchers" && <VoucherListPage onBuy={add} onDetail={goDetail} />}
+      {page === "vouchers" && (
+        <VoucherListPage
+          onBuy={add}
+          onDetail={goDetail}
+          searchQuery={voucherSearch}
+          filters={voucherFilters}
+          onFiltersChange={setVoucherFilters}
+        />
+      )}
       {page === "detail" && selectedVoucher && (
         <VoucherDetailPage
           voucher={selectedVoucher}

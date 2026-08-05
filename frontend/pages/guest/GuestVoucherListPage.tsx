@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { Search, SlidersHorizontal, Star, X, ChevronDown } from "lucide-react"
-import { C, fmt } from "@/utils/constants"
+import { C, fmt, formatCategoryLabel } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import type { Voucher } from "@/types"
 import { voucherService } from "@/services/voucherService"
@@ -63,10 +63,7 @@ export function GuestVoucherListPage({ onDetail, onLogin, onAddToCart }: Props) 
       { value: "all", label: "Tất cả" },
       ...Array.from(new Set(source.map((voucher) => voucher.category))).map((slug) => ({
         value: slug,
-        label: slug
-          .split("-")
-          .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-          .join(" ")
+        label: formatCategoryLabel(slug)
       }))
     ],
     [source]

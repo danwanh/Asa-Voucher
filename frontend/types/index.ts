@@ -42,6 +42,7 @@ export interface Voucher {
   partnerLogo: string
   title: string
   category: string
+  categoryId?: string
   discount: number
   discountType: "percent" | "fixed"
   minOrder: number
@@ -57,6 +58,7 @@ export interface Voucher {
   description: string
   image: string
   tags: string[]
+  applicableArea?: string | null
 }
 
 export interface Partner {

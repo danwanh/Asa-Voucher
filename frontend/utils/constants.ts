@@ -31,6 +31,27 @@ export const STATUS_LABEL: Record<string, string> = {
   inactive: "Không hoạt động",
 }
 
+const CATEGORY_LABELS: Record<string, string> = {
+  "an-uong": "Ăn uống",
+  "ca-phe": "Cà phê",
+  "tra-sua": "Trà sữa",
+  buffet: "Buffet",
+  "giai-tri": "Giải trí",
+  "ve-xem-phim": "Vé xem phim",
+  karaoke: "Karaoke",
+  "cham-soc-suc-khoe": "Chăm sóc sức khỏe",
+  "spa-massage": "Spa massage",
+  "du-lich-nghi-duong": "Du lịch nghỉ dưỡng",
+  "khach-san-resort": "Khách sạn resort"
+}
+
+export function formatCategoryLabel(slug: string) {
+  return CATEGORY_LABELS[slug] ?? slug
+    .split("-")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ")
+}
+
 export function statusColor(s: string): { bg: string; text: string } {
   if (s === "active" || s === "completed" || s === "approved" || s === "selling")
     return { bg: "#E8F5EE", text: "#2D7A52" }

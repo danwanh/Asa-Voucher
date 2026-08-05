@@ -15,6 +15,9 @@ interface Props {
   page: CustomerPage
   cartCount: number
   notifCount?: number
+  voucherSearch: string
+  onVoucherSearchChange: (value: string) => void
+  onVoucherSearchFocus: () => void
   onNavigate: (p: CustomerPage) => void
   onLogout: () => void
   children: React.ReactNode
@@ -36,7 +39,18 @@ const MOBILE_NAV: { label: string; pg: CustomerPage; icon: React.ReactNode }[] =
   { label: "Tài khoản", pg: "profile", icon: <User className="w-5 h-5" /> },
 ]
 
-export function CustomerLayout({ user, page, cartCount, notifCount = 0, onNavigate, onLogout, children }: Props) {
+export function CustomerLayout({
+  user,
+  page,
+  cartCount,
+  notifCount = 0,
+  voucherSearch,
+  onVoucherSearchChange,
+  onVoucherSearchFocus,
+  onNavigate,
+  onLogout,
+  children
+}: Props) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const router = useRouter()
 
@@ -50,22 +64,19 @@ export function CustomerLayout({ user, page, cartCount, notifCount = 0, onNaviga
             <span className="font-black text-lg text-white hidden sm:block">Asa</span>
           </button>
 
-          {/* Search — hidden when already on the vouchers search page to avoid duplicate */}
-          {page !== "vouchers" && (
-            <div className="flex-1 max-w-md">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "#8A8DA8" }} />
-                <input
-                  className="w-full pl-9 pr-4 py-2 rounded-xl text-sm outline-none"
-                  style={{ backgroundColor: "rgba(255,255,255,0.12)", color: "white", fontFamily: "'Inter', sans-serif" }}
-                  placeholder="Tìm voucher..."
-                  onFocus={() => onNavigate("vouchers")}
-                  readOnly
-                />
-              </div>
+          <div className="flex-1 max-w-md">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "#8A8DA8" }} />
+              <input
+                className="w-full pl-9 pr-4 py-2 rounded-xl text-sm outline-none"
+                style={{ backgroundColor: "rgba(255,255,255,0.12)", color: "white", fontFamily: "'Inter', sans-serif" }}
+                placeholder="Tìm voucher..."
+                value={voucherSearch}
+                onFocus={onVoucherSearchFocus}
+                onChange={(e) => onVoucherSearchChange(e.target.value)}
+              />
             </div>
-          )}
-          {page === "vouchers" && <div className="flex-1" />}
+          </div>
 
           {/* Desktop nav */}
           <nav className="hidden md:flex items-center gap-0.5">

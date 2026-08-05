@@ -6,6 +6,14 @@ import { rangeFromPagination } from "../validations/common.validation.js";
 
 type CurrentUser = { id: string; role: UserRole; partnerId?: string };
 
+const PARTNER_NAME_INCLUDE = {
+  partners: {
+    select: {
+      business_name: true
+    }
+  }
+};
+
 function calcDiscount(originalPrice: number, sellingPrice: number) {
   return originalPrice === 0 ? 0 : Math.round(((originalPrice - sellingPrice) / originalPrice) * 10000) / 100;
 }
@@ -19,7 +27,10 @@ async function getPartnerForUser(userId: string) {
 }
 
 async function getVoucher(id: string) {
-  return requireData<Record<string, unknown>>(await prisma.voucherProduct.findUnique({ where: { id } }) as unknown as Record<string, unknown> | null, "Voucher product not found");
+  return requireData<Record<string, unknown>>(
+    await prisma.voucherProduct.findUnique({ where: { id }, include: PARTNER_NAME_INCLUDE }) as unknown as Record<string, unknown> | null,
+    "Voucher product not found"
+  );
 }
 
 function assertVoucherOwnerOrAdmin(user: CurrentUser | undefined, voucher: Record<string, unknown>, allowAdminContent = true) {
@@ -46,7 +57,7 @@ export async function listVoucherProducts(queryInput: Record<string, string | nu
   if (search) where.name = { contains: String(search), mode: "insensitive" };
 
   const [items, count] = await prisma.$transaction([
-    prisma.voucherProduct.findMany({ where, skip: from, take: to - from + 1, orderBy: { created_at: "desc" } }),
+    prisma.voucherProduct.findMany({ where, include: PARTNER_NAME_INCLUDE, skip: from, take: to - from + 1, orderBy: { created_at: "desc" } }),
     prisma.voucherProduct.count({ where })
   ]);
   return { items, count, page, limit };

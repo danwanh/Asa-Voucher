@@ -26,6 +26,9 @@ type BackendVoucherProduct = {
   terms_and_conditions: unknown
   usage_instructions: unknown
   status: string
+  partners?: {
+    business_name: string
+  } | null
 }
 
 type BackendCategory = {
@@ -117,10 +120,11 @@ function mapVoucherProduct(product: BackendVoucherProduct, categorySlug: string)
   return {
     id: product.id,
     partnerId: product.partner_id,
-    partnerName: product.partner_id,
+    partnerName: product.partners?.business_name ?? product.partner_id,
     partnerLogo: "gift",
     title: product.name,
     category: categorySlug,
+    categoryId: product.category_id,
     discount,
     discountType: "percent",
     minOrder: 0,
@@ -135,7 +139,8 @@ function mapVoucherProduct(product: BackendVoucherProduct, categorySlug: string)
     reviews: 0,
     description: product.description ?? "",
     image: product.thumbnail_url ?? "",
-    tags: []
+    tags: [],
+    applicableArea: product.applicable_area
   }
 }
 
@@ -187,14 +192,16 @@ function categoryFromMap(categoryMap: Map<string, BackendCategory>, categoryId: 
 }
 
 export const voucherService = {
-  async listPublicVouchers(params?: { page?: number; limit?: number; search?: string }): Promise<Voucher[]> {
+  async listPublicVouchers(params?: { page?: number; limit?: number; search?: string; categoryId?: string; partnerId?: string }): Promise<Voucher[]> {
     const [categoryMap, listRes] = await Promise.all([
       getCategoryMap(),
       api.get<ApiEnvelope<BackendVoucherList>>("/voucher-products", {
         params: {
           page: params?.page ?? 1,
           limit: params?.limit ?? 100,
-          search: params?.search
+          search: params?.search,
+          category_id: params?.categoryId,
+          partner_id: params?.partnerId
         }
       })
     ])

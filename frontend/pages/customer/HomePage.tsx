@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { ChevronRight } from "lucide-react"
-import { C } from "@/utils/constants"
+import { C, formatCategoryLabel } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import { VoucherCard } from "@/components/VoucherCard"
 import type { Voucher } from "@/types"
@@ -11,13 +11,6 @@ interface Props {
   onBuy: (v: Voucher) => void
   onDetail: (v: Voucher) => void
   onNavigate: (p: CustomerPage) => void
-}
-
-function categoryLabel(slug: string) {
-  return slug
-    .split("-")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ")
 }
 
 export function HomePage({ onBuy, onDetail, onNavigate }: Props) {
@@ -56,7 +49,7 @@ export function HomePage({ onBuy, onDetail, onNavigate }: Props) {
     { id: "all", label: "Tất cả", icon: "gift" },
     ...Array.from(new Set(vouchers.map((voucher) => voucher.category))).slice(0, 4).map((slug) => ({
       id: slug,
-      label: categoryLabel(slug),
+      label: formatCategoryLabel(slug),
       icon: "tag"
     }))
   ]
