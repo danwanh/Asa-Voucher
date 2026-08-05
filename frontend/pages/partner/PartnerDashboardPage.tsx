@@ -5,21 +5,28 @@ import {
 } from "recharts"
 import { C, fmt, fmtDate } from "@/utils/constants"
 import { StatusBadge } from "@/components/StatusBadge"
-import { ORDERS } from "@/data/mock"
 import type { Voucher } from "@/types"
 import { voucherService } from "@/services/voucherService"
 
-const MY_ORDERS = ORDERS.filter((o) => o.partnerName === "Pizza Hut Vietnam")
+interface Props {
+  partnerId?: string
+}
 
-export function PartnerDashboardPage() {
+export function PartnerDashboardPage({ partnerId }: Props) {
   const [vouchers, setVouchers] = useState<Voucher[]>([])
 
   useEffect(() => {
     let isMounted = true
 
     async function loadVouchers() {
+      if (!partnerId) {
+        if (!isMounted) return
+        setVouchers([])
+        return
+      }
+
       try {
-        const items = await voucherService.listPublicVouchers({ limit: 100 })
+        const items = await voucherService.listPublicVouchers({ limit: 100, partnerId })
         if (!isMounted) return
         setVouchers(items)
       } catch {
@@ -32,17 +39,16 @@ export function PartnerDashboardPage() {
     return () => {
       isMounted = false
     }
-  }, [])
+  }, [partnerId])
 
-  const revenue = MY_ORDERS
-    .filter((o) => o.status === "completed")
-    .reduce((s, o) => s + o.amount, 0)
+  const soldCount = vouchers.reduce((sum, voucher) => sum + voucher.sold, 0)
+  const revenue = vouchers.reduce((sum, voucher) => sum + voucher.sold * voucher.price, 0)
 
   const kpis = [
-    { label: "Doanh thu tháng này", value: fmt(revenue), delta: "+8.3%", icon: <DollarSign className="w-5 h-5" />, color: C.teal },
-    { label: "Voucher đang bán", value: vouchers.filter((v) => v.status === "active").length.toString(), delta: "+2 mới", icon: <Tag className="w-5 h-5" />, color: C.peach },
-    { label: "Đơn hàng", value: MY_ORDERS.length.toString(), delta: "Tháng 7", icon: <Package className="w-5 h-5" />, color: C.indigo },
-    { label: "Đã sử dụng", value: MY_ORDERS.filter((o) => o.status === "used").length.toString(), delta: "Voucher", icon: <CheckCircle className="w-5 h-5" />, color: "#F2CC8F" },
+    { label: "Doanh thu ước tính", value: fmt(revenue), delta: "Theo dữ liệu voucher", icon: <DollarSign className="w-5 h-5" />, color: C.teal },
+    { label: "Voucher đang bán", value: vouchers.filter((v) => v.status === "active").length.toString(), delta: "Đang hoạt động", icon: <Tag className="w-5 h-5" />, color: C.peach },
+    { label: "Tổng voucher", value: vouchers.length.toString(), delta: "Theo partner hiện tại", icon: <Package className="w-5 h-5" />, color: C.indigo },
+    { label: "Đã bán", value: soldCount.toString(), delta: "Voucher", icon: <CheckCircle className="w-5 h-5" />, color: "#F2CC8F" },
   ]
 
   const activeVouchers = vouchers.filter((v) => v.status === "active")
@@ -86,20 +92,23 @@ export function PartnerDashboardPage() {
         </div>
 
         <div className="bg-card rounded-2xl p-5 shadow-sm">
-          <h3 className="font-black mb-4" style={{ color: C.indigo }}>Đơn hàng gần đây</h3>
+          <h3 className="font-black mb-4" style={{ color: C.indigo }}>Voucher gần đây</h3>
           <div className="space-y-3">
-            {MY_ORDERS.slice(0, 5).map((o) => (
-              <div key={o.id} className="flex items-center justify-between p-3 rounded-xl" style={{ backgroundColor: C.eggshell }}>
+            {vouchers.slice(0, 5).map((voucher) => (
+              <div key={voucher.id} className="flex items-center justify-between p-3 rounded-xl" style={{ backgroundColor: C.eggshell }}>
                 <div>
-                  <div className="text-xs font-bold" style={{ color: C.indigo }}>{o.voucherTitle.slice(0, 25)}…</div>
-                  <div className="text-xs mt-0.5" style={{ color: "#8A8DA8" }}>{fmtDate(o.createdAt)}</div>
+                  <div className="text-xs font-bold" style={{ color: C.indigo }}>{voucher.title.slice(0, 25)}…</div>
+                  <div className="text-xs mt-0.5" style={{ color: "#8A8DA8" }}>{fmtDate(voucher.validTo)}</div>
                 </div>
                 <div className="text-right">
-                  <div className="text-xs font-bold" style={{ color: C.peach }}>{fmt(o.amount)}</div>
-                  <StatusBadge status={o.status} />
+                  <div className="text-xs font-bold" style={{ color: C.peach }}>{fmt(voucher.price)}</div>
+                  <StatusBadge status={voucher.status} />
                 </div>
               </div>
             ))}
+            {vouchers.length === 0 && (
+              <div className="text-xs" style={{ color: "#8A8DA8" }}>Chưa có voucher để hiển thị.</div>
+            )}
           </div>
         </div>
       </div>

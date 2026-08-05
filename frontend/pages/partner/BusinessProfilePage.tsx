@@ -1,225 +1,367 @@
-import { useState } from "react"
-import { CheckCircle, Camera, ClipboardList, Clock, BadgeCheck } from "lucide-react"
+import { useMemo, useState } from "react"
+import { BadgeCheck, Clock, XCircle, Save, Loader2 } from "lucide-react"
+import { toast } from "sonner"
 import { C } from "@/utils/constants"
-import { AppIcon } from "@/components/AppIcon"
+import type { AppUser } from "@/types"
+import { authService } from "@/services/authService"
+import { partnerService, type PartnerProfile, type PartnerCreateInput, type PartnerUpdateInput } from "@/services/partnerService"
 
-type ProfileStatus = "unsubmitted" | "pending" | "approved"
+type Props = {
+  user: AppUser
+  partner: PartnerProfile | null
+  onPartnerUpdated: (partner: PartnerProfile | null) => void
+}
 
-const STATUS_OPTIONS: { value: ProfileStatus; label: string; icon: string; color: string }[] = [
-  { value: "unsubmitted", label: "Chưa nộp hồ sơ", icon: "document", color: "#6B7280" },
-  { value: "pending", label: "Chờ phê duyệt", icon: "help", color: "#D97706" },
-  { value: "approved", label: "Đã được duyệt", icon: "check", color: "#2D7A52" },
-]
+type PartnerForm = {
+  businessName: string
+  businessCode: string
+  businessType: string
+  taxNumber: string
+  website: string
+  description: string
+}
 
-export function BusinessProfilePage() {
-  const [profileStatus, setProfileStatus] = useState<ProfileStatus>("approved")
+type RepresentativeForm = {
+  fullName: string
+  email: string
+  phone: string
+  address: string
+}
 
-  const [form, setForm] = useState({
-    name: "Pizza Hut Vietnam",
-    taxCode: "0123456789",
-    representative: "Nguyễn Văn Giám Đốc",
-    email: "contact@pizzahut.vn",
-    phone: "028 1234 5678",
-    address: "123 Nguyễn Trãi, Quận 1, TP.HCM",
-    website: "https://pizzahut.vn",
-    description: "Pizza Hut là chuỗi nhà hàng pizza nổi tiếng với hơn 20 năm hoạt động tại Việt Nam.",
-  })
-  const [saved, setSaved] = useState(false)
+function approvalLabel(status: PartnerProfile["approvalStatus"]) {
+  if (status === "approved") return "Đã duyệt"
+  if (status === "pending") return "Chờ duyệt"
+  return "Bị từ chối"
+}
 
-  const [onboardForm, setOnboardForm] = useState({
-    name: "", taxCode: "", representative: "", email: "", phone: "", address: "", description: "", terms: false,
-  })
-  const [onboardErrors, setOnboardErrors] = useState<Record<string, string>>({})
+function approvalMeta(status: PartnerProfile["approvalStatus"]) {
+  if (status === "approved") {
+    return { icon: <BadgeCheck className="w-4 h-4" />, color: "#2D7A52", bg: "#E8F5EE" }
+  }
+  if (status === "pending") {
+    return { icon: <Clock className="w-4 h-4" />, color: "#D97706", bg: "#FEF3C7" }
+  }
+  return { icon: <XCircle className="w-4 h-4" />, color: "#B91C1C", bg: "#FEE2E2" }
+}
 
-  const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }))
-  const saveProfile = () => { setSaved(true); setTimeout(() => setSaved(false), 2000) }
+function businessTypeOptions() {
+  return [
+    { value: "", label: "Chọn loại hình" },
+    { value: "restaurant", label: "Ẩm thực" },
+    { value: "spa", label: "Làm đẹp" },
+    { value: "entertainment", label: "Giải trí" },
+    { value: "hotel", label: "Du lịch/Khách sạn" },
+    { value: "other", label: "Khác" },
+  ]
+}
 
-  const validateOnboard = () => {
-    const errs: Record<string, string> = {}
-    if (!onboardForm.name.trim()) errs.name = "Bắt buộc"
-    if (!onboardForm.taxCode.trim()) errs.taxCode = "Bắt buộc"
-    if (!onboardForm.representative.trim()) errs.representative = "Bắt buộc"
-    if (!onboardForm.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(onboardForm.email)) errs.email = "Email không hợp lệ"
-    if (!onboardForm.phone.trim()) errs.phone = "Bắt buộc"
-    if (!onboardForm.terms) errs.terms = "Vui lòng đồng ý điều khoản"
-    setOnboardErrors(errs)
-    return Object.keys(errs).length === 0
+function mapPartnerToForm(partner: PartnerProfile | null): PartnerForm {
+  return {
+    businessName: partner?.businessName ?? "",
+    businessCode: partner?.businessCode ?? "",
+    businessType: partner?.businessType ?? "",
+    taxNumber: partner?.taxNumber ?? "",
+    website: partner?.websiteUrl ?? "",
+    description: partner?.description ?? "",
+  }
+}
+
+function mapUserToRepresentative(user: AppUser): RepresentativeForm {
+  return {
+    fullName: user.name,
+    email: user.email,
+    phone: "",
+    address: "",
+  }
+}
+
+export function BusinessProfilePage({ user, partner, onPartnerUpdated }: Props) {
+  const [partnerForm, setPartnerForm] = useState<PartnerForm>(() => mapPartnerToForm(partner))
+  const [representative, setRepresentative] = useState<RepresentativeForm>(() => mapUserToRepresentative(user))
+  const [isSaving, setIsSaving] = useState(false)
+
+  const hasProfile = Boolean(partner)
+  const pendingReadonly = partner?.approvalStatus === "pending"
+
+  const statusMeta = useMemo(
+    () => (partner ? approvalMeta(partner.approvalStatus) : null),
+    [partner],
+  )
+
+  const setPartnerField = (key: keyof PartnerForm, value: string) => {
+    setPartnerForm((prev) => ({ ...prev, [key]: value }))
   }
 
-  const handleSubmitProfile = () => {
-    if (!validateOnboard()) return
-    setProfileStatus("pending")
+  const setRepresentativeField = (key: keyof RepresentativeForm, value: string) => {
+    setRepresentative((prev) => ({ ...prev, [key]: value }))
   }
 
-  const inputCls = "w-full px-4 py-3 rounded-xl border text-sm outline-none"
-  const inputStyle = { borderColor: "#E2DFC8", fontFamily: "'Inter', sans-serif", backgroundColor: "white" }
+  const validateProfile = () => {
+    if (!partnerForm.businessName.trim()) {
+      toast.error("Tên doanh nghiệp là bắt buộc")
+      return false
+    }
+    if (!hasProfile && !partnerForm.businessCode.trim()) {
+      toast.error("Mã doanh nghiệp là bắt buộc khi đăng ký mới")
+      return false
+    }
+    if (!representative.fullName.trim()) {
+      toast.error("Tên người đại diện là bắt buộc")
+      return false
+    }
+    return true
+  }
+
+  const loadRepresentativeFromApi = async () => {
+    try {
+      const profile = await authService.getProfile(user.id)
+      setRepresentative((prev) => ({
+        ...prev,
+        fullName: (profile.full_name as string) || prev.fullName,
+        email: (profile.email as string) || prev.email,
+        phone: (profile.phone as string) || "",
+        address: (profile.address as string) || "",
+      }))
+    } catch {
+      // Keep local user values as fallback if profile API fails.
+    }
+  }
+
+  const syncLatestPartnerAndUser = async () => {
+    await loadRepresentativeFromApi()
+    if (!user.partnerId) return
+    try {
+      const refreshedPartner = await partnerService.getPartner(user.partnerId)
+      onPartnerUpdated(refreshedPartner)
+      setPartnerForm(mapPartnerToForm(refreshedPartner))
+    } catch {
+      // Ignore refresh error to keep UI responsive after successful save.
+    }
+  }
+
+  const saveProfile = async () => {
+    if (!validateProfile()) return
+
+    setIsSaving(true)
+    try {
+      const profilePayload = {
+        full_name: representative.fullName,
+        phone: representative.phone || undefined,
+        address: representative.address || undefined,
+      }
+
+      if (!hasProfile) {
+        const createPayload: PartnerCreateInput = {
+          business_name: partnerForm.businessName,
+          business_code: partnerForm.businessCode,
+          business_type: partnerForm.businessType || undefined,
+          tax_number: partnerForm.taxNumber || undefined,
+          website_url: partnerForm.website || undefined,
+          description: partnerForm.description || undefined,
+        }
+
+        const [createdPartner] = await Promise.all([
+          partnerService.createMyPartner(createPayload),
+          authService.updateProfile(user.id, profilePayload),
+        ])
+
+        onPartnerUpdated(createdPartner)
+        setPartnerForm(mapPartnerToForm(createdPartner))
+        toast.success("Đã tạo hồ sơ đối tác thành công")
+      } else {
+        const updatePayload: PartnerUpdateInput = {
+          business_name: partnerForm.businessName,
+          business_type: partnerForm.businessType || undefined,
+          tax_number: partnerForm.taxNumber || undefined,
+          website_url: partnerForm.website || undefined,
+          description: partnerForm.description || undefined,
+        }
+
+        await Promise.all([
+          partnerService.updatePartner(partner.id, updatePayload),
+          authService.updateProfile(user.id, profilePayload),
+        ])
+
+        toast.success("Đã lưu hồ sơ đối tác")
+      }
+
+      await syncLatestPartnerAndUser()
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { error?: { message?: string } } } }
+      toast.error(err?.response?.data?.error?.message ?? "Không thể lưu hồ sơ đối tác")
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const inputClass = "w-full px-4 py-3 rounded-xl border text-sm outline-none bg-white"
+  const inputStyle = { borderColor: "#E2DFC8", fontFamily: "'Inter', sans-serif" }
 
   return (
-    <div className="p-6 max-w-2xl mx-auto space-y-6">
-      <h1 className="text-2xl font-black" style={{ color: C.indigo }}>Hồ sơ đối tác</h1>
+    <div className="p-6 max-w-3xl mx-auto space-y-5">
+      <div>
+        <h1 className="text-2xl font-black" style={{ color: C.indigo }}>Hồ sơ đối tác</h1>
+        {!hasProfile && (
+          <p className="text-sm mt-1" style={{ color: "#8A8DA8" }}>
+            Bạn chưa có hồ sơ doanh nghiệp. Hoàn tất thông tin để gửi xét duyệt.
+          </p>
+        )}
+      </div>
 
-      {/* Demo profile status switcher */}
-      <div className="rounded-2xl p-3 border" style={{ backgroundColor: C.indigo + "08", borderColor: C.indigo + "20" }}>
-        <p className="text-xs font-bold mb-2 flex items-center gap-1" style={{ color: C.indigo }}><AppIcon name="settings" className="w-3.5 h-3.5" /> Demo — Chọn trạng thái hồ sơ để xem flow:</p>
-        <div className="flex flex-wrap gap-2">
-          {STATUS_OPTIONS.map((s) => (
-            <button
-              key={s.value}
-              onClick={() => setProfileStatus(s.value)}
-              className="text-xs px-3 py-1.5 rounded-full font-bold border-2 transition-all"
-              style={{
-                borderColor: profileStatus === s.value ? s.color : "#E2DFC8",
-                backgroundColor: profileStatus === s.value ? s.color + "18" : "white",
-                color: profileStatus === s.value ? s.color : "#8A8DA8",
-              }}
+      {partner && statusMeta && (
+        <div className="rounded-2xl p-4 flex items-center justify-between" style={{ backgroundColor: statusMeta.bg }}>
+          <div>
+            <div className="text-sm font-bold" style={{ color: statusMeta.color }}>Trạng thái hồ sơ: {approvalLabel(partner.approvalStatus)}</div>
+            <div className="text-xs mt-1" style={{ color: "#6B7280" }}>
+              Trạng thái hoạt động: {partner.status === "active" ? "Đang hoạt động" : partner.status === "suspended" ? "Tạm ngưng" : "Đã đóng"}
+            </div>
+          </div>
+          <div style={{ color: statusMeta.color }}>{statusMeta.icon}</div>
+        </div>
+      )}
+
+      {pendingReadonly && (
+        <div className="rounded-xl p-3 text-sm" style={{ backgroundColor: "#FEF3C7", color: "#92400E" }}>
+          Hồ sơ đang chờ duyệt. Bạn chỉ nên chỉnh sửa thông tin liên hệ khi cần thiết.
+        </div>
+      )}
+
+      <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
+        <h2 className="font-black text-lg" style={{ color: C.indigo }}>Thông tin doanh nghiệp</h2>
+
+        <div>
+          <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Tên doanh nghiệp *</label>
+          <input
+            className={inputClass}
+            style={inputStyle}
+            value={partnerForm.businessName}
+            onChange={(event) => setPartnerField("businessName", event.target.value)}
+            disabled={isSaving || pendingReadonly}
+          />
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Mã doanh nghiệp *</label>
+            <input
+              className={inputClass}
+              style={inputStyle}
+              value={partnerForm.businessCode}
+              onChange={(event) => setPartnerField("businessCode", event.target.value)}
+              disabled={isSaving || hasProfile}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Mã số thuế</label>
+            <input
+              className={inputClass}
+              style={inputStyle}
+              value={partnerForm.taxNumber}
+              onChange={(event) => setPartnerField("taxNumber", event.target.value)}
+              disabled={isSaving || pendingReadonly}
+            />
+          </div>
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Loại hình kinh doanh</label>
+            <select
+              className={inputClass}
+              style={inputStyle}
+              value={partnerForm.businessType}
+              onChange={(event) => setPartnerField("businessType", event.target.value)}
+              disabled={isSaving || pendingReadonly}
             >
-              <AppIcon name={s.icon} className="w-4 h-4" /> {s.label}
-            </button>
-          ))}
+              {businessTypeOptions().map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Website</label>
+            <input
+              className={inputClass}
+              style={inputStyle}
+              value={partnerForm.website}
+              onChange={(event) => setPartnerField("website", event.target.value)}
+              disabled={isSaving}
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Mô tả doanh nghiệp</label>
+          <textarea
+            className={inputClass + " resize-none"}
+            style={inputStyle}
+            rows={4}
+            value={partnerForm.description}
+            onChange={(event) => setPartnerField("description", event.target.value)}
+            disabled={isSaving}
+          />
         </div>
       </div>
 
-      {/* ── Unsubmitted: Complete profile onboarding ─────────────────────── */}
-      {profileStatus === "unsubmitted" && (
-        <div className="bg-white rounded-2xl p-6 shadow-sm">
-          <div className="flex items-center gap-3 mb-2">
-            <ClipboardList className="w-6 h-6" style={{ color: C.peach }} />
-            <h2 className="text-xl font-black" style={{ color: C.indigo }}>Hoàn thiện hồ sơ đối tác</h2>
-          </div>
-          <p className="text-sm mb-6" style={{ color: "#8A8DA8" }}>
-            Điền đầy đủ thông tin doanh nghiệp để gửi hồ sơ phê duyệt. Sau khi được duyệt bạn mới có thể sử dụng đầy đủ tính năng.
-          </p>
-          <div className="space-y-4">
-            {[
-              { key: "name", label: "Tên doanh nghiệp *", ph: "Công ty TNHH ABC" },
-              { key: "taxCode", label: "Mã số thuế *", ph: "0123456789" },
-              { key: "representative", label: "Người đại diện *", ph: "Nguyễn Văn A" },
-              { key: "email", label: "Email liên hệ *", ph: "contact@company.vn" },
-              { key: "phone", label: "Số điện thoại *", ph: "028 1234 5678" },
-              { key: "address", label: "Địa chỉ trụ sở", ph: "123 Đường ABC, Quận 1" },
-            ].map((f) => (
-              <div key={f.key}>
-                <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>{f.label}</label>
-                <input
-                  className={inputCls}
-                  style={{ ...inputStyle, borderColor: onboardErrors[f.key] ? C.peach : "#E2DFC8" }}
-                  placeholder={f.ph}
-                  value={onboardForm[f.key as keyof typeof onboardForm] as string}
-                  onChange={(e) => setOnboardForm((p) => ({ ...p, [f.key]: e.target.value }))}
-                />
-                {onboardErrors[f.key] && <p className="text-xs mt-1" style={{ color: C.peach }}>{onboardErrors[f.key]}</p>}
-              </div>
-            ))}
-            <div>
-              <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Mô tả doanh nghiệp</label>
-              <textarea className={inputCls + " resize-none"} style={inputStyle} rows={3} placeholder="Mô tả ngắn..." value={onboardForm.description} onChange={(e) => setOnboardForm((p) => ({ ...p, description: e.target.value }))} />
-            </div>
-            <label className="flex items-start gap-2 cursor-pointer">
-              <input type="checkbox" checked={onboardForm.terms} onChange={(e) => setOnboardForm((p) => ({ ...p, terms: e.target.checked }))} className="mt-0.5 rounded" />
-              <span className="text-sm" style={{ color: C.indigo }}>
-                Tôi xác nhận thông tin chính xác và đồng ý với <span className="font-bold" style={{ color: C.peach }}>Điều khoản đối tác</span>
-              </span>
-            </label>
-            {onboardErrors.terms && <p className="text-xs" style={{ color: C.peach }}>{onboardErrors.terms}</p>}
-          </div>
-          <button onClick={handleSubmitProfile} className="mt-6 w-full py-3 rounded-xl font-bold text-white hover:opacity-90" style={{ backgroundColor: C.peach }}>
-            Nộp hồ sơ đối tác
-          </button>
-        </div>
-      )}
+      <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
+        <h2 className="font-black text-lg" style={{ color: C.indigo }}>Thông tin người đại diện</h2>
 
-      {/* ── Pending: Waiting for approval ────────────────────────────────── */}
-      {profileStatus === "pending" && (
-        <div className="bg-white rounded-2xl p-8 shadow-sm text-center">
-          <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-5" style={{ backgroundColor: C.apricot + "20" }}>
-            <Clock className="w-10 h-10" style={{ color: C.apricot }} />
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Họ tên *</label>
+            <input
+              className={inputClass}
+              style={inputStyle}
+              value={representative.fullName}
+              onChange={(event) => setRepresentativeField("fullName", event.target.value)}
+              disabled={isSaving}
+            />
           </div>
-          <h2 className="text-xl font-black mb-3" style={{ color: C.indigo }}>Đang chờ phê duyệt</h2>
-          <p className="text-sm mb-6" style={{ color: "#8A8DA8" }}>
-            Hồ sơ đã gửi thành công. Quản trị viên sẽ xem xét trong <strong>1–3 ngày làm việc</strong>. Bạn nhận thông báo khi được duyệt.
-          </p>
-          <div className="flex justify-center gap-6 mb-6">
-            {[
-              { label: "Nộp hồ sơ", done: true },
-              { label: "Chờ duyệt", done: false, active: true },
-              { label: "Được duyệt", done: false },
-            ].map((step, i) => (
-              <div key={i} className="flex flex-col items-center gap-1.5">
-                <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-black border-2"
-                  style={{
-                    backgroundColor: step.done ? C.teal : step.active ? C.apricot : "white",
-                    borderColor: step.done ? C.teal : step.active ? C.apricot : "#E2DFC8",
-                    color: step.done || step.active ? "white" : "#8A8DA8",
-                  }}
-                >
-                  {step.done ? <AppIcon name="check" className="w-4 h-4" /> : i + 1}
-                </div>
-                <span className="text-xs font-semibold" style={{ color: step.active ? C.apricot : step.done ? C.teal : "#8A8DA8" }}>
-                  {step.label}
-                </span>
-              </div>
-            ))}
-          </div>
-          <div className="p-3 rounded-xl text-xs font-semibold" style={{ backgroundColor: C.apricot + "18", color: "#D97706" }}>
-            <AppIcon name="help" className="w-4 h-4 inline-block mr-1" /> Trạng thái: Chờ phê duyệt
+          <div>
+            <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Email</label>
+            <input
+              className={inputClass}
+              style={inputStyle}
+              value={representative.email}
+              onChange={(event) => setRepresentativeField("email", event.target.value)}
+              disabled
+            />
           </div>
         </div>
-      )}
 
-      {/* ── Approved: Full profile edit ──────────────────────────────────── */}
-      {profileStatus === "approved" && (
-        <>
-          <div className="bg-white rounded-2xl p-6 shadow-sm">
-            <div className="flex items-center gap-5 mb-6 pb-6 border-b" style={{ borderColor: "#F0EDD8" }}>
-              <div className="relative">
-                <div className="w-20 h-20 rounded-2xl flex items-center justify-center" style={{ backgroundColor: C.peach + "15" }}><AppIcon name="gift" className="w-10 h-10" /></div>
-                <button className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full flex items-center justify-center" style={{ backgroundColor: C.peach, color: "white" }}>
-                  <Camera className="w-3.5 h-3.5" />
-                </button>
-              </div>
-              <div>
-                <h2 className="text-xl font-black" style={{ color: C.indigo }}>{form.name}</h2>
-                <p className="text-sm mt-0.5" style={{ color: "#8A8DA8" }}>MST: {form.taxCode}</p>
-                <span className="text-xs px-2 py-0.5 rounded-full font-bold flex items-center gap-1 w-fit mt-1" style={{ backgroundColor: "#E8F5EE", color: "#2D7A52" }}>
-                  <BadgeCheck className="w-3 h-3" /> Đã duyệt
-                </span>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              {[
-                { key: "name", label: "Tên doanh nghiệp *" },
-                { key: "taxCode", label: "Mã số thuế" },
-                { key: "representative", label: "Người đại diện" },
-                { key: "email", label: "Email" },
-                { key: "phone", label: "Số điện thoại" },
-                { key: "address", label: "Địa chỉ" },
-                { key: "website", label: "Website" },
-              ].map((f) => (
-                <div key={f.key}>
-                  <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>{f.label}</label>
-                  <input className={inputCls} style={inputStyle} value={form[f.key as keyof typeof form]} onChange={(e) => set(f.key, e.target.value)} />
-                </div>
-              ))}
-              <div>
-                <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Mô tả</label>
-                <textarea className={inputCls + " resize-none"} style={inputStyle} rows={3} value={form.description} onChange={(e) => set("description", e.target.value)} />
-              </div>
-            </div>
-
-            {saved && (
-              <div className="mt-4 p-3 rounded-xl flex items-center gap-2 text-sm" style={{ backgroundColor: C.teal + "20", color: "#2D7A52" }}>
-                <CheckCircle className="w-4 h-4" /> Đã lưu thay đổi
-              </div>
-            )}
-            <button onClick={saveProfile} className="mt-6 w-full py-3 rounded-xl font-bold text-white" style={{ backgroundColor: C.peach }}>
-              Lưu thay đổi
-            </button>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Số điện thoại</label>
+            <input
+              className={inputClass}
+              style={inputStyle}
+              value={representative.phone}
+              onChange={(event) => setRepresentativeField("phone", event.target.value)}
+              disabled={isSaving}
+            />
           </div>
+          <div>
+            <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Địa chỉ</label>
+            <input
+              className={inputClass}
+              style={inputStyle}
+              value={representative.address}
+              onChange={(event) => setRepresentativeField("address", event.target.value)}
+              disabled={isSaving}
+            />
+          </div>
+        </div>
+      </div>
 
-        </>
-      )}
+      <button
+        onClick={saveProfile}
+        disabled={isSaving}
+        className="w-full py-3 rounded-xl font-bold text-white flex items-center justify-center gap-2 disabled:opacity-70"
+        style={{ backgroundColor: C.peach }}
+      >
+        {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+        {hasProfile ? "Lưu thay đổi" : "Gửi đăng ký hồ sơ"}
+      </button>
     </div>
   )
 }
