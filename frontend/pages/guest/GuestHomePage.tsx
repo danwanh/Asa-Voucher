@@ -1,9 +1,9 @@
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Search, Star, ChevronRight, Zap, ShieldCheck, Smartphone, TrendingUp, ChevronDown } from "lucide-react"
 import { C, fmt } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
-import { VOUCHERS, PARTNERS } from "@/data/mock"
 import type { Voucher } from "@/types"
+import { voucherService } from "@/services/voucherService"
 
 interface Props {
   onNavigate: (p: string) => void
@@ -39,9 +39,42 @@ const FAQ = [
 export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCart }: Props) {
   const [search, setSearch] = useState("")
   const [openFaq, setOpenFaq] = useState<number | null>(null)
+  const [vouchers, setVouchers] = useState<Voucher[]>([])
+  const [isLoadingVouchers, setIsLoadingVouchers] = useState(true)
 
-  const featured = VOUCHERS.filter((v) => v.status === "active").slice(0, 6)
-  const flashSale = VOUCHERS.filter((v) => v.discount >= 30).slice(0, 4)
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadVouchers() {
+      setIsLoadingVouchers(true)
+      try {
+        const items = await voucherService.listPublicVouchers({ limit: 100 })
+        if (!isMounted) return
+        setVouchers(items)
+      } catch {
+        if (!isMounted) return
+        setVouchers([])
+      } finally {
+        if (isMounted) setIsLoadingVouchers(false)
+      }
+    }
+
+    loadVouchers()
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  const featured = useMemo(() => vouchers.filter((v) => v.status === "active").slice(0, 6), [vouchers])
+  const flashSale = useMemo(() => vouchers.filter((v) => v.discount >= 30).slice(0, 4), [vouchers])
+
+  const categoryCounts = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const voucher of vouchers) {
+      counts.set(voucher.category, (counts.get(voucher.category) ?? 0) + 1)
+    }
+    return counts
+  }, [vouchers])
 
   return (
     <div>
@@ -124,7 +157,7 @@ export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCar
               >
                 <AppIcon name={cat.icon} className="w-8 h-8 group-hover:scale-110 transition-transform" />
                 <div className="text-xs font-bold text-center leading-tight" style={{ color: C.indigo }}>{cat.name}</div>
-                <div className="text-[10px]" style={{ color: "#6B7280" }}>{cat.count}</div>
+                <div className="text-[10px]" style={{ color: "#6B7280" }}>{categoryCounts.get(cat.name.toLowerCase()) ?? cat.count}</div>
               </button>
             ))}
           </div>
@@ -145,11 +178,15 @@ export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCar
               Xem thêm <ChevronRight className="w-4 h-4" />
             </button>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {flashSale.map((v) => (
-              <VoucherCard key={v.id} voucher={v} onDetail={onVoucherDetail} onBuy={onAddToCart} isGuest />
-            ))}
-          </div>
+          {isLoadingVouchers ? (
+            <div className="text-sm" style={{ color: "#6B7280" }}>Đang tải voucher flash sale...</div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {flashSale.map((v) => (
+                <VoucherCard key={v.id} voucher={v} onDetail={onVoucherDetail} onBuy={onAddToCart} isGuest />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
@@ -162,11 +199,15 @@ export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCar
               Xem tất cả <ChevronRight className="w-4 h-4" />
             </button>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {featured.map((v) => (
-              <VoucherCard key={v.id} voucher={v} onDetail={onVoucherDetail} onBuy={onAddToCart} isGuest />
-            ))}
-          </div>
+          {isLoadingVouchers ? (
+            <div className="text-sm" style={{ color: "#6B7280" }}>Đang tải voucher nổi bật...</div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {featured.map((v) => (
+                <VoucherCard key={v.id} voucher={v} onDetail={onVoucherDetail} onBuy={onAddToCart} isGuest />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

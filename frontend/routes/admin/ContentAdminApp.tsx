@@ -1,12 +1,12 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { LayoutDashboard, FileText, Tag, User } from "lucide-react"
 import { SubAdminLayout, type SubAdminRole, type SubAdminNavItem } from "@/layouts/admin/SubAdminLayout"
 import { AdminContentDashboardPage } from "@/pages/admin/AdminContentDashboardPage"
 import { ContentManagementPage } from "@/pages/admin/ContentManagementPage"
 import { VoucherApprovalPage } from "@/pages/admin/VoucherApprovalPage"
 import { AdminProfilePage } from "@/pages/admin/AdminProfilePage"
-import { VOUCHERS } from "@/data/mock"
 import type { AppUser } from "@/types"
+import { voucherService } from "@/services/voucherService"
 
 type Page = "dashboard" | "content" | "approval" | "profile"
 
@@ -24,7 +24,27 @@ interface Props { user: AppUser; onLogout: () => void; onSwitchRole: () => void;
 
 export function ContentAdminApp({ user, onLogout, onSwitchRole, initialPage }: Props) {
   const [page, setPage] = useState<Page>(initialPage ?? "dashboard")
-  const pendingCount = VOUCHERS.filter((v) => v.status === "pending").length
+  const [pendingCount, setPendingCount] = useState(0)
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadPendingCount() {
+      try {
+        const items = await voucherService.listPublicVouchers({ limit: 100 })
+        if (!isMounted) return
+        setPendingCount(items.filter((voucher) => voucher.status === "pending").length)
+      } catch {
+        if (!isMounted) return
+        setPendingCount(0)
+      }
+    }
+
+    loadPendingCount()
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   const NAV: SubAdminNavItem[] = [
     { label: "Dashboard",         pg: "dashboard", icon: <LayoutDashboard className="w-4 h-4" /> },

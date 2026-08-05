@@ -1,25 +1,15 @@
-import { useState, useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Search, SlidersHorizontal, Star, X, ChevronDown } from "lucide-react"
 import { C, fmt } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
-import { VOUCHERS } from "@/data/mock"
 import type { Voucher } from "@/types"
+import { voucherService } from "@/services/voucherService"
 
 interface Props {
   onDetail: (v: Voucher) => void
   onLogin: () => void
   onAddToCart: (v: Voucher) => void
 }
-
-const CATEGORIES = [
-  { value: "all", label: "Tất cả" },
-  { value: "food", label: "Ẩm thực" },
-  { value: "beauty", label: "Làm đẹp" },
-  { value: "travel", label: "Du lịch" },
-  { value: "entertainment", label: "Giải trí" },
-  { value: "sport", label: "Thể thao" },
-  { value: "education", label: "Giáo dục" },
-]
 
 const SORT_OPTIONS = [
   { value: "newest", label: "Mới nhất" },
@@ -34,14 +24,56 @@ export function GuestVoucherListPage({ onDetail, onLogin, onAddToCart }: Props) 
   const [search, setSearch] = useState("")
   const [category, setCategory] = useState("all")
   const [sort, setSort] = useState("newest")
+  const [source, setSource] = useState<Voucher[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [priceMin, setPriceMin] = useState("")
   const [priceMax, setPriceMax] = useState("")
   const [showFilter, setShowFilter] = useState(false)
   const [page, setPage] = useState(1)
   const PER_PAGE = 9
 
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadVouchers() {
+      setIsLoading(true)
+      setLoadError(null)
+      try {
+        const items = await voucherService.listPublicVouchers({ limit: 100 })
+        if (!isMounted) return
+        setSource(items)
+      } catch {
+        if (!isMounted) return
+        setLoadError("Không thể tải danh sách voucher")
+        setSource([])
+      } finally {
+        if (isMounted) setIsLoading(false)
+      }
+    }
+
+    loadVouchers()
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  const categories = useMemo(
+    () => [
+      { value: "all", label: "Tất cả" },
+      ...Array.from(new Set(source.map((voucher) => voucher.category))).map((slug) => ({
+        value: slug,
+        label: slug
+          .split("-")
+          .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+          .join(" ")
+      }))
+    ],
+    [source]
+  )
+
   const filtered = useMemo(() => {
-    let list = VOUCHERS.filter((v) => v.status === "active")
+    let list = source.filter((v) => v.status === "active")
     if (search) list = list.filter((v) => v.title.toLowerCase().includes(search.toLowerCase()) || v.partnerName.toLowerCase().includes(search.toLowerCase()))
     if (category !== "all") list = list.filter((v) => v.category === category)
     if (priceMin) list = list.filter((v) => v.price >= Number(priceMin))
@@ -54,7 +86,7 @@ export function GuestVoucherListPage({ onDetail, onLogin, onAddToCart }: Props) 
       case "rating": return [...list].sort((a, b) => b.rating - a.rating)
       default: return list
     }
-  }, [search, category, sort, priceMin, priceMax])
+  }, [source, search, category, sort, priceMin, priceMax])
 
   const totalPages = Math.ceil(filtered.length / PER_PAGE)
   const paged = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE)
@@ -102,7 +134,7 @@ export function GuestVoucherListPage({ onDetail, onLogin, onAddToCart }: Props) 
             <div>
               <div className="text-xs font-bold mb-2 uppercase tracking-wide" style={{ color: "#6B7280" }}>Danh mục</div>
               <div className="flex flex-wrap gap-2">
-                {CATEGORIES.map((cat) => (
+                {categories.map((cat) => (
                   <button
                     key={cat.value}
                     onClick={() => { setCategory(cat.value); setPage(1) }}
@@ -154,7 +186,7 @@ export function GuestVoucherListPage({ onDetail, onLogin, onAddToCart }: Props) 
       )}
 
       <div className="flex gap-1 flex-wrap mb-5">
-        {CATEGORIES.map((cat) => (
+        {categories.map((cat) => (
           <button
             key={cat.value}
             onClick={() => { setCategory(cat.value); setPage(1) }}
@@ -170,9 +202,15 @@ export function GuestVoucherListPage({ onDetail, onLogin, onAddToCart }: Props) 
       </div>
 
       {/* Results info */}
-      <div className="text-sm mb-4" style={{ color: "#6B7280" }}>
-        Tìm thấy <strong style={{ color: C.indigo }}>{filtered.length}</strong> voucher
-      </div>
+      {isLoading ? (
+        <div className="text-sm mb-4" style={{ color: "#6B7280" }}>Đang tải voucher...</div>
+      ) : loadError ? (
+        <div className="text-sm mb-4" style={{ color: "#6B7280" }}>{loadError}</div>
+      ) : (
+        <div className="text-sm mb-4" style={{ color: "#6B7280" }}>
+          Tìm thấy <strong style={{ color: C.indigo }}>{filtered.length}</strong> voucher
+        </div>
+      )}
 
       {/* Grid */}
       {paged.length === 0 ? (

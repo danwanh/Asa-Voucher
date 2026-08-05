@@ -3,7 +3,6 @@ import { Search, Star, MessageSquare } from "lucide-react"
 import { C, fmt, fmtDate } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import { StatusBadge } from "@/components/StatusBadge"
-import { VOUCHERS } from "@/data/mock"
 import type { Order, OrderStatus } from "@/types"
 
 interface Props {
@@ -104,7 +103,6 @@ export function OrderHistoryPage({ orders, pendingOrderId, onDetail, onReview }:
 
       <div className="space-y-3">
         {filtered.map((o) => {
-          const voucher = VOUCHERS.find((v) => v.id === o.voucherId)
           const qty = 1 // default qty since Order type doesn't track it
           const codes = deriveVoucherCodes(o.id, qty, o.code)
           const canReview = o.status === "completed" || o.status === "used"
@@ -162,12 +160,6 @@ export function OrderHistoryPage({ orders, pendingOrderId, onDetail, onReview }:
                 <div className="flex flex-col items-end gap-1 shrink-0">
                   <span className="font-black text-sm" style={{ color: C.peach }}>{fmt(o.amount)}</span>
                   <span className="text-xs" style={{ color: "#8A8DA8" }}>{o.paymentMethod}</span>
-                  {/* Expiry date from voucher */}
-                  {voucher && (
-                    <span className="text-xs" style={{ color: "#8A8DA8" }}>
-                      HSD: {fmtDate(voucher.validTo)}
-                    </span>
-                  )}
                   <span className="text-xs" style={{ color: "#8A8DA8" }}>SL: {qty}</span>
                 </div>
               </div>

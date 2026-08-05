@@ -3,7 +3,6 @@ import { ArrowLeft, Copy, CheckCircle2, QrCode, Download, Star, MessageSquare } 
 import { C, fmt, fmtDate, STATUS_LABEL, statusColor } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import type { Order } from "@/types"
-import { VOUCHERS } from "@/data/mock"
 
 interface Props {
   order: Order
@@ -13,7 +12,6 @@ interface Props {
 
 export function OrderDetailPage({ order, onBack, onReview }: Props) {
   const [copied, setCopied] = useState(false)
-  const voucher = VOUCHERS.find((v) => v.id === order.voucherId)
   const sc = statusColor(order.status)
 
   const copy = () => {
@@ -74,22 +72,19 @@ export function OrderDetailPage({ order, onBack, onReview }: Props) {
         </div>
       </div>
 
-      {/* Voucher Info */}
-      {voucher && (
-        <div className="bg-white rounded-2xl p-6 border border-black/5 mb-4">
-          <h3 className="font-bold text-sm mb-4" style={{ color: C.indigo }}>Thông tin voucher</h3>
-          <div className="flex items-start gap-4">
-            <div className="w-20 h-16 rounded-xl overflow-hidden flex-shrink-0">
-              <img src={voucher.image} alt="" className="w-full h-full object-cover" />
-            </div>
-            <div className="flex-1">
-              <div className="font-bold text-sm mb-1" style={{ color: C.indigo }}>{voucher.title}</div>
-              <div className="text-xs mb-2 flex items-center gap-1" style={{ color: "#6B7280" }}><AppIcon name={voucher.partnerLogo} className="w-3.5 h-3.5" /> {voucher.partnerName}</div>
-              <div className="font-black" style={{ color: C.peach }}>{fmt(order.amount)}</div>
-            </div>
+      <div className="bg-white rounded-2xl p-6 border border-black/5 mb-4">
+        <h3 className="font-bold text-sm mb-4" style={{ color: C.indigo }}>Thông tin voucher</h3>
+        <div className="flex items-start gap-4">
+          <div className="w-20 h-16 rounded-xl flex-shrink-0 flex items-center justify-center" style={{ backgroundColor: C.eggshell }}>
+            <AppIcon name="gift" className="w-6 h-6" />
+          </div>
+          <div className="flex-1">
+            <div className="font-bold text-sm mb-1" style={{ color: C.indigo }}>{order.voucherTitle}</div>
+            <div className="text-xs mb-2" style={{ color: "#6B7280" }}>{order.partnerName}</div>
+            <div className="font-black" style={{ color: C.peach }}>{fmt(order.amount)}</div>
           </div>
         </div>
-      )}
+      </div>
 
       {/* QR Code */}
       {(order.status === "completed" || order.status === "used") && (

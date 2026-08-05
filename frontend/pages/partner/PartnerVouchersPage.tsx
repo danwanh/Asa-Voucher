@@ -1,10 +1,10 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Plus, Edit, FileEdit } from "lucide-react"
 import { C, fmt, fmtDate, statusColor, STATUS_LABEL } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import { StatusBadge } from "@/components/StatusBadge"
-import { VOUCHERS } from "@/data/mock"
 import type { Voucher } from "@/types"
+import { voucherService } from "@/services/voucherService"
 
 interface Props {
   onCreateNew: () => void
@@ -12,26 +12,6 @@ interface Props {
   onDetail: (v: Voucher) => void
   sessionDrafts?: Voucher[]
   onEditDraft?: (v: Voucher) => void
-}
-
-// Partner p1's published/pending vouchers from the data store
-const BASE_VOUCHERS = VOUCHERS.filter((v) => v.partnerId === "p1")
-
-// Pre-seeded demo draft — shows lifecycle before any in-session draft is created
-const DEMO_DRAFT: Voucher = {
-  id: "draft-demo-1",
-  partnerId: "p1", partnerName: "Pizza Hut Vietnam", partnerLogo: "gift",
-  title: "Combo Tết - Giảm 25% đơn trên 400k",
-  category: "food",
-  discount: 25, discountType: "percent", minOrder: 400000,
-  price: 59000, originalPrice: 79000,
-  validFrom: "2026-07-01", validTo: "2026-08-31",
-  quantity: 300, sold: 0,
-  status: "draft",
-  rating: 0, reviews: 0,
-  description: "Chưa hoàn thiện — đang chờ bổ sung điều khoản áp dụng.",
-  image: "",
-  tags: [],
 }
 
 type FilterTab = "all" | "active" | "draft" | "pending" | "other"
@@ -42,10 +22,29 @@ const TAB_LABELS: Record<FilterTab, string> = {
 
 export function PartnerVouchersPage({ onCreateNew, onEdit, onDetail, sessionDrafts = [], onEditDraft }: Props) {
   const [tab, setTab] = useState<FilterTab>("all")
+  const [baseVouchers, setBaseVouchers] = useState<Voucher[]>([])
 
-  // Merge: session drafts override the demo draft if any exist; otherwise show the demo
-  const allDrafts: Voucher[] = sessionDrafts.length > 0 ? sessionDrafts : [DEMO_DRAFT]
-  const allVouchers: Voucher[] = [...allDrafts, ...BASE_VOUCHERS]
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadVouchers() {
+      try {
+        const items = await voucherService.listPublicVouchers({ limit: 100 })
+        if (!isMounted) return
+        setBaseVouchers(items)
+      } catch {
+        if (!isMounted) return
+        setBaseVouchers([])
+      }
+    }
+
+    loadVouchers()
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  const allVouchers: Voucher[] = [...sessionDrafts, ...baseVouchers]
 
   const visibleVouchers = tab === "all"
     ? allVouchers

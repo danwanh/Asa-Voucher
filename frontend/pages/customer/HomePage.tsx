@@ -1,11 +1,11 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { ChevronRight } from "lucide-react"
 import { C } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import { VoucherCard } from "@/components/VoucherCard"
-import { VOUCHERS } from "@/data/mock"
 import type { Voucher } from "@/types"
 import type { CustomerPage } from "@/layouts/CustomerLayout"
+import { voucherService } from "@/services/voucherService"
 
 interface Props {
   onBuy: (v: Voucher) => void
@@ -13,19 +13,53 @@ interface Props {
   onNavigate: (p: CustomerPage) => void
 }
 
-const CATS = [
-  { id: "all", label: "Tất cả", icon: "gift" },
-  { id: "food", label: "Ẩm thực", icon: "gift" },
-  { id: "beauty", label: "Làm đẹp", icon: "heart" },
-  { id: "travel", label: "Du lịch", icon: "location" },
-  { id: "entertainment", label: "Giải trí", icon: "ticket" },
-]
+function categoryLabel(slug: string) {
+  return slug
+    .split("-")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ")
+}
 
 export function HomePage({ onBuy, onDetail, onNavigate }: Props) {
   const [activeCat, setActiveCat] = useState("all")
-  const featured = VOUCHERS.filter((v) => v.status === "active")
+  const [vouchers, setVouchers] = useState<Voucher[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadVouchers() {
+      setIsLoading(true)
+      try {
+        const items = await voucherService.listPublicVouchers({ limit: 100 })
+        if (!isMounted) return
+        setVouchers(items)
+      } catch {
+        if (!isMounted) return
+        setVouchers([])
+      } finally {
+        if (isMounted) setIsLoading(false)
+      }
+    }
+
+    loadVouchers()
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  const featured = vouchers.filter((v) => v.status === "active")
     .filter((v) => activeCat === "all" || v.category === activeCat)
     .slice(0, 6)
+
+  const categories = [
+    { id: "all", label: "Tất cả", icon: "gift" },
+    ...Array.from(new Set(vouchers.map((voucher) => voucher.category))).slice(0, 4).map((slug) => ({
+      id: slug,
+      label: categoryLabel(slug),
+      icon: "tag"
+    }))
+  ]
 
   return (
     <div>
@@ -63,7 +97,7 @@ export function HomePage({ onBuy, onDetail, onNavigate }: Props) {
       {/* Category pills */}
       <div className="max-w-6xl mx-auto px-4 -mt-5 relative z-10">
         <div className="bg-card rounded-3xl p-5 shadow-lg flex flex-wrap gap-2 justify-center">
-          {CATS.map((c) => (
+          {categories.map((c) => (
             <button
               key={c.id}
               onClick={() => setActiveCat(c.id)}
@@ -92,7 +126,11 @@ export function HomePage({ onBuy, onDetail, onNavigate }: Props) {
           </button>
         </div>
 
-        {featured.length === 0 ? (
+        {isLoading ? (
+          <div className="text-center py-16">
+            <div className="font-bold" style={{ color: C.indigo }}>Đang tải voucher...</div>
+          </div>
+        ) : featured.length === 0 ? (
           <div className="text-center py-16">
             <AppIcon name="search" className="w-10 h-10 mb-3 mx-auto" />
             <div className="font-bold" style={{ color: C.indigo }}>Không có voucher trong danh mục này</div>

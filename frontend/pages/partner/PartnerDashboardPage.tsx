@@ -1,27 +1,51 @@
+import { useEffect, useState } from "react"
 import { DollarSign, Tag, Package, CheckCircle } from "lucide-react"
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts"
 import { C, fmt, fmtDate } from "@/utils/constants"
 import { StatusBadge } from "@/components/StatusBadge"
-import { VOUCHERS, ORDERS } from "@/data/mock"
+import { ORDERS } from "@/data/mock"
+import type { Voucher } from "@/types"
+import { voucherService } from "@/services/voucherService"
 
-const MY_VOUCHERS = VOUCHERS.filter((v) => v.partnerId === "p1")
 const MY_ORDERS = ORDERS.filter((o) => o.partnerName === "Pizza Hut Vietnam")
 
 export function PartnerDashboardPage() {
+  const [vouchers, setVouchers] = useState<Voucher[]>([])
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadVouchers() {
+      try {
+        const items = await voucherService.listPublicVouchers({ limit: 100 })
+        if (!isMounted) return
+        setVouchers(items)
+      } catch {
+        if (!isMounted) return
+        setVouchers([])
+      }
+    }
+
+    loadVouchers()
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
   const revenue = MY_ORDERS
     .filter((o) => o.status === "completed")
     .reduce((s, o) => s + o.amount, 0)
 
   const kpis = [
     { label: "Doanh thu tháng này", value: fmt(revenue), delta: "+8.3%", icon: <DollarSign className="w-5 h-5" />, color: C.teal },
-    { label: "Voucher đang bán", value: MY_VOUCHERS.filter((v) => v.status === "active").length.toString(), delta: "+2 mới", icon: <Tag className="w-5 h-5" />, color: C.peach },
+    { label: "Voucher đang bán", value: vouchers.filter((v) => v.status === "active").length.toString(), delta: "+2 mới", icon: <Tag className="w-5 h-5" />, color: C.peach },
     { label: "Đơn hàng", value: MY_ORDERS.length.toString(), delta: "Tháng 7", icon: <Package className="w-5 h-5" />, color: C.indigo },
     { label: "Đã sử dụng", value: MY_ORDERS.filter((o) => o.status === "used").length.toString(), delta: "Voucher", icon: <CheckCircle className="w-5 h-5" />, color: "#F2CC8F" },
   ]
 
-  const activeVouchers = MY_VOUCHERS.filter((v) => v.status === "active")
+  const activeVouchers = vouchers.filter((v) => v.status === "active")
   const chartData = activeVouchers.map((v) => ({
     id: v.id,          // unique key for XAxis — prevents duplicate-key React warning
     label: v.title.slice(0, 12) + "…",

@@ -1,15 +1,40 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Check, X, Eye } from "lucide-react"
 import { C, fmt, fmtDate } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import { StatusBadge } from "@/components/StatusBadge"
-import { VOUCHERS } from "@/data/mock"
-import type { VoucherStatus } from "@/types"
+import type { Voucher, VoucherStatus } from "@/types"
+import { voucherService } from "@/services/voucherService"
 
 const FALLBACK = "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=200&h=150&fit=crop"
 
 export function VoucherApprovalPage() {
-  const [vouchers, setVouchers] = useState(VOUCHERS)
+  const [vouchers, setVouchers] = useState<Voucher[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadVouchers() {
+      setIsLoading(true)
+      try {
+        const items = await voucherService.listPublicVouchers({ limit: 100 })
+        if (!isMounted) return
+        setVouchers(items)
+      } catch {
+        if (!isMounted) return
+        setVouchers([])
+      } finally {
+        if (isMounted) setIsLoading(false)
+      }
+    }
+
+    loadVouchers()
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
   const pending = vouchers.filter((v) => v.status === "pending")
 
   const approve = (id: string) =>
@@ -29,7 +54,11 @@ export function VoucherApprovalPage() {
         )}
       </div>
 
-      {pending.length === 0 ? (
+      {isLoading ? (
+        <div className="text-center py-20">
+          <div className="font-bold text-lg" style={{ color: C.indigo }}>Đang tải voucher...</div>
+        </div>
+      ) : pending.length === 0 ? (
         <div className="text-center py-20">
           <AppIcon name="check" className="w-14 h-14 mb-4 mx-auto" />
           <div className="font-bold text-lg" style={{ color: C.indigo }}>Không có voucher nào chờ duyệt</div>

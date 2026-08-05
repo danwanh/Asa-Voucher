@@ -2,7 +2,7 @@ import { useState } from "react"
 import { Search, QrCode, CheckCircle, XCircle, AlertCircle, RefreshCw } from "lucide-react"
 import { C, fmtDate } from "@/utils/constants"
 import { MockQR } from "@/components/MockQR"
-import { VOUCHERS, ORDERS } from "@/data/mock"
+import { ORDERS } from "@/data/mock"
 
 type VerifyResult = "idle" | "valid" | "used" | "invalid" | "expired"
 
