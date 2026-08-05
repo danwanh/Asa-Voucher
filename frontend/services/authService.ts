@@ -12,12 +12,17 @@ type BackendUser = Record<string, unknown> & {
   branchId?: string | null
 }
 
+function normalizeRole(role: string): AppUser["role"] {
+  if (role === "admin_account") return "admin_operations"
+  return role as AppUser["role"]
+}
+
 function mapUser(u: BackendUser): AppUser {
   return {
     id: u.id,
     email: u.email,
     name: (u.full_name ?? u.name ?? "") as string,
-    role: u.role as AppUser["role"],
+    role: normalizeRole(u.role),
     partnerId: u.partnerId ?? undefined,
     branchId: u.branchId ?? undefined
   }

@@ -14,7 +14,7 @@ export type UserRole =
   | "partner_voucher_staff"
   | "partner_store_staff"
   | "admin_content"
-  | "admin_account"
+  | "admin_operations"
   | "admin_security";
 
 export const ids = {

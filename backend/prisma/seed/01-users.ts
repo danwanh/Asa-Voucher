@@ -37,7 +37,7 @@ const users: UserSeed[] = [
     email: "admin.operations@asa.test",
     phone: "0909000002",
     full_name: "Trần Bảo Ngọc",
-    role: "admin_account",
+    role: "admin_operations",
     dob: new Date("1991-07-09"),
     gender: "female",
     address: "88 Lý Chính Thắng",
