@@ -19,8 +19,6 @@ const STATUS_TRANSITIONS: Record<string, { next: VoucherStatus; label: string; c
   rejected: [{ next: "pending", label: "Gửi lại", color: "#3D405B" }],
 }
 
-const MOCK_STATS = { views: 1247, clicks: 389, conversions: 143, revenue: 7007000 }
-
 export function PartnerVoucherDetailPage({ voucher: initialVoucher, onBack, onEdit }: Props) {
   const [voucher, setVoucher] = useState(initialVoucher)
   const [showStatusDialog, setShowStatusDialog] = useState<{ next: VoucherStatus; label: string } | null>(null)
@@ -102,10 +100,10 @@ export function PartnerVoucherDetailPage({ voucher: initialVoucher, onBack, onEd
             <h3 className="font-bold text-sm mb-4" style={{ color: C.indigo }}>Hiệu suất</h3>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
-                 { label: "Lượt xem", value: MOCK_STATS.views.toLocaleString(), icon: "eye" },
-                 { label: "Nhấn vào", value: MOCK_STATS.clicks.toLocaleString(), icon: "mouse" },
+                { label: "Lượt hiển thị", value: "-", icon: "eye" },
+                { label: "Lượt nhấn", value: "-", icon: "mouse" },
                 { label: "Đã bán", value: voucher.sold.toLocaleString(), icon: "shoppingCart" },
-                 { label: "Doanh thu", value: fmt(MOCK_STATS.revenue), icon: "dollarSign" },
+                { label: "Doanh thu", value: fmt(voucher.sold * voucher.price), icon: "dollarSign" },
               ].map((s) => (
                 <div key={s.label} className="text-center p-3 rounded-xl" style={{ backgroundColor: C.eggshell }}>
                   <AppIcon name={s.icon} className="w-5 h-5 mb-1 mx-auto" />

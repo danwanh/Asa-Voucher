@@ -5,6 +5,8 @@ import { AppIcon } from "@/components/AppIcon"
 import type { Voucher } from "@/types"
 
 interface Props {
+  partnerId?: string
+  partnerName?: string
   onBack: () => void
   onSaveDraft: (draft: Voucher) => void
 }
@@ -19,7 +21,7 @@ const CATEGORIES = [
   { value: "entertainment", label: "Giải trí" },
 ]
 
-export function CreateVoucherPage({ onBack, onSaveDraft }: Props) {
+export function CreateVoucherPage({ partnerId, partnerName, onBack, onSaveDraft }: Props) {
   const [pageState, setPageState] = useState<PageState>("form")
   const [form, setForm] = useState({
     title: "", category: "food", discountType: "percent", discount: "",
@@ -41,8 +43,8 @@ export function CreateVoucherPage({ onBack, onSaveDraft }: Props) {
 
   const buildDraftVoucher = (): Voucher => ({
     id: "draft-" + Date.now(),
-    partnerId: "p1",
-    partnerName: "Pizza Hut Vietnam",
+    partnerId: partnerId ?? "",
+    partnerName: partnerName ?? "",
     partnerLogo: "gift",
     title: form.title || "Voucher chưa đặt tên",
     category: form.category,

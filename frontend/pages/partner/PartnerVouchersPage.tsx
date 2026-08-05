@@ -7,6 +7,7 @@ import type { Voucher } from "@/types"
 import { voucherService } from "@/services/voucherService"
 
 interface Props {
+  partnerId?: string
   onCreateNew: () => void
   onEdit: (v: Voucher) => void
   onDetail: (v: Voucher) => void
@@ -20,7 +21,7 @@ const TAB_LABELS: Record<FilterTab, string> = {
   all: "Tất cả", active: "Đang hoạt động", draft: "Bản nháp", pending: "Chờ duyệt", other: "Khác",
 }
 
-export function PartnerVouchersPage({ onCreateNew, onEdit, onDetail, sessionDrafts = [], onEditDraft }: Props) {
+export function PartnerVouchersPage({ partnerId, onCreateNew, onEdit, onDetail, sessionDrafts = [], onEditDraft }: Props) {
   const [tab, setTab] = useState<FilterTab>("all")
   const [baseVouchers, setBaseVouchers] = useState<Voucher[]>([])
 
@@ -28,8 +29,14 @@ export function PartnerVouchersPage({ onCreateNew, onEdit, onDetail, sessionDraf
     let isMounted = true
 
     async function loadVouchers() {
+      if (!partnerId) {
+        if (!isMounted) return
+        setBaseVouchers([])
+        return
+      }
+
       try {
-        const items = await voucherService.listPublicVouchers({ limit: 100 })
+        const items = await voucherService.listPublicVouchers({ limit: 100, partnerId })
         if (!isMounted) return
         setBaseVouchers(items)
       } catch {
@@ -42,7 +49,7 @@ export function PartnerVouchersPage({ onCreateNew, onEdit, onDetail, sessionDraf
     return () => {
       isMounted = false
     }
-  }, [])
+  }, [partnerId])
 
   const allVouchers: Voucher[] = [...sessionDrafts, ...baseVouchers]
 
