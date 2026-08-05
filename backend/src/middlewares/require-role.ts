@@ -2,7 +2,9 @@ import type { NextFunction, Request, Response } from "express";
 import { HttpError } from "../utils/http-error.js";
 import type { AppRole } from "../types/auth.types.js";
 
-export function requireRole(...roles: AppRole[]) {
+export function requireRole(...roleArgs: (AppRole | AppRole[])[]) {
+  const roles = roleArgs.flat();
+
   return (req: Request, _res: Response, next: NextFunction) => {
     if (!req.user) {
       next(new HttpError(401, "Authentication required"));

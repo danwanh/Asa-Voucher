@@ -118,6 +118,7 @@ export interface Order {
 export interface CartItem {
   voucher: Voucher
   qty: number
+  cartItemId?: string
 }
 
 export interface User {

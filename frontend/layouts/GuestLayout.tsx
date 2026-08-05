@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Menu, X, Tag, ShoppingCart } from "lucide-react"
 import { C } from "@/utils/constants"
 
@@ -23,6 +24,7 @@ const NAV = [
 
 export function GuestLayout({ page, onNavigate, onLogin, onRegister, cartCount = 0, children }: Props) {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const router = useRouter()
 
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: C.content, fontFamily: "'Inter', sans-serif" }}>
@@ -62,7 +64,7 @@ export function GuestLayout({ page, onNavigate, onLogin, onRegister, cartCount =
           <div className="hidden md:flex items-center gap-2">
             {/* Cart badge */}
             <button
-              onClick={() => onNavigate("cart")}
+              onClick={() => router.push("/cart")}
               className="relative p-2 rounded-xl hover:bg-black/5 transition-colors"
               title="Giỏ hàng"
             >
@@ -95,7 +97,7 @@ export function GuestLayout({ page, onNavigate, onLogin, onRegister, cartCount =
           {/* Mobile: cart badge + hamburger */}
           <div className="md:hidden flex items-center gap-1">
             <button
-              onClick={() => onNavigate("cart")}
+              onClick={() => router.push("/cart")}
               className="relative p-2 rounded-lg"
             >
               <ShoppingCart className="w-5 h-5" style={{ color: C.indigo }} />

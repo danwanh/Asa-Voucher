@@ -62,7 +62,7 @@ export async function getCart(userId: string) {
   const cart = await getOrCreateCart(userId);
   const items = await prisma.cartItem.findMany({
     where: { cart_id: cart.id as string },
-    include: { voucher_products: true },
+    include: { voucher_products: { include: { partners: true } } },
     orderBy: { created_at: "desc" }
   });
   return { ...cart, items };

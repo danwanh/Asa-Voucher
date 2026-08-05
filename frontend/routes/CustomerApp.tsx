@@ -19,6 +19,7 @@ import { CustomerSettingsPage } from "@/pages/customer/CustomerSettingsPage"
 import { ORDERS } from "@/data/mock"
 import { C } from "@/utils/constants"
 import type { AppUser, CartItem, Voucher, Order } from "@/types"
+import { cartService } from "@/services/cartService"
 
 interface Props {
   user: AppUser
@@ -73,10 +74,15 @@ export function CustomerApp({
     navigate("create-order")
   }
 
-  const handleCreateOrder = (info: RecipientInfo) => {
-    const orderId = "DH" + Date.now().toString().slice(-6)
-    setPendingOrder({ id: orderId, recipient: info })
-    navigate("payment")
+  const handleCreateOrder = async (info: RecipientInfo) => {
+    try {
+      const order = await cartService.checkout(info.note)
+      setPendingOrder({ id: order.id, recipient: info })
+      navigate("payment")
+    } catch {
+      toast.error("Không thể tạo đơn hàng. Vui lòng kiểm tra lại giỏ hàng và tồn kho.")
+      navigate("cart")
+    }
   }
 
   const handlePaymentSuccess = (code: string) => {

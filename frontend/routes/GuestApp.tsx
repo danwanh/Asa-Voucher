@@ -15,6 +15,11 @@ interface Props {
   onCheckout: () => void
   cartAdd: (v: Voucher) => void
   cartCount: number
+  cart: CartItem[]
+  total: number
+  cartRemove: (id: string) => void
+  cartUpdate: (id: string, qty: number) => void
+  initialPage?: GuestPage
 }
 
 // GuestApp manages the cart display only; cart state lives in App.tsx
@@ -28,10 +33,15 @@ interface FullProps {
   onCheckout: () => void
   cartAdd: (v: Voucher) => void
   cartCount: number
+  cart: CartItem[]
+  total: number
+  cartRemove: (id: string) => void
+  cartUpdate: (id: string, qty: number) => void
+  initialPage?: GuestPage
 }
 
-export function GuestApp({ onLogin, onRegister, onCheckout, cartAdd, cartCount }: FullProps) {
-  const [page, setPage] = useState<GuestPage>("home")
+export function GuestApp({ onLogin, onRegister, onCheckout, cartAdd, cartCount, cart, total, cartRemove, cartUpdate, initialPage }: FullProps) {
+  const [page, setPage] = useState<GuestPage>(initialPage ?? "home")
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null)
 
   const goDetail = (v: Voucher) => {
@@ -59,7 +69,7 @@ export function GuestApp({ onLogin, onRegister, onCheckout, cartAdd, cartCount }
     >
       {page === "home" && (
         <GuestHomePage
-          onNavigate={setPage}
+          onNavigate={(nextPage) => setPage(nextPage as GuestPage)}
           onVoucherDetail={goDetail}
           onLogin={onLogin}
           onAddToCart={handleAddToCart}
@@ -83,11 +93,13 @@ export function GuestApp({ onLogin, onRegister, onCheckout, cartAdd, cartCount }
         />
       )}
       {page === "cart" && (
-        <GuestCartPage
-          cartCount={cartCount}
+        <CartPage
+          cart={cart}
+          total={total}
+          onRemove={cartRemove}
+          onUpdate={cartUpdate}
           onCheckout={onCheckout}
           onContinue={() => setPage("vouchers")}
-          onLogin={onLogin}
         />
       )}
       {page === "categories" && (
