@@ -11,6 +11,7 @@ export const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhos
 let accessToken: string | null = null
 let isRefreshing = false
 let pendingRequests: PendingRequest[] = []
+let tokenRefreshHandler: ((token: string | null) => void) | null = null
 
 function isAuthEndpoint(url?: string) {
   return Boolean(url && /\/auth\/(login|register|register-partner|refresh|logout|forgot-password|reset-password|verify-email|resend-verification)/.test(url))
@@ -18,6 +19,10 @@ function isAuthEndpoint(url?: string) {
 
 export function setAccessToken(token: string | null) {
   accessToken = token
+}
+
+export function onAccessTokenRefreshed(handler: (token: string | null) => void) {
+  tokenRefreshHandler = handler
 }
 
 export function getAccessToken() {
@@ -63,6 +68,7 @@ api.interceptors.response.use(
       )
       const newToken = data.data.access_token
       setAccessToken(newToken)
+      tokenRefreshHandler?.(newToken)
       pendingRequests.forEach(({ resolve, config }) => {
         config.headers = { ...config.headers, Authorization: `Bearer ${newToken}` }
         resolve(api(config))
@@ -72,6 +78,7 @@ api.interceptors.response.use(
       return api(originalRequest)
     } catch (refreshError) {
       setAccessToken(null)
+      tokenRefreshHandler?.(null)
       pendingRequests.forEach(({ reject }) => reject(refreshError))
       pendingRequests = []
       return Promise.reject(refreshError)

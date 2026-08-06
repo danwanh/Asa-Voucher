@@ -2,7 +2,7 @@ import { create } from "zustand"
 import { persist } from "zustand/middleware"
 import type { AppUser } from "@/types"
 import { authService } from "@/services/authService"
-import { getAccessToken, setAccessToken } from "@/services/api"
+import { getAccessToken, onAccessTokenRefreshed, setAccessToken } from "@/services/api"
 
 let initializePromise: Promise<void> | null = null
 
@@ -105,3 +105,7 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 )
+
+onAccessTokenRefreshed((token) => {
+  useAuthStore.setState({ accessToken: token })
+})
