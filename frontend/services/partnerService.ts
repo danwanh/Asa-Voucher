@@ -39,6 +39,31 @@ type BackendBranch = {
   created_at: string
 }
 
+type BackendPartnerStaff = {
+  id: string
+  email: string
+  phone: string | null
+  full_name: string
+  role: "partner_voucher_staff" | "partner_store_staff"
+  is_active: boolean
+  partner_branches_id: string | null
+  branch: {
+    id: string
+    branch_name: string
+    partner_id: string
+    is_active: boolean
+  } | null
+  created_at: string
+  updated_at: string
+}
+
+type BackendPaginated<T> = {
+  items: T[]
+  count: number
+  page: number
+  limit: number
+}
+
 export type PartnerProfile = {
   id: string
   representativeUserId: string
@@ -65,6 +90,28 @@ export type PartnerBranch = {
   phone: string
   isActive: boolean
   createdAt: string
+}
+
+export type PartnerStaffRole = "partner_voucher_staff" | "partner_store_staff"
+
+export type PartnerStaffMember = {
+  id: string
+  email: string
+  phone: string
+  fullName: string
+  role: PartnerStaffRole
+  isActive: boolean
+  branchId: string | null
+  branchName: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type PartnerStaffUpdateInput = {
+  full_name?: string
+  phone?: string | null
+  role?: PartnerStaffRole
+  partner_branches_id?: string
 }
 
 export type PartnerCreateInput = {
@@ -125,6 +172,21 @@ function mapBranch(branch: BackendBranch): PartnerBranch {
   }
 }
 
+function mapPartnerStaff(staff: BackendPartnerStaff): PartnerStaffMember {
+  return {
+    id: staff.id,
+    email: staff.email,
+    phone: staff.phone ?? "",
+    fullName: staff.full_name,
+    role: staff.role,
+    isActive: staff.is_active,
+    branchId: staff.partner_branches_id,
+    branchName: staff.branch?.branch_name ?? "Chưa phân công",
+    createdAt: staff.created_at,
+    updatedAt: staff.updated_at,
+  }
+}
+
 export const partnerService = {
   async getPartner(partnerId: string): Promise<PartnerProfile> {
     const res = await api.get<ApiEnvelope<BackendPartner>>(`/partners/${partnerId}`)
@@ -158,6 +220,22 @@ export const partnerService = {
 
   async deleteBranch(branchId: string): Promise<void> {
     await api.delete(`/branches/${branchId}`)
+  },
+
+  async listPartnerStaff(params?: { page?: number; limit?: number; search?: string }): Promise<BackendPaginated<PartnerStaffMember>> {
+    const res = await api.get<ApiEnvelope<BackendPaginated<BackendPartnerStaff>>>("/users/partner-staff", { params })
+    const data = extractData(res)
+    return { ...data, items: data.items.map(mapPartnerStaff) }
+  },
+
+  async getPartnerStaff(staffId: string): Promise<PartnerStaffMember> {
+    const res = await api.get<ApiEnvelope<BackendPartnerStaff>>(`/users/partner-staff/${staffId}`)
+    return mapPartnerStaff(extractData(res))
+  },
+
+  async updatePartnerStaff(staffId: string, input: PartnerStaffUpdateInput): Promise<PartnerStaffMember> {
+    const res = await api.patch<ApiEnvelope<BackendPartnerStaff>>(`/users/partner-staff/${staffId}`, input)
+    return mapPartnerStaff(extractData(res))
   },
 
   async getCurrentPartner(user: AppUser): Promise<PartnerProfile | null> {
