@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react"
 import { AppIcon } from "@/components/AppIcon"
 import { PartnerLayout, type PartnerPage } from "@/layouts/PartnerLayout"
-import { PartnerDashboardPage } from "@/pages/partner/PartnerDashboardPage"
 import { PartnerVouchersPage } from "@/pages/partner/PartnerVouchersPage"
 import { CreateVoucherPage } from "@/pages/partner/CreateVoucherPage"
 import { EditVoucherPage } from "@/pages/partner/EditVoucherPage"
@@ -23,7 +22,7 @@ interface Props {
 }
 
 export function PartnerApp({ user, onLogout, initialPage }: Props) {
-  const [page, setPage] = useState<PartnerPage>(initialPage ?? "dashboard")
+  const [page, setPage] = useState<PartnerPage>(initialPage ?? "revenue")
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null)
   const [partner, setPartner] = useState<PartnerProfile | null>(null)
   const [isPartnerLoading, setIsPartnerLoading] = useState(true)
@@ -98,7 +97,6 @@ export function PartnerApp({ user, onLogout, initialPage }: Props) {
 
   return (
     <PartnerLayout user={user} partner={partner} page={page} onNavigate={setPage} onLogout={onLogout}>
-      {page === "dashboard" && <PartnerDashboardPage partnerId={user.partnerId} />}
       {page === "vouchers" && (
         <PartnerVouchersPage
           partnerId={user.partnerId}

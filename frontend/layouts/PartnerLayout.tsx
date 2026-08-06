@@ -1,13 +1,13 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Home, Tag, GitBranch, Users, BarChart2, Bell, Building2, Settings, LogOut, Menu, ChevronRight } from "lucide-react"
+import { Tag, GitBranch, Users, BarChart2, Bell, Building2, Settings, LogOut, Menu, ChevronRight } from "lucide-react"
 import { C } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import type { AppUser } from "@/types"
 import type { PartnerProfile } from "@/services/partnerService"
 
 export type PartnerPage =
-  | "dashboard" | "vouchers" | "create" | "edit" | "voucher-detail" | "revenue"
+  | "vouchers" | "create" | "edit" | "voucher-detail" | "revenue"
   | "branches" | "staff" | "profile" | "notifications" | "settings"
 
 interface NavItem {
@@ -17,11 +17,10 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: "Tổng quan", pg: "dashboard", icon: <Home className="w-4 h-4" /> },
+  { label: "Báo cáo", pg: "revenue", icon: <BarChart2 className="w-4 h-4" /> },
   { label: "Quản lý Voucher", pg: "vouchers", icon: <Tag className="w-4 h-4" /> },
   { label: "Chi nhánh", pg: "branches", icon: <GitBranch className="w-4 h-4" /> },
   { label: "Quản lý nhân viên", pg: "staff", icon: <Users className="w-4 h-4" /> },
-  { label: "Báo cáo", pg: "revenue", icon: <BarChart2 className="w-4 h-4" /> },
   { label: "Thông báo", pg: "notifications", icon: <Bell className="w-4 h-4" /> },
   { label: "Hồ sơ đối tác", pg: "profile", icon: <Building2 className="w-4 h-4" /> },
   { label: "Cài đặt", pg: "settings", icon: <Settings className="w-4 h-4" /> },
