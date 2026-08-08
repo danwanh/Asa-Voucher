@@ -231,7 +231,6 @@ export function UserManagementPage() {
                     "Email",
                     "SĐT",
                     "Vai trò",
-                    "Đơn hàng",
                     "Tham gia",
                     "Trạng thái",
                     "",
@@ -274,9 +273,6 @@ export function UserManagementPage() {
                       >
                         {getRoleLabel(u.role)}
                       </span>
-                    </td>
-                    <td className="px-4 py-3 text-xs font-semibold text-center" style={{ color: C.indigo }}>
-                      -
                     </td>
                     <td className="px-4 py-3 text-xs" style={{ color: "#8A8DA8" }}>
                       {fmtDate(u.created_at)}
