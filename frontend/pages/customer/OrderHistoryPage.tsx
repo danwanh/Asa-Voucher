@@ -9,7 +9,7 @@ interface Props {
   orders: Order[]
   pendingOrderId?: string
   onDetail?: (o: Order) => void
-  onReview?: (o: Order) => void
+  onReview?: (o: Order, existing?: { rating: number; content: string }) => void
 }
 
 const TABS: { label: string; value: string }[] = [
@@ -103,9 +103,10 @@ export function OrderHistoryPage({ orders, pendingOrderId, onDetail, onReview }:
 
       <div className="space-y-3">
         {filtered.map((o) => {
-          const qty = 1 // default qty since Order type doesn't track it
-          const codes = deriveVoucherCodes(o.id, qty, o.code)
-          const canReview = o.status === "completed" || o.status === "used"
+          const qty = o.items?.reduce((sum, item) => sum + item.quantity, 0) ?? 1
+          const issuedCodes = o.items?.flatMap((item) => item.issuedVouchers ?? []).map((item) => item.code) ?? []
+          const codes = issuedCodes.length > 0 ? issuedCodes : deriveVoucherCodes(o.id, qty, o.code)
+          const canReview = o.status === "completed" || o.status === "confirmed" || o.status === "used"
 
           return (
             <div

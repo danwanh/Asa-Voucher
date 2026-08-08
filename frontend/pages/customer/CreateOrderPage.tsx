@@ -1,13 +1,12 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { ArrowLeft, ShoppingBag } from "lucide-react"
 import { C, fmt } from "@/utils/constants"
 import type { CartItem } from "@/types"
+import { orderService } from "@/services/orderService"
 
 export interface RecipientInfo {
   name: string
-  email: string
-  phone: string
-  address: string
+  identifier: string
   note: string
   forSelf: boolean
 }
@@ -15,16 +14,34 @@ export interface RecipientInfo {
 interface Props {
   cart: CartItem[]
   total: number
+  userName?: string
+  userEmail?: string
   onCreateOrder: (info: RecipientInfo) => void
   onBack: () => void
 }
 
 const FALLBACK = "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=200&h=150&fit=crop"
 
-export function CreateOrderPage({ cart, total, onCreateOrder, onBack }: Props) {
+export function CreateOrderPage({ cart, total, userName = "", userEmail = "", onCreateOrder, onBack }: Props) {
   const [forSelf, setForSelf] = useState(true)
-  const [form, setForm] = useState({ name: "", email: "", phone: "", address: "", note: "" })
+  const [form, setForm] = useState({ name: userName, identifier: userEmail, note: "" })
+  const [lookupLoading, setLookupLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    if (forSelf || form.identifier.trim().length < 3) return
+    const timer = window.setTimeout(() => {
+      setLookupLoading(true)
+      void orderService.lookupRecipient(form.identifier).then((recipient) => {
+        setForm((current) => ({ ...current, name: String(recipient.full_name ?? "") }))
+        setErrors((current) => ({ ...current, identifier: "" }))
+      }).catch(() => {
+        setForm((current) => ({ ...current, name: "" }))
+        setErrors((current) => ({ ...current, identifier: "Không tìm thấy tài khoản người nhận" }))
+      }).finally(() => setLookupLoading(false))
+    }, 400)
+    return () => window.clearTimeout(timer)
+  }, [forSelf, form.identifier])
 
   const set = (k: string, v: string) => {
     setForm((f) => ({ ...f, [k]: v }))
@@ -33,10 +50,8 @@ export function CreateOrderPage({ cart, total, onCreateOrder, onBack }: Props) {
 
   const validate = () => {
     const e: Record<string, string> = {}
-    if (!form.name.trim()) e.name = "Vui lòng nhập họ tên"
-    if (!form.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "Email không hợp lệ"
-    if (!form.phone || !/^(0[3-9]\d{8})$/.test(form.phone.replace(/\s/g, ""))) e.phone = "Số điện thoại không hợp lệ"
-    if (!forSelf && !form.address.trim()) e.address = "Vui lòng nhập địa chỉ nhận"
+    if (!form.identifier.trim()) e.identifier = "Vui lòng nhập email hoặc số điện thoại người nhận"
+    if (!forSelf && !form.name.trim()) e.identifier = "Không tìm thấy tài khoản người nhận"
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -79,7 +94,15 @@ export function CreateOrderPage({ cart, total, onCreateOrder, onBack }: Props) {
               ].map((t) => (
                 <button
                   key={String(t.val)}
-                  onClick={() => setForSelf(t.val)}
+                  onClick={() => {
+                    setForSelf(t.val)
+                    setForm((current) => ({
+                      ...current,
+                      name: t.val ? userName : "",
+                      identifier: t.val ? userEmail : "",
+                    }))
+                    setErrors({})
+                  }}
                   className="flex-1 py-2 rounded-xl text-sm font-bold transition-all"
                   style={{
                     backgroundColor: forSelf === t.val ? "white" : "transparent",
@@ -92,62 +115,32 @@ export function CreateOrderPage({ cart, total, onCreateOrder, onBack }: Props) {
               ))}
             </div>
 
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div className="sm:col-span-2">
-                <label className="block text-sm font-bold mb-1" style={{ color: C.indigo }}>Họ và tên *</label>
-                <input
-                  type="text"
-                  value={form.name}
-                  onChange={(e) => set("name", e.target.value)}
-                  placeholder="Nguyễn Văn A"
-                  className={inputCls}
-                  style={{ borderColor: errors.name ? "#EF4444" : "#E5E7EB", fontFamily: "'Inter', sans-serif" }}
-                />
-                {errors.name && <p className="text-xs mt-1" style={{ color: "#EF4444" }}>{errors.name}</p>}
-              </div>
+             <div className="grid gap-4">
+               {!forSelf && (
+                 <>
+                   <div>
+                     <label className="block text-sm font-bold mb-1" style={{ color: C.indigo }}>Email hoặc số điện thoại người nhận *</label>
+                     <input
+                       type="text"
+                       value={form.identifier}
+                       onChange={(e) => set("identifier", e.target.value)}
+                       placeholder="email@example.com hoặc 0912345678"
+                       className={inputCls}
+                       style={{ borderColor: errors.identifier ? "#EF4444" : "#E5E7EB", fontFamily: "'Inter', sans-serif" }}
+                     />
+                     {errors.identifier && <p className="text-xs mt-1" style={{ color: "#EF4444" }}>{errors.identifier}</p>}
+                   </div>
 
-              <div>
-                <label className="block text-sm font-bold mb-1" style={{ color: C.indigo }}>Email *</label>
-                <input
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => set("email", e.target.value)}
-                  placeholder="email@example.com"
-                  className={inputCls}
-                  style={{ borderColor: errors.email ? "#EF4444" : "#E5E7EB", fontFamily: "'Inter', sans-serif" }}
-                />
-                {errors.email && <p className="text-xs mt-1" style={{ color: "#EF4444" }}>{errors.email}</p>}
-              </div>
+                   <div className="rounded-xl px-4 py-3" style={{ backgroundColor: C.eggshell }}>
+                     <div className="text-xs" style={{ color: "#8A8DA8" }}>Người được tặng</div>
+                     <div className="font-bold mt-1" style={{ color: C.indigo }}>
+                       {lookupLoading ? "Đang tìm tài khoản..." : form.name || "Chưa xác định"}
+                     </div>
+                   </div>
+                 </>
+               )}
 
-              <div>
-                <label className="block text-sm font-bold mb-1" style={{ color: C.indigo }}>Số điện thoại *</label>
-                <input
-                  type="tel"
-                  value={form.phone}
-                  onChange={(e) => set("phone", e.target.value)}
-                  placeholder="0912345678"
-                  className={inputCls}
-                  style={{ borderColor: errors.phone ? "#EF4444" : "#E5E7EB", fontFamily: "'Inter', sans-serif" }}
-                />
-                {errors.phone && <p className="text-xs mt-1" style={{ color: "#EF4444" }}>{errors.phone}</p>}
-              </div>
-
-              {!forSelf && (
-                <div className="sm:col-span-2">
-                  <label className="block text-sm font-bold mb-1" style={{ color: C.indigo }}>Địa chỉ nhận *</label>
-                  <textarea
-                    rows={2}
-                    value={form.address}
-                    onChange={(e) => set("address", e.target.value)}
-                    placeholder="Địa chỉ giao voucher..."
-                    className={inputCls + " resize-none"}
-                    style={{ borderColor: errors.address ? "#EF4444" : "#E5E7EB", fontFamily: "'Inter', sans-serif" }}
-                  />
-                  {errors.address && <p className="text-xs mt-1" style={{ color: "#EF4444" }}>{errors.address}</p>}
-                </div>
-              )}
-
-              <div className="sm:col-span-2">
+               <div className="sm:col-span-2">
                 <label className="block text-sm font-bold mb-1" style={{ color: C.indigo }}>Ghi chú</label>
                 <textarea
                   rows={2}

@@ -109,9 +109,11 @@ export const cartService = {
     await api.delete("/cart")
   },
 
-  async checkout(note?: string) {
+  async checkout(recipientIdentifier: string, isGift: boolean, note?: string) {
     const response = await api.post<{ data: { id: string } }>("/cart/checkout", {
-      payment_method: "bank_transfer",
+      payment_method: "vnpay",
+      recipient_identifier: recipientIdentifier,
+      is_gift: isGift,
       note,
     })
     return extractData<{ id: string }>(response)

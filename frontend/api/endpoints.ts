@@ -35,12 +35,15 @@ export const API = {
   ORDERS: `${BASE_URL}/orders`,
   // GET  /orders/admin       (Admin) ?status=&page= → Order[]
   ORDERS_ADMIN: `${BASE_URL}/orders/admin`,
-  // POST /orders             { voucherId, qty, paymentMethod } → Order
+  // POST /orders             { cart_item_ids, recipient_identifier, is_gift, payment_method } → Order
   ORDER_CREATE: `${BASE_URL}/orders`,
   // GET  /orders/:id         → Order
   ORDER: (id: string) => `${BASE_URL}/orders/${id}`,
   // POST /orders/:id/cancel  (Customer)
   ORDER_CANCEL: (id: string) => `${BASE_URL}/orders/${id}/cancel`,
+  ORDER_PAYMENTS: (id: string) => `${BASE_URL}/orders/${id}/payments`,
+  PAYMENT_SUCCESS: (id: string) => `${BASE_URL}/payments/${id}/simulate-success`,
+  PAYMENT_FAILED: (id: string) => `${BASE_URL}/payments/${id}/simulate-failed`,
 
   // ── Voucher Code Verification ────────────────────────────────
   // POST /vouchers/verify    (Partner) { code } → { order, valid }

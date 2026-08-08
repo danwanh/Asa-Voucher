@@ -3,37 +3,37 @@ import { ArrowLeft, CheckCircle2 } from "lucide-react"
 import { C, fmt } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import type { CartItem } from "@/types"
+import { toast } from "sonner"
 
-type PaymentMethod = "vnpay" | "momo" | "zalopay" | "bank" | "qr"
+type PaymentMethod = "vnpay" | "paypal"
 
 const PAYMENT_METHODS: { id: PaymentMethod; label: string; icon: string; desc: string }[] = [
   { id: "vnpay", label: "VNPay", icon: "creditCard", desc: "Thẻ ATM / Internet Banking" },
-  { id: "momo", label: "MoMo", icon: "wallet", desc: "Ví điện tử MoMo" },
-  { id: "zalopay", label: "ZaloPay", icon: "wallet", desc: "Ví điện tử ZaloPay" },
-  { id: "bank", label: "Thẻ ngân hàng", icon: "building", desc: "Visa / Mastercard / JCB" },
-  { id: "qr", label: "QR Banking", icon: "smartphone", desc: "Quét mã QR ngân hàng" },
+  { id: "paypal", label: "PayPal", icon: "wallet", desc: "Thanh toán mô phỏng qua PayPal" },
 ]
 
 interface Props {
   cart: CartItem[]
   total: number
   orderId: string
-  onSuccess: (code: string) => void
+  onPay: (method: PaymentMethod) => Promise<void>
   onBack: () => void
 }
 
 const FALLBACK = "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=200&h=150&fit=crop"
 
-export function PaymentPage({ cart, total, orderId, onSuccess, onBack }: Props) {
+export function PaymentPage({ cart, total, orderId, onPay, onBack }: Props) {
   const [payment, setPayment] = useState<PaymentMethod>("vnpay")
   const [processing, setProcessing] = useState(false)
 
-  const handlePay = () => {
+  const handlePay = async () => {
     setProcessing(true)
-    setTimeout(() => {
-      const code = "ASA-" + Math.random().toString(36).slice(2, 9).toUpperCase()
-      onSuccess(code)
-    }, 1500)
+    try {
+      await onPay(payment)
+    } catch {
+      toast.error("Giao dịch không thành công, vui lòng kiểm tra lại phương thức thanh toán")
+      setProcessing(false)
+    }
   }
 
   if (processing) {

@@ -23,7 +23,7 @@ export function OrderDetailPage({ order, onBack, onReview }: Props) {
   const TIMELINE = [
     { label: "Đặt hàng", done: true, time: fmtDate(order.createdAt) },
     { label: "Thanh toán", done: order.status !== "pending", time: order.status !== "pending" ? fmtDate(order.createdAt) : "" },
-    { label: "Nhận voucher", done: order.status === "completed" || order.status === "used", time: order.status === "completed" || order.status === "used" ? fmtDate(order.createdAt) : "" },
+    { label: "Nhận voucher", done: order.status === "confirmed" || order.status === "completed" || order.status === "used", time: order.status === "confirmed" || order.status === "completed" || order.status === "used" ? fmtDate(order.createdAt) : "" },
     { label: "Đã sử dụng", done: order.status === "used", time: order.status === "used" ? fmtDate(order.createdAt) : "" },
   ]
 
@@ -87,7 +87,7 @@ export function OrderDetailPage({ order, onBack, onReview }: Props) {
       </div>
 
       {/* QR Code */}
-      {(order.status === "completed" || order.status === "used") && (
+      {(order.status === "confirmed" || order.status === "completed" || order.status === "used") && (
         <div className="bg-white rounded-2xl p-6 border border-black/5 mb-4 text-center">
           <h3 className="font-bold text-sm mb-4" style={{ color: C.indigo }}>Mã voucher</h3>
           <div className="flex items-center justify-center gap-2 mb-4">
@@ -110,7 +110,7 @@ export function OrderDetailPage({ order, onBack, onReview }: Props) {
               <CheckCircle2 className="w-4 h-4" /> Đã sử dụng
             </div>
           )}
-          {order.status === "completed" && (
+          {(order.status === "confirmed" || order.status === "completed") && (
             <button className="flex items-center gap-2 mx-auto text-sm font-semibold hover:underline" style={{ color: C.teal }}>
               <Download className="w-4 h-4" /> Tải xuống QR Code
             </button>
@@ -129,7 +129,7 @@ export function OrderDetailPage({ order, onBack, onReview }: Props) {
 
       {/* Actions */}
       <div className="flex gap-3">
-        {order.status === "completed" && (
+        {(order.status === "confirmed" || order.status === "completed") && (
           <button
             onClick={() => onReview(order)}
             className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm border-2"

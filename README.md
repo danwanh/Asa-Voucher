@@ -100,6 +100,9 @@ Backend chạy tại: http://localhost:5000
 NEXT_PUBLIC_API_BASE_URL=http://localhost:5000/api
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+NEXT_PUBLIC_VNPAY_RETURN_URL=
+NEXT_PUBLIC_PAYPAL_CLIENT_ID=
+NEXT_PUBLIC_PAYPAL_RETURN_URL=
 ```
 
 ### Backend (`backend/.env`)
@@ -121,6 +124,17 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
 JWT_SECRET=your-jwt-secret
 JWT_EXPIRES_IN=7d
+
+# Simulated payment providers; leave credentials blank until real gateway integration.
+VNPAY_TMN_CODE=
+VNPAY_HASH_SECRET=
+VNPAY_URL=
+VNPAY_RETURN_URL=
+PAYPAL_CLIENT_ID=
+PAYPAL_CLIENT_SECRET=
+PAYPAL_ENVIRONMENT=sandbox
+PAYPAL_RETURN_URL=
+PAYPAL_CANCEL_URL=
 ```
 
 `DATABASE_URL` và `DIRECT_URL` phải là PostgreSQL connection string bắt đầu bằng `postgresql://`, không phải `SUPABASE_URL` dạng `https://...supabase.co`. Prisma Client dùng `DATABASE_URL`; Prisma migrate dùng `DIRECT_URL`.

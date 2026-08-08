@@ -9,14 +9,20 @@ export const updateCartItemSchema = z.object({ quantity: z.number().int().positi
 
 export const checkoutSchema = z.object({
   cart_item_ids: z.array(z.string().uuid()).optional(),
-  payment_method: z.enum(["momo", "vnpay", "zalopay", "bank_transfer"]).default("bank_transfer"),
+  payment_method: z.enum(["vnpay", "paypal"]).default("vnpay"),
+  recipient_identifier: z.string().trim().min(3).max(255),
+  is_gift: z.boolean().default(false),
+  expected_prices: z.record(z.string().uuid(), z.number().nonnegative()).optional(),
   note: z.string().optional()
 });
 
 export const createOrderSchema = z.object({
   items: z.array(cartItemSchema).min(1).optional(),
   cart_item_ids: z.array(z.string().uuid()).optional(),
-  payment_method: z.enum(["momo", "vnpay", "zalopay", "bank_transfer"]).default("bank_transfer"),
+  payment_method: z.enum(["vnpay", "paypal"]).default("vnpay"),
+  recipient_identifier: z.string().trim().min(3).max(255),
+  is_gift: z.boolean().default(false),
+  expected_prices: z.record(z.string().uuid(), z.number().nonnegative()).optional(),
   note: z.string().optional()
 }).refine((value) => value.items?.length || value.cart_item_ids?.length, {
   message: "items or cart_item_ids is required"
@@ -28,5 +34,5 @@ export const updateOrderSchema = z.object({
 });
 
 export const createPaymentSchema = z.object({
-  method: z.enum(["momo", "vnpay", "zalopay", "bank_transfer"]).optional()
+  method: z.enum(["vnpay", "paypal"]).optional()
 });

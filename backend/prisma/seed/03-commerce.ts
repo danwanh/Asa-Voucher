@@ -17,10 +17,11 @@ type OrderSeed = {
   id: string;
   order_code: string;
   user_id: string;
+  recipient_id?: string;
   subtotal: number;
   discount_amount: number;
   total_amount: number;
-  payment_method: "momo" | "vnpay" | "zalopay" | "bank_transfer";
+  payment_method: "vnpay" | "paypal";
   payment_status: "pending" | "paid" | "failed" | "refunded";
   status: "pending" | "confirmed" | "completed" | "cancelled";
   note: string;
@@ -43,7 +44,7 @@ type OrderItemSeed = {
 type PaymentSeed = {
   id: string;
   order_id: string;
-  method: "momo" | "vnpay" | "zalopay" | "bank_transfer";
+  method: "vnpay" | "paypal";
   amount: number;
   status: "pending" | "success" | "failed" | "refunded";
   transaction_ref: string;
@@ -99,7 +100,7 @@ const orders: OrderSeed[] = [
     subtotal: 318000,
     discount_amount: 49000,
     total_amount: 269000,
-    payment_method: "momo",
+    payment_method: "vnpay",
     payment_status: "paid",
     status: "completed",
     note: "Mua voucher xem phim cuối tuần",
@@ -125,7 +126,7 @@ const orders: OrderSeed[] = [
     subtotal: 429000,
     discount_amount: 30000,
     total_amount: 399000,
-    payment_method: "zalopay",
+    payment_method: "paypal",
     payment_status: "paid",
     status: "completed",
     note: "Buffet cuối tuần",
@@ -138,7 +139,7 @@ const orders: OrderSeed[] = [
     subtotal: 229000,
     discount_amount: 0,
     total_amount: 229000,
-    payment_method: "bank_transfer",
+    payment_method: "paypal",
     payment_status: "pending",
     status: "pending",
     note: "Chờ chuyển khoản",
@@ -151,7 +152,7 @@ const orders: OrderSeed[] = [
     subtotal: 160000,
     discount_amount: 0,
     total_amount: 160000,
-    payment_method: "momo",
+    payment_method: "vnpay",
     payment_status: "failed",
     status: "cancelled",
     note: "Thanh toán thất bại do ví không đủ tiền",
@@ -177,7 +178,7 @@ const orders: OrderSeed[] = [
     subtotal: 498000,
     discount_amount: 50000,
     total_amount: 448000,
-    payment_method: "momo",
+    payment_method: "vnpay",
     payment_status: "paid",
     status: "completed",
     note: "Combo điện ảnh cho nhóm bạn",
@@ -312,7 +313,7 @@ const payments: PaymentSeed[] = [
   {
     id: ids.payments.paid01,
     order_id: ids.orders.paid01,
-    method: "momo",
+    method: "vnpay",
     amount: 269000,
     status: "success",
     transaction_ref: "MOMO-DH0001",
@@ -334,7 +335,7 @@ const payments: PaymentSeed[] = [
   {
     id: ids.payments.paid03,
     order_id: ids.orders.paid03,
-    method: "zalopay",
+    method: "paypal",
     amount: 399000,
     status: "success",
     transaction_ref: "ZALO-DH0003",
@@ -345,7 +346,7 @@ const payments: PaymentSeed[] = [
   {
     id: ids.payments.pending01,
     order_id: ids.orders.pending01,
-    method: "bank_transfer",
+    method: "paypal",
     amount: 229000,
     status: "pending",
     transaction_ref: "BANK-DH0004",
@@ -355,7 +356,7 @@ const payments: PaymentSeed[] = [
   {
     id: ids.payments.failed01,
     order_id: ids.orders.failed01,
-    method: "momo",
+    method: "vnpay",
     amount: 160000,
     status: "failed",
     transaction_ref: "MOMO-DH0005",
@@ -376,7 +377,7 @@ const payments: PaymentSeed[] = [
   {
     id: ids.payments.paid04,
     order_id: ids.orders.paid04,
-    method: "momo",
+    method: "vnpay",
     amount: 448000,
     status: "success",
     transaction_ref: "MOMO-DH0007",
@@ -536,6 +537,7 @@ export async function seedCommerce({ prisma }: SeedContext) {
       where: { id: order.id },
       create: {
         ...order,
+        recipient_id: order.recipient_id ?? order.user_id,
         subtotal: money(order.subtotal),
         discount_amount: money(order.discount_amount),
         total_amount: money(order.total_amount),
@@ -544,6 +546,7 @@ export async function seedCommerce({ prisma }: SeedContext) {
       update: {
         order_code: order.order_code,
         user_id: order.user_id,
+        recipient_id: order.recipient_id ?? order.user_id,
         subtotal: money(order.subtotal),
         discount_amount: money(order.discount_amount),
         total_amount: money(order.total_amount),

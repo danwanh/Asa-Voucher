@@ -157,6 +157,26 @@ export async function getUser(req: Request, res: Response) {
   ok(res, sanitizeUser(user as unknown as Record<string, unknown>));
 }
 
+export async function lookupRecipient(req: Request, res: Response) {
+  const identifier = String(req.query.identifier).trim();
+  const phone = identifier.replace(/\s/g, "");
+  const normalizedPhone = phone.startsWith("+84") ? `0${phone.slice(3)}` : phone;
+  const user = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { email: { equals: identifier, mode: "insensitive" } },
+        { phone: normalizedPhone },
+        { phone }
+      ],
+      is_active: true
+    },
+    select: { id: true, full_name: true, email: true, phone: true }
+  });
+
+  if (!user) throw new HttpError(404, "Recipient account was not found", "RECIPIENT_NOT_FOUND");
+  ok(res, user);
+}
+
 export async function updateUser(req: Request, res: Response) {
   const isAdmin = req.user!.role === "admin_operations";
   if (!isAdmin && req.user!.id !== req.params.id) {

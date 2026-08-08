@@ -1,4 +1,5 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { AppIcon } from "@/components/AppIcon"
 import { toast } from "sonner"
 import { CustomerLayout, type CustomerPage } from "@/layouts/CustomerLayout"
@@ -16,10 +17,9 @@ import { ReviewPage } from "@/pages/customer/ReviewPage"
 import { ProfilePage } from "@/pages/customer/ProfilePage"
 import { NotificationsPage } from "@/pages/customer/NotificationsPage"
 import { CustomerSettingsPage } from "@/pages/customer/CustomerSettingsPage"
-import { ORDERS } from "@/data/mock"
 import { C } from "@/utils/constants"
 import type { AppUser, CartItem, Voucher, Order } from "@/types"
-import { cartService } from "@/services/cartService"
+import { orderService, paymentService } from "@/services/orderService"
 
 interface Props {
   user: AppUser
@@ -34,6 +34,7 @@ interface Props {
   clear: () => void
   // When set, start directly at this page (e.g. "create-order" after guest checkout redirect)
   initialPage?: CustomerPage
+  initialOrderId?: string
   onInitialPageConsumed?: () => void
 }
 
@@ -64,7 +65,9 @@ export function CustomerApp({
   user, onLogout,
   cart, total, count, add, remove, update, clear,
   initialPage, onInitialPageConsumed,
+  initialOrderId,
 }: Props) {
+  const router = useRouter()
   const [page, setPage] = useState<CustomerPage>(initialPage ?? "home")
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
@@ -74,6 +77,18 @@ export function CustomerApp({
   const [pendingOrder, setPendingOrder] = useState<PendingOrder | null>(null)
   const [voucherSearch, setVoucherSearch] = useState("")
   const [voucherFilters, setVoucherFilters] = useState<VoucherListFilters>(DEFAULT_VOUCHER_FILTERS)
+
+  useEffect(() => {
+    if (!initialOrderId) return
+    if (initialPage === "orders") {
+      void orderService.get(initialOrderId).then((order) => {
+        setSelectedOrder(order)
+        setPage("order-detail")
+      }).catch(() => undefined)
+      return
+    }
+    setPendingOrder({ id: initialOrderId, recipient: { name: "", identifier: "", note: "", forSelf: false } })
+  }, [initialOrderId, initialPage])
 
   const navigate = (p: CustomerPage) => {
     setPage(p)
@@ -90,7 +105,10 @@ export function CustomerApp({
   }
 
   const goDetail = (v: Voucher) => { setSelectedVoucher(v); navigate("detail") }
-  const goOrderDetail = (o: Order) => { setSelectedOrder(o); navigate("order-detail") }
+  const goOrderDetail = (o: Order) => {
+    setSelectedOrder(o)
+    router.push(`/orders/${o.id}`)
+  }
 
   const goReview = (o: Order, existing?: { rating: number; content: string }) => {
     setReviewOrder(o)
@@ -100,25 +118,47 @@ export function CustomerApp({
 
   const handleBuyNow = (v: Voucher) => {
     add(v)
-    navigate("create-order")
+    router.push("/checkout/create-order")
   }
 
   const handleCreateOrder = async (info: RecipientInfo) => {
     try {
-      const order = await cartService.checkout(info.note)
+      const order = await orderService.createFromCart({
+        cartItemIds: cart.map((item) => item.cartItemId).filter((id): id is string => Boolean(id)),
+        recipientIdentifier: info.identifier,
+        isGift: !info.forSelf,
+        note: info.note,
+        expectedPrices: Object.fromEntries(cart.map((item) => [item.voucher.id, item.voucher.price])),
+      })
       setPendingOrder({ id: order.id, recipient: info })
-      navigate("payment")
-    } catch {
-      toast.error("Không thể tạo đơn hàng. Vui lòng kiểm tra lại giỏ hàng và tồn kho.")
+      router.push(`/checkout/payment/${order.id}`)
+    } catch (error) {
+      const apiError = error as { response?: { data?: { code?: string } } }
+      toast.error(apiError.response?.data?.code === "PRICE_CHANGED"
+        ? "Giá voucher đã thay đổi. Vui lòng kiểm tra lại giỏ hàng."
+        : "Không thể tạo đơn hàng. Vui lòng kiểm tra email người nhận, giỏ hàng và tồn kho.")
       navigate("cart")
     }
   }
 
-  const handlePaymentSuccess = (code: string) => {
-    setLastCode(code)
+  const handlePaymentSuccess = async () => {
+    if (!pendingOrder) return
+    try {
+      const order = await orderService.get(pendingOrder.id)
+      setLastCode(order.items?.flatMap((item) => item.issuedVouchers ?? []).map((item) => item.code).join(", ") ?? order.code)
+    } catch {
+      setLastCode(pendingOrder.id)
+    }
     clear()
     setPendingOrder(null)
     navigate("success")
+  }
+
+  const handlePayment = async (method: "vnpay" | "paypal") => {
+    if (!pendingOrder) return
+    const payment = await paymentService.create(pendingOrder.id, method)
+    await paymentService.simulateSuccess(payment.id)
+    await handlePaymentSuccess()
   }
 
   const handlePaymentBack = () => {
@@ -126,7 +166,11 @@ export function CustomerApp({
     navigate("orders")
   }
 
-  const myOrders = ORDERS.filter((o) => o.userId === "u01")
+  const [myOrders, setMyOrders] = useState<Order[]>([])
+
+  useEffect(() => {
+    void orderService.list().then(setMyOrders).catch(() => undefined)
+  }, [page])
 
   return (
     <CustomerLayout
@@ -166,7 +210,7 @@ export function CustomerApp({
           total={total}
           onRemove={remove}
           onUpdate={update}
-          onCheckout={() => navigate("create-order")}
+          onCheckout={() => router.push("/checkout/create-order")}
           onContinue={() => navigate("vouchers")}
         />
       )}
@@ -174,6 +218,8 @@ export function CustomerApp({
         <CreateOrderPage
           cart={cart}
           total={total}
+          userName={user.name}
+          userEmail={user.email}
           onCreateOrder={handleCreateOrder}
           onBack={() => navigate("cart")}
         />
@@ -183,8 +229,8 @@ export function CustomerApp({
           cart={cart}
           total={total}
           orderId={pendingOrder.id}
-          onSuccess={handlePaymentSuccess}
-          onBack={handlePaymentBack}
+           onPay={handlePayment}
+           onBack={handlePaymentBack}
         />
       )}
       {page === "payment" && !pendingOrder && (
@@ -196,8 +242,8 @@ export function CustomerApp({
           </button>
         </div>
       )}
-      {page === "success" && <CheckoutSuccessPage code={lastCode} onDone={() => navigate("my-vouchers")} />}
-      {page === "my-vouchers" && <MyVouchersPage orders={myOrders} />}
+       {page === "success" && <CheckoutSuccessPage code={lastCode} onDone={() => router.push("/my-vouchers")} />}
+       {page === "my-vouchers" && <MyVouchersPage orders={myOrders} ownerId={user.id} />}
       {page === "orders" && (
         <OrderHistoryPage
           orders={myOrders}

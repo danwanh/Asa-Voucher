@@ -17,7 +17,16 @@ const envSchema = z.object({
   SMTP_USER: z.string().email().optional(),
   SMTP_PASS: z.string().optional(),
   EMAIL_FROM: z.string().default("Asa Voucher <noreply@asa.vn>"),
-  AUTH_TOKEN_EXPIRES_IN_MINUTES: z.coerce.number().int().positive().default(30)
+  AUTH_TOKEN_EXPIRES_IN_MINUTES: z.coerce.number().int().positive().default(30),
+  VNPAY_TMN_CODE: z.string().optional(),
+  VNPAY_HASH_SECRET: z.string().optional(),
+  VNPAY_URL: z.string().url().optional(),
+  VNPAY_RETURN_URL: z.string().url().optional(),
+  PAYPAL_CLIENT_ID: z.string().optional(),
+  PAYPAL_CLIENT_SECRET: z.string().optional(),
+  PAYPAL_ENVIRONMENT: z.enum(["sandbox", "live"]).default("sandbox"),
+  PAYPAL_RETURN_URL: z.string().url().optional(),
+  PAYPAL_CANCEL_URL: z.string().url().optional()
 });
 
 export const env = envSchema.parse(process.env);

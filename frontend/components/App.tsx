@@ -12,6 +12,7 @@ import { AdminApp } from "@/routes/AdminApp"
 import { useCart } from "@/hooks/useCart"
 import { useAuthStore } from "@/stores/authStore"
 import type { AppUser } from "@/types"
+import type { CustomerPage } from "@/layouts/CustomerLayout"
 import { toast } from "sonner"
 
 function LogoutConfirmDialog({ onCancel, onConfirm }: { onCancel: () => void; onConfirm: () => void }) {
@@ -29,7 +30,7 @@ function LogoutConfirmDialog({ onCancel, onConfirm }: { onCancel: () => void; on
   )
 }
 
-export default function App({ initialPage }: { initialPage?: "profile" | "cart" } = {}) {
+export default function App({ initialPage, initialOrderId }: { initialPage?: CustomerPage | "profile" | "cart"; initialOrderId?: string } = {}) {
   const user = useAuthStore((s) => s.user)
   const isInitialized = useAuthStore((s) => s.isInitialized)
   const initialize = useAuthStore((s) => s.initialize)
@@ -124,6 +125,7 @@ export default function App({ initialPage }: { initialPage?: "profile" | "cart" 
       update={update}
       clear={clear}
        initialPage={pendingCheckout ? "create-order" : initialPage}
+       initialOrderId={initialOrderId}
       onInitialPageConsumed={() => setPendingCheckout(false)}
     />
   )
