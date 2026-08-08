@@ -90,7 +90,7 @@ export function MyVouchersPage({ orders, ownerId }: Props) {
             <div key={o.id} className="bg-card rounded-3xl overflow-hidden shadow-sm" style={{ opacity: tab === "expired" ? 0.7 : 1 }}>
               <div className="p-5 flex items-start gap-4">
                 <div className="flex-shrink-0">
-                  <MockQR code={o.code} />
+                   <MockQR code={o.qrPayload || o.code} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <StatusBadge status={o.status} />
@@ -130,7 +130,7 @@ export function MyVouchersPage({ orders, ownerId }: Props) {
             <div className="font-black text-lg mb-1" style={{ color: C.indigo }}>{openOrder.voucherTitle}</div>
             <div className="text-sm mb-4" style={{ color: "#8A8DA8" }}>{openOrder.partnerName}</div>
             <div className="flex justify-center mb-4">
-              <MockQR code={openOrder.code} size={120} />
+               <MockQR code={openOrder.qrPayload || openOrder.code} size={120} />
             </div>
             <code className="text-lg font-black tracking-widest block mb-4" style={{ color: C.indigo, fontFamily: "'Inter', monospace" }}>
               {openOrder.code}

@@ -1,4 +1,4 @@
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Camera, X, Zap, CheckCircle2, AlertCircle, RotateCcw } from "lucide-react"
 import { C } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
@@ -7,33 +7,64 @@ interface Props {
   onVoucherFound: (code: string) => void
 }
 
-const MOCK_QR_CODES = ["ASA-PH-7F3K2", "ASA-CG-8H5N1", "ASA-VJ-4M9P7", "ASA-DEMO-001", "ASA-TEST-VALID"]
+type BarcodeDetectorLike = {
+  detect: (source: HTMLVideoElement) => Promise<Array<{ rawValue: string }>>
+}
+
+type BarcodeDetectorConstructor = new (options?: { formats: string[] }) => BarcodeDetectorLike
 
 export function QRScanPage({ onVoucherFound }: Props) {
   const [scanning, setScanning] = useState(false)
   const [scanResult, setScanResult] = useState<"scanning" | "success" | "error" | null>(null)
   const [scannedCode, setScannedCode] = useState("")
   const [manualCode, setManualCode] = useState("")
+  const [scanError, setScanError] = useState("")
+  const videoRef = useRef<HTMLVideoElement | null>(null)
   const scanInterval = useRef<ReturnType<typeof setInterval> | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
 
-  const startScan = () => {
-    setScanning(true)
-    setScanResult("scanning")
-    setScannedCode("")
+  useEffect(() => () => stopScan(), [])
 
-    // Simulate scanning animation for 2.5s then auto-detect
-    scanInterval.current = setTimeout(() => {
-      const mockCode = MOCK_QR_CODES[Math.floor(Math.random() * MOCK_QR_CODES.length)]
-      setScannedCode(mockCode)
-      setScanResult("success")
-      setScanning(false)
-    }, 2500)
+  const startScan = async () => {
+    const Detector = (window as Window & { BarcodeDetector?: BarcodeDetectorConstructor }).BarcodeDetector
+    if (!Detector) {
+      setScanError("Trình duyệt không hỗ trợ quét QR tự động. Vui lòng nhập mã voucher thủ công.")
+      return
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+      streamRef.current = stream
+      setScanError("")
+      setScanning(true)
+      setScanResult("scanning")
+      setScannedCode("")
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        await videoRef.current.play()
+      }
+      const detector = new Detector({ formats: ["qr_code"] })
+      scanInterval.current = setInterval(async () => {
+        if (!videoRef.current || videoRef.current.readyState < 2) return
+        const codes = await detector.detect(videoRef.current)
+        const value = codes[0]?.rawValue
+        if (value) {
+          setScannedCode(value)
+          setScanResult("success")
+          stopScan(false)
+        }
+      }, 250)
+    } catch {
+      setScanError("Không thể mở camera. Vui lòng cấp quyền camera hoặc nhập mã voucher thủ công.")
+      stopScan()
+    }
   }
 
-  const stopScan = () => {
-    if (scanInterval.current) clearTimeout(scanInterval.current)
+  const stopScan = (resetResult = true) => {
+    if (scanInterval.current) clearInterval(scanInterval.current)
+    streamRef.current?.getTracks().forEach((track) => track.stop())
+    streamRef.current = null
     setScanning(false)
-    setScanResult(null)
+    if (resetResult) setScanResult(null)
   }
 
   const handleFoundCode = () => {
@@ -65,8 +96,7 @@ export function QRScanPage({ onVoucherFound }: Props) {
 
           {scanning && (
             <div className="relative w-full h-full flex items-center justify-center">
-              {/* Simulated camera feed */}
-              <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #1A1A2E 0%, #16213E 100%)" }} />
+              <video ref={videoRef} muted playsInline className="absolute inset-0 w-full h-full object-cover" />
 
               {/* Scan frame */}
               <div className="relative z-10 w-52 h-52">
@@ -88,12 +118,6 @@ export function QRScanPage({ onVoucherFound }: Props) {
                   />
                 </div>
 
-                {/* Mock QR pattern */}
-                <div className="absolute inset-4 grid grid-cols-5 gap-0.5 opacity-20">
-                  {[...Array(25)].map((_, i) => (
-                    <div key={i} className="bg-white rounded-sm" style={{ opacity: Math.random() > 0.5 ? 1 : 0 }} />
-                  ))}
-                </div>
               </div>
 
               <div className="absolute bottom-4 left-0 right-0 text-center">
@@ -128,7 +152,7 @@ export function QRScanPage({ onVoucherFound }: Props) {
           )}
           {scanning && (
             <button
-              onClick={stopScan}
+              onClick={() => stopScan()}
               className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-bold border-2"
               style={{ borderColor: "#EF4444", color: "#EF4444" }}
             >
@@ -154,6 +178,7 @@ export function QRScanPage({ onVoucherFound }: Props) {
             </>
           )}
         </div>
+        {scanError && <p className="mt-3 text-xs font-semibold" style={{ color: "#C0392B" }}>{scanError}</p>}
       </div>
 
       {/* Divider */}

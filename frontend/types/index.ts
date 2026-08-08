@@ -115,6 +115,7 @@ export interface Order {
   paymentMethod: string
   createdAt: string
   code: string
+  qrPayload?: string
   paymentStatus?: "pending" | "paid" | "failed" | "refunded"
   recipientId?: string
   isGift?: boolean

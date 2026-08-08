@@ -1,8 +1,9 @@
 import { useState } from "react"
-import { ArrowLeft, Copy, CheckCircle2, QrCode, Download, Star, MessageSquare } from "lucide-react"
+import { ArrowLeft, Copy, CheckCircle2, Download, Star, MessageSquare } from "lucide-react"
 import { C, fmt, fmtDate, STATUS_LABEL, statusColor } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import type { Order } from "@/types"
+import { MockQR } from "@/components/MockQR"
 
 interface Props {
   order: Order
@@ -99,12 +100,9 @@ export function OrderDetailPage({ order, onBack, onReview }: Props) {
             </button>
           </div>
           {/* Mock QR */}
-          <div className="w-40 h-40 mx-auto rounded-2xl flex items-center justify-center mb-4 border-2 border-dashed" style={{ borderColor: "#E5E7EB" }}>
-            <div className="text-center">
-              <QrCode className="w-16 h-16 mx-auto mb-1" style={{ color: C.indigo }} />
-              <div className="text-xs" style={{ color: "#9CA3AF" }}>QR Code</div>
-            </div>
-          </div>
+           <div className="flex justify-center mb-4">
+             <MockQR code={order.qrPayload || order.code} size={160} />
+           </div>
           {order.status === "used" && (
             <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-bold" style={{ backgroundColor: "#E0EEFF", color: "#1A5FAD" }}>
               <CheckCircle2 className="w-4 h-4" /> Đã sử dụng

@@ -4,6 +4,7 @@ import { adminRoles, type UserRole } from "../types/auth.types.js";
 import { requireData } from "../utils/db.js";
 import { HttpError } from "../utils/http-error.js";
 import { createSimulatedPayment, type PaymentProvider } from "./payment-provider.service.js";
+import { env } from "../config/env.js";
 
 type CurrentUser = { id: string; role: UserRole; partnerId?: string | null };
 type Voucher = Record<string, unknown> & {
@@ -363,12 +364,13 @@ export async function simulatePaymentSuccess(user: CurrentUser, id: string) {
 
       const issued = Array.from({ length: Number(item.quantity) }, () => {
         const code = voucherCode();
+        const qrPayload = `${env.FRONTEND_URL}/voucher/verify?code=${encodeURIComponent(code)}`;
         const issuedDate = new Date();
         const expiredDate = new Date(issuedDate);
         expiredDate.setDate(expiredDate.getDate() + Number(voucher.validity_days));
         return {
           voucher_code: code,
-          qr_code_payload: code,
+          qr_code_payload: qrPayload,
           order_item_id: item.id as string,
           voucher_product_id: voucher.id,
           owner_id: (order.recipient_id ?? order.user_id) as string,

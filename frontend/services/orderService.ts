@@ -51,6 +51,7 @@ export function mapOrder(value: BackendRecord): Order {
     paymentMethod: String(value.payment_method ?? ""),
     createdAt: value.created_at,
     code: issued[0]?.code ?? String(value.order_code ?? value.id),
+    qrPayload: issued[0]?.qrPayload,
     paymentStatus: value.payment_status,
     recipientId: value.recipient_id,
     isGift: Boolean(value.is_gift),

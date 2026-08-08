@@ -279,6 +279,15 @@ Không khuyến nghị viết API sửa/xóa `order_items` sau khi đơn đã t�
 | `PATCH` | `/payments/{id}/simulate-failed` | Owner hoặc admin | Mô phỏng thanh toán thất bại |
 | `GET` | `/payments/{id}` | Owner hoặc admin | Chi tiết thanh toán |
 
+### Voucher validation and redemption
+
+| Method | Endpoint | Quyền | Mục đích |
+| --- | --- | --- | --- |
+| `POST` | `/issued-vouchers/validate` | Partner staff hoặc admin | Kiểm tra voucher bằng code hoặc `qr_code_payload` |
+| `POST` | `/issued-vouchers/{id}/redeem` | `partner_store_staff` | Xác nhận sử dụng voucher tại đúng chi nhánh |
+
+QR payload được phát hành dưới dạng URL `FRONTEND_URL/voucher/verify?code={voucher_code}` để mở trực tiếp trang xác nhận staff.
+
 ### Nghiệp vụ chính
 
 - Mỗi buyer có một giỏ hàng hiện hành trong `carts`, tham chiếu `carts.user_id -> users.id`.

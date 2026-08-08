@@ -19,6 +19,10 @@ Khong goi cong thanh toan that khi cac bien moi truong provider de trong.
 6. Gan `issued_vouchers.owner_id = orders.recipient_id`.
 7. Cap nhat payment `success`, order `payment_status = paid`, status `confirmed`.
 
+Frontend tao QR image that tu URL `FRONTEND_URL/voucher/verify?code={voucher_code}` bang thu vien QR. Moi quantity co mot code va QR rieng. QR duoc quet boi `partner_store_staff`.
+
+Chi `partner_store_staff` duoc redeem. He thong bat buoc voucher thuoc doi tac va chi nhanh ma nhan vien dang phu trach.
+
 ## Luong loi
 
 - Payment fail: payment thanh `failed`, order van `pending`.

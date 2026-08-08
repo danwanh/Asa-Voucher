@@ -30,7 +30,7 @@ function LogoutConfirmDialog({ onCancel, onConfirm }: { onCancel: () => void; on
   )
 }
 
-export default function App({ initialPage, initialOrderId }: { initialPage?: CustomerPage | "profile" | "cart"; initialOrderId?: string } = {}) {
+export default function App({ initialPage, initialOrderId, initialStaffCode }: { initialPage?: CustomerPage | "profile" | "cart"; initialOrderId?: string; initialStaffCode?: string } = {}) {
   const user = useAuthStore((s) => s.user)
   const isInitialized = useAuthStore((s) => s.isInitialized)
   const initialize = useAuthStore((s) => s.initialize)
@@ -85,8 +85,11 @@ export default function App({ initialPage, initialOrderId }: { initialPage?: Cus
 
   if (!isInitialized) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#F4F1DE" }}>
-        <div className="w-10 h-10 rounded-2xl flex items-center justify-center font-black text-lg animate-pulse" style={{ backgroundColor: "#E07A5F", color: "white" }}>A</div>
+      <div className="min-h-screen flex items-center justify-center px-6" style={{ backgroundColor: "#F4F1DE" }} role="status" aria-live="polite">
+        <div className="text-center">
+          <div className="w-12 h-12 mx-auto mb-4 rounded-2xl flex items-center justify-center font-black text-lg animate-pulse" style={{ backgroundColor: "#E07A5F", color: "white" }}>A</div>
+          <p className="text-sm font-semibold" style={{ color: "#3D405B" }}>Đang kiểm tra phiên đăng nhập...</p>
+        </div>
       </div>
     )
   }
@@ -132,7 +135,7 @@ export default function App({ initialPage, initialOrderId }: { initialPage?: Cus
 
   if (user.role === "partner_owner")         return withLogoutDialog(<PartnerApp user={user} onLogout={handleLogout} initialPage={initialPage === "profile" ? initialPage : undefined} />)
   if (user.role === "partner_voucher_staff") return withLogoutDialog(<VoucherStaffApp user={user} onLogout={handleLogout} initialPage={initialPage === "profile" ? initialPage : undefined} />)
-  if (user.role === "partner_store_staff")   return withLogoutDialog(<StaffApp user={user} onLogout={handleLogout} initialPage={initialPage === "profile" ? initialPage : undefined} />)
+  if (user.role === "partner_store_staff")   return withLogoutDialog(<StaffApp user={user} onLogout={handleLogout} initialPage={initialStaffCode ? "verify" : initialPage === "profile" ? initialPage : undefined} initialCode={initialStaffCode} />)
   if (user.role === "admin_content" || user.role === "admin_operations" || user.role === "admin_security")
     return withLogoutDialog(<AdminApp user={user} onLogout={handleLogout} initialPage={initialPage === "profile" ? initialPage : undefined} />)
   return null

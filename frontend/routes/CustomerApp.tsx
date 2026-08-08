@@ -74,6 +74,7 @@ export function CustomerApp({
   const [reviewOrder, setReviewOrder] = useState<Order | null>(null)
   const [reviewExisting, setReviewExisting] = useState<{ rating: number; content: string } | undefined>()
   const [lastCode, setLastCode] = useState("")
+  const [lastQrPayload, setLastQrPayload] = useState("")
   const [pendingOrder, setPendingOrder] = useState<PendingOrder | null>(null)
   const [voucherSearch, setVoucherSearch] = useState("")
   const [voucherFilters, setVoucherFilters] = useState<VoucherListFilters>(DEFAULT_VOUCHER_FILTERS)
@@ -145,7 +146,9 @@ export function CustomerApp({
     if (!pendingOrder) return
     try {
       const order = await orderService.get(pendingOrder.id)
-      setLastCode(order.items?.flatMap((item) => item.issuedVouchers ?? []).map((item) => item.code).join(", ") ?? order.code)
+      const issued = order.items?.flatMap((item) => item.issuedVouchers ?? []) ?? []
+      setLastCode(issued.map((item) => item.code).join(", ") || order.code)
+      setLastQrPayload(issued[0]?.qrPayload ?? order.qrPayload ?? "")
     } catch {
       setLastCode(pendingOrder.id)
     }
@@ -242,7 +245,7 @@ export function CustomerApp({
           </button>
         </div>
       )}
-       {page === "success" && <CheckoutSuccessPage code={lastCode} onDone={() => router.push("/my-vouchers")} />}
+       {page === "success" && <CheckoutSuccessPage code={lastCode} qrPayload={lastQrPayload} onDone={() => router.push("/my-vouchers")} />}
        {page === "my-vouchers" && <MyVouchersPage orders={myOrders} ownerId={user.id} />}
       {page === "orders" && (
         <OrderHistoryPage
