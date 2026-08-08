@@ -86,12 +86,24 @@ function partnerStaffWhere(partnerId: string, staffId?: string) {
 }
 
 export async function listUsers(req: Request, res: Response) {
-  const { page, limit, role, is_active: isActive } = req.query as Record<string, string | number | boolean>;
+  const { page, limit, role, is_active: isActive, search } = req.query as Record<string, string | number | boolean | undefined>;
   const { from, to } = rangeFromPagination(Number(page), Number(limit));
-  const where: Record<string, unknown> = {};
 
-  if (role) where.role = role;
-  if (typeof isActive === "boolean") where.is_active = isActive;
+  const searchTerm = typeof search === "string" ? search.trim() : undefined;
+
+  const where: Prisma.UserWhereInput = {
+    ...(role ? { role: role as Prisma.UserWhereInput["role"] } : {}),
+    ...(typeof isActive === "boolean" ? { is_active: isActive } : {}),
+    ...(searchTerm
+      ? {
+          OR: [
+            { full_name: { contains: searchTerm, mode: "insensitive" } },
+            { email: { contains: searchTerm, mode: "insensitive" } },
+            { phone: { contains: searchTerm, mode: "insensitive" } }
+          ]
+        }
+      : {})
+  };
 
   const [data, count] = await prisma.$transaction([
     prisma.user.findMany({ where, skip: from, take: to - from + 1, orderBy: { created_at: "desc" } }),
