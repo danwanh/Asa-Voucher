@@ -29,7 +29,7 @@ function LogoutConfirmDialog({ onCancel, onConfirm }: { onCancel: () => void; on
   )
 }
 
-export default function App({ initialPage }: { initialPage?: "profile" } = {}) {
+export default function App({ initialPage }: { initialPage?: "profile" | "cart" } = {}) {
   const user = useAuthStore((s) => s.user)
   const isInitialized = useAuthStore((s) => s.isInitialized)
   const initialize = useAuthStore((s) => s.initialize)
@@ -40,7 +40,7 @@ export default function App({ initialPage }: { initialPage?: "profile" } = {}) {
   const [pendingCheckout, setPendingCheckout] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
-  const { cart, add, remove, update, clear, total, count } = useCart()
+  const { cart, add, remove, update, clear, total, count } = useCart(user?.id)
 
   useEffect(() => {
     initialize()
@@ -90,13 +90,18 @@ export default function App({ initialPage }: { initialPage?: "profile" } = {}) {
     )
   }
 
-  if (!user && !showLogin && !initialPage) return (
+  if (!user && !showLogin && (!initialPage || initialPage === "cart")) return (
     <GuestApp
       onLogin={handleRequestLogin}
       onRegister={handleRequestRegister}
       onCheckout={handleCheckoutAsGuest}
       cartAdd={add}
       cartCount={count}
+      cart={cart}
+      total={total}
+      cartRemove={remove}
+      cartUpdate={update}
+      initialPage={initialPage === "cart" ? "cart" : undefined}
     />
   )
 
@@ -123,10 +128,10 @@ export default function App({ initialPage }: { initialPage?: "profile" } = {}) {
     />
   )
 
-  if (user.role === "partner_owner")         return withLogoutDialog(<PartnerApp user={user} onLogout={handleLogout} initialPage={initialPage} />)
-  if (user.role === "partner_voucher_staff") return withLogoutDialog(<VoucherStaffApp user={user} onLogout={handleLogout} initialPage={initialPage} />)
-  if (user.role === "partner_store_staff")   return withLogoutDialog(<StaffApp user={user} onLogout={handleLogout} initialPage={initialPage} />)
+  if (user.role === "partner_owner")         return withLogoutDialog(<PartnerApp user={user} onLogout={handleLogout} initialPage={initialPage === "profile" ? initialPage : undefined} />)
+  if (user.role === "partner_voucher_staff") return withLogoutDialog(<VoucherStaffApp user={user} onLogout={handleLogout} initialPage={initialPage === "profile" ? initialPage : undefined} />)
+  if (user.role === "partner_store_staff")   return withLogoutDialog(<StaffApp user={user} onLogout={handleLogout} initialPage={initialPage === "profile" ? initialPage : undefined} />)
   if (user.role === "admin_content" || user.role === "admin_operations" || user.role === "admin_security")
-    return withLogoutDialog(<AdminApp user={user} onLogout={handleLogout} initialPage={initialPage} />)
+    return withLogoutDialog(<AdminApp user={user} onLogout={handleLogout} initialPage={initialPage === "profile" ? initialPage : undefined} />)
   return null
 }

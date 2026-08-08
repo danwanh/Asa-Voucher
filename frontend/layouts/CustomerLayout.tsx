@@ -83,7 +83,7 @@ export function CustomerLayout({
             {DESKTOP_NAV.map((n) => (
               <button
                 key={n.pg}
-                onClick={() => n.pg === "profile" ? router.push(`/${user.role}/profile`) : onNavigate(n.pg)}
+                onClick={() => n.pg === "profile" ? router.push(`/${user.role}/profile`) : n.pg === "cart" ? router.push("/cart") : onNavigate(n.pg)}
                 className="px-3 py-2 rounded-xl text-sm font-semibold flex items-center gap-1.5 transition-colors"
                 style={{
                   color: page === n.pg ? C.apricot : "rgba(244,241,222,0.75)",
@@ -107,7 +107,7 @@ export function CustomerLayout({
             </button>
 
             {/* Cart */}
-            <button onClick={() => onNavigate("cart")} className="relative p-2 rounded-xl hover:bg-white/10">
+            <button onClick={() => router.push("/cart")} className="relative p-2 rounded-xl hover:bg-white/10">
               <ShoppingCart className="w-5 h-5 text-white" />
               {cartCount > 0 && (
                 <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center" style={{ backgroundColor: C.peach, color: "white" }}>
@@ -140,7 +140,7 @@ export function CustomerLayout({
             {DESKTOP_NAV.map((n) => (
               <button
                 key={n.pg}
-                onClick={() => { n.pg === "profile" ? router.push(`/${user.role}/profile`) : onNavigate(n.pg); setMobileOpen(false) }}
+                onClick={() => { n.pg === "profile" ? router.push(`/${user.role}/profile`) : n.pg === "cart" ? router.push("/cart") : onNavigate(n.pg); setMobileOpen(false) }}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold"
                 style={{ backgroundColor: page === n.pg ? C.peach : "rgba(255,255,255,0.1)", color: "white" }}
               >
@@ -169,7 +169,7 @@ export function CustomerLayout({
           return (
             <button
               key={n.pg}
-              onClick={() => n.pg === "profile" ? router.push(`/${user.role}/profile`) : onNavigate(n.pg)}
+              onClick={() => n.pg === "profile" ? router.push(`/${user.role}/profile`) : n.pg === "cart" ? router.push("/cart") : onNavigate(n.pg)}
               className="flex flex-col items-center gap-0.5 px-3 py-2 relative"
               style={{ color: isActive ? C.peach : "#8A8DA8" }}
             >

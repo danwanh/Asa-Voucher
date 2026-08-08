@@ -1,5 +1,5 @@
 // Base URL — thay bằng URL backend thật khi tích hợp
-const BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000/api/v1"
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5000/api"
 
 export const API = {
   // ── Auth ────────────────────────────────────────────────────
