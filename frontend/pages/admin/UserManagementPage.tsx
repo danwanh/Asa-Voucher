@@ -4,6 +4,7 @@ import { C, fmtDate } from "@/utils/constants"
 import { StatusBadge } from "@/components/StatusBadge"
 import { getUsers, getUser, createUser, updateUser } from "@/services/userService"
 import type { AdminUser } from "@/types"
+import { useAuthStore } from "@/stores/authStore"
 
 export function UserManagementPage() {
   const [search, setSearch] = useState("")
@@ -27,7 +28,7 @@ export function UserManagementPage() {
     phone: "",
     role: "buyer" as AdminUser["role"],
   })
-
+  const currentUser = useAuthStore((state) => state.user)
   const limit = 10
   const totalPages = Math.max(1, Math.ceil(total / limit))
 
@@ -160,6 +161,7 @@ export function UserManagementPage() {
       setTotal(result.data.count)
     } catch (error) {
       console.error("Failed to deactivate user:", error)
+      setDeactivateUser(null)
       setError("Không thể vô hiệu hóa người dùng")
     } finally {
       setDeactivateLoading(false)
@@ -280,57 +282,56 @@ export function UserManagementPage() {
                     <td className="px-4 py-3">
                       <StatusBadge status={u.is_active ? "active" : "cancelled"} />
                     </td>
-                    <td className="px-4 py-3">
-  <div className="relative flex justify-center">
-    <button
-      onClick={() =>
-        setOpenMenuId(openMenuId === u.id ? null : u.id)
-      }
-      className="p-1.5 rounded-lg hover:bg-muted"
-    >
-      <MoreVertical
-        className="w-4 h-4"
-        style={{ color: "#8A8DA8" }}
-      />
-    </button>
+                    <td className="px-4 py-3 relative">
+                      <div className="relative flex justify-center">
+                        <button
+                          onClick={() => setOpenMenuId(openMenuId === u.id ? null : u.id)}
+                          className="p-1.5 rounded-lg hover:bg-muted"
+                        >
+                          <MoreVertical className="w-4 h-4" style={{ color: "#8A8DA8" }} />
+                        </button>
 
-    {openMenuId === u.id && (
-      <div className="absolute right-0 top-9 z-20 w-40 rounded-xl border bg-white shadow-lg overflow-hidden">
-        <button
-          onClick={() => {
-            setOpenMenuId(null)
-            handleViewUser(u.id)
-          }}
-          className="w-full px-4 py-2.5 text-left text-xs hover:bg-gray-50"
-        >
-          Xem chi tiết
-        </button>
+                        {openMenuId === u.id && (
+                          <div className="absolute right-0 top-9 z-20 w-40 rounded-xl border bg-white shadow-lg overflow-hidden">
+                            <button
+                              onClick={() => {
+                                setOpenMenuId(null)
+                                handleViewUser(u.id)
+                              }}
+                              className="w-full px-4 py-2.5 text-left text-xs hover:bg-gray-50"
+                            >
+                              Xem chi tiết
+                            </button>
 
-        {u.is_active ? (
-          <button
-            onClick={() => {
-              setOpenMenuId(null)
-              setDeactivateUser(u)
-            }}
-            className="w-full px-4 py-2.5 text-left text-xs text-red-500 hover:bg-red-50"
-          >
-            Vô hiệu hóa
-          </button>
-        ) : (
-          <button
-            onClick={() => {
-              setOpenMenuId(null)
-              handleActivateUser(u)
-            }}
-            className="w-full px-4 py-2.5 text-left text-xs text-green-600 hover:bg-green-50"
-          >
-            Kích hoạt lại
-          </button>
-        )}
-      </div>
-    )}
-  </div>
-</td>
+                            {u.is_active ? (
+                              u.id !== currentUser?.id && (
+                                <button
+                                  onClick={() => {
+                                    setOpenMenuId(null)
+                                    setDeactivateUser(u)
+                                  }}
+                                  className="w-full px-4 py-2.5 text-left text-xs text-red-500 hover:bg-red-50"
+                                >
+                                  Vô hiệu hóa
+                                </button>
+                              )
+                            ) : (
+                              u.id !== currentUser?.id && (
+                                <button
+                                  onClick={() => {
+                                    setOpenMenuId(null)
+                                    handleActivateUser(u)
+                                  }}
+                                  className="w-full px-4 py-2.5 text-left text-xs text-green-600 hover:bg-green-50"
+                                >
+                                  Kích hoạt lại
+                                </button>
+                              )
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>

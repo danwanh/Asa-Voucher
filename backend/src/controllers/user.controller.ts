@@ -171,6 +171,18 @@ export async function getUser(req: Request, res: Response) {
 
 export async function updateUser(req: Request, res: Response) {
   const isAdmin = req.user!.role === "admin_operations";
+  if (
+    isAdmin &&
+    req.user!.id === req.params.id &&
+    req.body.is_active === false
+  ) {
+    throw new HttpError(
+      403,
+      "You cannot deactivate your own account",
+      "FORBIDDEN"
+    );
+  }
+
   if (!isAdmin && req.user!.id !== req.params.id) {
     throw new HttpError(403, "Insufficient permissions", "FORBIDDEN");
   }
@@ -219,10 +231,25 @@ export async function updatePartnerStaff(req: Request, res: Response) {
 }
 
 export async function deleteUser(req: Request, res: Response) {
+  if (req.user!.id === req.params.id) {
+    throw new HttpError(
+      403,
+      "You cannot deactivate your own account",
+      "FORBIDDEN"
+    );
+  }
+
   try {
-    await prisma.user.update({ where: { id: req.params.id }, data: { is_active: false, updated_at: new Date() } });
+    await prisma.user.update({
+      where: { id: req.params.id },
+      data: {
+        is_active: false,
+        updated_at: new Date(),
+      },
+    });
   } catch (error) {
     throwDbError(error, "User not found");
   }
+
   noContent(res);
 }
