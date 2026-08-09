@@ -26,6 +26,42 @@ export type OrderStatus = "pending" | "confirmed" | "completed" | "cancelled" | 
 // full Role values now).
 export type AdminSubRole = "content" | "operations" | "security"
 
+export interface AdminUser {
+  id: string
+  email: string
+  phone: string | null
+  full_name: string
+  role: Role
+  is_active: boolean
+  is_verified: boolean
+  created_at: string
+  updated_at: string
+}
+
+export type UserQuery = {
+  page?: number
+  limit?: number
+  search?: string
+  role?: string
+  is_active?: boolean
+}
+
+export type CreateUserData = {
+  email: string
+  password: string
+  full_name: string
+  phone?: string
+  role: string
+}
+
+export type UpdateUserData = {
+  email?: string
+  full_name?: string
+  phone?: string
+  role?: string
+  is_active?: boolean
+}
+
 export interface AppUser {
   id: string
   name: string
