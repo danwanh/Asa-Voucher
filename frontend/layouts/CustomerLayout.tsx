@@ -9,7 +9,7 @@ export type CustomerPage =
   | "home" | "vouchers" | "categories" | "detail" | "cart"
   | "checkout" | "create-order" | "payment" | "success"
   | "my-vouchers" | "orders" | "order-detail"
-  | "review" | "profile" | "notifications" | "favorites" | "settings"
+  | "review" | "complaint" | "profile" | "notifications" | "favorites" | "settings"
 
 interface Props {
   user: AppUser

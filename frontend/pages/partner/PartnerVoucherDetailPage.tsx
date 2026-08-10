@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { ArrowLeft, Edit2, Calendar, Users, AlertTriangle } from "lucide-react"
+import { ArrowLeft, Edit2, Calendar, Users, AlertTriangle, Star } from "lucide-react"
 import { C, fmt, fmtDate, STATUS_LABEL, statusColor } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import type { Voucher, VoucherStatus } from "@/types"
@@ -136,7 +136,7 @@ export function PartnerVoucherDetailPage({ voucher: initialVoucher, onBack, onEd
                 { label: "Đơn tối thiểu", value: fmt(voucher.minOrder) },
                 { label: "Bắt đầu", value: fmtDate(voucher.validFrom) },
                 { label: "Hết hạn", value: fmtDate(voucher.validTo) },
-                { label: "Đánh giá", value: `⭐ ${voucher.rating} (${voucher.reviews})` },
+                { label: "Đánh giá", value: <span className="inline-flex items-center gap-1"><Star className="w-3 h-3 fill-current" /> {voucher.rating} ({voucher.reviews})</span> },
               ].map((item) => (
                 <div key={item.label} className="flex justify-between">
                   <span style={{ color: "#6B7280" }}>{item.label}</span>

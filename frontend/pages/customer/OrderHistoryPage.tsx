@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Search, Star, CreditCard } from "lucide-react"
+import { Search, Star, CreditCard, MessageSquare } from "lucide-react"
 import { C, fmt, fmtDate } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import { StatusBadge } from "@/components/StatusBadge"
@@ -10,6 +10,7 @@ interface Props {
   pendingOrderId?: string
   onDetail?: (o: Order) => void
   onReview?: (o: Order, existing?: { rating: number; content: string }) => void
+  onComplaint?: (o: Order) => void
   onPayAgain?: (o: Order) => void
 }
 
@@ -26,7 +27,7 @@ function deriveVoucherCodes(orderId: string, qty: number, baseCode: string): str
   return Array.from({ length: qty }, (_, i) => `${base}-${String(i + 1).padStart(3, "0")}`)
 }
 
-export function OrderHistoryPage({ orders, pendingOrderId, onDetail, onReview, onPayAgain }: Props) {
+export function OrderHistoryPage({ orders, pendingOrderId, onDetail, onReview, onComplaint, onPayAgain }: Props) {
   const [tab, setTab] = useState("all")
   const [search, setSearch] = useState("")
 
@@ -108,7 +109,7 @@ export function OrderHistoryPage({ orders, pendingOrderId, onDetail, onReview, o
           const issuedCodes = o.items?.flatMap((item) => item.issuedVouchers ?? []).map((item) => item.code) ?? []
           const codes = issuedCodes.length > 0 ? issuedCodes : deriveVoucherCodes(o.id, qty, o.code)
           const hasIssuedCodes = issuedCodes.length > 0 || o.paymentStatus === "paid" || (o.status !== "pending" && o.status !== "cancelled")
-          const canReview = o.status === "completed" || o.status === "confirmed" || o.status === "used"
+          const canReview = o.paymentStatus === "paid" || o.status === "completed" || o.status === "confirmed" || o.status === "used"
           const canPayAgain = o.status === "pending" && o.paymentStatus !== "paid" && (!o.paymentExpiresAt || new Date(o.paymentExpiresAt).getTime() > Date.now())
 
           return (
@@ -185,6 +186,15 @@ export function OrderHistoryPage({ orders, pendingOrderId, onDetail, onReview, o
                   >
                     <Star className="w-3 h-3" />
                     Đánh giá
+                  </button>
+                )}
+                {onComplaint && (o.complaints?.[0] || canReview) && (
+                  <button
+                    onClick={() => onComplaint(o)}
+                    className="text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors"
+                    style={{ backgroundColor: o.complaints?.[0] ? "#DBEAFE" : "#EFF6FF", color: "#2563EB" }}
+                  >
+                    <MessageSquare className="w-3 h-3" /> {o.complaints?.[0] ? "Xem khiếu nại đơn" : "Khiếu nại đơn"}
                   </button>
                 )}
                 {canPayAgain && onPayAgain && (

@@ -234,7 +234,13 @@ async function getOrder(id: string) {
     where: { id },
     include: {
       users: { select: { full_name: true } },
-      order_items: { include: { voucher_products: { include: { partners: true } }, issued_vouchers: true } }
+      complaints: true,
+      order_items: {
+        include: {
+          voucher_products: { include: { partners: true } },
+          issued_vouchers: { include: { reviews: true, complaints: true } },
+        },
+      }
     }
   }) as unknown as Record<string, unknown> | null, "Order not found");
 }
@@ -251,7 +257,13 @@ export async function listOrders(user: CurrentUser) {
     where: user.role === "buyer" ? { OR: [{ user_id: user.id }, { recipient_id: user.id }] } : {},
     include: {
       users: { select: { full_name: true } },
-      order_items: { include: { voucher_products: { include: { partners: true } }, issued_vouchers: true } }
+      complaints: true,
+      order_items: {
+        include: {
+          voucher_products: { include: { partners: true } },
+          issued_vouchers: { include: { reviews: true, complaints: true } },
+        },
+      }
     },
     orderBy: { created_at: "desc" }
   });

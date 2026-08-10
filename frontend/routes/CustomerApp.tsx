@@ -14,13 +14,15 @@ import { MyVouchersPage } from "@/pages/customer/MyVouchersPage"
 import { OrderHistoryPage } from "@/pages/customer/OrderHistoryPage"
 import { OrderDetailPage } from "@/pages/customer/OrderDetailPage"
 import { ReviewPage } from "@/pages/customer/ReviewPage"
+import { ComplaintPage } from "@/pages/customer/ComplaintPage"
 import { ProfilePage } from "@/pages/customer/ProfilePage"
 import { NotificationsPage } from "@/pages/customer/NotificationsPage"
 import { CustomerSettingsPage } from "@/pages/customer/CustomerSettingsPage"
 import { C } from "@/utils/constants"
 import { customerPagePath } from "@/utils/customerRoutes"
-import type { AppUser, CartItem, Voucher, Order } from "@/types"
+import type { AppUser, CartItem, IssuedVoucher, Voucher, Order } from "@/types"
 import { orderService, paymentService } from "@/services/orderService"
+import { issuedVoucherService } from "@/services/issuedVoucherService"
 
 interface Props {
   user: AppUser
@@ -31,7 +33,7 @@ interface Props {
   count: number
   cartCount: number | null
   cartCountLoading: boolean
-  add: (v: Voucher) => void
+  add: (v: Voucher) => Promise<CartItem | undefined>
   remove: (id: string) => void
   update: (id: string, qty: number) => void
   removeMany: (cartItemIds: string[]) => void
@@ -84,7 +86,9 @@ export function CustomerApp({
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [reviewOrder, setReviewOrder] = useState<Order | null>(null)
-  const [reviewExisting, setReviewExisting] = useState<{ rating: number; content: string } | undefined>()
+  const [reviewIssuedVoucher, setReviewIssuedVoucher] = useState<IssuedVoucher | null>(null)
+  const [complaintOrder, setComplaintOrder] = useState<Order | null>(null)
+  const [complaintIssuedVoucher, setComplaintIssuedVoucher] = useState<IssuedVoucher | null>(null)
   const [reviewReturnPage, setReviewReturnPage] = useState<CustomerPage>("orders")
   const [lastCode, setLastCode] = useState("")
   const [lastQrPayload, setLastQrPayload] = useState("")
@@ -93,6 +97,10 @@ export function CustomerApp({
   const [isRedirectingToPayment, setIsRedirectingToPayment] = useState(false)
   const [voucherSearch, setVoucherSearch] = useState("")
   const [voucherFilters, setVoucherFilters] = useState<VoucherListFilters>(DEFAULT_VOUCHER_FILTERS)
+  const [myOrders, setMyOrders] = useState<Order[]>([])
+  const [myOrdersLoading, setMyOrdersLoading] = useState(initialPage === "orders" || initialPage === "my-vouchers")
+  const [myIssuedVouchers, setMyIssuedVouchers] = useState<Order[]>([])
+  const [myIssuedVouchersLoading, setMyIssuedVouchersLoading] = useState(initialPage === "my-vouchers")
 
   useEffect(() => {
     if (initialPage) setPage(initialPage)
@@ -147,11 +155,23 @@ export function CustomerApp({
     router.push(`/orders/${o.id}`)
   }
 
-  const goReview = (o: Order, existing?: { rating: number; content: string }, returnPage: CustomerPage = "orders") => {
+  const goReview = (o: Order, issuedVoucher?: IssuedVoucher, returnPage: CustomerPage = "orders") => {
+    const selected = issuedVoucher ?? o.items?.flatMap((item) => item.issuedVouchers ?? [])[0]
+    if (!selected) {
+      toast.error("Không tìm thấy voucher đã phát hành để đánh giá.")
+      return
+    }
     setReviewOrder(o)
-    setReviewExisting(existing)
+    setReviewIssuedVoucher(selected)
     setReviewReturnPage(returnPage)
     navigate("review")
+  }
+
+  const goComplaint = (o: Order, issuedVoucher?: IssuedVoucher, returnPage: CustomerPage = "orders") => {
+    setComplaintOrder(o)
+    setComplaintIssuedVoucher(issuedVoucher ?? null)
+    setReviewReturnPage(returnPage)
+    navigate("complaint")
   }
 
   const handleBuyNow = async (v: Voucher) => {
@@ -223,11 +243,30 @@ export function CustomerApp({
     navigate("orders")
   }
 
-  const [myOrders, setMyOrders] = useState<Order[]>([])
+  const reloadOrders = () => {
+    void orderService.list().then(setMyOrders).catch(() => undefined)
+  }
+
+  const reloadIssuedVouchers = () => {
+    setMyIssuedVouchersLoading(true)
+    void issuedVoucherService.listMine().then(setMyIssuedVouchers).catch(() => undefined).finally(() => setMyIssuedVouchersLoading(false))
+  }
+
+  const returnFromFeedback = () => {
+    if (reviewReturnPage === "my-vouchers") reloadIssuedVouchers()
+    else reloadOrders()
+    setPage(reviewReturnPage)
+    onInitialPageConsumed?.()
+  }
 
   useEffect(() => {
-    if (page !== "orders" && page !== "my-vouchers") return
-    void orderService.list().then(setMyOrders).catch(() => undefined)
+    if (page === "my-vouchers") {
+      reloadIssuedVouchers()
+      return
+    }
+    if (page !== "orders") return
+    setMyOrdersLoading(true)
+    void orderService.list().then(setMyOrders).catch(() => undefined).finally(() => setMyOrdersLoading(false))
   }, [page])
 
   return (
@@ -316,9 +355,11 @@ export function CustomerApp({
        {page === "success" && <CheckoutSuccessPage code={lastCode} qrPayload={lastQrPayload} onDone={() => router.push("/my-vouchers")} />}
        {page === "my-vouchers" && (
          <MyVouchersPage
-           orders={myOrders}
-           ownerId={user.id}
-           onReview={(order) => goReview(order, undefined, "my-vouchers")}
+             orders={myIssuedVouchers}
+             ownerId={user.id}
+             loading={myIssuedVouchersLoading}
+           onReview={(order, issuedVoucher) => goReview(order, issuedVoucher, "my-vouchers")}
+            onComplaint={(order, issuedVoucher) => goComplaint(order, issuedVoucher, "my-vouchers")}
          />
        )}
       {page === "orders" && (
@@ -326,21 +367,30 @@ export function CustomerApp({
           orders={myOrders}
           pendingOrderId={pendingOrder?.id}
           onDetail={goOrderDetail}
-          onReview={(o) => goReview(o)}
+           onReview={(o) => goReview(o)}
+           onComplaint={(o) => goComplaint(o, undefined, "orders")}
           onPayAgain={handlePayAgain}
         />
       )}
       {page === "order-detail" && selectedOrder && (
-         <OrderDetailPage order={selectedOrder} onBack={() => navigate("orders")} onReview={(o) => goReview(o)} onPayAgain={handlePayAgain} />
+          <OrderDetailPage order={selectedOrder} onBack={() => navigate("orders")} onReview={(o) => goReview(o)} onComplaint={(o) => goComplaint(o, undefined, "order-detail")} onPayAgain={handlePayAgain} />
       )}
-      {page === "review" && reviewOrder && (
+       {page === "review" && reviewOrder && reviewIssuedVoucher && (
         <ReviewPage
           order={reviewOrder}
-          existingReview={reviewExisting}
-           onBack={() => navigate(reviewReturnPage)}
-           onSubmit={() => navigate(reviewReturnPage)}
-        />
-      )}
+           issuedVoucher={reviewIssuedVoucher}
+            onBack={returnFromFeedback}
+            onSubmit={returnFromFeedback}
+         />
+       )}
+       {page === "complaint" && complaintOrder && (
+         <ComplaintPage
+           order={complaintOrder}
+           issuedVoucher={complaintIssuedVoucher ?? undefined}
+           onBack={returnFromFeedback}
+           onSubmit={returnFromFeedback}
+         />
+       )}
       {page === "profile" && <ProfilePage user={user} onLogout={onLogout} />}
       {page === "notifications" && <NotificationsPage />}
       {page === "settings" && <CustomerSettingsPage onLogout={onLogout} />}

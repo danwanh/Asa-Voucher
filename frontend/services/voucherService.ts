@@ -54,6 +54,8 @@ type BackendReview = {
 
 type BackendReviewList = {
   items: BackendReview[]
+  pagination?: { total: number }
+  average_rating?: number
 }
 
 type BackendVoucherBranch = {
@@ -225,7 +227,8 @@ export const voucherService = {
     const category = categoryFromMap(categoryMap, voucherProduct.category_id)
 
     const current = mapVoucherProduct(voucherProduct, category.slug)
-    const reviews = extractData(reviewsRes).items.map(mapReview).filter((item) => item.text)
+    const reviewList = extractData(reviewsRes)
+    const reviews = reviewList.items.map(mapReview).filter((item) => item.text)
     const branches = extractData(branchesRes).map(mapBranch)
 
     const conditions = parseStringArray(voucherProduct.terms_and_conditions)
@@ -234,8 +237,8 @@ export const voucherService = {
     return {
       voucher: {
         ...current,
-        reviews: reviews.length,
-        rating: reviews.length === 0 ? 0 : Number((reviews.reduce((sum, item) => sum + item.rating, 0) / reviews.length).toFixed(1))
+        reviews: reviewList.pagination?.total ?? reviews.length,
+        rating: reviewList.average_rating ?? 0
       },
       reviews,
       branches,

@@ -156,6 +156,7 @@ export interface Order {
   recipientId?: string
   isGift?: boolean
   giverName?: string
+  complaints?: Complaint[]
   paymentExpiresAt?: string
   items?: OrderItem[]
 }
@@ -177,6 +178,32 @@ export interface IssuedVoucher {
   qrPayload: string
   status: "active" | "used" | "expired" | "refunded"
   expiredDate?: string
+  review?: Review
+  complaint?: Complaint
+}
+
+export interface Review {
+  id: string
+  issuedVoucherId?: string
+  rating: number
+  comment: string | null
+  mediaUrls: string[]
+  createdAt: string
+}
+
+export type ComplaintStatus = "open" | "under_review" | "resolved" | "closed"
+
+export interface Complaint {
+  id: string
+  issuedVoucherId?: string
+  reason: string
+  description: string
+  evidenceUrls: string[]
+  status: ComplaintStatus
+  resolutionNote?: string | null
+  resolutionType?: string | null
+  createdAt: string
+  resolvedAt?: string | null
 }
 
 export interface Payment {
