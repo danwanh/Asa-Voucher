@@ -87,14 +87,17 @@ function mapCartItem(item: BackendCartItem): CartItem | null {
 }
 
 export const cartService = {
-  async get(): Promise<CartItem[]> {
-    const response = await api.get<{ data: BackendCart }>("/cart")
+  async get(cartItemIds?: string[]): Promise<CartItem[]> {
+    const response = await api.get<{ data: BackendCart }>("/cart", {
+      params: cartItemIds === undefined ? undefined : { item_ids: cartItemIds.join(",") },
+    })
     const cart = extractData<BackendCart>(response)
     return (cart.items ?? []).map(mapCartItem).filter((item): item is CartItem => item !== null)
   },
 
-  async add(voucherProductId: string, quantity = 1) {
-    await api.post("/cart/items", { voucher_product_id: voucherProductId, quantity })
+  async add(voucherProductId: string, quantity = 1): Promise<BackendCartItem> {
+    const response = await api.post<{ data: BackendCartItem }>("/cart/items", { voucher_product_id: voucherProductId, quantity })
+    return extractData<BackendCartItem>(response)
   },
 
   async update(cartItemId: string, quantity: number) {

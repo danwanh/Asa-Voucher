@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Plus, Minus, Trash2, AlertTriangle, ShoppingBag } from "lucide-react"
 import { toast } from "sonner"
 import { C, fmt } from "@/utils/constants"
@@ -13,13 +13,23 @@ interface Props {
   total: number
   onRemove: (id: string) => void
   onUpdate: (id: string, qty: number) => void
-  onCheckout: () => void
+  onCheckout: (items: CartItem[]) => void
   onContinue: () => void
+  loading?: boolean
 }
 
-export function CartPage({ cart, total, onRemove, onUpdate, onCheckout, onContinue }: Props) {
+function cartKey(item: CartItem) {
+  return item.voucher.id
+}
+
+export function CartPage({ cart, total: _total, onRemove, onUpdate, onCheckout, onContinue, loading = false }: Props) {
   const [pendingDelete, setPendingDelete] = useState<CartItem | null>(null)
   const [quantityDraft, setQuantityDraft] = useState<Record<string, string>>({})
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(() => new Set(cart.map(cartKey)))
+
+  useEffect(() => {
+    setSelectedKeys(new Set(cart.map(cartKey)))
+  }, [cart.length])
 
   const handleRemove = (id: string) => {
     onRemove(id)
@@ -42,6 +52,54 @@ export function CartPage({ cart, total, onRemove, onUpdate, onCheckout, onContin
   }
 
   const hasUnavailable = cart.some((item) => !isVoucherAvailable(item.voucher))
+  const selectedItems = cart.filter((item) => selectedKeys.has(cartKey(item)))
+  const selectedTotal = selectedItems.reduce((sum, item) => (
+    isVoucherAvailable(item.voucher) ? sum + item.voucher.price * item.qty : sum
+  ), 0)
+  const hasSelectedUnavailable = selectedItems.some((item) => !isVoucherAvailable(item.voucher))
+  const allSelected = cart.length > 0 && selectedItems.length === cart.length
+
+  const toggleSelected = (item: CartItem) => {
+    const key = cartKey(item)
+    setSelectedKeys((previous) => {
+      const next = new Set(previous)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  const handleCheckout = () => {
+    if (!selectedItems.length) {
+      toast.error("Vui lòng chọn ít nhất một sản phẩm để đặt hàng")
+      return
+    }
+    if (hasSelectedUnavailable) {
+      toast.error("Vui lòng bỏ chọn hoặc xóa sản phẩm không khả dụng")
+      return
+    }
+    const cartItemIds = selectedItems.map((item) => item.cartItemId).filter((id): id is string => Boolean(id))
+    if (cartItemIds.length !== selectedItems.length) {
+      toast.error("Giỏ hàng đang đồng bộ. Vui lòng thử lại sau một chút")
+      return
+    }
+    onCheckout(selectedItems)
+  }
+
+  if (loading) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-8" role="status" aria-live="polite">
+        <div className="h-8 w-56 rounded-xl bg-gray-200 animate-pulse mb-6" />
+        <div className="grid md:grid-cols-3 gap-6">
+          <div className="md:col-span-2 space-y-3">
+            {[1, 2, 3].map((item) => <div key={item} className="h-28 rounded-2xl bg-white animate-pulse" />)}
+          </div>
+          <div className="h-52 rounded-2xl bg-white animate-pulse" />
+        </div>
+        <span className="sr-only">Đang tải danh sách giỏ hàng...</span>
+      </div>
+    )
+  }
 
   if (cart.length === 0) {
     return (
@@ -58,7 +116,18 @@ export function CartPage({ cart, total, onRemove, onUpdate, onCheckout, onContin
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-black mb-6" style={{ color: C.indigo }}>Giỏ hàng ({cart.length} sản phẩm)</h1>
+      <div className="flex items-center justify-between gap-4 mb-6">
+        <h1 className="text-2xl font-black" style={{ color: C.indigo }}>Giỏ hàng ({cart.length} sản phẩm)</h1>
+        <label className="flex items-center gap-2 text-sm font-semibold whitespace-nowrap" style={{ color: C.indigo }}>
+          <input
+            type="checkbox"
+            checked={allSelected}
+            onChange={() => setSelectedKeys(allSelected ? new Set() : new Set(cart.map(cartKey)))}
+            className="h-4 w-4 accent-[#E07A5F]"
+          />
+          Chọn tất cả
+        </label>
+      </div>
 
       {/* E2 warning banner */}
       {hasUnavailable && (
@@ -81,7 +150,8 @@ export function CartPage({ cart, total, onRemove, onUpdate, onCheckout, onContin
       <div className="grid md:grid-cols-3 gap-6">
         {/* Items */}
         <div className="md:col-span-2 space-y-3">
-          {cart.map(({ voucher: v, qty }) => {
+          {cart.map((item) => {
+            const { voucher: v, qty } = item
             const isUnavailable = !isVoucherAvailable(v)
             return (
               <div
@@ -92,6 +162,13 @@ export function CartPage({ cart, total, onRemove, onUpdate, onCheckout, onContin
                   opacity: isUnavailable ? 0.78 : 1,
                 }}
               >
+                <input
+                  type="checkbox"
+                  checked={selectedKeys.has(cartKey(item))}
+                  onChange={() => toggleSelected(item)}
+                  aria-label={`Chọn ${v.title}`}
+                  className="mt-1 h-4 w-4 shrink-0 accent-[#E07A5F]"
+                />
                 <img
                   src={v.image}
                   alt={v.title}
@@ -187,7 +264,7 @@ export function CartPage({ cart, total, onRemove, onUpdate, onCheckout, onContin
           <div className="space-y-2 mb-4 text-sm">
             <div className="flex justify-between">
               <span style={{ color: "#8A8DA8" }}>Tạm tính</span>
-              <span className="font-semibold" style={{ color: C.indigo }}>{fmt(total)}</span>
+              <span className="font-semibold" style={{ color: C.indigo }}>{fmt(selectedTotal)}</span>
             </div>
             <div className="flex justify-between">
               <span style={{ color: "#8A8DA8" }}>Phí dịch vụ</span>
@@ -195,7 +272,7 @@ export function CartPage({ cart, total, onRemove, onUpdate, onCheckout, onContin
             </div>
             <div className="flex justify-between font-black text-base border-t pt-3 mt-1" style={{ borderColor: "#E2DFC8" }}>
               <span style={{ color: C.indigo }}>Tổng cộng</span>
-              <span style={{ color: C.peach }}>{fmt(total)}</span>
+              <span style={{ color: C.peach }}>{fmt(selectedTotal)}</span>
             </div>
           </div>
 
@@ -214,12 +291,12 @@ export function CartPage({ cart, total, onRemove, onUpdate, onCheckout, onContin
             </div>
           ) : (
             <button
-              onClick={onCheckout}
+              onClick={handleCheckout}
               className="w-full py-3.5 rounded-2xl font-bold text-white transition-all hover:opacity-90 active:scale-95 flex items-center justify-center gap-2"
               style={{ backgroundColor: C.peach }}
             >
               <ShoppingBag className="w-4 h-4" />
-              Tiến hành đặt hàng
+              Tiến hành đặt hàng ({selectedItems.length})
             </button>
           )}
 

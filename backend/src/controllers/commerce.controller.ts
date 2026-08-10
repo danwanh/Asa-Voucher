@@ -3,7 +3,10 @@ import * as commerceService from "../services/commerce.service.js";
 import { created, noContent, ok } from "../utils/response.js";
 
 export async function getCart(req: Request, res: Response) {
-  ok(res, await commerceService.getCart(req.user!.id));
+  const hasItemFilter = req.query.item_ids !== undefined;
+  const rawItemIds = typeof req.query.item_ids === "string" ? req.query.item_ids : "";
+  const itemIds = hasItemFilter ? rawItemIds.split(",").filter(Boolean) : undefined;
+  ok(res, await commerceService.getCart(req.user!.id, itemIds));
 }
 
 export async function addCartItem(req: Request, res: Response) {

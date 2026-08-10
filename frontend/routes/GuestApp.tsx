@@ -12,7 +12,7 @@ interface Props {
   onLogin: () => void
   onRegister: () => void
   // Called when guest clicks "Tiến hành đặt hàng" — triggers login then redirects to create-order
-  onCheckout: () => void
+  onCheckout: (items?: CartItem[]) => void
   cartAdd: (v: Voucher) => void
   cartCount: number
   cart: CartItem[]
@@ -30,7 +30,7 @@ interface Props {
 interface FullProps {
   onLogin: () => void
   onRegister: () => void
-  onCheckout: () => void
+  onCheckout: (items?: CartItem[]) => void
   cartAdd: (v: Voucher) => void
   cartCount: number
   cart: CartItem[]

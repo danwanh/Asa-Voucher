@@ -9,9 +9,9 @@ import { PartnerApp } from "@/routes/PartnerApp"
 import { VoucherStaffApp } from "@/routes/VoucherStaffApp"
 import { StaffApp } from "@/routes/StaffApp"
 import { AdminApp } from "@/routes/AdminApp"
-import { useCart } from "@/hooks/useCart"
+import { useCartContext } from "@/components/CartProvider"
 import { useAuthStore } from "@/stores/authStore"
-import type { AppUser } from "@/types"
+import type { AppUser, CartItem } from "@/types"
 import type { CustomerPage } from "@/layouts/CustomerLayout"
 import { toast } from "sonner"
 
@@ -41,16 +41,25 @@ export default function App({ initialPage, initialOrderId, initialStaffCode, ini
   const [pendingCheckout, setPendingCheckout] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
-  const { cart, add, remove, update, clear, total, count } = useCart(user?.id)
+  const {
+    cart, add, remove, update, clear, removeMany, total, count, isLoading: cartLoading,
+    checkoutSelectionIds, checkoutItems, setCheckoutSelection, clearCheckoutSelection,
+  } = useCartContext()
 
   useEffect(() => {
     initialize()
   }, [initialize])
 
+  useEffect(() => {
+    if (!pendingCheckout || !user || cartLoading) return
+    const cartItemIds = cart.map((item) => item.cartItemId).filter((id): id is string => Boolean(id))
+    if (cartItemIds.length > 0) setCheckoutSelection(cartItemIds)
+  }, [pendingCheckout, user, cartLoading, cart, setCheckoutSelection])
+
   const handleRequestLogin = () => router.push("/login")
   const handleRequestRegister = () => router.push("/signup")
 
-  const handleCheckoutAsGuest = () => {
+  const handleCheckoutAsGuest = (_items?: CartItem[]) => {
     setPendingCheckout(true)
     setShowLogin(true)
   }
@@ -71,6 +80,7 @@ export default function App({ initialPage, initialOrderId, initialStaffCode, ini
     try {
       await logout()
       clear()
+      clearCheckoutSelection()
     } catch {
       toast.error("Đăng xuất thất bại. Vui lòng thử lại.")
     }
@@ -127,6 +137,12 @@ export default function App({ initialPage, initialOrderId, initialStaffCode, ini
       remove={remove}
       update={update}
       clear={clear}
+       removeMany={removeMany}
+       cartLoading={cartLoading}
+       checkoutSelectionIds={checkoutSelectionIds}
+       checkoutItems={checkoutItems}
+       setCheckoutSelection={setCheckoutSelection}
+       clearCheckoutSelection={clearCheckoutSelection}
       initialPage={pendingCheckout ? "create-order" : initialPage}
       initialOrderId={initialOrderId}
       initialPaymentStatus={initialPaymentStatus}

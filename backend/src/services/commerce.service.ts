@@ -89,10 +89,13 @@ async function getSellableVoucher(id: string, quantity: number) {
   return voucher;
 }
 
-export async function getCart(userId: string) {
+export async function getCart(userId: string, cartItemIds?: string[]) {
   const cart = await getOrCreateCart(userId);
   const items = await prisma.cartItem.findMany({
-    where: { cart_id: cart.id as string },
+    where: {
+      cart_id: cart.id as string,
+      ...(cartItemIds ? { id: { in: cartItemIds } } : {}),
+    },
     include: { voucher_products: { include: { partners: true } } },
     orderBy: { created_at: "desc" }
   });

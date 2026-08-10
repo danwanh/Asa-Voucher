@@ -16,16 +16,18 @@ interface Props {
   total: number
   userName?: string
   userEmail?: string
-  onCreateOrder: (info: RecipientInfo) => void
+  onCreateOrder: (info: RecipientInfo) => Promise<void>
   onBack: () => void
+  loading?: boolean
 }
 
 const FALLBACK = "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=200&h=150&fit=crop"
 
-export function CreateOrderPage({ cart, total, userName = "", userEmail = "", onCreateOrder, onBack }: Props) {
+export function CreateOrderPage({ cart, total, userName = "", userEmail = "", onCreateOrder, onBack, loading = false }: Props) {
   const [forSelf, setForSelf] = useState(true)
   const [form, setForm] = useState({ name: userName, identifier: userEmail, note: "" })
   const [lookupLoading, setLookupLoading] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   useEffect(() => {
@@ -56,12 +58,43 @@ export function CreateOrderPage({ cart, total, userName = "", userEmail = "", on
     return Object.keys(e).length === 0
   }
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!validate()) return
-    onCreateOrder({ ...form, forSelf })
+    setSubmitting(true)
+    try {
+      await onCreateOrder({ ...form, forSelf })
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const inputCls = "w-full px-4 py-2.5 rounded-xl border-2 text-sm outline-none transition-colors"
+
+  if (loading) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-8" role="status" aria-live="polite">
+        <div className="h-5 w-40 rounded-lg bg-gray-200 animate-pulse mb-6" />
+        <div className="grid md:grid-cols-3 gap-6">
+          <div className="md:col-span-2 h-80 rounded-2xl bg-white animate-pulse" />
+          <div className="h-64 rounded-2xl bg-white animate-pulse" />
+        </div>
+        <span className="sr-only">Đang tải sản phẩm đã chọn...</span>
+      </div>
+    )
+  }
+
+  if (!cart.length) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-20 text-center">
+        <ShoppingBag className="w-14 h-14 mx-auto mb-4" style={{ color: C.peach }} />
+        <h1 className="text-xl font-black" style={{ color: C.indigo }}>Không có sản phẩm được chọn</h1>
+        <p className="mt-2 text-sm" style={{ color: "#6B7280" }}>Vui lòng quay lại giỏ hàng và chọn sản phẩm trước khi tạo đơn.</p>
+        <button onClick={onBack} className="mt-6 px-6 py-3 rounded-2xl font-bold text-white" style={{ backgroundColor: C.peach }}>
+          Quay lại giỏ hàng
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
@@ -200,11 +233,13 @@ export function CreateOrderPage({ cart, total, userName = "", userEmail = "", on
 
             <button
               onClick={handleCreate}
+              disabled={submitting || !cart.length}
+              aria-busy={submitting}
               className="w-full py-3.5 rounded-2xl font-black text-white hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
               style={{ backgroundColor: C.peach }}
             >
               <ShoppingBag className="w-4 h-4" />
-              Tạo đơn hàng
+              {submitting ? "Đang tạo đơn hàng..." : "Tạo đơn hàng"}
             </button>
             <p className="text-xs text-center mt-2" style={{ color: "#9CA3AF" }}>
               Đơn hàng → Trạng thái: Chờ thanh toán

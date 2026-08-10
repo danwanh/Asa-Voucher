@@ -32,6 +32,12 @@ interface Props {
   remove: (id: string) => void
   update: (id: string, qty: number) => void
   clear: () => void
+  removeMany: (cartItemIds: string[]) => void
+  cartLoading: boolean
+  checkoutSelectionIds: string[] | null
+  checkoutItems: CartItem[]
+  setCheckoutSelection: (cartItemIds: string[]) => void
+  clearCheckoutSelection: () => void
   // When set, start directly at this page (e.g. "create-order" after guest checkout redirect)
   initialPage?: CustomerPage
   initialOrderId?: string
@@ -65,7 +71,8 @@ const DEFAULT_VOUCHER_FILTERS: VoucherListFilters = {
 
 export function CustomerApp({
   user, onLogout,
-  cart, total, count, add, remove, update, clear,
+  cart, total, count, add, remove, update, clear, removeMany, cartLoading,
+  checkoutSelectionIds, checkoutItems, setCheckoutSelection, clearCheckoutSelection,
   initialPage, onInitialPageConsumed,
   initialOrderId,
   initialPaymentStatus,
@@ -79,11 +86,15 @@ export function CustomerApp({
   const [lastCode, setLastCode] = useState("")
   const [lastQrPayload, setLastQrPayload] = useState("")
   const [pendingOrder, setPendingOrder] = useState<PendingOrder | null>(null)
+  const [pendingOrderLoading, setPendingOrderLoading] = useState(Boolean(initialOrderId && initialPage === "payment"))
   const [voucherSearch, setVoucherSearch] = useState("")
   const [voucherFilters, setVoucherFilters] = useState<VoucherListFilters>(DEFAULT_VOUCHER_FILTERS)
 
   useEffect(() => {
-    if (!initialOrderId) return
+    if (!initialOrderId) {
+      setPendingOrderLoading(false)
+      return
+    }
     if (initialPage === "orders") {
       void orderService.get(initialOrderId).then((order) => {
         setSelectedOrder(order)
@@ -94,6 +105,7 @@ export function CustomerApp({
     void orderService.get(initialOrderId).then((order) => {
       setPendingOrder({ id: initialOrderId, order, recipient: { name: "", identifier: "", note: "", forSelf: true } })
     }).catch(() => setPendingOrder({ id: initialOrderId, recipient: { name: "", identifier: "", note: "", forSelf: false } }))
+      .finally(() => setPendingOrderLoading(false))
   }, [initialOrderId, initialPage])
 
   useEffect(() => {
@@ -127,20 +139,31 @@ export function CustomerApp({
     navigate("review")
   }
 
-  const handleBuyNow = (v: Voucher) => {
-    add(v)
+  const handleBuyNow = async (v: Voucher) => {
+    const item = await add(v)
+    if (!item?.cartItemId) {
+      toast.error("Không thể chuẩn bị sản phẩm để đặt hàng. Vui lòng thử lại.")
+      return
+    }
+    setCheckoutSelection([item.cartItemId])
     router.push("/checkout/create-order")
   }
+
+  const checkoutCartItemIds = checkoutSelectionIds ?? []
+  const selectedCart = checkoutItems
+  const selectedTotal = selectedCart.reduce((sum, item) => sum + item.voucher.price * item.qty, 0)
 
   const handleCreateOrder = async (info: RecipientInfo) => {
     try {
       const order = await orderService.createFromCart({
-        cartItemIds: cart.map((item) => item.cartItemId).filter((id): id is string => Boolean(id)),
+        cartItemIds: checkoutCartItemIds,
         recipientIdentifier: info.identifier,
         isGift: !info.forSelf,
         note: info.note,
-        expectedPrices: Object.fromEntries(cart.map((item) => [item.voucher.id, item.voucher.price])),
+        expectedPrices: Object.fromEntries(selectedCart.map((item) => [item.voucher.id, item.voucher.price])),
       })
+      removeMany(checkoutCartItemIds)
+       clearCheckoutSelection()
       setPendingOrder({ id: order.id, recipient: info })
       router.push(`/checkout/payment/${order.id}`)
     } catch (error) {
@@ -187,6 +210,7 @@ export function CustomerApp({
   const [myOrders, setMyOrders] = useState<Order[]>([])
 
   useEffect(() => {
+    if (page !== "orders" && page !== "my-vouchers") return
     void orderService.list().then(setMyOrders).catch(() => undefined)
   }, [page])
 
@@ -228,31 +252,42 @@ export function CustomerApp({
           total={total}
           onRemove={remove}
           onUpdate={update}
-          onCheckout={() => router.push("/checkout/create-order")}
+           onCheckout={(items) => {
+             const cartItemIds = items.map((item) => item.cartItemId).filter((id): id is string => Boolean(id))
+             setCheckoutSelection(cartItemIds)
+             router.push("/checkout/create-order")
+           }}
           onContinue={() => navigate("vouchers")}
+          loading={cartLoading}
         />
       )}
       {page === "create-order" && (
         <CreateOrderPage
-          cart={cart}
-          total={total}
+          cart={selectedCart}
+          total={selectedTotal}
           userName={user.name}
           userEmail={user.email}
           onCreateOrder={handleCreateOrder}
           onBack={() => navigate("cart")}
-        />
-      )}
-      {page === "payment" && pendingOrder && (
-        <PaymentPage
-          cart={cart}
-          total={pendingOrder.order?.amount ?? total}
+           loading={cartLoading}
+         />
+       )}
+       {page === "payment" && pendingOrderLoading && (
+         <div className="max-w-md mx-auto px-4 py-20 text-center" role="status" aria-live="polite">
+           <div className="w-12 h-12 rounded-full mx-auto mb-4 animate-pulse" style={{ backgroundColor: C.apricot }} />
+           <p className="font-bold" style={{ color: C.indigo }}>Đang tải đơn hàng...</p>
+         </div>
+       )}
+       {page === "payment" && !pendingOrderLoading && pendingOrder?.order && (
+         <PaymentPage
+           total={pendingOrder.order.amount}
            orderId={pendingOrder.id}
            order={pendingOrder.order}
            onPay={handlePayment}
            onBack={handlePaymentBack}
-        />
-      )}
-      {page === "payment" && !pendingOrder && (
+         />
+       )}
+       {page === "payment" && !pendingOrderLoading && !pendingOrder?.order && (
         <div className="max-w-md mx-auto px-4 py-20 text-center">
            <AppIcon name="shoppingCart" className="w-14 h-14 mb-4 mx-auto" />
           <p className="font-bold" style={{ color: C.indigo }}>Không có đơn hàng đang chờ thanh toán.</p>
