@@ -2,8 +2,7 @@ import { useState } from "react"
 import { Search, Star, CreditCard, MessageSquare } from "lucide-react"
 import { C, fmt, fmtDate } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
-import { StatusBadge } from "@/components/StatusBadge"
-import type { Order, OrderStatus } from "@/types"
+import type { Order } from "@/types"
 
 interface Props {
   orders: Order[]
@@ -14,75 +13,69 @@ interface Props {
   onPayAgain?: (o: Order) => void
 }
 
-const TABS: { label: string; value: string }[] = [
+const PAYMENT_TABS: { label: string; value: NonNullable<Order["paymentStatus"]> | "all" }[] = [
   { label: "Tất cả", value: "all" },
   { label: "Chờ thanh toán", value: "pending" },
-  { label: "Đã thanh toán", value: "completed" },
-  { label: "Đã sử dụng", value: "used" },
-  { label: "Đã hủy", value: "cancelled" },
+  { label: "Đã thanh toán", value: "paid" },
+  { label: "Thanh toán thất bại", value: "failed" },
+  { label: "Đã hoàn tiền", value: "refunded" },
 ]
 
-function deriveVoucherCodes(orderId: string, qty: number, baseCode: string): string[] {
-  const base = baseCode || orderId.slice(-5).toUpperCase()
-  return Array.from({ length: qty }, (_, i) => `${base}-${String(i + 1).padStart(3, "0")}`)
+function paymentStatusLabel(status?: Order["paymentStatus"]) {
+  if (status === "paid") return "Đã thanh toán"
+  if (status === "failed") return "Thanh toán thất bại"
+  if (status === "refunded") return "Đã hoàn tiền"
+  return "Chờ thanh toán"
 }
 
-export function OrderHistoryPage({ orders, pendingOrderId, onDetail, onReview, onComplaint, onPayAgain }: Props) {
+function itemSummary(order: Order) {
+  const items = order.items ?? []
+  if (items.length === 0) return order.voucherTitle
+  return items.map((item) => `${item.voucherTitle ?? order.voucherTitle} ×${item.quantity}`).join(" · ")
+}
+
+export function OrderHistoryPage({ orders, onDetail, onReview, onComplaint, onPayAgain }: Props) {
   const [tab, setTab] = useState("all")
   const [search, setSearch] = useState("")
 
-  const allOrders = pendingOrderId
-    ? [
-        {
-          id: pendingOrderId,
-          userId: "u01",
-          voucherId: "",
-          voucherTitle: "(Đơn hàng vừa tạo)",
-          partnerName: "—",
-          amount: 0,
-          status: "pending" as OrderStatus,
-          paymentMethod: "—",
-          createdAt: new Date().toISOString(),
-          code: pendingOrderId,
-        },
-        ...orders,
-      ]
-    : orders
-
-  const filtered = allOrders.filter((o) => {
-    const matchTab = tab === "all" || o.status === (tab as OrderStatus)
+  const filtered = orders.filter((order) => {
+    const matchTab = tab === "all" || order.paymentStatus === tab
     const matchSearch =
       !search ||
-      o.voucherTitle.toLowerCase().includes(search.toLowerCase()) ||
-      o.id.toLowerCase().includes(search.toLowerCase())
+      order.voucherTitle.toLowerCase().includes(search.toLowerCase()) ||
+      (order.orderCode ?? order.id).toLowerCase().includes(search.toLowerCase())
     return matchTab && matchSearch
   })
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-black" style={{ color: C.indigo }}>Lịch sử đơn hàng</h1>
-        
+        <div>
+          <h1 className="text-2xl font-black" style={{ color: C.indigo }}>Lịch sử đơn hàng</h1>
+          <p className="text-sm mt-1" style={{ color: "#8A8DA8" }}>Lịch sử đơn hàng theo trạng thái thanh toán</p>
+        </div>
       </div>
 
-      {/* Tabs */}
       <div className="flex gap-1 overflow-x-auto pb-2 mb-4 scrollbar-hide">
-        {TABS.map((t) => {
-          const count = t.value === "all" ? allOrders.length : allOrders.filter((o) => o.status === t.value).length
+        {PAYMENT_TABS.map((tabItem) => {
+          const count = tabItem.value === "all"
+            ? orders.length
+            : orders.filter((order) => order.paymentStatus === tabItem.value).length
+
           return (
             <button
-              key={t.value}
-              onClick={() => setTab(t.value)}
+              key={tabItem.value}
+              onClick={() => setTab(tabItem.value)}
               className="flex-shrink-0 px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-1.5 transition-colors"
               style={{
-                backgroundColor: tab === t.value ? C.peach : "white",
-                color: tab === t.value ? "white" : C.indigo,
-                border: `1px solid ${tab === t.value ? C.peach : "#E2DFC8"}`,
+                backgroundColor: tab === tabItem.value ? C.peach : "white",
+                color: tab === tabItem.value ? "white" : C.indigo,
+                border: `1px solid ${tab === tabItem.value ? C.peach : "#E2DFC8"}`,
               }}
             >
-              {t.label}
+              {tabItem.label}
               {count > 0 && (
-                <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ backgroundColor: tab === t.value ? "rgba(255,255,255,0.25)" : C.eggshell }}>
+                <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ backgroundColor: tab === tabItem.value ? "rgba(255,255,255,0.25)" : C.eggshell }}>
                   {count}
                 </span>
               )}
@@ -91,7 +84,6 @@ export function OrderHistoryPage({ orders, pendingOrderId, onDetail, onReview, o
         })}
       </div>
 
-      {/* Search */}
       <div className="relative mb-4">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "#8A8DA8" }} />
         <input
@@ -99,80 +91,63 @@ export function OrderHistoryPage({ orders, pendingOrderId, onDetail, onReview, o
           style={{ borderColor: "#E2DFC8", backgroundColor: "white", fontFamily: "'Inter', sans-serif" }}
           placeholder="Tìm theo mã đơn, tên voucher..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(event) => setSearch(event.target.value)}
         />
       </div>
 
       <div className="space-y-3">
-        {filtered.map((o) => {
-          const qty = o.items?.reduce((sum, item) => sum + item.quantity, 0) ?? 1
-          const issuedCodes = o.items?.flatMap((item) => item.issuedVouchers ?? []).map((item) => item.code) ?? []
-          const codes = issuedCodes.length > 0 ? issuedCodes : deriveVoucherCodes(o.id, qty, o.code)
-          const hasIssuedCodes = issuedCodes.length > 0 || o.paymentStatus === "paid" || (o.status !== "pending" && o.status !== "cancelled")
-          const canReview = o.paymentStatus === "paid" || o.status === "completed" || o.status === "confirmed" || o.status === "used"
-          const canPayAgain = o.status === "pending" && o.paymentStatus !== "paid" && (!o.paymentExpiresAt || new Date(o.paymentExpiresAt).getTime() > Date.now())
+        {filtered.map((order) => {
+          const totalQuantity = order.items?.reduce((sum, item) => sum + item.quantity, 0) ?? 1
+          const issuedCount = order.items?.flatMap((item) => item.issuedVouchers ?? []).length ?? 0
+          const hasIssuedCodes = issuedCount > 0
+          const isRefunded = order.paymentStatus === "refunded"
+          const canReview = order.paymentStatus === "paid"
+          const canPayAgain = (order.paymentStatus === "pending" || order.paymentStatus === "failed") && (!order.paymentExpiresAt || new Date(order.paymentExpiresAt).getTime() > Date.now())
+          const voucherSummary = itemSummary(order)
 
           return (
             <div
-              key={o.id}
+              key={order.id}
               className="bg-white rounded-2xl shadow-sm overflow-hidden border"
-              style={{ borderColor: o.id === pendingOrderId ? C.apricot : "#F0EDD8", borderWidth: o.id === pendingOrderId ? 2 : 1 }}
+              style={{ borderColor: "#F0EDD8", borderWidth: 1 }}
             >
-              {/* Header row */}
-              <div
-                className="flex items-center justify-between px-4 py-2.5 border-b"
-                style={{ backgroundColor: o.id === pendingOrderId ? C.apricot + "15" : C.eggshell, borderColor: "#F0EDD8" }}
-              >
+              <div className="flex items-center justify-between px-4 py-2.5 border-b" style={{ backgroundColor: C.eggshell, borderColor: "#F0EDD8" }}>
                 <div className="flex items-center gap-2">
-                  <code className="text-xs font-bold" style={{ color: C.indigo }}>{o.id}</code>
-                  {o.id === pendingOrderId && (
-                    <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{ backgroundColor: C.apricot + "30", color: "#D97706" }}>
-                      Vừa tạo
-                    </span>
-                  )}
+                  <code className="text-xs font-bold" style={{ color: C.indigo }}>{order.orderCode ?? order.id}</code>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs" style={{ color: "#8A8DA8" }}>{fmtDate(o.createdAt)}</span>
-                  <StatusBadge status={o.status} />
+                  <span className="text-xs" style={{ color: "#8A8DA8" }}>{fmtDate(order.createdAt)}</span>
+                  <span className="text-xs" style={{ color: "#6B7280" }}>Thanh toán:</span>
+                  <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{ backgroundColor: order.paymentStatus === "paid" ? C.teal + "20" : order.paymentStatus === "failed" ? "#FEE2E2" : order.paymentStatus === "refunded" ? "#E0EEFF" : C.apricot + "25", color: order.paymentStatus === "paid" ? C.teal : order.paymentStatus === "failed" ? "#DC2626" : order.paymentStatus === "refunded" ? "#1A5FAD" : "#D97706" }}>
+                    {paymentStatusLabel(order.paymentStatus)}
+                  </span>
                 </div>
               </div>
 
-              {/* Body */}
               <div className="px-4 py-3 flex flex-wrap gap-4 items-start">
-                {/* Voucher info */}
                 <div className="flex-1 min-w-0">
-                  <p className="font-bold text-sm" style={{ color: C.indigo }}>{o.voucherTitle}</p>
-                  <p className="text-xs mt-0.5" style={{ color: "#8A8DA8" }}>{o.partnerName}</p>
-
-                  {/* Voucher codes */}
-                  {hasIssuedCodes && o.code && (
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {codes.map((c) => (
-                        <span
-                          key={c}
-                          className="text-xs px-2 py-0.5 rounded-lg font-mono font-bold border"
-                          style={{ borderColor: C.teal + "60", color: C.teal, backgroundColor: C.teal + "10" }}
-                        >
-                          {c}
-                        </span>
-                      ))}
-                      <span className="text-xs" style={{ color: "#B0B3C8" }}>({qty} mã)</span>
-                    </div>
-                  )}
+                  <p className="font-bold text-sm" style={{ color: C.indigo }}>{order.voucherTitle}</p>
+                  <p className="text-xs mt-0.5" style={{ color: "#8A8DA8" }}>{order.partnerName}</p>
+                  <p className="text-xs mt-1" style={{ color: "#8A8DA8" }}>{voucherSummary}</p>
+                  <p className="text-xs mt-1 font-semibold" style={{ color: "#8A8DA8" }}>{totalQuantity} voucher</p>
+                  <div className="mt-2 text-xs font-semibold" style={{ color: hasIssuedCodes ? (isRefunded ? "#DC2626" : C.teal) : "#8A8DA8" }}>
+                    {hasIssuedCodes
+                      ? isRefunded
+                        ? `Đã phát hành ${issuedCount} mã voucher nhưng đã vô hiệu do hoàn tiền`
+                        : `Đã phát hành ${issuedCount} mã voucher`
+                      : "Chưa phát hành mã voucher"}
+                  </div>
                 </div>
 
-                {/* Meta */}
                 <div className="flex flex-col items-end gap-1 shrink-0">
-                  <span className="font-black text-sm" style={{ color: C.peach }}>{fmt(o.amount)}</span>
-                  <span className="text-xs" style={{ color: "#8A8DA8" }}>{o.paymentMethod}</span>
-                  <span className="text-xs" style={{ color: "#8A8DA8" }}>SL: {qty}</span>
+                  <span className="font-black text-sm" style={{ color: C.peach }}>{fmt(order.amount)}</span>
+                  <span className="text-xs" style={{ color: "#8A8DA8" }}>{order.paymentMethod}</span>
                 </div>
               </div>
 
-              {/* Actions row */}
               <div className="px-4 pb-3 flex items-center gap-2 flex-wrap">
                 <button
-                  onClick={() => onDetail?.(o)}
+                  onClick={() => onDetail?.(order)}
                   className="text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors hover:bg-muted"
                   style={{ borderColor: "#E2DFC8", color: C.indigo }}
                 >
@@ -180,7 +155,7 @@ export function OrderHistoryPage({ orders, pendingOrderId, onDetail, onReview, o
                 </button>
                 {canReview && onReview && (
                   <button
-                    onClick={() => onReview(o)}
+                    onClick={() => onReview(order)}
                     className="text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors"
                     style={{ backgroundColor: C.apricot + "20", color: "#D97706" }}
                   >
@@ -188,18 +163,18 @@ export function OrderHistoryPage({ orders, pendingOrderId, onDetail, onReview, o
                     Đánh giá
                   </button>
                 )}
-                {onComplaint && (o.complaints?.[0] || canReview) && (
+                {onComplaint && (order.complaints?.[0] || order.paymentStatus === "paid") && (
                   <button
-                    onClick={() => onComplaint(o)}
+                    onClick={() => onComplaint(order)}
                     className="text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors"
-                    style={{ backgroundColor: o.complaints?.[0] ? "#DBEAFE" : "#EFF6FF", color: "#2563EB" }}
+                    style={{ backgroundColor: order.complaints?.[0] ? "#DBEAFE" : "#EFF6FF", color: "#2563EB" }}
                   >
-                    <MessageSquare className="w-3 h-3" /> {o.complaints?.[0] ? "Xem khiếu nại đơn" : "Khiếu nại đơn"}
+                    <MessageSquare className="w-3 h-3" /> {order.complaints?.[0] ? "Xem khiếu nại đơn" : "Khiếu nại đơn"}
                   </button>
                 )}
                 {canPayAgain && onPayAgain && (
                   <button
-                    onClick={() => onPayAgain(o)}
+                    onClick={() => onPayAgain(order)}
                     className="text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-white"
                     style={{ backgroundColor: C.peach }}
                   >
@@ -215,7 +190,7 @@ export function OrderHistoryPage({ orders, pendingOrderId, onDetail, onReview, o
           <div className="text-center py-16 bg-white rounded-2xl">
             <AppIcon name="package" className="w-10 h-10 mb-3 mx-auto" />
             <div className="font-bold" style={{ color: C.indigo }}>
-              {search ? "Không tìm thấy đơn hàng phù hợp" : "Chưa có đơn hàng nào"}
+              {search ? "Không tìm thấy đơn hàng phù hợp" : "Bạn chưa có đơn hàng nào."}
             </div>
             {search && <div className="text-sm mt-1" style={{ color: "#8A8DA8" }}>Thử tìm với từ khóa khác</div>}
           </div>

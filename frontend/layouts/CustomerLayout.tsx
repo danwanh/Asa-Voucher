@@ -30,7 +30,7 @@ const DESKTOP_NAV: { label: string; pg: CustomerPage; icon: React.ReactNode }[] 
   { label: "Voucher", pg: "vouchers", icon: <Tag className="w-4 h-4" /> },
   { label: "Voucher của tôi", pg: "my-vouchers", icon: <Gift className="w-4 h-4" /> },
   { label: "Danh mục", pg: "categories", icon: <Grid3x3 className="w-4 h-4" /> },
-  { label: "Đơn hàng", pg: "orders", icon: <Package className="w-4 h-4" /> },
+  { label: "Lịch sử đơn hàng", pg: "orders", icon: <Package className="w-4 h-4" /> },
   { label: "Hồ sơ", pg: "profile", icon: <User className="w-4 h-4" /> },
 ]
 
