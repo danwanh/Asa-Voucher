@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { ArrowLeft, Copy, CheckCircle2, Download, Star, MessageSquare, CreditCard } from "lucide-react"
-import { C, fmt, fmtDate, STATUS_LABEL, statusColor } from "@/utils/constants"
+import { C, fmt, fmtDate } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import type { Order } from "@/types"
 import { MockQR } from "@/components/MockQR"
@@ -20,11 +20,20 @@ function paymentStatusLabel(status?: Order["paymentStatus"]) {
   return "Chờ thanh toán"
 }
 
+function issuedVoucherStatusLabel(status: string) {
+  if (status === "refunded") return "Đã vô hiệu do hoàn tiền"
+  if (status === "used") return "Đã sử dụng"
+  if (status === "expired") return "Hết hạn"
+  return "Đang hoạt động"
+}
+
 export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAgain }: Props) {
   const [copied, setCopied] = useState(false)
-  const sc = statusColor(order.status)
   const issuedVouchers = (order.items ?? []).flatMap((item) => item.issuedVouchers ?? [])
+  const isRefunded = order.paymentStatus === "refunded"
   const hasPaid = order.paymentStatus === "paid"
+  const paymentStepDone = order.paymentStatus === "paid" || order.paymentStatus === "refunded"
+  const voucherReceiveDone = issuedVouchers.length > 0 && !isRefunded
 
   const copy = () => {
     navigator.clipboard.writeText(order.orderCode ?? order.id).catch(() => {})
@@ -34,9 +43,9 @@ export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAga
 
   const TIMELINE = [
     { label: "Đặt hàng", done: true, time: fmtDate(order.createdAt) },
-    { label: "Thanh toán", done: hasPaid, time: hasPaid ? fmtDate(order.updatedAt ?? order.createdAt) : "" },
-    { label: "Nhận voucher", done: issuedVouchers.length > 0, time: issuedVouchers.length > 0 ? fmtDate(order.updatedAt ?? order.createdAt) : "" },
-    { label: "Đã sử dụng", done: issuedVouchers.some((voucher) => voucher.status === "used"), time: issuedVouchers.some((voucher) => voucher.status === "used") ? fmtDate(order.updatedAt ?? order.createdAt) : "" },
+    { label: "Thanh toán", done: paymentStepDone, time: paymentStepDone ? fmtDate(order.updatedAt ?? order.createdAt) : "" },
+    { label: "Nhận voucher", done: voucherReceiveDone, time: voucherReceiveDone ? fmtDate(order.updatedAt ?? order.createdAt) : "" },
+    { label: "Đã sử dụng", done: voucherReceiveDone && issuedVouchers.some((voucher) => voucher.status === "used"), time: voucherReceiveDone && issuedVouchers.some((voucher) => voucher.status === "used") ? fmtDate(order.updatedAt ?? order.createdAt) : "" },
   ]
 
   return (
@@ -52,11 +61,20 @@ export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAga
             <div className="font-black text-xl" style={{ color: C.indigo, fontFamily: "'Nunito', sans-serif" }}>{order.orderCode ?? order.id}</div>
             <div className="text-xs mt-1" style={{ color: "#9CA3AF" }}>Ngày đặt: {fmtDate(order.createdAt)}</div>
           </div>
-          <span className="px-3 py-1.5 rounded-xl text-sm font-bold" style={{ backgroundColor: sc.bg, color: sc.text }}>
-            {STATUS_LABEL[order.status]}
+          <span className="px-3 py-1.5 rounded-xl text-sm font-bold" style={{ backgroundColor: order.paymentStatus === "paid" ? C.teal + "20" : order.paymentStatus === "failed" ? "#FEE2E2" : order.paymentStatus === "refunded" ? "#E0EEFF" : C.apricot + "25", color: order.paymentStatus === "paid" ? C.teal : order.paymentStatus === "failed" ? "#DC2626" : order.paymentStatus === "refunded" ? "#1A5FAD" : "#D97706" }}>
+            {paymentStatusLabel(order.paymentStatus)}
           </span>
         </div>
       </div>
+
+      {isRefunded && (
+        <div className="rounded-2xl border p-4 mb-4" style={{ borderColor: "#93C5FD", backgroundColor: "#EFF6FF" }}>
+          <div className="text-sm font-bold" style={{ color: "#1A5FAD" }}>Đơn hàng đã hoàn tiền</div>
+          <div className="text-xs mt-1" style={{ color: "#1E40AF" }}>
+            Voucher code vẫn hiển thị để tra cứu lịch sử, nhưng đã bị vô hiệu và không thể sử dụng.
+          </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-2xl p-6 border border-black/5 mb-4">
         <h3 className="font-bold text-sm mb-4" style={{ color: C.indigo }}>Trạng thái đơn hàng</h3>
@@ -113,7 +131,7 @@ export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAga
                           <div className="text-xs font-semibold" style={{ color: "#6B7280" }}>Voucher code</div>
                           <div className="font-black tracking-widest text-base break-all" style={{ color: C.indigo, fontFamily: "'Inter', monospace" }}>{voucher.code}</div>
                           <div className="mt-1 text-xs" style={{ color: "#6B7280" }}>
-                            Trạng thái: {STATUS_LABEL[voucher.status] ?? voucher.status}
+                            Trạng thái: {issuedVoucherStatusLabel(voucher.status)}
                             {voucher.expiredDate ? ` • Hết hạn: ${fmtDate(voucher.expiredDate)}` : ""}
                           </div>
                         </div>
@@ -172,7 +190,7 @@ export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAga
       </div>
 
       <div className="flex gap-3">
-        {order.status === "pending" && order.paymentStatus !== "paid" && (!order.paymentExpiresAt || new Date(order.paymentExpiresAt).getTime() > Date.now()) && onPayAgain && (
+        {(order.paymentStatus === "pending" || order.paymentStatus === "failed") && (!order.paymentExpiresAt || new Date(order.paymentExpiresAt).getTime() > Date.now()) && onPayAgain && (
           <button
             onClick={() => onPayAgain(order)}
             className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm text-white"
@@ -181,7 +199,7 @@ export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAga
             <CreditCard className="w-4 h-4" /> Thanh toán lại
           </button>
         )}
-        {(order.paymentStatus === "paid" || order.status === "confirmed" || order.status === "used") && (
+        {order.paymentStatus === "paid" && (
           <button
             onClick={() => onReview(order)}
             className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm border-2"
@@ -190,7 +208,7 @@ export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAga
             <Star className="w-4 h-4" style={{ color: C.apricot }} /> Đánh giá
           </button>
         )}
-        {onComplaint && (order.complaints?.[0] || order.paymentStatus === "paid" || order.status === "confirmed" || order.status === "used") && (
+        {onComplaint && (order.complaints?.[0] || order.paymentStatus === "paid") && (
           <button onClick={() => onComplaint(order)} className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm border-2" style={{ borderColor: "#93C5FD", color: "#2563EB" }}>
             <MessageSquare className="w-4 h-4" /> {order.complaints?.[0] ? "Xem khiếu nại đơn hàng" : "Khiếu nại đơn hàng"}
           </button>

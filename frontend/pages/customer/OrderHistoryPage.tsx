@@ -2,7 +2,6 @@ import { useState } from "react"
 import { Search, Star, CreditCard, MessageSquare } from "lucide-react"
 import { C, fmt, fmtDate } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
-import { StatusBadge } from "@/components/StatusBadge"
 import type { Order } from "@/types"
 
 interface Props {
@@ -14,12 +13,12 @@ interface Props {
   onPayAgain?: (o: Order) => void
 }
 
-const TABS: { label: string; value: string }[] = [
+const PAYMENT_TABS: { label: string; value: NonNullable<Order["paymentStatus"]> | "all" }[] = [
   { label: "Tất cả", value: "all" },
   { label: "Chờ thanh toán", value: "pending" },
   { label: "Đã thanh toán", value: "paid" },
-  { label: "Đã sử dụng", value: "used" },
-  { label: "Đã hủy", value: "cancelled" },
+  { label: "Thanh toán thất bại", value: "failed" },
+  { label: "Đã hoàn tiền", value: "refunded" },
 ]
 
 function paymentStatusLabel(status?: Order["paymentStatus"]) {
@@ -40,12 +39,7 @@ export function OrderHistoryPage({ orders, onDetail, onReview, onComplaint, onPa
   const [search, setSearch] = useState("")
 
   const filtered = orders.filter((order) => {
-    const hasUsedVoucher = (order.items ?? []).some((item) => (item.issuedVouchers ?? []).some((voucher) => voucher.status === "used"))
-    const matchTab = tab === "all"
-      || (tab === "pending" && order.paymentStatus !== "paid" && order.status === "pending")
-      || (tab === "paid" && order.paymentStatus === "paid")
-      || (tab === "used" && hasUsedVoucher)
-      || (tab === "cancelled" && order.status === "cancelled")
+    const matchTab = tab === "all" || order.paymentStatus === tab
     const matchSearch =
       !search ||
       order.voucherTitle.toLowerCase().includes(search.toLowerCase()) ||
@@ -56,21 +50,17 @@ export function OrderHistoryPage({ orders, onDetail, onReview, onComplaint, onPa
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-black" style={{ color: C.indigo }}>Lịch sử đơn hàng</h1>
+        <div>
+          <h1 className="text-2xl font-black" style={{ color: C.indigo }}>Lịch sử đơn hàng</h1>
+          <p className="text-sm mt-1" style={{ color: "#8A8DA8" }}>Lịch sử đơn hàng theo trạng thái thanh toán</p>
+        </div>
       </div>
 
       <div className="flex gap-1 overflow-x-auto pb-2 mb-4 scrollbar-hide">
-        {TABS.map((tabItem) => {
+        {PAYMENT_TABS.map((tabItem) => {
           const count = tabItem.value === "all"
             ? orders.length
-            : orders.filter((order) => {
-              const hasUsedVoucher = (order.items ?? []).some((item) => (item.issuedVouchers ?? []).some((voucher) => voucher.status === "used"))
-              if (tabItem.value === "pending") return order.paymentStatus !== "paid" && order.status === "pending"
-              if (tabItem.value === "paid") return order.paymentStatus === "paid"
-              if (tabItem.value === "used") return hasUsedVoucher
-              if (tabItem.value === "cancelled") return order.status === "cancelled"
-              return true
-            }).length
+            : orders.filter((order) => order.paymentStatus === tabItem.value).length
 
           return (
             <button
@@ -110,8 +100,9 @@ export function OrderHistoryPage({ orders, onDetail, onReview, onComplaint, onPa
           const totalQuantity = order.items?.reduce((sum, item) => sum + item.quantity, 0) ?? 1
           const issuedCount = order.items?.flatMap((item) => item.issuedVouchers ?? []).length ?? 0
           const hasIssuedCodes = issuedCount > 0
-          const canReview = order.paymentStatus === "paid" || order.status === "confirmed" || order.status === "used"
-          const canPayAgain = order.status === "pending" && order.paymentStatus !== "paid" && (!order.paymentExpiresAt || new Date(order.paymentExpiresAt).getTime() > Date.now())
+          const isRefunded = order.paymentStatus === "refunded"
+          const canReview = order.paymentStatus === "paid"
+          const canPayAgain = (order.paymentStatus === "pending" || order.paymentStatus === "failed") && (!order.paymentExpiresAt || new Date(order.paymentExpiresAt).getTime() > Date.now())
           const voucherSummary = itemSummary(order)
 
           return (
@@ -126,8 +117,8 @@ export function OrderHistoryPage({ orders, onDetail, onReview, onComplaint, onPa
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs" style={{ color: "#8A8DA8" }}>{fmtDate(order.createdAt)}</span>
-                  <StatusBadge status={order.status} />
-                  <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{ backgroundColor: order.paymentStatus === "paid" ? C.teal + "20" : C.apricot + "25", color: order.paymentStatus === "paid" ? C.teal : "#D97706" }}>
+                  <span className="text-xs" style={{ color: "#6B7280" }}>Thanh toán:</span>
+                  <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{ backgroundColor: order.paymentStatus === "paid" ? C.teal + "20" : order.paymentStatus === "failed" ? "#FEE2E2" : order.paymentStatus === "refunded" ? "#E0EEFF" : C.apricot + "25", color: order.paymentStatus === "paid" ? C.teal : order.paymentStatus === "failed" ? "#DC2626" : order.paymentStatus === "refunded" ? "#1A5FAD" : "#D97706" }}>
                     {paymentStatusLabel(order.paymentStatus)}
                   </span>
                 </div>
@@ -139,8 +130,12 @@ export function OrderHistoryPage({ orders, onDetail, onReview, onComplaint, onPa
                   <p className="text-xs mt-0.5" style={{ color: "#8A8DA8" }}>{order.partnerName}</p>
                   <p className="text-xs mt-1" style={{ color: "#8A8DA8" }}>{voucherSummary}</p>
                   <p className="text-xs mt-1 font-semibold" style={{ color: "#8A8DA8" }}>{totalQuantity} voucher</p>
-                  <div className="mt-2 text-xs font-semibold" style={{ color: hasIssuedCodes ? C.teal : "#8A8DA8" }}>
-                    {hasIssuedCodes ? `Đã phát hành ${issuedCount} mã voucher` : "Chưa phát hành mã voucher"}
+                  <div className="mt-2 text-xs font-semibold" style={{ color: hasIssuedCodes ? (isRefunded ? "#DC2626" : C.teal) : "#8A8DA8" }}>
+                    {hasIssuedCodes
+                      ? isRefunded
+                        ? `Đã phát hành ${issuedCount} mã voucher nhưng đã vô hiệu do hoàn tiền`
+                        : `Đã phát hành ${issuedCount} mã voucher`
+                      : "Chưa phát hành mã voucher"}
                   </div>
                 </div>
 
@@ -168,7 +163,7 @@ export function OrderHistoryPage({ orders, onDetail, onReview, onComplaint, onPa
                     Đánh giá
                   </button>
                 )}
-                {onComplaint && (order.complaints?.[0] || canReview) && (
+                {onComplaint && (order.complaints?.[0] || order.paymentStatus === "paid") && (
                   <button
                     onClick={() => onComplaint(order)}
                     className="text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors"
