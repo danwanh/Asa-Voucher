@@ -4,7 +4,7 @@ import { requireData, throwDbError } from "../utils/db.js";
 import { HttpError } from "../utils/http-error.js";
 import { rangeFromPagination } from "../validations/common.validation.js";
 
-type CurrentUser = { id: string; role: UserRole; partnerId?: string; branchId?: string };
+type CurrentUser = { id: string; role: UserRole; partnerId?: string | null; branchId?: string | null };
 
 function isAdminOperations(user: CurrentUser) {
   return user.role === "admin_operations";
@@ -25,7 +25,7 @@ function assertPartnerOwnerOrAdmin(user: CurrentUser, partner: Record<string, un
 }
 
 function assertPartnerReadAccess(user: CurrentUser, partner: Record<string, unknown>) {
-  if (isAnyAdmin(user) || partner.representative_user_id === user.id) return;
+  if (isAnyAdmin(user) || partner.representative_user_id === user.id || user.partnerId === partner.id) return;
   throw new HttpError(403, "Insufficient permissions", "FORBIDDEN");
 }
 
