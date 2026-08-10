@@ -99,11 +99,15 @@ erDiagram
 
     orders {
         uuid   id             PK
+        uuid   user_id
+        uuid   recipient_id
         string order_code
         string payment_method
         string payment_status
         string status
         text   note
+        boolean is_gift
+        timestamp payment_expires_at
     }
 
     carts {
@@ -231,6 +235,7 @@ users              ||--o{ voucher_products       : "approves"
 users              ||--o| carts                  : "owns"
 carts              ||--o{ cart_items : "contains"
 users              ||--o{ orders                 : "places"
+users              ||--o{ orders                 : "receives"
 orders             ||--o{ order_items : "contains"
 orders             ||--o{ payments               : "paid via"
 orders             ||--o{ complaints             : "results in"
@@ -354,13 +359,15 @@ erDiagram
     }
 
     orders {
-        uuid   id             PK
-        string order_code
-        uuid   user_id        FK
-        string payment_method
-        string payment_status
-        string status
-        text   note
+        uuid      id                  PK
+        string    order_code
+        uuid      user_id             FK
+        uuid      recipient_id       FK
+        string    payment_method
+        string    payment_status
+        string    status
+        text      note
+        timestamp payment_expires_at
     }
 
     carts {
@@ -524,6 +531,7 @@ erDiagram
     users                   ||--o| carts                      : "owns"
     carts                   ||--o{ cart_items                 : "contains"
     users                   ||--o{ orders                     : "places"
+    users                   ||--o{ orders                     : "receives"
     orders                  ||--o{ order_items                : "contains"
     orders                  ||--o{ payments                   : "paid via"
     orders                  ||--o{ complaints                 : "may trigger"
@@ -732,6 +740,7 @@ erDiagram
         uuid      id                  PK
         string    order_code
         uuid      user_id             FK
+        uuid      recipient_id       FK
         decimal   subtotal
         decimal   discount_amount
         decimal   total_amount
@@ -739,9 +748,17 @@ erDiagram
         string    payment_status
         string    status
         string    note
+        boolean   is_gift
+        timestamp payment_expires_at
         timestamp created_at
         timestamp updated_at
     }
+
+    %% Migration 202608080001_add_order_recipient_and_payment_expiry:
+    %% recipient_id is backfilled from user_id, then made NOT NULL.
+    %% is_gift is NOT NULL DEFAULT false; payment_expires_at is nullable TIMESTAMPTZ(6).
+    %% FK: orders_recipient_id_fkey -> users(id), ON DELETE RESTRICT, ON UPDATE CASCADE.
+    %% INDEX: orders_recipient_id_idx on orders(recipient_id).
 
     carts {
         uuid      id          PK
@@ -897,6 +914,7 @@ erDiagram
     users                   ||--o| carts                      : "owns"
     carts                   ||--o{ cart_items                 : "contains"
     users                   ||--o{ orders                     : "places"
+    users                   ||--o{ orders                     : "receives"
     orders                  ||--o{ order_items                : "contains"
     orders                  ||--o{ payments                   : "paid via"
     orders                  ||--o{ complaints                 : "may trigger"
@@ -1126,13 +1144,16 @@ Gợi ý ràng buộc: UNIQUE (`cart_id`, `voucher_product_id`) để mỗi vouc
 | `id`              | UUID          | PK              |                                                          |
 | `order_code`      | VARCHAR(30)   | UNIQUE NOT NULL | Mã đơn hàng hiển thị                                     |
 | `user_id`         | UUID          | FK NOT NULL     | Tham chiếu `users.id`                                    |
+| `recipient_id`    | UUID          | FK NOT NULL     | Người sở hữu voucher, tham chiếu `users.id`; `ON DELETE RESTRICT ON UPDATE CASCADE` |
 | `subtotal`        | DECIMAL(15,0) | NOT NULL        | Tổng trước giảm giá _(suy diễn: Σ order_items.subtotal)_ |
 | `discount_amount` | DECIMAL(15,0) | DEFAULT 0       | Số tiền được giảm                                        |
 | `total_amount`    | DECIMAL(15,0) | NOT NULL        | Tổng thanh toán _(suy diễn: subtotal − discount_amount)_ |
-| `payment_method`  | ENUM          | NOT NULL        | `momo` · `vnpay` · `zalopay` · `bank_transfer`           |
+| `payment_method`  | ENUM          | NOT NULL        | `vnpay` · `paypal`                                       |
 | `payment_status`  | ENUM          | NOT NULL        | `pending` · `paid` · `failed` · `refunded`               |
 | `status`          | ENUM          | NOT NULL        | `pending` · `confirmed` · `completed` · `cancelled`      |
 | `note`            | TEXT          |                 | Ghi chú của người mua                                    |
+| `is_gift`         | BOOLEAN       | DEFAULT false   | Đơn tặng người dùng khác hay không                      |
+| `payment_expires_at` | TIMESTAMPTZ(6) |               | Thời hạn hoàn tất thanh toán                            |
 | `created_at`      | TIMESTAMP     | NOT NULL        |                                                          |
 | `updated_at`      | TIMESTAMP     | NOT NULL        |                                                          |
 
@@ -1159,9 +1180,9 @@ Gợi ý ràng buộc: UNIQUE (`order_id`, `voucher_product_id`) để mỗi vou
 | ------------------ | ------------- | ----------- | ---------------------------------------------- |
 | `id`               | UUID          | PK          |                                                |
 | `order_id`         | UUID          | FK NOT NULL | Tham chiếu `orders.id`                         |
-| `method`           | ENUM          | NOT NULL    | `momo` · `vnpay` · `zalopay` · `bank_transfer` |
+| `method`           | ENUM          | NOT NULL    | `vnpay` · `paypal`                              |
 | `amount`           | DECIMAL(15,0) | NOT NULL    | Số tiền giao dịch                              |
-| `status`           | ENUM          | NOT NULL    | `pending` · `success` · `failed` · `refunded`  |
+| `status`           | ENUM          | NOT NULL    | `pending` · `processing` · `success` · `failed` · `refunded` |
 | `transaction_ref`  | VARCHAR(255)  |             | Mã giao dịch từ cổng thanh toán                |
 | `gateway_response` | TEXT          |             | Raw response từ gateway                        |
 | `paid_at`          | TIMESTAMP     |             | Thời điểm thanh toán thành công                |
@@ -1270,12 +1291,12 @@ Gợi ý ràng buộc: UNIQUE (`order_id`, `voucher_product_id`) để mỗi vou
 | `partners`             | `business_type`   | `restaurant` · `spa` · `entertainment` · `hotel` · `other`                                         |
 | `voucher_products`     | `status`          | `draft` · `active` · `paused` · `sold_out` · `expired`                                             |
 | `voucher_products`     | `approval_status` | `pending` · `approved` · `rejected`                                                                |
-| `orders`               | `payment_method`  | `momo` · `vnpay` · `zalopay` · `bank_transfer`                                                     |
+| `orders`               | `payment_method`  | `vnpay` · `paypal`                                                                                  |
 | `orders`               | `payment_status`  | `pending` · `paid` · `failed` · `refunded`                                                         |
 | `orders`               | `status`          | `pending` · `confirmed` · `completed` · `cancelled`                                                |
-| `order_logs`           | `action`          | `CREATE_ORDER` · `CANCEL_ORDER` · `UPDATE_STATUS`                                                  |
-| `payments`             | `method`          | `momo` · `vnpay` · `zalopay` · `bank_transfer`                                                     |
-| `payments`             | `status`          | `pending` · `success` · `failed` · `refunded`                                                      |
+| `order_logs`           | `action`          | `CREATE_ORDER` · `CANCEL_ORDER` · `UPDATE_STATUS` · `PAYMENT_SUCCESS` · `EXPIRE_ORDER`                |
+| `payments`             | `method`          | `vnpay` · `paypal`                                                                                  |
+| `payments`             | `status`          | `pending` · `processing` · `success` · `failed` · `refunded`                                         |
 | `payment_logs`         | `action`          | `PAYMENT_CREATED` · `PAYMENT_SUCCESS` · `PAYMENT_FAILED` · `REFUND`                                |
 | `payment_logs`         | `status`          | `pending` · `success` · `failed` · `refunded`                                                      |
 | `issued_vouchers`      | `status`          | `active` · `used` · `expired` · `refunded`                                                         |

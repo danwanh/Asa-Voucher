@@ -1,9 +1,10 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Plus, Minus, Trash2, AlertTriangle, ShoppingBag } from "lucide-react"
 import { toast } from "sonner"
 import { C, fmt } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import type { CartItem } from "@/types"
+import { isVoucherAvailable } from "@/hooks/useCart"
 
 const FALLBACK = "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=200&h=150&fit=crop"
 
@@ -12,27 +13,93 @@ interface Props {
   total: number
   onRemove: (id: string) => void
   onUpdate: (id: string, qty: number) => void
-  onCheckout: () => void
+  onCheckout: (items: CartItem[]) => void
   onContinue: () => void
+  loading?: boolean
 }
 
-export function CartPage({ cart, total, onRemove, onUpdate, onCheckout, onContinue }: Props) {
-  // E2: tracks which voucher IDs are currently unavailable (sold out / removed)
-  const [unavailableIds, setUnavailableIds] = useState<Set<string>>(new Set())
+function cartKey(item: CartItem) {
+  return item.voucher.id
+}
 
-  const markUnavailable = (id: string) => {
-    setUnavailableIds((prev) => new Set(prev).add(id))
-    toast.warning("Một voucher trong giỏ hàng của bạn không còn khả dụng.", {
-      description: "Vui lòng xóa voucher đó để tiếp tục thanh toán.",
+export function CartPage({ cart, total: _total, onRemove, onUpdate, onCheckout, onContinue, loading = false }: Props) {
+  const [pendingDelete, setPendingDelete] = useState<CartItem | null>(null)
+  const [quantityDraft, setQuantityDraft] = useState<Record<string, string>>({})
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(() => new Set(cart.map(cartKey)))
+
+  useEffect(() => {
+    setSelectedKeys(new Set(cart.map(cartKey)))
+  }, [cart.length])
+
+  const handleRemove = (id: string) => {
+    onRemove(id)
+    setPendingDelete(null)
+  }
+
+  const commitQuantity = (id: string, currentQty: number, available: number) => {
+    const value = Number(quantityDraft[id] ?? currentQty)
+    if (!Number.isInteger(value) || value < 1) {
+      setQuantityDraft((prev) => ({ ...prev, [id]: String(currentQty) }))
+      return
+    }
+    if (value > available) {
+      toast.error("Số lượng yêu cầu vượt quá số lượng voucher còn lại trong kho")
+      setQuantityDraft((prev) => ({ ...prev, [id]: String(currentQty) }))
+      return
+    }
+    setQuantityDraft((prev) => ({ ...prev, [id]: String(value) }))
+    if (value !== currentQty) onUpdate(id, value)
+  }
+
+  const hasUnavailable = cart.some((item) => !isVoucherAvailable(item.voucher))
+  const selectedItems = cart.filter((item) => selectedKeys.has(cartKey(item)))
+  const selectedTotal = selectedItems.reduce((sum, item) => (
+    isVoucherAvailable(item.voucher) ? sum + item.voucher.price * item.qty : sum
+  ), 0)
+  const hasSelectedUnavailable = selectedItems.some((item) => !isVoucherAvailable(item.voucher))
+  const allSelected = cart.length > 0 && selectedItems.length === cart.length
+
+  const toggleSelected = (item: CartItem) => {
+    const key = cartKey(item)
+    setSelectedKeys((previous) => {
+      const next = new Set(previous)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
     })
   }
 
-  const handleRemove = (id: string) => {
-    setUnavailableIds((prev) => { const s = new Set(prev); s.delete(id); return s })
-    onRemove(id)
+  const handleCheckout = () => {
+    if (!selectedItems.length) {
+      toast.error("Vui lòng chọn ít nhất một sản phẩm để đặt hàng")
+      return
+    }
+    if (hasSelectedUnavailable) {
+      toast.error("Vui lòng bỏ chọn hoặc xóa sản phẩm không khả dụng")
+      return
+    }
+    const cartItemIds = selectedItems.map((item) => item.cartItemId).filter((id): id is string => Boolean(id))
+    if (cartItemIds.length !== selectedItems.length) {
+      toast.error("Giỏ hàng đang đồng bộ. Vui lòng thử lại sau một chút")
+      return
+    }
+    onCheckout(selectedItems)
   }
 
-  const hasUnavailable = cart.some((item) => unavailableIds.has(item.voucher.id))
+  if (loading) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-8" role="status" aria-live="polite">
+        <div className="h-8 w-56 rounded-xl bg-gray-200 animate-pulse mb-6" />
+        <div className="grid md:grid-cols-3 gap-6">
+          <div className="md:col-span-2 space-y-3">
+            {[1, 2, 3].map((item) => <div key={item} className="h-28 rounded-2xl bg-white animate-pulse" />)}
+          </div>
+          <div className="h-52 rounded-2xl bg-white animate-pulse" />
+        </div>
+        <span className="sr-only">Đang tải danh sách giỏ hàng...</span>
+      </div>
+    )
+  }
 
   if (cart.length === 0) {
     return (
@@ -49,7 +116,18 @@ export function CartPage({ cart, total, onRemove, onUpdate, onCheckout, onContin
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-black mb-6" style={{ color: C.indigo }}>Giỏ hàng ({cart.length} sản phẩm)</h1>
+      <div className="flex items-center justify-between gap-4 mb-6">
+        <h1 className="text-2xl font-black" style={{ color: C.indigo }}>Giỏ hàng ({cart.length} sản phẩm)</h1>
+        <label className="flex items-center gap-2 text-sm font-semibold whitespace-nowrap" style={{ color: C.indigo }}>
+          <input
+            type="checkbox"
+            checked={allSelected}
+            onChange={() => setSelectedKeys(allSelected ? new Set() : new Set(cart.map(cartKey)))}
+            className="h-4 w-4 accent-[#E07A5F]"
+          />
+          Chọn tất cả
+        </label>
+      </div>
 
       {/* E2 warning banner */}
       {hasUnavailable && (
@@ -72,17 +150,25 @@ export function CartPage({ cart, total, onRemove, onUpdate, onCheckout, onContin
       <div className="grid md:grid-cols-3 gap-6">
         {/* Items */}
         <div className="md:col-span-2 space-y-3">
-          {cart.map(({ voucher: v, qty }) => {
-            const isUnavailable = unavailableIds.has(v.id)
+          {cart.map((item) => {
+            const { voucher: v, qty } = item
+            const isUnavailable = !isVoucherAvailable(v)
             return (
               <div
                 key={v.id}
                 className="bg-card rounded-2xl p-4 flex gap-4 shadow-sm"
                 style={{
                   border: isUnavailable ? "2px solid #EF4444" : "2px solid transparent",
-                  opacity: isUnavailable ? 0.85 : 1,
+                  opacity: isUnavailable ? 0.78 : 1,
                 }}
               >
+                <input
+                  type="checkbox"
+                  checked={selectedKeys.has(cartKey(item))}
+                  onChange={() => toggleSelected(item)}
+                  aria-label={`Chọn ${v.title}`}
+                  className="mt-1 h-4 w-4 shrink-0 accent-[#E07A5F]"
+                />
                 <img
                   src={v.image}
                   alt={v.title}
@@ -91,7 +177,7 @@ export function CartPage({ cart, total, onRemove, onUpdate, onCheckout, onContin
                 />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start gap-2">
-                    <p className="font-bold text-sm leading-snug line-clamp-2 flex-1" style={{ color: C.indigo }}>{v.title}</p>
+                    <p className={`font-bold text-sm leading-snug line-clamp-2 flex-1 ${isUnavailable ? "line-through" : ""}`} style={{ color: C.indigo }}>{v.title}</p>
                     {isUnavailable && (
                       <span className="shrink-0 text-xs px-2 py-0.5 rounded-full font-bold" style={{ backgroundColor: "#FEE2E2", color: "#B91C1C" }}>
                         Không khả dụng
@@ -106,7 +192,7 @@ export function CartPage({ cart, total, onRemove, onUpdate, onCheckout, onContin
                         Voucher đã hết hàng hoặc bị gỡ
                       </span>
                       <button
-                        onClick={() => handleRemove(v.id)}
+                        onClick={() => setPendingDelete({ voucher: v, qty })}
                         className="flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-xl"
                         style={{ backgroundColor: "#FEE2E2", color: "#B91C1C" }}
                       >
@@ -118,21 +204,39 @@ export function CartPage({ cart, total, onRemove, onUpdate, onCheckout, onContin
                       <span className="font-extrabold text-sm" style={{ color: C.peach }}>{fmt(v.price * qty)}</span>
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => qty > 1 ? onUpdate(v.id, qty - 1) : handleRemove(v.id)}
+                          onClick={() => {
+                            if (qty > 1) {
+                              setQuantityDraft((prev) => ({ ...prev, [v.id]: String(qty - 1) }))
+                              onUpdate(v.id, qty - 1)
+                            } else {
+                              setPendingDelete({ voucher: v, qty })
+                            }
+                          }}
                           className="w-7 h-7 rounded-xl flex items-center justify-center border transition-colors"
                           style={{ borderColor: "#E2DFC8" }}
                         >
                           <Minus className="w-3 h-3" style={{ color: C.indigo }} />
                         </button>
-                        <span className="text-sm font-bold w-4 text-center" style={{ color: C.indigo }}>{qty}</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={v.quantity - v.sold}
+                          value={quantityDraft[v.id] ?? String(qty)}
+                          onChange={(event) => setQuantityDraft((prev) => ({ ...prev, [v.id]: event.target.value }))}
+                          onBlur={() => commitQuantity(v.id, qty, v.quantity - v.sold)}
+                          onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur() }}
+                          aria-label={`Số lượng ${v.title}`}
+                          className="w-12 h-7 rounded-xl border text-center text-sm font-bold outline-none"
+                          style={{ borderColor: "#E2DFC8", color: C.indigo }}
+                        />
                         <button
                           onClick={() => {
-                            const available = v.quantity - v.sold
+                             const available = v.quantity - v.sold
                             if (qty >= available) {
-                              // E1: block and toast
-                              toast.error("Số lượng yêu cầu vượt quá tồn kho hiện tại.")
+                              toast.error("Số lượng yêu cầu vượt quá số lượng voucher còn lại trong kho")
                               return
                             }
+                            setQuantityDraft((prev) => ({ ...prev, [v.id]: String(qty + 1) }))
                             onUpdate(v.id, qty + 1)
                           }}
                           className="w-7 h-7 rounded-xl flex items-center justify-center border transition-colors"
@@ -140,7 +244,7 @@ export function CartPage({ cart, total, onRemove, onUpdate, onCheckout, onContin
                         >
                           <Plus className="w-3 h-3" style={{ color: C.indigo }} />
                         </button>
-                        <button onClick={() => handleRemove(v.id)} className="w-7 h-7 rounded-xl flex items-center justify-center ml-1 hover:bg-red-50">
+                        <button onClick={() => setPendingDelete({ voucher: v, qty })} className="w-7 h-7 rounded-xl flex items-center justify-center ml-1 hover:bg-red-50" aria-label={`Xóa ${v.title}`}>
                           <Trash2 className="w-3.5 h-3.5" style={{ color: "#C0392B" }} />
                         </button>
                       </div>
@@ -151,24 +255,6 @@ export function CartPage({ cart, total, onRemove, onUpdate, onCheckout, onContin
             )
           })}
 
-          {/* Demo trigger for E2 — only shown while no item is already unavailable */}
-          {!hasUnavailable && cart.length > 0 && (
-            <div
-              className="rounded-2xl p-3 border border-dashed text-center"
-              style={{ borderColor: "#E2DFC8" }}
-            >
-              <p className="text-xs mb-2 font-semibold" style={{ color: "#8A8DA8" }}>
-                Demo Exception E2 — Voucher becomes unavailable
-              </p>
-              <button
-                onClick={() => markUnavailable(cart[0].voucher.id)}
-                className="text-xs px-4 py-1.5 rounded-xl font-bold border"
-                style={{ borderColor: "#E2DFC8", color: "#8A8DA8" }}
-              >
-                Simulate: Voucher removed from system
-              </button>
-            </div>
-          )}
         </div>
 
         {/* Order summary + checkout */}
@@ -178,7 +264,7 @@ export function CartPage({ cart, total, onRemove, onUpdate, onCheckout, onContin
           <div className="space-y-2 mb-4 text-sm">
             <div className="flex justify-between">
               <span style={{ color: "#8A8DA8" }}>Tạm tính</span>
-              <span className="font-semibold" style={{ color: C.indigo }}>{fmt(total)}</span>
+              <span className="font-semibold" style={{ color: C.indigo }}>{fmt(selectedTotal)}</span>
             </div>
             <div className="flex justify-between">
               <span style={{ color: "#8A8DA8" }}>Phí dịch vụ</span>
@@ -186,7 +272,7 @@ export function CartPage({ cart, total, onRemove, onUpdate, onCheckout, onContin
             </div>
             <div className="flex justify-between font-black text-base border-t pt-3 mt-1" style={{ borderColor: "#E2DFC8" }}>
               <span style={{ color: C.indigo }}>Tổng cộng</span>
-              <span style={{ color: C.peach }}>{fmt(total)}</span>
+              <span style={{ color: C.peach }}>{fmt(selectedTotal)}</span>
             </div>
           </div>
 
@@ -205,12 +291,12 @@ export function CartPage({ cart, total, onRemove, onUpdate, onCheckout, onContin
             </div>
           ) : (
             <button
-              onClick={onCheckout}
+              onClick={handleCheckout}
               className="w-full py-3.5 rounded-2xl font-bold text-white transition-all hover:opacity-90 active:scale-95 flex items-center justify-center gap-2"
               style={{ backgroundColor: C.peach }}
             >
               <ShoppingBag className="w-4 h-4" />
-              Tiến hành đặt hàng
+              Tiến hành đặt hàng ({selectedItems.length})
             </button>
           )}
 
@@ -219,6 +305,19 @@ export function CartPage({ cart, total, onRemove, onUpdate, onCheckout, onContin
           </button>
         </div>
       </div>
+
+      {pendingDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="presentation">
+          <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="delete-cart-item-title">
+            <h2 id="delete-cart-item-title" className="text-lg font-black" style={{ color: C.indigo }}>Xóa voucher khỏi giỏ hàng?</h2>
+            <p className="mt-2 text-sm" style={{ color: "#8A8DA8" }}>Bạn có chắc muốn xóa “{pendingDelete.voucher.title}” không?</p>
+            <div className="mt-6 flex gap-3">
+              <button onClick={() => setPendingDelete(null)} className="flex-1 rounded-2xl border-2 py-3 font-bold" style={{ borderColor: "#E2DFC8", color: C.indigo }}>Hủy</button>
+              <button onClick={() => handleRemove(pendingDelete.voucher.id)} className="flex-1 rounded-2xl py-3 font-bold text-white" style={{ backgroundColor: "#C0392B" }}>Xác nhận</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

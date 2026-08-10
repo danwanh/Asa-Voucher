@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { AppIcon } from "@/components/AppIcon"
 import { toast } from "sonner"
 import { GuestLayout, type GuestPage } from "@/layouts/GuestLayout"
@@ -12,9 +13,15 @@ interface Props {
   onLogin: () => void
   onRegister: () => void
   // Called when guest clicks "Tiến hành đặt hàng" — triggers login then redirects to create-order
-  onCheckout: () => void
+  onCheckout: (items?: CartItem[]) => void
   cartAdd: (v: Voucher) => void
-  cartCount: number
+  cartCount: number | null
+  cartCountLoading?: boolean
+  cart: CartItem[]
+  total: number
+  cartRemove: (id: string) => void
+  cartUpdate: (id: string, qty: number) => void
+  initialPage?: GuestPage
 }
 
 // GuestApp manages the cart display only; cart state lives in App.tsx
@@ -25,18 +32,32 @@ interface Props {
 interface FullProps {
   onLogin: () => void
   onRegister: () => void
-  onCheckout: () => void
+  onCheckout: (items?: CartItem[]) => void
   cartAdd: (v: Voucher) => void
-  cartCount: number
+  cartCount: number | null
+  cartCountLoading?: boolean
+  cart: CartItem[]
+  total: number
+  cartRemove: (id: string) => void
+  cartUpdate: (id: string, qty: number) => void
+  initialPage?: GuestPage
 }
 
-export function GuestApp({ onLogin, onRegister, onCheckout, cartAdd, cartCount }: FullProps) {
-  const [page, setPage] = useState<GuestPage>("home")
+export function GuestApp({ onLogin, onRegister, onCheckout, cartAdd, cartCount, cartCountLoading = false, cart, total, cartRemove, cartUpdate, initialPage }: FullProps) {
+  const router = useRouter()
+  const [page, setPage] = useState<GuestPage>(initialPage ?? "home")
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null)
 
   const goDetail = (v: Voucher) => {
     setSelectedVoucher(v)
     setPage("detail")
+  }
+
+  const navigate = (nextPage: GuestPage) => {
+    if (nextPage === "home") router.push("/")
+    else if (nextPage === "vouchers") router.push("/vouchers")
+    else if (nextPage === "categories") router.push("/categories")
+    else setPage(nextPage)
   }
 
   const handleAddToCart = (v: Voucher) => {
@@ -52,14 +73,15 @@ export function GuestApp({ onLogin, onRegister, onCheckout, cartAdd, cartCount }
   return (
     <GuestLayout
       page={page}
-      onNavigate={setPage}
+      onNavigate={navigate}
       onLogin={onLogin}
        onRegister={onRegister}
       cartCount={cartCount}
+      cartCountLoading={cartCountLoading}
     >
       {page === "home" && (
         <GuestHomePage
-          onNavigate={setPage}
+          onNavigate={(nextPage) => setPage(nextPage as GuestPage)}
           onVoucherDetail={goDetail}
           onLogin={onLogin}
           onAddToCart={handleAddToCart}
@@ -83,11 +105,13 @@ export function GuestApp({ onLogin, onRegister, onCheckout, cartAdd, cartCount }
         />
       )}
       {page === "cart" && (
-        <GuestCartPage
-          cartCount={cartCount}
+        <CartPage
+          cart={cart}
+          total={total}
+          onRemove={cartRemove}
+          onUpdate={cartUpdate}
           onCheckout={onCheckout}
           onContinue={() => setPage("vouchers")}
-          onLogin={onLogin}
         />
       )}
       {page === "categories" && (

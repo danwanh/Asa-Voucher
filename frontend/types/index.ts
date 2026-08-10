@@ -19,7 +19,7 @@ export type VoucherStatus =
   | "locked"
   | "cancelled"
   | "used"
-export type OrderStatus = "pending" | "completed" | "cancelled" | "used"
+export type OrderStatus = "pending" | "confirmed" | "completed" | "cancelled" | "used"
 
 // Kept for pages that still reference the old admin sub-role concept;
 // no longer used on AppUser (admin_content/admin_operations/admin_security are
@@ -151,11 +151,47 @@ export interface Order {
   paymentMethod: string
   createdAt: string
   code: string
+  qrPayload?: string
+  paymentStatus?: "pending" | "paid" | "failed" | "refunded"
+  recipientId?: string
+  isGift?: boolean
+  paymentExpiresAt?: string
+  items?: OrderItem[]
+}
+
+export interface OrderItem {
+  id: string
+  voucherId: string
+  quantity: number
+  unitPrice: number
+  subtotal: number
+  voucherTitle?: string
+  partnerName?: string
+  issuedVouchers?: IssuedVoucher[]
+}
+
+export interface IssuedVoucher {
+  id: string
+  code: string
+  qrPayload: string
+  status: "active" | "used" | "expired" | "refunded"
+  expiredDate?: string
+}
+
+export interface Payment {
+  id: string
+  orderId: string
+  method: "vnpay" | "paypal"
+  amount: number
+  status: "pending" | "success" | "failed" | "refunded"
+  transactionRef?: string
+  checkout_url?: string
 }
 
 export interface CartItem {
   voucher: Voucher
   qty: number
+  cartItemId?: string
 }
 
 export interface User {

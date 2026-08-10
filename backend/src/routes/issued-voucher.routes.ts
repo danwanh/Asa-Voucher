@@ -23,7 +23,7 @@ issuedVoucherRoutes.post(
 );
 issuedVoucherRoutes.post(
   "/issued-vouchers/:id/redeem",
-  requireRole("partner_owner", "partner_voucher_staff", "partner_store_staff"),
+  requireRole("partner_store_staff"),
   asyncHandler(issuedVoucherController.redeemVoucher),
 );
 

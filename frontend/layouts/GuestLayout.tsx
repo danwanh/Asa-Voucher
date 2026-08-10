@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Menu, X, Tag, ShoppingCart } from "lucide-react"
 import { C } from "@/utils/constants"
 
@@ -9,7 +10,8 @@ interface Props {
   onNavigate: (p: GuestPage) => void
   onLogin: () => void
   onRegister: () => void
-  cartCount?: number
+  cartCount?: number | null
+  cartCountLoading?: boolean
   children: React.ReactNode
 }
 
@@ -21,8 +23,9 @@ const NAV = [
   { label: "Liên hệ", value: "contact" as GuestPage },
 ]
 
-export function GuestLayout({ page, onNavigate, onLogin, onRegister, cartCount = 0, children }: Props) {
+export function GuestLayout({ page, onNavigate, onLogin, onRegister, cartCount = 0, cartCountLoading = false, children }: Props) {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const router = useRouter()
 
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: C.content, fontFamily: "'Inter', sans-serif" }}>
@@ -62,19 +65,21 @@ export function GuestLayout({ page, onNavigate, onLogin, onRegister, cartCount =
           <div className="hidden md:flex items-center gap-2">
             {/* Cart badge */}
             <button
-              onClick={() => onNavigate("cart")}
+              onClick={() => router.push("/cart")}
               className="relative p-2 rounded-xl hover:bg-black/5 transition-colors"
               title="Giỏ hàng"
             >
               <ShoppingCart className="w-5 h-5" style={{ color: C.indigo }} />
-              {cartCount > 0 && (
+              {cartCountLoading ? (
+                <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full animate-pulse" style={{ backgroundColor: "#D6D2B8" }} aria-label="Đang tải số lượng giỏ hàng" />
+              ) : cartCount !== null && cartCount > 0 ? (
                 <span
                   className="absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-xs font-black text-white"
                   style={{ backgroundColor: C.peach }}
                 >
                   {cartCount > 9 ? "9+" : cartCount}
                 </span>
-              )}
+              ) : null}
             </button>
             <button
               onClick={onLogin}
@@ -95,15 +100,17 @@ export function GuestLayout({ page, onNavigate, onLogin, onRegister, cartCount =
           {/* Mobile: cart badge + hamburger */}
           <div className="md:hidden flex items-center gap-1">
             <button
-              onClick={() => onNavigate("cart")}
+              onClick={() => router.push("/cart")}
               className="relative p-2 rounded-lg"
             >
               <ShoppingCart className="w-5 h-5" style={{ color: C.indigo }} />
-              {cartCount > 0 && (
+              {cartCountLoading ? (
+                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full animate-pulse" style={{ backgroundColor: "#D6D2B8" }} aria-label="Đang tải số lượng giỏ hàng" />
+              ) : cartCount !== null && cartCount > 0 ? (
                 <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center text-xs font-black text-white" style={{ backgroundColor: C.peach, fontSize: 10 }}>
                   {cartCount}
                 </span>
-              )}
+              ) : null}
             </button>
             <button className="p-2 rounded-lg" onClick={() => setMobileOpen(!mobileOpen)}>
               {mobileOpen ? <X className="w-5 h-5" style={{ color: C.indigo }} /> : <Menu className="w-5 h-5" style={{ color: C.indigo }} />}

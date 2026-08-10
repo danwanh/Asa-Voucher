@@ -17,6 +17,10 @@ export const partnerStaffUpdateSchema = z
   .refine((value) => Object.keys(value).length > 0, {
     message: "At least one field is required"
   });
+
+export const recipientLookupSchema = z.object({
+  identifier: z.string().trim().min(3).max(255)
+});
   
 export const userQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),

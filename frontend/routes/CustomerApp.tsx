@@ -1,4 +1,5 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { AppIcon } from "@/components/AppIcon"
 import { toast } from "sonner"
 import { CustomerLayout, type CustomerPage } from "@/layouts/CustomerLayout"
@@ -16,9 +17,10 @@ import { ReviewPage } from "@/pages/customer/ReviewPage"
 import { ProfilePage } from "@/pages/customer/ProfilePage"
 import { NotificationsPage } from "@/pages/customer/NotificationsPage"
 import { CustomerSettingsPage } from "@/pages/customer/CustomerSettingsPage"
-import { ORDERS } from "@/data/mock"
 import { C } from "@/utils/constants"
+import { customerPagePath } from "@/utils/customerRoutes"
 import type { AppUser, CartItem, Voucher, Order } from "@/types"
+import { orderService, paymentService } from "@/services/orderService"
 
 interface Props {
   user: AppUser
@@ -27,18 +29,28 @@ interface Props {
   cart: CartItem[]
   total: number
   count: number
+  cartCount: number | null
+  cartCountLoading: boolean
   add: (v: Voucher) => void
   remove: (id: string) => void
   update: (id: string, qty: number) => void
-  clear: () => void
+  removeMany: (cartItemIds: string[]) => void
+  cartLoading: boolean
+  checkoutSelectionIds: string[] | null
+  checkoutItems: CartItem[]
+  setCheckoutSelection: (cartItemIds: string[]) => void
+  clearCheckoutSelection: () => void
   // When set, start directly at this page (e.g. "create-order" after guest checkout redirect)
   initialPage?: CustomerPage
+  initialOrderId?: string
+  initialPaymentStatus?: string
   onInitialPageConsumed?: () => void
 }
 
 interface PendingOrder {
   id: string
   recipient: RecipientInfo
+  order?: Order
 }
 
 type VoucherListFilters = {
@@ -61,20 +73,60 @@ const DEFAULT_VOUCHER_FILTERS: VoucherListFilters = {
 
 export function CustomerApp({
   user, onLogout,
-  cart, total, count, add, remove, update, clear,
+  cart, total, count, cartCount, cartCountLoading, add, remove, update, removeMany, cartLoading,
+  checkoutSelectionIds, checkoutItems, setCheckoutSelection, clearCheckoutSelection,
   initialPage, onInitialPageConsumed,
+  initialOrderId,
+  initialPaymentStatus,
 }: Props) {
+  const router = useRouter()
   const [page, setPage] = useState<CustomerPage>(initialPage ?? "home")
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [reviewOrder, setReviewOrder] = useState<Order | null>(null)
   const [reviewExisting, setReviewExisting] = useState<{ rating: number; content: string } | undefined>()
   const [lastCode, setLastCode] = useState("")
+  const [lastQrPayload, setLastQrPayload] = useState("")
   const [pendingOrder, setPendingOrder] = useState<PendingOrder | null>(null)
+  const [pendingOrderLoading, setPendingOrderLoading] = useState(Boolean(initialOrderId && initialPage === "payment"))
+  const [isRedirectingToPayment, setIsRedirectingToPayment] = useState(false)
   const [voucherSearch, setVoucherSearch] = useState("")
   const [voucherFilters, setVoucherFilters] = useState<VoucherListFilters>(DEFAULT_VOUCHER_FILTERS)
 
+  useEffect(() => {
+    if (initialPage) setPage(initialPage)
+  }, [initialPage])
+
+  useEffect(() => {
+    if (!initialOrderId) {
+      setPendingOrderLoading(false)
+      return
+    }
+    if (initialPage === "orders") {
+      void orderService.get(initialOrderId).then((order) => {
+        setSelectedOrder(order)
+        setPage("order-detail")
+      }).catch(() => undefined)
+      return
+    }
+    void orderService.get(initialOrderId).then((order) => {
+      setPendingOrder({ id: initialOrderId, order, recipient: { name: "", identifier: "", note: "", forSelf: true } })
+    }).catch(() => setPendingOrder({ id: initialOrderId, recipient: { name: "", identifier: "", note: "", forSelf: false } }))
+      .finally(() => setPendingOrderLoading(false))
+  }, [initialOrderId, initialPage])
+
+  useEffect(() => {
+    if (initialPaymentStatus === "success") toast.success("Thanh toán thành công, voucher đã được phát hành.")
+    if (initialPaymentStatus === "failed") toast.error("Thanh toán thất bại. Đơn hàng vẫn được giữ để bạn thanh toán lại.")
+  }, [initialPaymentStatus])
+
   const navigate = (p: CustomerPage) => {
+    const path = customerPagePath(p, user.role)
+    if (path) {
+      onInitialPageConsumed?.()
+      router.push(path)
+      return
+    }
     setPage(p)
     onInitialPageConsumed?.()
   }
@@ -89,7 +141,10 @@ export function CustomerApp({
   }
 
   const goDetail = (v: Voucher) => { setSelectedVoucher(v); navigate("detail") }
-  const goOrderDetail = (o: Order) => { setSelectedOrder(o); navigate("order-detail") }
+  const goOrderDetail = (o: Order) => {
+    setSelectedOrder(o)
+    router.push(`/orders/${o.id}`)
+  }
 
   const goReview = (o: Order, existing?: { rating: number; content: string }) => {
     setReviewOrder(o)
@@ -97,22 +152,68 @@ export function CustomerApp({
     navigate("review")
   }
 
-  const handleBuyNow = (v: Voucher) => {
-    add(v)
-    navigate("create-order")
+  const handleBuyNow = async (v: Voucher) => {
+    const item = await add(v)
+    if (!item?.cartItemId) {
+      toast.error("Không thể chuẩn bị sản phẩm để đặt hàng. Vui lòng thử lại.")
+      return
+    }
+    setCheckoutSelection([item.cartItemId])
+    router.push("/checkout/create-order")
   }
 
-  const handleCreateOrder = (info: RecipientInfo) => {
-    const orderId = "DH" + Date.now().toString().slice(-6)
-    setPendingOrder({ id: orderId, recipient: info })
-    navigate("payment")
+  const checkoutCartItemIds = checkoutSelectionIds ?? []
+  const selectedCart = checkoutItems
+  const selectedTotal = selectedCart.reduce((sum, item) => sum + item.voucher.price * item.qty, 0)
+
+  const handleCreateOrder = async (info: RecipientInfo) => {
+    setIsRedirectingToPayment(true)
+    try {
+      const order = await orderService.createFromCart({
+        cartItemIds: checkoutCartItemIds,
+        recipientIdentifier: info.identifier,
+        isGift: !info.forSelf,
+        note: info.note,
+        expectedPrices: Object.fromEntries(selectedCart.map((item) => [item.voucher.id, item.voucher.price])),
+      })
+      removeMany(checkoutCartItemIds)
+       clearCheckoutSelection()
+      setPendingOrder({ id: order.id, recipient: info })
+      router.push(`/checkout/payment/${order.id}`)
+    } catch (error) {
+      setIsRedirectingToPayment(false)
+      const apiError = error as { response?: { data?: { code?: string } } }
+      toast.error(apiError.response?.data?.code === "PRICE_CHANGED"
+        ? "Giá voucher đã thay đổi. Vui lòng kiểm tra lại giỏ hàng."
+        : "Không thể tạo đơn hàng. Vui lòng kiểm tra email người nhận, giỏ hàng và tồn kho.")
+      navigate("cart")
+    }
   }
 
-  const handlePaymentSuccess = (code: string) => {
-    setLastCode(code)
-    clear()
+  const handlePaymentSuccess = async () => {
+    if (!pendingOrder) return
+    try {
+      const order = await orderService.get(pendingOrder.id)
+      const issued = order.items?.flatMap((item) => item.issuedVouchers ?? []) ?? []
+      setLastCode(issued.map((item) => item.code).join(", ") || order.code)
+      setLastQrPayload(issued[0]?.qrPayload ?? order.qrPayload ?? "")
+    } catch {
+      setLastCode(pendingOrder.id)
+    }
     setPendingOrder(null)
     navigate("success")
+  }
+
+  const handlePayment = async (method: "vnpay" | "paypal") => {
+    if (!pendingOrder) return
+    const payment = await paymentService.create(pendingOrder.id, method)
+    window.location.assign(payment.checkout_url)
+  }
+
+  const handlePayAgain = (order: Order) => {
+    setPendingOrder({ id: order.id, order, recipient: { name: "", identifier: "", note: "", forSelf: true } })
+    setSelectedOrder(null)
+    router.push(`/checkout/payment/${order.id}`)
   }
 
   const handlePaymentBack = () => {
@@ -120,13 +221,19 @@ export function CustomerApp({
     navigate("orders")
   }
 
-  const myOrders = ORDERS.filter((o) => o.userId === "u01")
+  const [myOrders, setMyOrders] = useState<Order[]>([])
+
+  useEffect(() => {
+    if (page !== "orders" && page !== "my-vouchers") return
+    void orderService.list().then(setMyOrders).catch(() => undefined)
+  }, [page])
 
   return (
     <CustomerLayout
       user={user}
       page={page}
-      cartCount={count}
+      cartCount={cartCount}
+      cartCountLoading={cartCountLoading}
       voucherSearch={voucherSearch}
       onVoucherSearchChange={handleVoucherSearchChange}
       onVoucherSearchFocus={handleVoucherSearchFocus}
@@ -160,28 +267,42 @@ export function CustomerApp({
           total={total}
           onRemove={remove}
           onUpdate={update}
-          onCheckout={() => navigate("create-order")}
+           onCheckout={(items) => {
+             const cartItemIds = items.map((item) => item.cartItemId).filter((id): id is string => Boolean(id))
+             setCheckoutSelection(cartItemIds)
+             router.push("/checkout/create-order")
+           }}
           onContinue={() => navigate("vouchers")}
+          loading={cartLoading}
         />
       )}
       {page === "create-order" && (
         <CreateOrderPage
-          cart={cart}
-          total={total}
+          cart={selectedCart}
+          total={selectedTotal}
+          userName={user.name}
+          userEmail={user.email}
           onCreateOrder={handleCreateOrder}
           onBack={() => navigate("cart")}
-        />
-      )}
-      {page === "payment" && pendingOrder && (
-        <PaymentPage
-          cart={cart}
-          total={total}
-          orderId={pendingOrder.id}
-          onSuccess={handlePaymentSuccess}
-          onBack={handlePaymentBack}
-        />
-      )}
-      {page === "payment" && !pendingOrder && (
+           loading={cartLoading || isRedirectingToPayment}
+         />
+       )}
+       {page === "payment" && pendingOrderLoading && (
+         <div className="max-w-md mx-auto px-4 py-20 text-center" role="status" aria-live="polite">
+           <div className="w-12 h-12 rounded-full mx-auto mb-4 animate-pulse" style={{ backgroundColor: C.apricot }} />
+           <p className="font-bold" style={{ color: C.indigo }}>Đang tải đơn hàng...</p>
+         </div>
+       )}
+       {page === "payment" && !pendingOrderLoading && pendingOrder?.order && (
+         <PaymentPage
+           total={pendingOrder.order.amount}
+           orderId={pendingOrder.id}
+           order={pendingOrder.order}
+           onPay={handlePayment}
+           onBack={handlePaymentBack}
+         />
+       )}
+       {page === "payment" && !pendingOrderLoading && !pendingOrder?.order && (
         <div className="max-w-md mx-auto px-4 py-20 text-center">
            <AppIcon name="shoppingCart" className="w-14 h-14 mb-4 mx-auto" />
           <p className="font-bold" style={{ color: C.indigo }}>Không có đơn hàng đang chờ thanh toán.</p>
@@ -190,18 +311,19 @@ export function CustomerApp({
           </button>
         </div>
       )}
-      {page === "success" && <CheckoutSuccessPage code={lastCode} onDone={() => navigate("my-vouchers")} />}
-      {page === "my-vouchers" && <MyVouchersPage orders={myOrders} />}
+       {page === "success" && <CheckoutSuccessPage code={lastCode} qrPayload={lastQrPayload} onDone={() => router.push("/my-vouchers")} />}
+       {page === "my-vouchers" && <MyVouchersPage orders={myOrders} ownerId={user.id} />}
       {page === "orders" && (
         <OrderHistoryPage
           orders={myOrders}
           pendingOrderId={pendingOrder?.id}
           onDetail={goOrderDetail}
           onReview={(o) => goReview(o)}
+          onPayAgain={handlePayAgain}
         />
       )}
       {page === "order-detail" && selectedOrder && (
-        <OrderDetailPage order={selectedOrder} onBack={() => navigate("orders")} onReview={(o) => goReview(o)} />
+         <OrderDetailPage order={selectedOrder} onBack={() => navigate("orders")} onReview={(o) => goReview(o)} onPayAgain={handlePayAgain} />
       )}
       {page === "review" && reviewOrder && (
         <ReviewPage

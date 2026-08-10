@@ -40,7 +40,8 @@ model User {
   approved_partners    Partner[]           @relation("PartnerApprover")
   approved_vouchers    VoucherProduct[]    @relation("VoucherApprover")
   carts                Cart?
-  orders               Order[]
+  orders               Order[]           @relation("CreatedOrders")
+  received_orders      Order[]           @relation("ReceivedOrders")
   order_logs           OrderLog[]
   payment_logs         PaymentLog[]
   issued_vouchers      IssuedVoucher[]
@@ -275,6 +276,7 @@ model Order {
   id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   order_code      String   @unique @db.VarChar(30)
   user_id         String   @db.Uuid
+  recipient_id    String   @db.Uuid
   subtotal        Decimal  @db.Decimal(15, 0)
   discount_amount Decimal  @default(0) @db.Decimal(15, 0)
   total_amount    Decimal  @db.Decimal(15, 0)
@@ -282,10 +284,13 @@ model Order {
   payment_status  String   @default("pending") @db.VarChar(20)
   status          String   @default("pending") @db.VarChar(20)
   note            String?
+  is_gift         Boolean  @default(false)
+  payment_expires_at DateTime? @db.Timestamptz(6)
   created_at      DateTime @default(now()) @db.Timestamptz(6)
   updated_at      DateTime @default(now()) @updatedAt @db.Timestamptz(6)
 
-  users        User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  users        User         @relation("CreatedOrders", fields: [user_id], references: [id], onDelete: Cascade)
+  recipient    User         @relation("ReceivedOrders", fields: [recipient_id], references: [id], onDelete: Restrict)
   order_items  OrderItem[]
   payments     Payment[]
   complaints   Complaint[]
@@ -293,6 +298,7 @@ model Order {
   payment_logs PaymentLog[]
 
   @@index([user_id], map: "orders_user_id_idx")
+  @@index([recipient_id], map: "orders_recipient_id_idx")
   @@map("orders")
 }
 

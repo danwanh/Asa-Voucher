@@ -30,6 +30,7 @@ export const STATUS_LABEL: Record<string, string> = {
   locked: "Đã khóa",
   cancelled: "Đã hủy",
   used: "Đã dùng",
+  confirmed: "Đã thanh toán",
   completed: "Hoàn thành",
   banned: "Bị khóa",
   inactive: "Không hoạt động",

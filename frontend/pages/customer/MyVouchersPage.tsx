@@ -8,27 +8,29 @@ import type { Order } from "@/types"
 
 interface Props {
   orders: Order[]
+  ownerId?: string
 }
 
 const TABS = [
-  { label: "Đang hoạt động", value: "active", statuses: ["completed"] },
+  { label: "Đang hoạt động", value: "active", statuses: ["confirmed", "completed"] },
   { label: "Đã sử dụng", value: "used", statuses: ["used"] },
   { label: "Hết hạn", value: "expired", statuses: ["cancelled"] },
 ]
 
-export function MyVouchersPage({ orders }: Props) {
+export function MyVouchersPage({ orders, ownerId }: Props) {
+  const ownedOrders = ownerId ? orders.filter((order) => order.recipientId === ownerId) : orders
   const [tab, setTab] = useState("active")
   const [search, setSearch] = useState("")
   const [qrOpen, setQrOpen] = useState<string | null>(null)
 
   const currentTab = TABS.find((t) => t.value === tab)!
-  const filtered = orders.filter((o) => {
+  const filtered = ownedOrders.filter((o) => {
     const matchTab = currentTab.statuses.includes(o.status)
     const matchSearch = !search || o.voucherTitle.toLowerCase().includes(search.toLowerCase()) || o.code.toLowerCase().includes(search.toLowerCase())
     return matchTab && matchSearch
   })
 
-  const openOrder = orders.find((o) => o.id === qrOpen)
+  const openOrder = ownedOrders.find((o) => o.id === qrOpen)
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
@@ -37,7 +39,7 @@ export function MyVouchersPage({ orders }: Props) {
       {/* Tabs */}
       <div className="flex gap-1 mb-4 overflow-x-auto pb-1">
         {TABS.map((t) => {
-          const count = orders.filter((o) => t.statuses.includes(o.status)).length
+          const count = ownedOrders.filter((o) => t.statuses.includes(o.status)).length
           return (
             <button
               key={t.value}
@@ -88,7 +90,7 @@ export function MyVouchersPage({ orders }: Props) {
             <div key={o.id} className="bg-card rounded-3xl overflow-hidden shadow-sm" style={{ opacity: tab === "expired" ? 0.7 : 1 }}>
               <div className="p-5 flex items-start gap-4">
                 <div className="flex-shrink-0">
-                  <MockQR code={o.code} />
+                   <MockQR code={o.qrPayload || o.code} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <StatusBadge status={o.status} />
@@ -128,7 +130,7 @@ export function MyVouchersPage({ orders }: Props) {
             <div className="font-black text-lg mb-1" style={{ color: C.indigo }}>{openOrder.voucherTitle}</div>
             <div className="text-sm mb-4" style={{ color: "#8A8DA8" }}>{openOrder.partnerName}</div>
             <div className="flex justify-center mb-4">
-              <MockQR code={openOrder.code} size={120} />
+               <MockQR code={openOrder.qrPayload || openOrder.code} size={120} />
             </div>
             <code className="text-lg font-black tracking-widest block mb-4" style={{ color: C.indigo, fontFamily: "'Inter', monospace" }}>
               {openOrder.code}

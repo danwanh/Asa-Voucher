@@ -100,6 +100,9 @@ Backend chạy tại: http://localhost:5000
 NEXT_PUBLIC_API_BASE_URL=http://localhost:5000/api
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+NEXT_PUBLIC_VNPAY_RETURN_URL=
+NEXT_PUBLIC_PAYPAL_CLIENT_ID=
+NEXT_PUBLIC_PAYPAL_RETURN_URL=
 ```
 
 ### Backend (`backend/.env`)
@@ -121,11 +124,26 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
 JWT_SECRET=your-jwt-secret
 JWT_EXPIRES_IN=7d
+
+# Simulated payment providers; leave credentials blank until real gateway integration.
+VNPAY_TMN_CODE=
+VNPAY_HASH_SECRET=
+VNPAY_URL=https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
+VNPAY_RETURN_URL=http://localhost:5000/api/payments/vnpay/return
+PAYPAL_CLIENT_ID=
+PAYPAL_CLIENT_SECRET=
+PAYPAL_ENVIRONMENT=sandbox
+PAYPAL_CURRENCY=USD
+PAYPAL_VND_TO_USD_RATE=25000
+PAYPAL_RETURN_URL=http://localhost:5000/api/payments/paypal/return
+PAYPAL_CANCEL_URL=http://localhost:5000/api/payments/paypal/cancel
 ```
 
 `DATABASE_URL` và `DIRECT_URL` phải là PostgreSQL connection string bắt đầu bằng `postgresql://`, không phải `SUPABASE_URL` dạng `https://...supabase.co`. Prisma Client dùng `DATABASE_URL`; Prisma migrate dùng `DIRECT_URL`.
 
 > ⚠️ **Không đưa các secret thật lên Git.** Chỉ commit file `.env.example`.
+
+PayPal sandbox không hỗ trợ thanh toán bằng VND, nên backend quy đổi số tiền VND sang USD theo `PAYPAL_VND_TO_USD_RATE`. VNPay dùng trực tiếp số tiền VND. Hai return URL phải trỏ về backend đang chạy trên localhost.
 
 ---
 
