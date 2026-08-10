@@ -50,6 +50,10 @@ type BackendVoucherList = {
 type BackendReview = {
   id: string
   user_id: string
+  users?: {
+    full_name?: string | null
+    avatar_url?: string | null
+  } | null
   rating: number
   comment: string | null
   created_at: string
@@ -57,6 +61,8 @@ type BackendReview = {
 
 type BackendReviewList = {
   items: BackendReview[]
+  pagination?: { total: number }
+  average_rating?: number
 }
 
 type BackendVoucherBranch = {
@@ -179,9 +185,16 @@ function mapVoucherProduct(product: BackendVoucherProduct, categorySlug: string)
 }
 
 function mapReview(review: BackendReview): VoucherPublicReview {
+  const fullName = review.users?.full_name?.trim() || "Khách hàng"
+  const nameParts = fullName.split(/\s+/).filter(Boolean)
+  const lastName = nameParts.pop() ?? "K"
+  const maskedName = nameParts.length > 0
+    ? `${nameParts.join(" ")} ${lastName.charAt(0)}***`
+    : `${lastName.charAt(0)}***`
+
   return {
     id: review.id,
-    name: "Khách hàng",
+    name: maskedName,
     rating: review.rating,
     text: review.comment?.trim() || "",
     date: review.created_at
@@ -319,7 +332,8 @@ export const voucherService = {
     const category = categoryFromMap(categoryMap, voucherProduct.category_id)
 
     const current = mapVoucherProduct(voucherProduct, category.slug)
-    const reviews = extractData(reviewsRes).items.map(mapReview).filter((item) => item.text)
+    const reviewList = extractData(reviewsRes)
+    const reviews = reviewList.items.map(mapReview).filter((item) => item.text)
     const branches = extractData(branchesRes).map(mapBranch)
 
     const conditions = parseStringArray(voucherProduct.terms_and_conditions)
@@ -328,8 +342,8 @@ export const voucherService = {
     return {
       voucher: {
         ...current,
-        reviews: reviews.length,
-        rating: reviews.length === 0 ? 0 : Number((reviews.reduce((sum, item) => sum + item.rating, 0) / reviews.length).toFixed(1))
+        reviews: reviewList.pagination?.total ?? reviews.length,
+        rating: reviewList.average_rating ?? 0
       },
       reviews,
       branches,

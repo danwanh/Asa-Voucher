@@ -9,10 +9,11 @@ interface Props {
   order: Order
   onBack: () => void
   onReview: (order: Order) => void
+  onComplaint?: (order: Order) => void
   onPayAgain?: (order: Order) => void
 }
 
-export function OrderDetailPage({ order, onBack, onReview, onPayAgain }: Props) {
+export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAgain }: Props) {
   const [copied, setCopied] = useState(false)
   const sc = statusColor(order.status)
 
@@ -137,13 +138,18 @@ export function OrderDetailPage({ order, onBack, onReview, onPayAgain }: Props) 
             <CreditCard className="w-4 h-4" /> Thanh toán lại
           </button>
         )}
-        {(order.status === "confirmed" || order.status === "completed") && (
+        {(order.paymentStatus === "paid" || order.status === "confirmed" || order.status === "completed" || order.status === "used") && (
           <button
             onClick={() => onReview(order)}
             className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm border-2"
             style={{ borderColor: C.apricot, color: C.indigo }}
           >
             <Star className="w-4 h-4" style={{ color: C.apricot }} /> Đánh giá
+          </button>
+        )}
+        {onComplaint && (order.complaints?.[0] || order.paymentStatus === "paid" || order.status === "confirmed" || order.status === "completed" || order.status === "used") && (
+          <button onClick={() => onComplaint(order)} className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm border-2" style={{ borderColor: "#93C5FD", color: "#2563EB" }}>
+            <MessageSquare className="w-4 h-4" /> {order.complaints?.[0] ? "Xem khiếu nại đơn hàng" : "Khiếu nại đơn hàng"}
           </button>
         )}
         <button className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm border-2" style={{ borderColor: "#E5E7EB", color: C.indigo }}>

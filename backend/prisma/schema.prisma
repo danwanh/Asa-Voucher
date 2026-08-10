@@ -439,6 +439,7 @@ model Review {
 
   @@index([voucher_product_id], map: "reviews_voucher_product_id_idx")
   @@index([user_id], map: "reviews_user_id_idx")
+  @@unique([issued_voucher_id])
   @@map("reviews")
 }
 
@@ -479,6 +480,7 @@ model Complaint {
 
   @@index([user_id], map: "complaints_user_id_idx")
   @@index([status], map: "complaints_status_idx")
+  @@unique([user_id, issued_voucher_id])
   @@map("complaints")
 }
 

@@ -1,4 +1,6 @@
 import { HttpError } from "../utils/http-error.js";
+import { env } from "../config/env.js";
+import { v2 as cloudinary } from "cloudinary";
 import { buildPaginatedResult } from "../utils/pagination.js";
 import * as reviewRepo from "../repositories/review.repository.js";
 import * as reviewResponseRepo from "../repositories/review-response.repository.js";
@@ -14,13 +16,25 @@ export async function listPublicReviews(
   voucherProductId: string,
   query: { page: number; limit: number },
 ) {
-  const { rows, total } = await reviewRepo.listReviews({
+  const [{ rows, total }, stats] = await Promise.all([reviewRepo.listReviews({
     voucherProductId,
     onlyPublished: true,
     page: query.page,
     limit: query.limit,
-  });
-  return buildPaginatedResult(rows, total, query);
+  }), reviewRepo.getReviewStats(voucherProductId)]);
+  return { ...buildPaginatedResult(rows, total, query), average_rating: Number((stats._avg.rating ?? 0).toFixed(1)) };
+}
+
+export async function createMediaSignature() {
+  if (!env.CLOUDINARY_CLOUD_NAME || !env.CLOUDINARY_API_KEY || !env.CLOUDINARY_API_SECRET) {
+    throw new HttpError(503, "Upload ảnh hiện chưa được cấu hình");
+  }
+
+  const timestamp = Math.floor(Date.now() / 1000);
+  const folder = "asa-voucher/feedback";
+  cloudinary.config({ cloud_name: env.CLOUDINARY_CLOUD_NAME, api_key: env.CLOUDINARY_API_KEY, api_secret: env.CLOUDINARY_API_SECRET });
+  const signature = cloudinary.utils.api_sign_request({ folder, timestamp }, env.CLOUDINARY_API_SECRET);
+  return { cloud_name: env.CLOUDINARY_CLOUD_NAME, api_key: env.CLOUDINARY_API_KEY, timestamp, folder, signature };
 }
 
 export async function getReviewById(user: AuthUser | undefined, id: string) {
@@ -46,9 +60,10 @@ export async function createReview(user: AuthUser, input: CreateReviewInput) {
   if (issuedVoucher.owner_id !== user.id) {
     throw new HttpError(403, "Bạn chỉ được đánh giá voucher của chính mình");
   }
-  // RB-10: chỉ được đánh giá sau khi đã sử dụng
-  if (issuedVoucher.status !== "used") {
-    throw new HttpError(422, "Chỉ được đánh giá sau khi đã sử dụng voucher");
+  const order = issuedVoucher.order_items?.orders;
+  const isPaid = order?.payment_status === "paid" || order?.status === "confirmed" || order?.status === "completed";
+  if (!isPaid && issuedVoucher.status !== "used") {
+    throw new HttpError(422, "Chỉ được đánh giá voucher đã thanh toán hoặc đã sử dụng");
   }
 
   const existing = await reviewRepo.findReviewByIssuedVoucherId(input.issued_voucher_id);
@@ -61,11 +76,10 @@ export async function updateReview(user: AuthUser, id: string, input: UpdateRevi
   const review = await reviewRepo.findReviewById(id);
   if (!review) throw new HttpError(404, "Không tìm thấy đánh giá");
 
-  const isOwner = review.user_id === user.id;
   const isAdminContent = user.role === "admin_content";
 
-  if (!isOwner && !isAdminContent) {
-    throw new HttpError(403, "Bạn không có quyền cập nhật đánh giá này");
+  if (!isAdminContent) {
+    throw new HttpError(403, "Đánh giá đã gửi không thể chỉnh sửa");
   }
 
   // Chỉ admin_content được đổi trạng thái publish (kiểm duyệt)

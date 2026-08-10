@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { AppIcon } from "@/components/AppIcon"
 import { toast } from "sonner"
@@ -8,6 +8,7 @@ import { GuestVoucherListPage } from "@/pages/guest/GuestVoucherListPage"
 import { GuestVoucherDetailPage } from "@/pages/guest/GuestVoucherDetailPage"
 import { CartPage } from "@/pages/customer/CartPage"
 import type { Voucher, CartItem } from "@/types"
+import { voucherService } from "@/services/voucherService"
 
 interface Props {
   onLogin: () => void
@@ -22,6 +23,7 @@ interface Props {
   cartRemove: (id: string) => void
   cartUpdate: (id: string, qty: number) => void
   initialPage?: GuestPage
+  initialVoucherId?: string
 }
 
 // GuestApp manages the cart display only; cart state lives in App.tsx
@@ -41,16 +43,24 @@ interface FullProps {
   cartRemove: (id: string) => void
   cartUpdate: (id: string, qty: number) => void
   initialPage?: GuestPage
+  initialVoucherId?: string
 }
 
-export function GuestApp({ onLogin, onRegister, onCheckout, cartAdd, cartCount, cartCountLoading = false, cart, total, cartRemove, cartUpdate, initialPage }: FullProps) {
+export function GuestApp({ onLogin, onRegister, onCheckout, cartAdd, cartCount, cartCountLoading = false, cart, total, cartRemove, cartUpdate, initialPage, initialVoucherId }: FullProps) {
   const router = useRouter()
   const [page, setPage] = useState<GuestPage>(initialPage ?? "home")
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null)
 
+  useEffect(() => {
+    if (!initialVoucherId) return
+    void voucherService.getDetail(initialVoucherId).then((detail) => setSelectedVoucher(detail.voucher)).catch(() => {
+      toast.error("Không thể tải chi tiết voucher.")
+      router.push("/vouchers")
+    })
+  }, [initialVoucherId, router])
+
   const goDetail = (v: Voucher) => {
-    setSelectedVoucher(v)
-    setPage("detail")
+    router.push(`/vouchers/${v.id}`)
   }
 
   const navigate = (nextPage: GuestPage) => {
@@ -94,10 +104,11 @@ export function GuestApp({ onLogin, onRegister, onCheckout, cartAdd, cartCount, 
           onAddToCart={handleAddToCart}
         />
       )}
+      {page === "detail" && !selectedVoucher && <div className="max-w-3xl mx-auto px-4 py-20 text-center font-semibold" style={{ color: "#3D405B" }}>Đang tải chi tiết voucher...</div>}
       {page === "detail" && selectedVoucher && (
         <GuestVoucherDetailPage
           voucher={selectedVoucher}
-          onBack={() => setPage("vouchers")}
+          onBack={() => router.push("/vouchers")}
           onLogin={onLogin}
           onDetail={goDetail}
           onAddToCart={handleAddToCart}

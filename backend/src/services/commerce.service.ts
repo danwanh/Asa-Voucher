@@ -232,7 +232,16 @@ export async function createOrder(userId: string, input: { items?: Array<{ vouch
 async function getOrder(id: string) {
   return requireData<Record<string, unknown>>(await prisma.order.findUnique({
     where: { id },
-    include: { order_items: { include: { voucher_products: { include: { partners: true } }, issued_vouchers: true } } }
+    include: {
+      users: { select: { full_name: true } },
+      complaints: true,
+      order_items: {
+        include: {
+          voucher_products: { include: { partners: true } },
+          issued_vouchers: { include: { reviews: true, complaints: true } },
+        },
+      }
+    }
   }) as unknown as Record<string, unknown> | null, "Order not found");
 }
 
@@ -246,7 +255,16 @@ function assertOrderAccess(user: CurrentUser, order: Record<string, unknown>) {
 export async function listOrders(user: CurrentUser) {
   const data = await prisma.order.findMany({
     where: user.role === "buyer" ? { OR: [{ user_id: user.id }, { recipient_id: user.id }] } : {},
-    include: { order_items: { include: { voucher_products: { include: { partners: true } }, issued_vouchers: true } } },
+    include: {
+      users: { select: { full_name: true } },
+      complaints: true,
+      order_items: {
+        include: {
+          voucher_products: { include: { partners: true } },
+          issued_vouchers: { include: { reviews: true, complaints: true } },
+        },
+      }
+    },
     orderBy: { created_at: "desc" }
   });
   return data.filter((order) => {

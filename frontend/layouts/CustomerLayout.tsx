@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { ShoppingCart, Search, Menu, Home, Tag, Package, User, Bell, Grid3x3, LogOut } from "lucide-react"
+import { ShoppingCart, Search, Menu, Home, Tag, Package, User, Bell, Grid3x3, Gift, LogOut } from "lucide-react"
 import { C } from "@/utils/constants"
 import type { AppUser } from "@/types"
 import { customerPagePath } from "@/utils/customerRoutes"
@@ -9,7 +9,7 @@ export type CustomerPage =
   | "home" | "vouchers" | "categories" | "detail" | "cart"
   | "checkout" | "create-order" | "payment" | "success"
   | "my-vouchers" | "orders" | "order-detail"
-  | "review" | "profile" | "notifications" | "favorites" | "settings"
+  | "review" | "complaint" | "profile" | "notifications" | "favorites" | "settings"
 
 interface Props {
   user: AppUser
@@ -28,6 +28,7 @@ interface Props {
 const DESKTOP_NAV: { label: string; pg: CustomerPage; icon: React.ReactNode }[] = [
   { label: "Trang chủ", pg: "home", icon: <Home className="w-4 h-4" /> },
   { label: "Voucher", pg: "vouchers", icon: <Tag className="w-4 h-4" /> },
+  { label: "Voucher của tôi", pg: "my-vouchers", icon: <Gift className="w-4 h-4" /> },
   { label: "Danh mục", pg: "categories", icon: <Grid3x3 className="w-4 h-4" /> },
   { label: "Đơn hàng", pg: "orders", icon: <Package className="w-4 h-4" /> },
   { label: "Hồ sơ", pg: "profile", icon: <User className="w-4 h-4" /> },

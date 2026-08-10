@@ -1,5 +1,5 @@
 import { api } from "./api"
-import type { IssuedVoucher, Order, OrderItem, Payment } from "@/types"
+import type { Complaint, IssuedVoucher, Order, OrderItem, Payment, Review } from "@/types"
 
 type BackendRecord = Record<string, any>
 
@@ -12,6 +12,36 @@ function num(value: unknown) {
   return Number.isFinite(result) ? result : 0
 }
 
+function strings(value: unknown) {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : []
+}
+
+function mapReview(value: BackendRecord): Review {
+  return {
+    id: String(value.id),
+    issuedVoucherId: value.issued_voucher_id,
+    rating: Number(value.rating),
+    comment: value.comment ?? null,
+    mediaUrls: strings(value.media_urls),
+    createdAt: value.created_at,
+  }
+}
+
+function mapComplaint(value: BackendRecord): Complaint {
+  return {
+    id: String(value.id),
+    issuedVoucherId: value.issued_voucher_id,
+    reason: String(value.reason),
+    description: String(value.description ?? ""),
+    evidenceUrls: strings(value.evidence_urls),
+    status: value.status,
+    resolutionNote: value.resolution_note,
+    resolutionType: value.resolution_type,
+    createdAt: value.created_at,
+    resolvedAt: value.resolved_at,
+  }
+}
+
 function mapIssuedVoucher(value: BackendRecord): IssuedVoucher {
   return {
     id: String(value.id),
@@ -19,6 +49,8 @@ function mapIssuedVoucher(value: BackendRecord): IssuedVoucher {
     qrPayload: String(value.qr_code_payload ?? value.qrPayload ?? ""),
     status: value.status,
     expiredDate: value.expired_date,
+    review: Array.isArray(value.reviews) && value.reviews[0] ? mapReview(value.reviews[0]) : undefined,
+    complaint: Array.isArray(value.complaints) && value.complaints[0] ? mapComplaint(value.complaints[0]) : undefined,
   }
 }
 
@@ -55,6 +87,8 @@ export function mapOrder(value: BackendRecord): Order {
     paymentStatus: value.payment_status,
     recipientId: value.recipient_id,
     isGift: Boolean(value.is_gift),
+    giverName: value.users?.full_name,
+    complaints: Array.isArray(value.complaints) ? value.complaints.map(mapComplaint) : [],
     paymentExpiresAt: value.payment_expires_at,
     items,
   }

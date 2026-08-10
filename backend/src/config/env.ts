@@ -28,7 +28,10 @@ const envSchema = z.object({
   PAYPAL_CURRENCY: z.string().length(3).default("USD"),
   PAYPAL_VND_TO_USD_RATE: z.coerce.number().positive().default(25000),
   PAYPAL_RETURN_URL: z.string().url().optional(),
-  PAYPAL_CANCEL_URL: z.string().url().optional()
+  PAYPAL_CANCEL_URL: z.string().url().optional(),
+  CLOUDINARY_CLOUD_NAME: z.string().optional(),
+  CLOUDINARY_API_KEY: z.string().optional(),
+  CLOUDINARY_API_SECRET: z.string().optional()
 });
 
 export const env = envSchema.parse(process.env);

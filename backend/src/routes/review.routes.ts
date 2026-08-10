@@ -10,6 +10,7 @@ reviewRoutes.get(
   "/voucher-products/:id/reviews",
   asyncHandler(reviewController.listPublicReviews),
 );
+reviewRoutes.post("/reviews/media/signature", requireAuth, asyncHandler(reviewController.createMediaSignature));
 
 reviewRoutes.post("/reviews", requireAuth, asyncHandler(reviewController.createReview));
 reviewRoutes.get("/reviews/:id", optionalAuth, asyncHandler(reviewController.getReview));

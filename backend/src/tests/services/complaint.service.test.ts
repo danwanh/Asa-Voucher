@@ -6,6 +6,8 @@ vi.mock("../../repositories/complaint.repository.js", () => ({
   listComplaints: vi.fn(),
   findComplaintById: vi.fn(),
   createComplaint: vi.fn(),
+  findComplaintByIssuedVoucherId: vi.fn(),
+  findOrderLevelComplaint: vi.fn(),
   findOrderOwner: vi.fn(),
   updateComplaint: vi.fn(),
 }));
@@ -53,6 +55,8 @@ function makeComplaint(overrides: Record<string, unknown> = {}) {
 describe("Complaint Service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(complaintRepo.findComplaintByIssuedVoucherId).mockResolvedValue(null);
+    vi.mocked(complaintRepo.findOrderLevelComplaint).mockResolvedValue(null);
   });
 
   describe("listComplaints", () => {
@@ -78,7 +82,7 @@ describe("Complaint Service", () => {
 
   describe("createComplaint", () => {
     it("creates complaint for buyer's order", async () => {
-      vi.mocked(complaintRepo.findOrderOwner).mockResolvedValue({ id: "order-1", user_id: "u-buyer" });
+      vi.mocked(complaintRepo.findOrderOwner).mockResolvedValue({ id: "order-1", user_id: "u-buyer", recipient_id: "u-buyer" });
       vi.mocked(complaintRepo.createComplaint).mockResolvedValue(makeComplaint());
 
       const result = await complaintService.createComplaint(BUYER, {
@@ -90,7 +94,7 @@ describe("Complaint Service", () => {
     });
 
     it("rejects complaint for another buyer's order", async () => {
-      vi.mocked(complaintRepo.findOrderOwner).mockResolvedValue({ id: "order-1", user_id: "u-other" });
+      vi.mocked(complaintRepo.findOrderOwner).mockResolvedValue({ id: "order-1", user_id: "u-other", recipient_id: "u-other" });
 
       await expect(
         complaintService.createComplaint(BUYER, {
@@ -156,12 +160,12 @@ describe("Complaint Service", () => {
   });
 
   describe("updateComplaint", () => {
-    it("owner can update open complaint", async () => {
+    it("owner cannot update an existing complaint", async () => {
       vi.mocked(complaintRepo.findComplaintById).mockResolvedValue(makeComplaint());
-      vi.mocked(complaintRepo.updateComplaint).mockResolvedValue(makeComplaint({ description: "Updated" }));
 
-      const result = await complaintService.updateComplaint(BUYER, "comp-1", { description: "Updated" });
-      expect(result.description).toBe("Updated");
+      await expect(
+        complaintService.updateComplaint(BUYER, "comp-1", { description: "Updated" })
+      ).rejects.toThrow(HttpError);
     });
 
     it("owner cannot update non-open complaint", async () => {

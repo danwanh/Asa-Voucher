@@ -4,6 +4,7 @@ import type { CreateReviewInput, UpdateReviewInput } from "../validations/review
 
 const INCLUDE = {
   voucher_products: { select: { id: true, name: true, partner_id: true } },
+  users: { select: { full_name: true, avatar_url: true } },
 } as const;
 
 export async function listReviews(
@@ -30,6 +31,14 @@ export async function findReviewById(id: string) {
 
 export async function findReviewByIssuedVoucherId(issuedVoucherId: string) {
   return prisma.review.findUnique({ where: { issued_voucher_id: issuedVoucherId }, select: { id: true } });
+}
+
+export async function getReviewStats(voucherProductId: string) {
+  return prisma.review.aggregate({
+    where: { voucher_product_id: voucherProductId, is_published: true },
+    _avg: { rating: true },
+    _count: { _all: true },
+  });
 }
 
 export async function createReview(userId: string, voucherProductId: string, input: CreateReviewInput) {
