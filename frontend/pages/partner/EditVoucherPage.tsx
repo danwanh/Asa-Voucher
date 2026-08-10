@@ -1,6 +1,8 @@
 import { useState } from "react"
-import { ArrowLeft, CheckCircle, Save, FileEdit } from "lucide-react"
-import { C, fmt, fmtDate, STATUS_LABEL, statusColor } from "@/utils/constants"
+import { ArrowLeft, CheckCircle, Save, FileEdit, Lock, Loader2 } from "lucide-react"
+import { C, fmt, STATUS_LABEL, statusColor } from "@/utils/constants"
+import { isFieldLocked, getLockedFields } from "@/types"
+import { voucherService } from "@/services/voucherService"
 import type { Voucher, VoucherStatus } from "@/types"
 
 interface Props {
@@ -18,9 +20,19 @@ const CATEGORIES = [
   { value: "education", label: "📚 Giáo dục" },
 ]
 
+const FIELD_MAP: Record<string, string> = {
+  title: "name",
+  category: "category_id",
+  price: "selling_price",
+  originalPrice: "original_price",
+  quantity: "total_quantity",
+}
+
 export function EditVoucherPage({ voucher, onBack, onSave }: Props) {
   const [saved, setSaved] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [apiError, setApiError] = useState<string | null>(null)
   const [form, setForm] = useState({
     title: voucher.title,
     category: voucher.category,
@@ -37,7 +49,15 @@ export function EditVoucherPage({ voucher, onBack, onSave }: Props) {
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  const up = (k: string, v: string) => { setForm((f) => ({ ...f, [k]: v })); setErrors((e) => ({ ...e, [k]: "" })) }
+  const up = (k: string, v: string) => { setForm((f) => ({ ...f, [k]: v })); setErrors((e) => ({ ...e, [k]: "" })); setApiError(null) }
+
+  const isLocked = (formField: string): boolean => {
+    const backendField = FIELD_MAP[formField]
+    return backendField ? isFieldLocked(voucher.status, backendField) : false
+  }
+
+  const lockedFields = getLockedFields(voucher.status)
+  const isFullyLocked = lockedFields.includes("*")
 
   const validate = () => {
     const e: Record<string, string> = {}
@@ -46,6 +66,9 @@ export function EditVoucherPage({ voucher, onBack, onSave }: Props) {
     if (!form.price || isNaN(Number(form.price))) e.price = "Giá bán không hợp lệ"
     if (!form.quantity || isNaN(Number(form.quantity))) e.quantity = "Số lượng không hợp lệ"
     if (!form.validTo) e.validTo = "Vui lòng chọn ngày hết hạn"
+    if (form.price && form.originalPrice && Number(form.price) > Number(form.originalPrice)) {
+      e.price = "Giá bán không được lớn hơn giá gốc"
+    }
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -67,16 +90,49 @@ export function EditVoucherPage({ voucher, onBack, onSave }: Props) {
     ...(overrideStatus ? { status: overrideStatus } : {}),
   })
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!validate()) return
-    onSave(buildUpdated())
-    setSaved(true)
+    setSaving(true)
+    setApiError(null)
+    try {
+      await voucherService.update(voucher.id, {
+        name: form.title,
+        selling_price: Number(form.price),
+        original_price: Number(form.originalPrice),
+        total_quantity: Number(form.quantity),
+        description: form.description || undefined,
+      })
+      onSave(buildUpdated())
+      setSaved(true)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Lỗi khi lưu voucher"
+      setApiError(msg)
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const handleSubmitForReview = () => {
+  const handleSubmitForReview = async () => {
     if (!validate()) return
-    onSave(buildUpdated("pending"))
-    setSubmitted(true)
+    setSaving(true)
+    setApiError(null)
+    try {
+      await voucherService.update(voucher.id, {
+        name: form.title,
+        selling_price: Number(form.price),
+        original_price: Number(form.originalPrice),
+        total_quantity: Number(form.quantity),
+        description: form.description || undefined,
+      })
+      await voucherService.submit(voucher.id)
+      onSave(buildUpdated("pending"))
+      setSubmitted(true)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Lỗi khi gửi duyệt"
+      setApiError(msg)
+    } finally {
+      setSaving(false)
+    }
   }
 
   if (submitted) {
@@ -128,18 +184,42 @@ export function EditVoucherPage({ voucher, onBack, onSave }: Props) {
         </span>
       </div>
 
-      <h2 className="text-xl font-black mb-6" style={{ color: C.indigo, fontFamily: "'Nunito', sans-serif" }}>Chỉnh sửa voucher</h2>
+      <h2 className="text-xl font-black mb-2" style={{ color: C.indigo, fontFamily: "'Nunito', sans-serif" }}>Chỉnh sửa voucher</h2>
+
+      {lockedFields.length > 0 && !isFullyLocked && (
+        <div className="flex items-center gap-2 mb-4 px-4 py-2.5 rounded-xl text-xs font-semibold"
+          style={{ backgroundColor: "#FFF3CD", color: "#856404" }}>
+          <Lock className="w-3.5 h-3.5" />
+          <span>
+            Một số field bị khóa ở trạng thái <strong>{STATUS_LABEL[voucher.status]}</strong>: {lockedFields.join(", ").replace(/_/g, " ")}
+          </span>
+        </div>
+      )}
+      {isFullyLocked && (
+        <div className="flex items-center gap-2 mb-4 px-4 py-2.5 rounded-xl text-xs font-semibold"
+          style={{ backgroundColor: "#FCEAEA", color: "#C0392B" }}>
+          <Lock className="w-3.5 h-3.5" />
+          <span>Voucher ở trạng thái <strong>{STATUS_LABEL[voucher.status]}</strong> — không thể chỉnh sửa.</span>
+        </div>
+      )}
+
+      {apiError && (
+        <div className="flex items-center gap-2 mb-4 px-4 py-2.5 rounded-xl text-xs font-semibold"
+          style={{ backgroundColor: "#FCEAEA", color: "#C0392B" }}>
+          <span>⚠️</span><span>{apiError}</span>
+        </div>
+      )}
 
       <div className="space-y-5">
         {/* Basic info */}
         <div className="bg-white rounded-2xl p-6 border border-black/5">
           <h3 className="font-bold text-sm mb-4" style={{ color: C.indigo }}>Thông tin cơ bản</h3>
           <div className="space-y-4">
-            <Field label="Tên voucher *" error={errors.title}>
-              <input className={inputCls(errors.title)} value={form.title} onChange={(e) => up("title", e.target.value)} placeholder="VD: Giảm 30% pizza size L" />
+            <Field label="Tên voucher *" error={errors.title} locked={isLocked("title")}>
+              <input className={inputCls(errors.title)} value={form.title} onChange={(e) => up("title", e.target.value)} placeholder="VD: Giảm 30% pizza size L" disabled={isLocked("title")} />
             </Field>
-            <Field label="Danh mục">
-              <select className={inputCls()} value={form.category} onChange={(e) => up("category", e.target.value)}>
+            <Field label="Danh mục" locked={isLocked("category")}>
+              <select className={inputCls()} value={form.category} onChange={(e) => up("category", e.target.value)} disabled={isLocked("category")}>
                 {CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
               </select>
             </Field>
@@ -182,17 +262,17 @@ export function EditVoucherPage({ voucher, onBack, onSave }: Props) {
             <Field label={form.discountType === "percent" ? "Phần trăm giảm *" : "Số tiền giảm *"} error={errors.discount}>
               <input type="number" className={inputCls(errors.discount)} value={form.discount} onChange={(e) => up("discount", e.target.value)} placeholder={form.discountType === "percent" ? "30" : "50000"} />
             </Field>
-            <Field label="Giá bán (đ) *" error={errors.price}>
-              <input type="number" className={inputCls(errors.price)} value={form.price} onChange={(e) => up("price", e.target.value)} placeholder="49000" />
+            <Field label="Giá bán (đ) *" error={errors.price} locked={isLocked("price")}>
+              <input type="number" className={inputCls(errors.price)} value={form.price} onChange={(e) => up("price", e.target.value)} placeholder="49000" disabled={isLocked("price")} />
             </Field>
-            <Field label="Giá gốc (đ)">
-              <input type="number" className={inputCls()} value={form.originalPrice} onChange={(e) => up("originalPrice", e.target.value)} placeholder="70000" />
+            <Field label="Giá gốc (đ)" locked={isLocked("originalPrice")}>
+              <input type="number" className={inputCls()} value={form.originalPrice} onChange={(e) => up("originalPrice", e.target.value)} placeholder="70000" disabled={isLocked("originalPrice")} />
             </Field>
             <Field label="Đơn hàng tối thiểu (đ)">
               <input type="number" className={inputCls()} value={form.minOrder} onChange={(e) => up("minOrder", e.target.value)} placeholder="0" />
             </Field>
-            <Field label="Số lượng *" error={errors.quantity}>
-              <input type="number" className={inputCls(errors.quantity)} value={form.quantity} onChange={(e) => up("quantity", e.target.value)} placeholder="100" />
+            <Field label="Số lượng *" error={errors.quantity} locked={isLocked("quantity")}>
+              <input type="number" className={inputCls(errors.quantity)} value={form.quantity} onChange={(e) => up("quantity", e.target.value)} placeholder="100" disabled={isLocked("quantity")} />
             </Field>
           </div>
         </div>
@@ -218,35 +298,39 @@ export function EditVoucherPage({ voucher, onBack, onSave }: Props) {
             <>
               <button
                 onClick={handleSave}
-                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm border-2"
+                disabled={saving || isFullyLocked}
+                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm border-2 disabled:opacity-50"
                 style={{ borderColor: C.apricot, color: "#856404", backgroundColor: C.apricot + "20" }}
               >
-                <Save className="w-4 h-4" /> Lưu nháp
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Lưu nháp
               </button>
               <button
                 onClick={handleSubmitForReview}
-                className="flex-1 py-3 rounded-2xl font-bold text-sm text-white"
+                disabled={saving || isFullyLocked}
+                className="flex-1 py-3 rounded-2xl font-bold text-sm text-white disabled:opacity-50"
                 style={{ backgroundColor: C.peach }}
               >
-                🚀 Gửi duyệt
+                {saving ? "Đang gửi..." : "🚀 Gửi duyệt"}
               </button>
             </>
           ) : (
             <>
               <button
                 onClick={handleSave}
-                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm text-white"
+                disabled={saving || isFullyLocked}
+                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm text-white disabled:opacity-50"
                 style={{ backgroundColor: C.peach }}
               >
-                <Save className="w-4 h-4" /> Lưu thay đổi
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Lưu thay đổi
               </button>
               {voucher.status === "rejected" && (
                 <button
                   onClick={handleSubmitForReview}
-                  className="flex-1 py-3 rounded-2xl font-bold text-sm text-white"
+                  disabled={saving || isFullyLocked}
+                  className="flex-1 py-3 rounded-2xl font-bold text-sm text-white disabled:opacity-50"
                   style={{ backgroundColor: C.teal }}
                 >
-                  🚀 Gửi duyệt lại
+                  {saving ? "Đang gửi..." : "🚀 Gửi duyệt lại"}
                 </button>
               )}
             </>
@@ -257,12 +341,16 @@ export function EditVoucherPage({ voucher, onBack, onSave }: Props) {
   )
 }
 
-function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
+function Field({ label, error, locked, children }: { label: string; error?: string; locked?: boolean; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-sm font-bold mb-1.5" style={{ color: "#3D405B" }}>{label}</label>
+      <label className="flex items-center gap-1.5 text-sm font-bold mb-1.5" style={{ color: "#3D405B" }}>
+        {label}
+        {locked && <Lock className="w-3 h-3" style={{ color: "#C0392B" }} />}
+      </label>
       {children}
       {error && <p className="text-xs mt-1" style={{ color: "#EF4444" }}>{error}</p>}
+      {locked && !error && <p className="text-xs mt-1" style={{ color: "#C0392B" }}>Field bị khóa ở trạng thái hiện tại</p>}
     </div>
   )
 }

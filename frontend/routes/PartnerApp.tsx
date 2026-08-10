@@ -53,6 +53,7 @@ export function PartnerApp({ user, onLogout }: Props) {
           onDetail={goDetail}
           sessionDrafts={sessionDrafts}
           onEditDraft={handleEditDraft}
+          partnerId={user.partnerId}
         />
       )}
       {page === "create" && (

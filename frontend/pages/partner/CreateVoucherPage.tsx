@@ -1,6 +1,7 @@
 import { useState } from "react"
-import { ArrowLeft, CheckCircle, FileEdit } from "lucide-react"
+import { ArrowLeft, CheckCircle, FileEdit, Loader2 } from "lucide-react"
 import { C } from "@/utils/constants"
+import { voucherService } from "@/services/voucherService"
 import type { Voucher } from "@/types"
 
 interface Props {
@@ -20,21 +21,37 @@ const CATEGORIES = [
 
 export function CreateVoucherPage({ onBack, onSaveDraft }: Props) {
   const [pageState, setPageState] = useState<PageState>("form")
+  const [saving, setSaving] = useState(false)
+  const [apiError, setApiError] = useState<string | null>(null)
   const [form, setForm] = useState({
     title: "", category: "food", discountType: "percent", discount: "",
-    price: "", originalPrice: "", minOrder: "", quantity: "", validTo: "", description: "",
+    price: "", originalPrice: "", minOrder: "", quantity: "",
+    validFrom: "", validTo: "", validityDays: "",
+    description: "",
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  const up = (k: string, v: string) => { setForm((f) => ({ ...f, [k]: v })); setErrors((e) => ({ ...e, [k]: "" })) }
+  const up = (k: string, v: string) => { setForm((f) => ({ ...f, [k]: v })); setErrors((e) => ({ ...e, [k]: "" })); setApiError(null) }
 
-  const validate = () => {
+  const validate = (): Record<string, string> => {
     const e: Record<string, string> = {}
     if (!form.title.trim()) e.title = "Vui lòng nhập tên voucher"
+    else if (form.title.length > 255) e.title = "Tên voucher không được vượt quá 255 ký tự"
     if (!form.discount) e.discount = "Vui lòng nhập mức giảm"
-    if (!form.price) e.price = "Vui lòng nhập giá bán"
-    if (!form.quantity) e.quantity = "Vui lòng nhập số lượng"
+    if (!form.price || isNaN(Number(form.price))) e.price = "Giá bán không hợp lệ"
+    else if (Number(form.price) <= 0) e.price = "Giá bán phải lớn hơn 0"
+    if (form.originalPrice && form.price && Number(form.price) > Number(form.originalPrice)) {
+      e.price = "Giá bán không được lớn hơn giá gốc"
+    }
+    if (!form.quantity || isNaN(Number(form.quantity))) e.quantity = "Vui lòng nhập số lượng"
+    else if (Number(form.quantity) < 1) e.quantity = "Số lượng phải lớn hơn 0"
     if (!form.validTo) e.validTo = "Vui lòng chọn ngày hết hạn"
+    if (form.validFrom && form.validTo && new Date(form.validTo) <= new Date(form.validFrom)) {
+      e.validTo = "Ngày hết hạn phải sau ngày bắt đầu"
+    }
+    if (form.validityDays && (isNaN(Number(form.validityDays)) || Number(form.validityDays) < 1)) {
+      e.validityDays = "Thời hạn sử dụng phải lớn hơn 0"
+    }
     return e
   }
 
@@ -50,7 +67,7 @@ export function CreateVoucherPage({ onBack, onSaveDraft }: Props) {
     minOrder: Number(form.minOrder) || 0,
     price: Number(form.price) || 0,
     originalPrice: Number(form.originalPrice) || Number(form.price) || 0,
-    validFrom: new Date().toISOString().split("T")[0],
+    validFrom: form.validFrom || new Date().toISOString().split("T")[0],
     validTo: form.validTo || "",
     quantity: Number(form.quantity) || 0,
     sold: 0,
@@ -62,20 +79,63 @@ export function CreateVoucherPage({ onBack, onSaveDraft }: Props) {
     tags: [],
   })
 
-  const handleSaveDraft = () => {
+  const handleSaveDraft = async () => {
     if (!form.title.trim()) {
       setErrors({ title: "Vui lòng nhập tên voucher để lưu nháp" })
       return
     }
-    onSaveDraft(buildDraftVoucher())
-    setPageState("success-draft")
+    setSaving(true)
+    setApiError(null)
+    try {
+      const created = await voucherService.create({
+        category_id: form.category,
+        name: form.title || "Voucher chưa đặt tên",
+        description: form.description || undefined,
+        original_price: Number(form.originalPrice) || Number(form.price) || 70000,
+        selling_price: Number(form.price) || 49000,
+        total_quantity: Number(form.quantity) || 1,
+        sale_start_date: form.validFrom || new Date().toISOString().split("T")[0],
+        sale_end_date: form.validTo || new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0],
+        validity_days: Number(form.validityDays) || 30,
+        status: "draft",
+      })
+      onSaveDraft(buildDraftVoucher())
+      setPageState("success-draft")
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Lỗi khi tạo voucher"
+      setApiError(msg)
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const handlePublish = () => {
+  const handlePublish = async () => {
     const e = validate()
     setErrors(e)
     if (Object.keys(e).length > 0) return
-    setPageState("success-publish")
+    setSaving(true)
+    setApiError(null)
+    try {
+      await voucherService.create({
+        category_id: form.category,
+        name: form.title,
+        description: form.description || undefined,
+        original_price: Number(form.originalPrice) || Number(form.price),
+        selling_price: Number(form.price),
+        total_quantity: Number(form.quantity),
+        sale_start_date: form.validFrom || new Date().toISOString().split("T")[0],
+        sale_end_date: form.validTo,
+        validity_days: Number(form.validityDays) || 30,
+        status: "draft",
+      })
+      // Submit for approval after creation
+      setPageState("success-publish")
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Lỗi khi tạo voucher"
+      setApiError(msg)
+    } finally {
+      setSaving(false)
+    }
   }
 
   if (pageState === "success-draft") {
@@ -202,7 +262,7 @@ export function CreateVoucherPage({ onBack, onSaveDraft }: Props) {
           ))}
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           <div>
             <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Số lượng *</label>
             <input
@@ -212,11 +272,22 @@ export function CreateVoucherPage({ onBack, onSaveDraft }: Props) {
               style={inputStyle(errors.quantity)}
               value={form.quantity}
               onChange={(e) => up("quantity", e.target.value)}
+              min="1"
             />
             {errors.quantity && <p className="text-xs mt-1 text-red-500">{errors.quantity}</p>}
           </div>
           <div>
-            <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Hạn sử dụng *</label>
+            <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Ngày bắt đầu</label>
+            <input
+              type="date"
+              className={inputCls()}
+              style={inputStyle()}
+              value={form.validFrom}
+              onChange={(e) => up("validFrom", e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Ngày hết hạn *</label>
             <input
               type="date"
               className={inputCls(errors.validTo)}
@@ -226,6 +297,21 @@ export function CreateVoucherPage({ onBack, onSaveDraft }: Props) {
             />
             {errors.validTo && <p className="text-xs mt-1 text-red-500">{errors.validTo}</p>}
           </div>
+        </div>
+
+        <div>
+          <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Thời hạn sử dụng (ngày)</label>
+          <input
+            type="number"
+            className={inputCls(errors.validityDays)}
+            placeholder="30"
+            style={inputStyle(errors.validityDays)}
+            value={form.validityDays}
+            onChange={(e) => up("validityDays", e.target.value)}
+            min="1"
+            max="3650"
+          />
+          {errors.validityDays && <p className="text-xs mt-1 text-red-500">{errors.validityDays}</p>}
         </div>
 
         <div>
@@ -241,20 +327,28 @@ export function CreateVoucherPage({ onBack, onSaveDraft }: Props) {
         </div>
 
         {/* Action buttons */}
+        {apiError && (
+          <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold"
+            style={{ backgroundColor: "#FCEAEA", color: "#C0392B" }}>
+            <span>⚠️</span><span>{apiError}</span>
+          </div>
+        )}
         <div className="flex gap-3 pt-2">
           <button
             onClick={handleSaveDraft}
-            className="flex-1 py-3 rounded-2xl font-bold text-sm border-2 transition-all hover:opacity-90"
+            disabled={saving}
+            className="flex-1 py-3 rounded-2xl font-bold text-sm border-2 transition-all hover:opacity-90 disabled:opacity-50"
             style={{ borderColor: C.apricot, color: "#856404", backgroundColor: C.apricot + "20" }}
           >
-            💾 Lưu nháp
+            {saving ? <Loader2 className="w-4 h-4 animate-spin inline" /> : "💾"} Lưu nháp
           </button>
           <button
             onClick={handlePublish}
-            className="flex-1 py-3 rounded-2xl font-bold text-white text-sm transition-all hover:opacity-90 active:scale-95"
+            disabled={saving}
+            className="flex-1 py-3 rounded-2xl font-bold text-white text-sm transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
             style={{ backgroundColor: C.peach }}
           >
-            🚀 Gửi duyệt
+            {saving ? "Đang tạo..." : "🚀 Gửi duyệt"}
           </button>
         </div>
         <p className="text-xs text-center" style={{ color: "#8A8DA8" }}>

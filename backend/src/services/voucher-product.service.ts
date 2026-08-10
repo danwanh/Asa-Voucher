@@ -29,6 +29,42 @@ function assertVoucherOwnerOrAdmin(user: CurrentUser | undefined, voucher: Recor
   }
 }
 
+/**
+ * Returns the list of fields that cannot be edited for a given voucher status.
+ * Used by updateVoucherProduct to enforce field-locking business rules.
+ *
+ * BR-PAV-03 / BR-PAR-04: Partner may only edit fields permitted for the current status.
+ * RB-11: total_quantity/remaining_quantity must not be altered after approval.
+ */
+const LOCKED_FIELDS_BY_STATUS: Record<string, string[]> = {
+  draft: [],
+  pending: [],
+  approved: ["total_quantity", "remaining_quantity"],
+  active: ["total_quantity", "remaining_quantity", "original_price", "selling_price"],
+  sold_out: ["total_quantity", "remaining_quantity", "original_price", "selling_price", "name", "category_id"],
+  expired: ["*"],
+};
+
+function getLockedFields(status: string): string[] {
+  return LOCKED_FIELDS_BY_STATUS[status] ?? ["*"];
+}
+
+function assertFieldsNotLocked(status: string, inputKeys: string[]) {
+  const locked = getLockedFields(status);
+  if (locked.includes("*")) {
+    throw new HttpError(403, `Cannot edit voucher in "${status}" status`, "STATUS_LOCKED");
+  }
+  const blocked = inputKeys.filter((k) => locked.includes(k));
+  if (blocked.length > 0) {
+    throw new HttpError(
+      403,
+      `Field(s) not editable in "${status}" status: ${blocked.join(", ")}`,
+      "FIELD_LOCKED",
+      { locked_fields: blocked }
+    );
+  }
+}
+
 export async function listVoucherProducts(queryInput: Record<string, string | number>) {
   const { page, limit, category_id: categoryId, partner_id: partnerId, search } = queryInput;
   const { from, to } = rangeFromPagination(Number(page), Number(limit));
@@ -87,9 +123,32 @@ export async function getVoucherProduct(user: CurrentUser | undefined, id: strin
 export async function updateVoucherProduct(user: CurrentUser, id: string, input: Record<string, unknown>) {
   const voucher = await getVoucher(id);
   assertVoucherOwnerOrAdmin(user, voucher, false);
+
+  // Field locking: reject edits to locked fields based on current status
+  const inputKeys = Object.keys(input).filter((k) => input[k] !== undefined);
+  assertFieldsNotLocked(String(voucher.status), inputKeys);
+
+  // RB-02: selling price must not exceed original price
   if (input.selling_price && Number(input.selling_price) > Number(input.original_price ?? voucher.original_price)) {
     throw new HttpError(400, "Selling price must not exceed original price", "INVALID_PRICE");
   }
+
+  // RB-11: remaining_quantity must track with total_quantity changes
+  if (input.total_quantity !== undefined) {
+    const newTotal = Number(input.total_quantity);
+    const currentSold = Number(voucher.total_quantity) - Number(voucher.remaining_quantity);
+    if (newTotal < currentSold) {
+      throw new HttpError(
+        400,
+        `Total quantity (${newTotal}) cannot be less than already sold quantity (${currentSold})`,
+        "INVALID_QUANTITY",
+        { sold: currentSold, requested: newTotal }
+      );
+    }
+    // Auto-update remaining_quantity to maintain sold count
+    (input as Record<string, unknown>).remaining_quantity = newTotal - currentSold;
+  }
+
   const originalPrice = Number(input.original_price ?? voucher.original_price);
   const sellingPrice = Number(input.selling_price ?? voucher.selling_price);
   const payload = { ...input, discount_rate: calcDiscount(originalPrice, sellingPrice), updated_at: new Date() };
@@ -182,6 +241,19 @@ export async function listVoucherBranches(id: string) {
 export async function createVoucherBranch(user: CurrentUser, id: string, branchId: string) {
   const voucher = await getVoucher(id);
   assertVoucherOwnerOrAdmin(user, voucher, false);
+
+  // Verify branch belongs to the same partner as the voucher
+  const branch = await prisma.partnerBranch.findUnique({ where: { id: branchId }, select: { partner_id: true, is_active: true } });
+  if (!branch) {
+    throw new HttpError(404, "Branch not found", "BRANCH_NOT_FOUND");
+  }
+  if (branch.partner_id !== voucher.partner_id) {
+    throw new HttpError(403, "Branch does not belong to this partner's organization", "BRANCH_PARTNER_MISMATCH");
+  }
+  if (!branch.is_active) {
+    throw new HttpError(400, "Cannot assign an inactive branch", "BRANCH_INACTIVE");
+  }
+
   try {
     return await prisma.voucherProductBranch.create({ data: { voucher_product_id: id, branch_id: branchId } });
   } catch (error) {

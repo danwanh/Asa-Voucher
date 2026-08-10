@@ -147,7 +147,7 @@ export function VoucherStaffApp({ user, onLogout }: Props) {
           {page === "vouchers" && (
             <PartnerVouchersPage onCreateNew={() => setPage("create")} onEdit={goEdit} onDetail={goDetail} />
           )}
-          {page === "create" && <CreateVoucherPage onBack={() => setPage("vouchers")} />}
+          {page === "create" && <CreateVoucherPage onBack={() => setPage("vouchers")} onSaveDraft={() => setPage("vouchers")} />}
           {page === "edit" && selectedVoucher && (
             <EditVoucherPage voucher={selectedVoucher} onBack={() => setPage("vouchers")} onSave={(v) => setSelectedVoucher(v)} />
           )}
