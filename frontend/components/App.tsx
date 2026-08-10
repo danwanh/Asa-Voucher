@@ -42,7 +42,7 @@ export default function App({ initialPage, initialOrderId, initialStaffCode, ini
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
   const {
-    cart, add, remove, update, clear, removeMany, total, count, isLoading: cartLoading,
+    cart, add, remove, update, clear, removeMany, total, count, cartCount, cartCountLoading, isLoading: cartLoading,
     checkoutSelectionIds, checkoutItems, setCheckoutSelection, clearCheckoutSelection,
   } = useCartContext()
 
@@ -110,7 +110,8 @@ export default function App({ initialPage, initialOrderId, initialStaffCode, ini
       onRegister={handleRequestRegister}
       onCheckout={handleCheckoutAsGuest}
       cartAdd={add}
-      cartCount={count}
+       cartCount={cartCount}
+       cartCountLoading={cartCountLoading}
       cart={cart}
       total={total}
       cartRemove={remove}
@@ -132,11 +133,12 @@ export default function App({ initialPage, initialOrderId, initialStaffCode, ini
       onLogout={handleLogout}
       cart={cart}
       total={total}
-      count={count}
+       count={count}
+       cartCount={cartCount}
+       cartCountLoading={cartCountLoading}
       add={add}
       remove={remove}
       update={update}
-      clear={clear}
        removeMany={removeMany}
        cartLoading={cartLoading}
        checkoutSelectionIds={checkoutSelectionIds}

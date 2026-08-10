@@ -14,7 +14,8 @@ interface Props {
   // Called when guest clicks "Tiến hành đặt hàng" — triggers login then redirects to create-order
   onCheckout: (items?: CartItem[]) => void
   cartAdd: (v: Voucher) => void
-  cartCount: number
+  cartCount: number | null
+  cartCountLoading?: boolean
   cart: CartItem[]
   total: number
   cartRemove: (id: string) => void
@@ -32,7 +33,8 @@ interface FullProps {
   onRegister: () => void
   onCheckout: (items?: CartItem[]) => void
   cartAdd: (v: Voucher) => void
-  cartCount: number
+  cartCount: number | null
+  cartCountLoading?: boolean
   cart: CartItem[]
   total: number
   cartRemove: (id: string) => void
@@ -40,7 +42,7 @@ interface FullProps {
   initialPage?: GuestPage
 }
 
-export function GuestApp({ onLogin, onRegister, onCheckout, cartAdd, cartCount, cart, total, cartRemove, cartUpdate, initialPage }: FullProps) {
+export function GuestApp({ onLogin, onRegister, onCheckout, cartAdd, cartCount, cartCountLoading = false, cart, total, cartRemove, cartUpdate, initialPage }: FullProps) {
   const [page, setPage] = useState<GuestPage>(initialPage ?? "home")
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null)
 
@@ -66,6 +68,7 @@ export function GuestApp({ onLogin, onRegister, onCheckout, cartAdd, cartCount, 
       onLogin={onLogin}
        onRegister={onRegister}
       cartCount={cartCount}
+      cartCountLoading={cartCountLoading}
     >
       {page === "home" && (
         <GuestHomePage

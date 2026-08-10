@@ -371,6 +371,11 @@ export async function createPayment(user: CurrentUser, orderId: string, method?:
   }
 }
 
+export async function getCartCount(userId: string) {
+  const cart = await getOrCreateCart(userId);
+  return prisma.cartItem.count({ where: { cart_id: cart.id as string } });
+}
+
 function errorForLog(error: unknown) {
   if (error instanceof HttpError) return { name: error.name, message: error.message, code: error.code, details: error.details, stack: error.stack };
   if (error instanceof Error) return { name: error.name, message: error.message, stack: error.stack };

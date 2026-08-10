@@ -13,7 +13,8 @@ export type CustomerPage =
 interface Props {
   user: AppUser
   page: CustomerPage
-  cartCount: number
+  cartCount: number | null
+  cartCountLoading?: boolean
   notifCount?: number
   voucherSearch: string
   onVoucherSearchChange: (value: string) => void
@@ -43,6 +44,7 @@ export function CustomerLayout({
   user,
   page,
   cartCount,
+  cartCountLoading = false,
   notifCount = 0,
   voucherSearch,
   onVoucherSearchChange,
@@ -109,11 +111,13 @@ export function CustomerLayout({
             {/* Cart */}
             <button onClick={() => router.push("/cart")} className="relative p-2 rounded-xl hover:bg-white/10">
               <ShoppingCart className="w-5 h-5 text-white" />
-              {cartCount > 0 && (
+              {cartCountLoading ? (
+                <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full animate-pulse" style={{ backgroundColor: "rgba(244,241,222,0.45)" }} aria-label="Đang tải số lượng giỏ hàng" />
+              ) : cartCount !== null && cartCount > 0 ? (
                 <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center" style={{ backgroundColor: C.peach, color: "white" }}>
                   {cartCount}
                 </span>
-              )}
+              ) : null}
             </button>
 
             {/* Logout — visible in header */}
@@ -164,7 +168,7 @@ export function CustomerLayout({
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around h-16 border-t" style={{ backgroundColor: "white", borderColor: "#E2DFC8" }}>
         {MOBILE_NAV.map((n) => {
           const isActive = page === n.pg || (n.pg === "vouchers" && page === "detail")
-          const showBadge = n.pg === "cart" && cartCount > 0
+          const showBadge = n.pg === "cart" && cartCount !== null && cartCount > 0
           const showNotifBadge = n.pg === "notifications" && notifCount > 0
           return (
             <button
@@ -175,7 +179,9 @@ export function CustomerLayout({
             >
               <div className="relative">
                 {n.icon}
-                {(showBadge || showNotifBadge) && (
+                {cartCountLoading && n.pg === "cart" ? (
+                  <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full animate-pulse" style={{ backgroundColor: "#D6D2B8" }} aria-label="Đang tải số lượng giỏ hàng" />
+                ) : (showBadge || showNotifBadge) && (
                   <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full text-xs font-bold flex items-center justify-center" style={{ backgroundColor: C.peach, color: "white", fontSize: "10px" }}>
                     {showBadge ? cartCount : notifCount}
                   </span>

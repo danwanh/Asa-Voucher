@@ -28,10 +28,11 @@ interface Props {
   cart: CartItem[]
   total: number
   count: number
+  cartCount: number | null
+  cartCountLoading: boolean
   add: (v: Voucher) => void
   remove: (id: string) => void
   update: (id: string, qty: number) => void
-  clear: () => void
   removeMany: (cartItemIds: string[]) => void
   cartLoading: boolean
   checkoutSelectionIds: string[] | null
@@ -71,7 +72,7 @@ const DEFAULT_VOUCHER_FILTERS: VoucherListFilters = {
 
 export function CustomerApp({
   user, onLogout,
-  cart, total, count, add, remove, update, clear, removeMany, cartLoading,
+  cart, total, count, cartCount, cartCountLoading, add, remove, update, removeMany, cartLoading,
   checkoutSelectionIds, checkoutItems, setCheckoutSelection, clearCheckoutSelection,
   initialPage, onInitialPageConsumed,
   initialOrderId,
@@ -87,6 +88,7 @@ export function CustomerApp({
   const [lastQrPayload, setLastQrPayload] = useState("")
   const [pendingOrder, setPendingOrder] = useState<PendingOrder | null>(null)
   const [pendingOrderLoading, setPendingOrderLoading] = useState(Boolean(initialOrderId && initialPage === "payment"))
+  const [isRedirectingToPayment, setIsRedirectingToPayment] = useState(false)
   const [voucherSearch, setVoucherSearch] = useState("")
   const [voucherFilters, setVoucherFilters] = useState<VoucherListFilters>(DEFAULT_VOUCHER_FILTERS)
 
@@ -154,6 +156,7 @@ export function CustomerApp({
   const selectedTotal = selectedCart.reduce((sum, item) => sum + item.voucher.price * item.qty, 0)
 
   const handleCreateOrder = async (info: RecipientInfo) => {
+    setIsRedirectingToPayment(true)
     try {
       const order = await orderService.createFromCart({
         cartItemIds: checkoutCartItemIds,
@@ -167,6 +170,7 @@ export function CustomerApp({
       setPendingOrder({ id: order.id, recipient: info })
       router.push(`/checkout/payment/${order.id}`)
     } catch (error) {
+      setIsRedirectingToPayment(false)
       const apiError = error as { response?: { data?: { code?: string } } }
       toast.error(apiError.response?.data?.code === "PRICE_CHANGED"
         ? "Giá voucher đã thay đổi. Vui lòng kiểm tra lại giỏ hàng."
@@ -185,7 +189,6 @@ export function CustomerApp({
     } catch {
       setLastCode(pendingOrder.id)
     }
-    clear()
     setPendingOrder(null)
     navigate("success")
   }
@@ -218,7 +221,8 @@ export function CustomerApp({
     <CustomerLayout
       user={user}
       page={page}
-      cartCount={count}
+      cartCount={cartCount}
+      cartCountLoading={cartCountLoading}
       voucherSearch={voucherSearch}
       onVoucherSearchChange={handleVoucherSearchChange}
       onVoucherSearchFocus={handleVoucherSearchFocus}
@@ -269,7 +273,7 @@ export function CustomerApp({
           userEmail={user.email}
           onCreateOrder={handleCreateOrder}
           onBack={() => navigate("cart")}
-           loading={cartLoading}
+           loading={cartLoading || isRedirectingToPayment}
          />
        )}
        {page === "payment" && pendingOrderLoading && (
