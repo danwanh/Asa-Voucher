@@ -75,6 +75,7 @@ export function mapOrder(value: BackendRecord): Order {
   return {
     id: String(value.id),
     userId: String(value.user_id),
+    orderCode: String(value.order_code ?? value.code ?? value.id),
     voucherId: first?.voucherId ?? "",
     voucherTitle: first?.voucherTitle ?? "Đơn hàng voucher",
     partnerName: first?.partnerName ?? "",
@@ -82,6 +83,7 @@ export function mapOrder(value: BackendRecord): Order {
     status: value.status,
     paymentMethod: String(value.payment_method ?? ""),
     createdAt: value.created_at,
+    updatedAt: value.updated_at,
     code: issued[0]?.code ?? String(value.order_code ?? value.id),
     qrPayload: issued[0]?.qrPayload,
     paymentStatus: value.payment_status,

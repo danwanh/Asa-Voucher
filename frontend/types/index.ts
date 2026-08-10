@@ -143,6 +143,7 @@ export interface StaffMember {
 export interface Order {
   id: string
   userId: string
+  orderCode?: string
   voucherId: string
   voucherTitle: string
   partnerName: string
@@ -150,6 +151,7 @@ export interface Order {
   status: OrderStatus
   paymentMethod: string
   createdAt: string
+  updatedAt?: string
   code: string
   qrPayload?: string
   paymentStatus?: "pending" | "paid" | "failed" | "refunded"
