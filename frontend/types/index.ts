@@ -155,6 +155,7 @@ export interface Order {
   paymentStatus?: "pending" | "paid" | "failed" | "refunded"
   recipientId?: string
   isGift?: boolean
+  giverName?: string
   paymentExpiresAt?: string
   items?: OrderItem[]
 }

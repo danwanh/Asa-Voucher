@@ -55,6 +55,7 @@ export function mapOrder(value: BackendRecord): Order {
     paymentStatus: value.payment_status,
     recipientId: value.recipient_id,
     isGift: Boolean(value.is_gift),
+    giverName: value.users?.full_name,
     paymentExpiresAt: value.payment_expires_at,
     items,
   }

@@ -85,6 +85,7 @@ export function CustomerApp({
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [reviewOrder, setReviewOrder] = useState<Order | null>(null)
   const [reviewExisting, setReviewExisting] = useState<{ rating: number; content: string } | undefined>()
+  const [reviewReturnPage, setReviewReturnPage] = useState<CustomerPage>("orders")
   const [lastCode, setLastCode] = useState("")
   const [lastQrPayload, setLastQrPayload] = useState("")
   const [pendingOrder, setPendingOrder] = useState<PendingOrder | null>(null)
@@ -146,9 +147,10 @@ export function CustomerApp({
     router.push(`/orders/${o.id}`)
   }
 
-  const goReview = (o: Order, existing?: { rating: number; content: string }) => {
+  const goReview = (o: Order, existing?: { rating: number; content: string }, returnPage: CustomerPage = "orders") => {
     setReviewOrder(o)
     setReviewExisting(existing)
+    setReviewReturnPage(returnPage)
     navigate("review")
   }
 
@@ -312,7 +314,13 @@ export function CustomerApp({
         </div>
       )}
        {page === "success" && <CheckoutSuccessPage code={lastCode} qrPayload={lastQrPayload} onDone={() => router.push("/my-vouchers")} />}
-       {page === "my-vouchers" && <MyVouchersPage orders={myOrders} ownerId={user.id} />}
+       {page === "my-vouchers" && (
+         <MyVouchersPage
+           orders={myOrders}
+           ownerId={user.id}
+           onReview={(order) => goReview(order, undefined, "my-vouchers")}
+         />
+       )}
       {page === "orders" && (
         <OrderHistoryPage
           orders={myOrders}
@@ -329,8 +337,8 @@ export function CustomerApp({
         <ReviewPage
           order={reviewOrder}
           existingReview={reviewExisting}
-          onBack={() => navigate("order-detail")}
-          onSubmit={() => navigate("orders")}
+           onBack={() => navigate(reviewReturnPage)}
+           onSubmit={() => navigate(reviewReturnPage)}
         />
       )}
       {page === "profile" && <ProfilePage user={user} onLogout={onLogout} />}

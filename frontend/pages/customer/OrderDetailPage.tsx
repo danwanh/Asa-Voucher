@@ -137,7 +137,7 @@ export function OrderDetailPage({ order, onBack, onReview, onPayAgain }: Props) 
             <CreditCard className="w-4 h-4" /> Thanh toán lại
           </button>
         )}
-        {(order.status === "confirmed" || order.status === "completed") && (
+        {(order.status === "confirmed" || order.status === "completed" || order.status === "used") && (
           <button
             onClick={() => onReview(order)}
             className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm border-2"

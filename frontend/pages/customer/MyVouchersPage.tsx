@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Search, QrCode, ExternalLink } from "lucide-react"
+import { Search, QrCode, Gift, Star } from "lucide-react"
 import { C, fmt, fmtDate } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import { StatusBadge } from "@/components/StatusBadge"
@@ -9,6 +9,7 @@ import type { Order } from "@/types"
 interface Props {
   orders: Order[]
   ownerId?: string
+  onReview?: (order: Order) => void
 }
 
 const TABS = [
@@ -17,7 +18,7 @@ const TABS = [
   { label: "Hết hạn", value: "expired", statuses: ["cancelled"] },
 ]
 
-export function MyVouchersPage({ orders, ownerId }: Props) {
+export function MyVouchersPage({ orders, ownerId, onReview }: Props) {
   const ownedOrders = ownerId ? orders.filter((order) => order.recipientId === ownerId) : orders
   const [tab, setTab] = useState("active")
   const [search, setSearch] = useState("")
@@ -34,7 +35,14 @@ export function MyVouchersPage({ orders, ownerId }: Props) {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-black mb-6" style={{ color: C.indigo }}>Voucher của tôi</h1>
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
+        <div>
+          <h1 className="text-2xl font-black" style={{ color: C.indigo }}>
+            Voucher của tôi
+          </h1>
+          <p className="text-sm mt-1" style={{ color: "#8A8DA8" }}>Voucher bạn tự mua và voucher được tặng</p>
+        </div>
+      </div>
 
       {/* Tabs */}
       <div className="flex gap-1 mb-4 overflow-x-auto pb-1">
@@ -81,7 +89,7 @@ export function MyVouchersPage({ orders, ownerId }: Props) {
             {search ? "Không tìm thấy voucher" : `Không có voucher ${currentTab.label.toLowerCase()}`}
           </div>
           <div className="text-sm mt-2" style={{ color: "#8A8DA8" }}>
-            {!search && tab === "active" ? "Mua voucher để nhận mã ưu đãi" : "Thử tìm với từ khóa khác"}
+            {!search && tab === "active" ? "Mua voucher hoặc nhận quà để bắt đầu" : "Thử tìm với từ khóa khác"}
           </div>
         </div>
       ) : (
@@ -96,6 +104,11 @@ export function MyVouchersPage({ orders, ownerId }: Props) {
                   <StatusBadge status={o.status} />
                   <p className="font-bold text-sm mt-2 leading-snug" style={{ color: C.indigo }}>{o.voucherTitle}</p>
                   <p className="text-xs mt-1" style={{ color: "#8A8DA8" }}>{o.partnerName}</p>
+                  {o.isGift && (
+                    <span className="inline-flex items-center gap-1 mt-2 px-2 py-1 rounded-lg text-xs font-bold" style={{ backgroundColor: C.peach + "15", color: C.peach }}>
+                      <Gift className="w-3 h-3" /> Được tặng{o.giverName ? ` bởi ${o.giverName}` : ""}
+                    </span>
+                  )}
                   <div className="mt-3">
                     <code className="text-xs font-black tracking-wider px-2 py-1 rounded-lg" style={{ backgroundColor: C.eggshell, color: C.indigo, fontFamily: "'Inter', monospace" }}>
                       {o.code}
@@ -105,10 +118,22 @@ export function MyVouchersPage({ orders, ownerId }: Props) {
               </div>
               <div className="px-5 py-3 border-t flex items-center justify-between" style={{ borderColor: "#F0EDD8" }}>
                 <div className="text-xs" style={{ color: "#8A8DA8" }}>
-                  <span>Ngày mua: {fmtDate(o.createdAt)}</span>
+                  <span>{o.isGift ? "Ngày nhận" : "Ngày mua"}: {fmtDate(o.createdAt)}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="font-bold text-xs" style={{ color: C.peach }}>{fmt(o.amount)}</span>
+                  {onReview && (
+                    (o.isGift && (o.status === "confirmed" || o.status === "completed" || o.status === "used" || o.paymentStatus === "paid")) ||
+                    (!o.isGift && o.status === "used")
+                  ) && (
+                    <button
+                      onClick={() => onReview(o)}
+                      className="flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-lg"
+                      style={{ backgroundColor: C.apricot + "25", color: "#B66A00" }}
+                    >
+                      <Star className="w-3 h-3" /> Đánh giá
+                    </button>
+                  )}
                   <button
                     onClick={() => setQrOpen(o.id)}
                     className="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg"

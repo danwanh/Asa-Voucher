@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Search, Star, MessageSquare, CreditCard } from "lucide-react"
+import { Search, Star, CreditCard } from "lucide-react"
 import { C, fmt, fmtDate } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import { StatusBadge } from "@/components/StatusBadge"
@@ -194,16 +194,6 @@ export function OrderHistoryPage({ orders, pendingOrderId, onDetail, onReview, o
                     style={{ backgroundColor: C.peach }}
                   >
                     <CreditCard className="w-3 h-3" /> Thanh toán lại
-                  </button>
-                )}
-                {canReview && onReview && (
-                  <button
-                    onClick={() => onReview(o, { rating: 4, content: "Voucher chất lượng, dịch vụ tốt!" })}
-                    className="text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors"
-                    style={{ backgroundColor: C.teal + "15", color: C.teal }}
-                  >
-                    <MessageSquare className="w-3 h-3" />
-                    Sửa đánh giá
                   </button>
                 )}
               </div>
