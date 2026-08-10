@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Tag, PlusCircle, BarChart2, User, LogOut, Menu, ChevronRight } from "lucide-react"
+import { Tag, PlusCircle, User, LogOut, Menu, ChevronRight } from "lucide-react"
 import { C } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import { PartnerVouchersPage } from "@/pages/partner/PartnerVouchersPage"
@@ -22,7 +22,6 @@ interface Props {
 const NAV = [
   { label: "Quản lý Voucher",  pg: "vouchers" as Page, icon: <Tag className="w-4 h-4" /> },
   { label: "Tạo voucher mới",  pg: "create" as Page,   icon: <PlusCircle className="w-4 h-4" /> },
-  { label: "Hiệu suất của tôi", pg: "reports" as Page,  icon: <BarChart2 className="w-4 h-4" /> },
   { label: "Hồ sơ cá nhân",    pg: "profile" as Page,   icon: <User className="w-4 h-4" /> },
 ]
 
