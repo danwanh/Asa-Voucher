@@ -26,6 +26,9 @@ export const createComplaintSchema = z
   })
   .refine((data) => Boolean(data.order_id || data.issued_voucher_id), {
     message: "order_id hoặc issued_voucher_id là bắt buộc",
+  })
+  .refine((data) => !data.issued_voucher_id || Boolean(data.order_id), {
+    message: "Khiếu nại theo voucher bắt buộc phải có order_id",
   });
 export type CreateComplaintInput = z.infer<typeof createComplaintSchema>;
 

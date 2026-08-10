@@ -1,8 +1,9 @@
-import { useId } from "react"
+import { useEffect, useId, useState } from "react"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
 import { FileText, Tag, Image, Bell, CheckCircle2, XCircle, Clock } from "lucide-react"
 import { C } from "@/utils/constants"
-import { VOUCHERS } from "@/data/mock"
+import type { Voucher } from "@/types"
+import { voucherService } from "@/services/voucherService"
 
 const APPROVAL_TREND = [
   { week: "T1", approved: 12, rejected: 3 },
@@ -23,10 +24,31 @@ const CONTENT_TYPES = [
 
 export function AdminContentDashboardPage() {
   const uid = useId().replace(/:/g, "")
+  const [vouchers, setVouchers] = useState<Voucher[]>([])
 
-  const pending   = VOUCHERS.filter((v) => v.status === "pending").length
-  const approved  = VOUCHERS.filter((v) => v.status === "approved" || v.status === "selling").length
-  const rejected  = VOUCHERS.filter((v) => v.status === "rejected").length
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadVouchers() {
+      try {
+        const items = await voucherService.listPublicVouchers({ limit: 100 })
+        if (!isMounted) return
+        setVouchers(items)
+      } catch {
+        if (!isMounted) return
+        setVouchers([])
+      }
+    }
+
+    loadVouchers()
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  const pending   = vouchers.filter((v) => v.status === "pending").length
+  const approved  = vouchers.filter((v) => v.status === "active").length
+  const rejected  = vouchers.filter((v) => v.status === "rejected").length
   const allContent = CONTENT_TYPES.reduce((s, t) => s + t.value, 0)
 
   const kpis = [
@@ -113,7 +135,7 @@ export function AdminContentDashboardPage() {
           </span>
         </div>
         <div className="space-y-2">
-          {VOUCHERS.filter((v) => v.status === "pending").slice(0, 5).map((v) => (
+          {vouchers.filter((v) => v.status === "pending").slice(0, 5).map((v) => (
             <div key={v.id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/30 transition-colors" style={{ backgroundColor: "#FAFAF7" }}>
               <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0">
                 <img src={v.image} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = "https://placehold.co/40x40/E07A5F/white?text=V" }} />

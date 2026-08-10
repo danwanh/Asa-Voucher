@@ -3,13 +3,14 @@ import { z } from "zod";
 export const voucherProductQuerySchema = z.object({
   category_id: z.string().uuid().optional(),
   partner_id: z.string().uuid().optional(),
+  area: z.string().trim().min(1).optional(),
   search: z.string().trim().optional(),
+  scope: z.enum(["mine"]).optional(),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20)
 });
 
 const voucherProductBaseSchema = z.object({
-  partner_id: z.string().uuid().optional(),
   category_id: z.string().uuid(),
   name: z.string().trim().min(1, "Name is required").max(255, "Name must not exceed 255 characters"),
   description: z.string().max(2000, "Description must not exceed 2000 characters").optional(),
@@ -23,7 +24,6 @@ const voucherProductBaseSchema = z.object({
   sale_start_date: z.string(),
   sale_end_date: z.string(),
   validity_days: z.number().int().min(1, "Validity days must be at least 1").max(3650, "Validity days must not exceed 3650"),
-  status: z.enum(["draft", "active", "paused", "sold_out", "expired"]).optional()
 });
 
 export const createVoucherProductSchema = voucherProductBaseSchema
@@ -44,7 +44,6 @@ export const createVoucherProductSchema = voucherProductBaseSchema
 
 export const updateVoucherProductSchema = voucherProductBaseSchema
   .partial()
-  .omit({ partner_id: true })
   .refine(
     (data) => {
       if (!data.sale_start_date || !data.sale_end_date) return true;

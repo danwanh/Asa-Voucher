@@ -109,8 +109,8 @@ export async function validateVoucher(user: AuthUser, input: ValidateVoucherInpu
 }
 
 export async function redeemVoucher(user: AuthUser, issuedVoucherId: string, input: RedeemVoucherInput) {
-  if (!isPartnerStaff(user)) {
-    throw new HttpError(403, "Chỉ nhân viên đối tác được xác nhận sử dụng voucher");
+  if (user.role !== "partner_store_staff") {
+    throw new HttpError(403, "Chỉ nhân viên cửa hàng được xác nhận sử dụng voucher");
   }
 
   const voucher = await issuedVoucherRepo.findIssuedVoucherById(issuedVoucherId);

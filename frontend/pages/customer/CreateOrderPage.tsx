@@ -1,13 +1,12 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { ArrowLeft, ShoppingBag } from "lucide-react"
 import { C, fmt } from "@/utils/constants"
 import type { CartItem } from "@/types"
+import { orderService } from "@/services/orderService"
 
 export interface RecipientInfo {
   name: string
-  email: string
-  phone: string
-  address: string
+  identifier: string
   note: string
   forSelf: boolean
 }
@@ -15,16 +14,36 @@ export interface RecipientInfo {
 interface Props {
   cart: CartItem[]
   total: number
-  onCreateOrder: (info: RecipientInfo) => void
+  userName?: string
+  userEmail?: string
+  onCreateOrder: (info: RecipientInfo) => Promise<void>
   onBack: () => void
+  loading?: boolean
 }
 
 const FALLBACK = "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=200&h=150&fit=crop"
 
-export function CreateOrderPage({ cart, total, onCreateOrder, onBack }: Props) {
+export function CreateOrderPage({ cart, total, userName = "", userEmail = "", onCreateOrder, onBack, loading = false }: Props) {
   const [forSelf, setForSelf] = useState(true)
-  const [form, setForm] = useState({ name: "", email: "", phone: "", address: "", note: "" })
+  const [form, setForm] = useState({ name: userName, identifier: userEmail, note: "" })
+  const [lookupLoading, setLookupLoading] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    if (forSelf || form.identifier.trim().length < 3) return
+    const timer = window.setTimeout(() => {
+      setLookupLoading(true)
+      void orderService.lookupRecipient(form.identifier).then((recipient) => {
+        setForm((current) => ({ ...current, name: String(recipient.full_name ?? "") }))
+        setErrors((current) => ({ ...current, identifier: "" }))
+      }).catch(() => {
+        setForm((current) => ({ ...current, name: "" }))
+        setErrors((current) => ({ ...current, identifier: "Không tìm thấy tài khoản người nhận" }))
+      }).finally(() => setLookupLoading(false))
+    }, 400)
+    return () => window.clearTimeout(timer)
+  }, [forSelf, form.identifier])
 
   const set = (k: string, v: string) => {
     setForm((f) => ({ ...f, [k]: v }))
@@ -33,20 +52,49 @@ export function CreateOrderPage({ cart, total, onCreateOrder, onBack }: Props) {
 
   const validate = () => {
     const e: Record<string, string> = {}
-    if (!form.name.trim()) e.name = "Vui lòng nhập họ tên"
-    if (!form.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "Email không hợp lệ"
-    if (!form.phone || !/^(0[3-9]\d{8})$/.test(form.phone.replace(/\s/g, ""))) e.phone = "Số điện thoại không hợp lệ"
-    if (!forSelf && !form.address.trim()) e.address = "Vui lòng nhập địa chỉ nhận"
+    if (!form.identifier.trim()) e.identifier = "Vui lòng nhập email hoặc số điện thoại người nhận"
+    if (!forSelf && !form.name.trim()) e.identifier = "Không tìm thấy tài khoản người nhận"
     setErrors(e)
     return Object.keys(e).length === 0
   }
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!validate()) return
-    onCreateOrder({ ...form, forSelf })
+    setSubmitting(true)
+    try {
+      await onCreateOrder({ ...form, forSelf })
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const inputCls = "w-full px-4 py-2.5 rounded-xl border-2 text-sm outline-none transition-colors"
+
+  if (loading) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-8" role="status" aria-live="polite">
+        <div className="h-5 w-40 rounded-lg bg-gray-200 animate-pulse mb-6" />
+        <div className="grid md:grid-cols-3 gap-6">
+          <div className="md:col-span-2 h-80 rounded-2xl bg-white animate-pulse" />
+          <div className="h-64 rounded-2xl bg-white animate-pulse" />
+        </div>
+        <span className="sr-only">Đang tải sản phẩm đã chọn...</span>
+      </div>
+    )
+  }
+
+  if (!cart.length) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-20 text-center">
+        <ShoppingBag className="w-14 h-14 mx-auto mb-4" style={{ color: C.peach }} />
+        <h1 className="text-xl font-black" style={{ color: C.indigo }}>Không có sản phẩm được chọn</h1>
+        <p className="mt-2 text-sm" style={{ color: "#6B7280" }}>Vui lòng quay lại giỏ hàng và chọn sản phẩm trước khi tạo đơn.</p>
+        <button onClick={onBack} className="mt-6 px-6 py-3 rounded-2xl font-bold text-white" style={{ backgroundColor: C.peach }}>
+          Quay lại giỏ hàng
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
@@ -79,7 +127,15 @@ export function CreateOrderPage({ cart, total, onCreateOrder, onBack }: Props) {
               ].map((t) => (
                 <button
                   key={String(t.val)}
-                  onClick={() => setForSelf(t.val)}
+                  onClick={() => {
+                    setForSelf(t.val)
+                    setForm((current) => ({
+                      ...current,
+                      name: t.val ? userName : "",
+                      identifier: t.val ? userEmail : "",
+                    }))
+                    setErrors({})
+                  }}
                   className="flex-1 py-2 rounded-xl text-sm font-bold transition-all"
                   style={{
                     backgroundColor: forSelf === t.val ? "white" : "transparent",
@@ -92,62 +148,32 @@ export function CreateOrderPage({ cart, total, onCreateOrder, onBack }: Props) {
               ))}
             </div>
 
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div className="sm:col-span-2">
-                <label className="block text-sm font-bold mb-1" style={{ color: C.indigo }}>Họ và tên *</label>
-                <input
-                  type="text"
-                  value={form.name}
-                  onChange={(e) => set("name", e.target.value)}
-                  placeholder="Nguyễn Văn A"
-                  className={inputCls}
-                  style={{ borderColor: errors.name ? "#EF4444" : "#E5E7EB", fontFamily: "'Inter', sans-serif" }}
-                />
-                {errors.name && <p className="text-xs mt-1" style={{ color: "#EF4444" }}>{errors.name}</p>}
-              </div>
+             <div className="grid gap-4">
+               {!forSelf && (
+                 <>
+                   <div>
+                     <label className="block text-sm font-bold mb-1" style={{ color: C.indigo }}>Email hoặc số điện thoại người nhận *</label>
+                     <input
+                       type="text"
+                       value={form.identifier}
+                       onChange={(e) => set("identifier", e.target.value)}
+                       placeholder="email@example.com hoặc 0912345678"
+                       className={inputCls}
+                       style={{ borderColor: errors.identifier ? "#EF4444" : "#E5E7EB", fontFamily: "'Inter', sans-serif" }}
+                     />
+                     {errors.identifier && <p className="text-xs mt-1" style={{ color: "#EF4444" }}>{errors.identifier}</p>}
+                   </div>
 
-              <div>
-                <label className="block text-sm font-bold mb-1" style={{ color: C.indigo }}>Email *</label>
-                <input
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => set("email", e.target.value)}
-                  placeholder="email@example.com"
-                  className={inputCls}
-                  style={{ borderColor: errors.email ? "#EF4444" : "#E5E7EB", fontFamily: "'Inter', sans-serif" }}
-                />
-                {errors.email && <p className="text-xs mt-1" style={{ color: "#EF4444" }}>{errors.email}</p>}
-              </div>
+                   <div className="rounded-xl px-4 py-3" style={{ backgroundColor: C.eggshell }}>
+                     <div className="text-xs" style={{ color: "#8A8DA8" }}>Người được tặng</div>
+                     <div className="font-bold mt-1" style={{ color: C.indigo }}>
+                       {lookupLoading ? "Đang tìm tài khoản..." : form.name || "Chưa xác định"}
+                     </div>
+                   </div>
+                 </>
+               )}
 
-              <div>
-                <label className="block text-sm font-bold mb-1" style={{ color: C.indigo }}>Số điện thoại *</label>
-                <input
-                  type="tel"
-                  value={form.phone}
-                  onChange={(e) => set("phone", e.target.value)}
-                  placeholder="0912345678"
-                  className={inputCls}
-                  style={{ borderColor: errors.phone ? "#EF4444" : "#E5E7EB", fontFamily: "'Inter', sans-serif" }}
-                />
-                {errors.phone && <p className="text-xs mt-1" style={{ color: "#EF4444" }}>{errors.phone}</p>}
-              </div>
-
-              {!forSelf && (
-                <div className="sm:col-span-2">
-                  <label className="block text-sm font-bold mb-1" style={{ color: C.indigo }}>Địa chỉ nhận *</label>
-                  <textarea
-                    rows={2}
-                    value={form.address}
-                    onChange={(e) => set("address", e.target.value)}
-                    placeholder="Địa chỉ giao voucher..."
-                    className={inputCls + " resize-none"}
-                    style={{ borderColor: errors.address ? "#EF4444" : "#E5E7EB", fontFamily: "'Inter', sans-serif" }}
-                  />
-                  {errors.address && <p className="text-xs mt-1" style={{ color: "#EF4444" }}>{errors.address}</p>}
-                </div>
-              )}
-
-              <div className="sm:col-span-2">
+               <div className="sm:col-span-2">
                 <label className="block text-sm font-bold mb-1" style={{ color: C.indigo }}>Ghi chú</label>
                 <textarea
                   rows={2}
@@ -207,11 +233,13 @@ export function CreateOrderPage({ cart, total, onCreateOrder, onBack }: Props) {
 
             <button
               onClick={handleCreate}
+              disabled={submitting || !cart.length}
+              aria-busy={submitting}
               className="w-full py-3.5 rounded-2xl font-black text-white hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
               style={{ backgroundColor: C.peach }}
             >
               <ShoppingBag className="w-4 h-4" />
-              Tạo đơn hàng
+              {submitting ? "Đang tạo đơn hàng..." : "Tạo đơn hàng"}
             </button>
             <p className="text-xs text-center mt-2" style={{ color: "#9CA3AF" }}>
               Đơn hàng → Trạng thái: Chờ thanh toán

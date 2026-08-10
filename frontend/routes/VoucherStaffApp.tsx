@@ -1,6 +1,8 @@
 import { useState } from "react"
-import { Tag, PlusCircle, BarChart2, User, LogOut, Menu, ChevronRight } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { Tag, PlusCircle, User, LogOut, Menu, ChevronRight } from "lucide-react"
 import { C } from "@/utils/constants"
+import { AppIcon } from "@/components/AppIcon"
 import { PartnerVouchersPage } from "@/pages/partner/PartnerVouchersPage"
 import { CreateVoucherPage } from "@/pages/partner/CreateVoucherPage"
 import { EditVoucherPage } from "@/pages/partner/EditVoucherPage"
@@ -14,12 +16,12 @@ type Page = "vouchers" | "create" | "edit" | "voucher-detail" | "reports" | "pro
 interface Props {
   user: AppUser
   onLogout: () => void
+  initialPage?: "profile"
 }
 
 const NAV = [
   { label: "Quản lý Voucher",  pg: "vouchers" as Page, icon: <Tag className="w-4 h-4" /> },
   { label: "Tạo voucher mới",  pg: "create" as Page,   icon: <PlusCircle className="w-4 h-4" /> },
-  { label: "Hiệu suất của tôi", pg: "reports" as Page,  icon: <BarChart2 className="w-4 h-4" /> },
   { label: "Hồ sơ cá nhân",    pg: "profile" as Page,   icon: <User className="w-4 h-4" /> },
 ]
 
@@ -32,8 +34,9 @@ const PAGE_LABELS: Record<Page, string> = {
   profile: "Hồ sơ cá nhân",
 }
 
-export function VoucherStaffApp({ user, onLogout }: Props) {
-  const [page, setPage] = useState<Page>("vouchers")
+export function VoucherStaffApp({ user, onLogout, initialPage }: Props) {
+  const router = useRouter()
+  const [page, setPage] = useState<Page>(initialPage ?? "vouchers")
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null)
   const [mobileOpen, setMobileOpen] = useState(false)
 
@@ -53,7 +56,7 @@ export function VoucherStaffApp({ user, onLogout }: Props) {
         </div>
         {/* Role badge */}
         <div className="px-3 py-2.5 rounded-2xl border" style={{ backgroundColor: `${ACCENT}20`, borderColor: `${ACCENT}40` }}>
-          <div className="text-lg mb-0.5">🏷️</div>
+           <AppIcon name="tag" className="w-5 h-5 mb-1 text-white" />
           <div className="font-black text-xs text-white leading-tight">Nhân viên Tạo Voucher</div>
           <div className="text-xs mt-0.5 opacity-70 text-white">Tạo & quản lý voucher</div>
         </div>
@@ -79,7 +82,7 @@ export function VoucherStaffApp({ user, onLogout }: Props) {
           return (
             <button
               key={n.pg}
-              onClick={() => { setPage(n.pg); setMobileOpen(false) }}
+              onClick={() => { n.pg === "profile" ? router.push(`/${user.role}/profile`) : setPage(n.pg); setMobileOpen(false) }}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-left transition-all"
               style={{
                 backgroundColor: active ? ACCENT : "transparent",
@@ -130,7 +133,7 @@ export function VoucherStaffApp({ user, onLogout }: Props) {
               <Menu className="w-5 h-5" style={{ color: C.indigo }} />
             </button>
             <div className="flex items-center gap-2">
-              <span className="text-base">🏷️</span>
+              <AppIcon name="tag" className="w-4 h-4" />
               <div>
                 <span className="text-xs font-semibold opacity-60" style={{ color: C.indigo }}>Nhân viên Tạo Voucher</span>
                 <span className="hidden sm:inline text-xs opacity-40 mx-2" style={{ color: C.indigo }}>›</span>
@@ -139,11 +142,11 @@ export function VoucherStaffApp({ user, onLogout }: Props) {
             </div>
           </div>
           <div className="flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold border" style={{ backgroundColor: `${ACCENT}18`, color: ACCENT, borderColor: `${ACCENT}30` }}>
-            <span>🏷️</span> NV Tạo Voucher
+            <AppIcon name="tag" className="w-4 h-4" /> NV Tạo Voucher
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto" style={{ backgroundColor: C.eggshell }}>
+        <main className="flex-1 overflow-y-auto" style={{ backgroundColor: C.content }}>
           {page === "vouchers" && (
             <PartnerVouchersPage onCreateNew={() => setPage("create")} onEdit={goEdit} onDetail={goDetail} />
           )}

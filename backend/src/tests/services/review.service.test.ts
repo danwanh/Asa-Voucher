@@ -4,6 +4,7 @@ import type { AuthUser } from "../../types/auth.types.js";
 
 vi.mock("../../repositories/review.repository.js", () => ({
   listReviews: vi.fn(),
+  getReviewStats: vi.fn(),
   findReviewById: vi.fn(),
   findReviewByIssuedVoucherId: vi.fn(),
   createReview: vi.fn(),
@@ -50,6 +51,7 @@ function makeReview(overrides: Record<string, unknown> = {}) {
 describe("Review Service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(reviewRepo.getReviewStats).mockResolvedValue({ _avg: { rating: 5 }, _count: { _all: 1 } } as any);
   });
 
   describe("listPublicReviews", () => {
@@ -146,12 +148,12 @@ describe("Review Service", () => {
   });
 
   describe("updateReview", () => {
-    it("owner can update their review", async () => {
+    it("owner cannot update their review", async () => {
       vi.mocked(reviewRepo.findReviewById).mockResolvedValue(makeReview());
-      vi.mocked(reviewRepo.updateReview).mockResolvedValue(makeReview({ comment: "Updated" }));
 
-      const result = await reviewService.updateReview(BUYER, "rev-1", { comment: "Updated" });
-      expect(result.comment).toBe("Updated");
+      await expect(
+        reviewService.updateReview(BUYER, "rev-1", { comment: "Updated" })
+      ).rejects.toThrow(HttpError);
     });
 
     it("admin_content can update any review", async () => {

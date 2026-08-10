@@ -13,6 +13,7 @@ export type AccessTokenPayload = {
   role: UserRole;
   partner_id?: string;
   branch_id?: string;
+  auth_version?: number;
 };
 
 function jwtSecret() {
@@ -56,6 +57,14 @@ export function createRefreshToken() {
 }
 
 export function hashRefreshToken(token: string) {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+export function createOpaqueToken() {
+  return crypto.randomBytes(32).toString("base64url");
+}
+
+export function hashOpaqueToken(token: string) {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
 

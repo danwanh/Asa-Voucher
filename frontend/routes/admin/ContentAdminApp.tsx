@@ -1,12 +1,12 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { LayoutDashboard, FileText, Tag, User } from "lucide-react"
 import { SubAdminLayout, type SubAdminRole, type SubAdminNavItem } from "@/layouts/admin/SubAdminLayout"
 import { AdminContentDashboardPage } from "@/pages/admin/AdminContentDashboardPage"
 import { ContentManagementPage } from "@/pages/admin/ContentManagementPage"
 import { VoucherApprovalPage } from "@/pages/admin/VoucherApprovalPage"
 import { AdminProfilePage } from "@/pages/admin/AdminProfilePage"
-import { VOUCHERS } from "@/data/mock"
 import type { AppUser } from "@/types"
+import { voucherService } from "@/services/voucherService"
 
 type Page = "dashboard" | "content" | "approval" | "profile"
 
@@ -14,17 +14,37 @@ const ROLE: SubAdminRole = {
   id: "content",
   name: "Admin Nội dung",
   subtitle: "Quản lý nội dung & duyệt voucher",
-  emoji: "📝",
+  icon: "document",
   accent: "#81B29A",
   accentBg: "#EBF5F0",
   sidebarBg: "#253830",
 }
 
-interface Props { user: AppUser; onLogout: () => void; onSwitchRole: () => void }
+interface Props { user: AppUser; onLogout: () => void; onSwitchRole: () => void; initialPage?: "profile" }
 
-export function ContentAdminApp({ user, onLogout, onSwitchRole }: Props) {
-  const [page, setPage] = useState<Page>("dashboard")
-  const pendingCount = VOUCHERS.filter((v) => v.status === "pending").length
+export function ContentAdminApp({ user, onLogout, onSwitchRole, initialPage }: Props) {
+  const [page, setPage] = useState<Page>(initialPage ?? "dashboard")
+  const [pendingCount, setPendingCount] = useState(0)
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadPendingCount() {
+      try {
+        const items = await voucherService.listPublicVouchers({ limit: 100 })
+        if (!isMounted) return
+        setPendingCount(items.filter((voucher) => voucher.status === "pending").length)
+      } catch {
+        if (!isMounted) return
+        setPendingCount(0)
+      }
+    }
+
+    loadPendingCount()
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   const NAV: SubAdminNavItem[] = [
     { label: "Dashboard",         pg: "dashboard", icon: <LayoutDashboard className="w-4 h-4" /> },

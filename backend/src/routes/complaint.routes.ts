@@ -20,12 +20,12 @@ complaintRoutes.delete("/complaints/:id", asyncHandler(complaintController.close
 
 complaintRoutes.patch(
   "/complaints/:id/assign",
-  requireRole("admin_content", "admin_account"),
+  requireRole("admin_content", "admin_operations"),
   asyncHandler(complaintController.assignComplaint),
 );
 complaintRoutes.patch(
   "/complaints/:id/resolve",
-  requireRole("admin_content", "admin_account"),
+  requireRole("admin_content", "admin_operations"),
   asyncHandler(complaintController.resolveComplaint),
 );
 

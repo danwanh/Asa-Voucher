@@ -1,18 +1,20 @@
 import { useState } from "react"
-import { ArrowLeft, Copy, CheckCircle2, QrCode, Download, Star, MessageSquare } from "lucide-react"
+import { ArrowLeft, Copy, CheckCircle2, Download, Star, MessageSquare, CreditCard } from "lucide-react"
 import { C, fmt, fmtDate, STATUS_LABEL, statusColor } from "@/utils/constants"
+import { AppIcon } from "@/components/AppIcon"
 import type { Order } from "@/types"
-import { VOUCHERS } from "@/data/mock"
+import { MockQR } from "@/components/MockQR"
 
 interface Props {
   order: Order
   onBack: () => void
   onReview: (order: Order) => void
+  onComplaint?: (order: Order) => void
+  onPayAgain?: (order: Order) => void
 }
 
-export function OrderDetailPage({ order, onBack, onReview }: Props) {
+export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAgain }: Props) {
   const [copied, setCopied] = useState(false)
-  const voucher = VOUCHERS.find((v) => v.id === order.voucherId)
   const sc = statusColor(order.status)
 
   const copy = () => {
@@ -24,7 +26,7 @@ export function OrderDetailPage({ order, onBack, onReview }: Props) {
   const TIMELINE = [
     { label: "Đặt hàng", done: true, time: fmtDate(order.createdAt) },
     { label: "Thanh toán", done: order.status !== "pending", time: order.status !== "pending" ? fmtDate(order.createdAt) : "" },
-    { label: "Nhận voucher", done: order.status === "completed" || order.status === "used", time: order.status === "completed" || order.status === "used" ? fmtDate(order.createdAt) : "" },
+    { label: "Nhận voucher", done: order.status === "confirmed" || order.status === "completed" || order.status === "used", time: order.status === "confirmed" || order.status === "completed" || order.status === "used" ? fmtDate(order.createdAt) : "" },
     { label: "Đã sử dụng", done: order.status === "used", time: order.status === "used" ? fmtDate(order.createdAt) : "" },
   ]
 
@@ -73,25 +75,22 @@ export function OrderDetailPage({ order, onBack, onReview }: Props) {
         </div>
       </div>
 
-      {/* Voucher Info */}
-      {voucher && (
-        <div className="bg-white rounded-2xl p-6 border border-black/5 mb-4">
-          <h3 className="font-bold text-sm mb-4" style={{ color: C.indigo }}>Thông tin voucher</h3>
-          <div className="flex items-start gap-4">
-            <div className="w-20 h-16 rounded-xl overflow-hidden flex-shrink-0">
-              <img src={voucher.image} alt="" className="w-full h-full object-cover" />
-            </div>
-            <div className="flex-1">
-              <div className="font-bold text-sm mb-1" style={{ color: C.indigo }}>{voucher.title}</div>
-              <div className="text-xs mb-2" style={{ color: "#6B7280" }}>{voucher.partnerLogo} {voucher.partnerName}</div>
-              <div className="font-black" style={{ color: C.peach }}>{fmt(order.amount)}</div>
-            </div>
+      <div className="bg-white rounded-2xl p-6 border border-black/5 mb-4">
+        <h3 className="font-bold text-sm mb-4" style={{ color: C.indigo }}>Thông tin voucher</h3>
+        <div className="flex items-start gap-4">
+          <div className="w-20 h-16 rounded-xl flex-shrink-0 flex items-center justify-center" style={{ backgroundColor: C.eggshell }}>
+            <AppIcon name="gift" className="w-6 h-6" />
+          </div>
+          <div className="flex-1">
+            <div className="font-bold text-sm mb-1" style={{ color: C.indigo }}>{order.voucherTitle}</div>
+            <div className="text-xs mb-2" style={{ color: "#6B7280" }}>{order.partnerName}</div>
+            <div className="font-black" style={{ color: C.peach }}>{fmt(order.amount)}</div>
           </div>
         </div>
-      )}
+      </div>
 
       {/* QR Code */}
-      {(order.status === "completed" || order.status === "used") && (
+      {(order.status === "confirmed" || order.status === "completed" || order.status === "used") && (
         <div className="bg-white rounded-2xl p-6 border border-black/5 mb-4 text-center">
           <h3 className="font-bold text-sm mb-4" style={{ color: C.indigo }}>Mã voucher</h3>
           <div className="flex items-center justify-center gap-2 mb-4">
@@ -103,18 +102,15 @@ export function OrderDetailPage({ order, onBack, onReview }: Props) {
             </button>
           </div>
           {/* Mock QR */}
-          <div className="w-40 h-40 mx-auto rounded-2xl flex items-center justify-center mb-4 border-2 border-dashed" style={{ borderColor: "#E5E7EB" }}>
-            <div className="text-center">
-              <QrCode className="w-16 h-16 mx-auto mb-1" style={{ color: C.indigo }} />
-              <div className="text-xs" style={{ color: "#9CA3AF" }}>QR Code</div>
-            </div>
-          </div>
+           <div className="flex justify-center mb-4">
+             <MockQR code={order.qrPayload || order.code} size={160} />
+           </div>
           {order.status === "used" && (
             <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-bold" style={{ backgroundColor: "#E0EEFF", color: "#1A5FAD" }}>
               <CheckCircle2 className="w-4 h-4" /> Đã sử dụng
             </div>
           )}
-          {order.status === "completed" && (
+          {(order.status === "confirmed" || order.status === "completed") && (
             <button className="flex items-center gap-2 mx-auto text-sm font-semibold hover:underline" style={{ color: C.teal }}>
               <Download className="w-4 h-4" /> Tải xuống QR Code
             </button>
@@ -133,13 +129,27 @@ export function OrderDetailPage({ order, onBack, onReview }: Props) {
 
       {/* Actions */}
       <div className="flex gap-3">
-        {order.status === "completed" && (
+        {order.status === "pending" && order.paymentStatus !== "paid" && (!order.paymentExpiresAt || new Date(order.paymentExpiresAt).getTime() > Date.now()) && onPayAgain && (
+          <button
+            onClick={() => onPayAgain(order)}
+            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm text-white"
+            style={{ backgroundColor: C.peach }}
+          >
+            <CreditCard className="w-4 h-4" /> Thanh toán lại
+          </button>
+        )}
+        {(order.paymentStatus === "paid" || order.status === "confirmed" || order.status === "completed" || order.status === "used") && (
           <button
             onClick={() => onReview(order)}
             className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm border-2"
             style={{ borderColor: C.apricot, color: C.indigo }}
           >
             <Star className="w-4 h-4" style={{ color: C.apricot }} /> Đánh giá
+          </button>
+        )}
+        {onComplaint && (order.complaints?.[0] || order.paymentStatus === "paid" || order.status === "confirmed" || order.status === "completed" || order.status === "used") && (
+          <button onClick={() => onComplaint(order)} className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm border-2" style={{ borderColor: "#93C5FD", color: "#2563EB" }}>
+            <MessageSquare className="w-4 h-4" /> {order.complaints?.[0] ? "Xem khiếu nại đơn hàng" : "Khiếu nại đơn hàng"}
           </button>
         )}
         <button className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm border-2" style={{ borderColor: "#E5E7EB", color: C.indigo }}>

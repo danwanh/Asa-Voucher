@@ -1,10 +1,13 @@
 import { useState } from "react"
-import { Home, Tag, GitBranch, Users, BarChart2, Bell, Building2, Settings, LogOut, Menu, ChevronRight } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { Tag, GitBranch, Users, BarChart2, Bell, Building2, Settings, LogOut, Menu, ChevronRight } from "lucide-react"
 import { C } from "@/utils/constants"
+import { AppIcon } from "@/components/AppIcon"
 import type { AppUser } from "@/types"
+import type { PartnerProfile } from "@/services/partnerService"
 
 export type PartnerPage =
-  | "dashboard" | "vouchers" | "create" | "edit" | "voucher-detail" | "revenue"
+  | "vouchers" | "create" | "edit" | "voucher-detail" | "revenue"
   | "branches" | "staff" | "profile" | "notifications" | "settings"
 
 interface NavItem {
@@ -14,11 +17,10 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: "Tổng quan", pg: "dashboard", icon: <Home className="w-4 h-4" /> },
+  { label: "Báo cáo", pg: "revenue", icon: <BarChart2 className="w-4 h-4" /> },
   { label: "Quản lý Voucher", pg: "vouchers", icon: <Tag className="w-4 h-4" /> },
   { label: "Chi nhánh", pg: "branches", icon: <GitBranch className="w-4 h-4" /> },
   { label: "Quản lý nhân viên", pg: "staff", icon: <Users className="w-4 h-4" /> },
-  { label: "Báo cáo", pg: "revenue", icon: <BarChart2 className="w-4 h-4" /> },
   { label: "Thông báo", pg: "notifications", icon: <Bell className="w-4 h-4" /> },
   { label: "Hồ sơ đối tác", pg: "profile", icon: <Building2 className="w-4 h-4" /> },
   { label: "Cài đặt", pg: "settings", icon: <Settings className="w-4 h-4" /> },
@@ -26,13 +28,31 @@ const NAV_ITEMS: NavItem[] = [
 
 interface Props {
   user: AppUser
+  partner: PartnerProfile | null
   page: PartnerPage
   onNavigate: (p: PartnerPage) => void
   onLogout: () => void
   children: React.ReactNode
 }
 
-function SidebarContent({ user, page, onNavigate, onLogout, onClose }: Props & { onClose?: () => void }) {
+type SidebarProps = Omit<Props, "children"> & { onClose?: () => void }
+
+function SidebarContent({ user, partner, page, onNavigate, onLogout, onClose }: SidebarProps) {
+  const router = useRouter()
+  const partnerLabel = user.role === "partner_owner" ? (user.name || user.email) : user.name
+  const partnerName = partner?.businessName ?? partnerLabel
+  const approvalStatus = partner?.approvalStatus
+  const partnerStatus = partner?.status
+  const approvalText = approvalStatus === "approved"
+    ? "Đã duyệt"
+    : approvalStatus === "pending"
+    ? "Chờ duyệt"
+    : approvalStatus === "rejected"
+    ? "Bị từ chối"
+    : "Chưa có hồ sơ"
+  const isActive = partnerStatus === "active"
+  const statusColor = approvalStatus === "approved" && isActive ? "#81B29A" : "#E07A5F"
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -45,12 +65,12 @@ function SidebarContent({ user, page, onNavigate, onLogout, onClose }: Props & {
           </div>
         </div>
         <div className="flex items-center gap-3 p-3 rounded-2xl" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}>
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0" style={{ backgroundColor: "rgba(255,255,255,0.1)" }}>🍕</div>
+           <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "rgba(255,255,255,0.1)" }}><AppIcon name="gift" className="w-5 h-5 text-white" /></div>
           <div className="min-w-0">
-            <div className="text-sm font-bold text-white truncate">Pizza Hut Vietnam</div>
-            <div className="text-xs flex items-center gap-1" style={{ color: "#81B29A" }}>
-              <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: "#81B29A" }} />
-              Đã duyệt
+            <div className="text-sm font-bold text-white truncate">{partnerName}</div>
+            <div className="text-xs flex items-center gap-1" style={{ color: statusColor }}>
+              <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: statusColor }} />
+              {approvalText}
             </div>
           </div>
         </div>
@@ -61,7 +81,15 @@ function SidebarContent({ user, page, onNavigate, onLogout, onClose }: Props & {
         {NAV_ITEMS.map((n) => (
           <button
             key={n.pg}
-            onClick={() => { onNavigate(n.pg); onClose?.() }}
+            onClick={() => {
+              if (n.pg === "profile") {
+                onNavigate("profile")
+                router.push(`/${user.role}/profile`)
+              } else {
+                onNavigate(n.pg)
+              }
+              onClose?.()
+            }}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-left transition-all"
             style={{
               backgroundColor: page === n.pg ? C.peach : "transparent",
@@ -90,22 +118,24 @@ function SidebarContent({ user, page, onNavigate, onLogout, onClose }: Props & {
   )
 }
 
-export function PartnerLayout({ user, page, onNavigate, onLogout, children }: Props) {
+export function PartnerLayout({ user, partner, page, onNavigate, onLogout, children }: Props) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const currentLabel = NAV_ITEMS.find((n) => n.pg === page)?.label ?? ""
+  const partnerLabel = user.role === "partner_owner" ? (user.name || user.email) : user.name
+  const partnerName = partner?.businessName ?? partnerLabel
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ fontFamily: "'Nunito', sans-serif" }}>
       {/* Desktop sidebar */}
       <div className="hidden md:flex w-60 shrink-0 flex-col" style={{ backgroundColor: C.indigo }}>
-        <SidebarContent user={user} page={page} onNavigate={onNavigate} onLogout={onLogout} />
+        <SidebarContent user={user} partner={partner} page={page} onNavigate={onNavigate} onLogout={onLogout} />
       </div>
 
       {/* Mobile sidebar overlay */}
       {mobileOpen && (
         <div className="md:hidden fixed inset-0 z-50 flex">
           <div className="w-60 flex flex-col" style={{ backgroundColor: C.indigo }}>
-            <SidebarContent user={user} page={page} onNavigate={onNavigate} onLogout={onLogout} onClose={() => setMobileOpen(false)} />
+            <SidebarContent user={user} partner={partner} page={page} onNavigate={onNavigate} onLogout={onLogout} onClose={() => setMobileOpen(false)} />
           </div>
           <div className="flex-1 bg-black/50" onClick={() => setMobileOpen(false)} />
         </div>
@@ -123,11 +153,11 @@ export function PartnerLayout({ user, page, onNavigate, onLogout, children }: Pr
             <button onClick={() => onNavigate("notifications")} className="p-2 rounded-xl hover:bg-muted relative">
               <Bell className="w-5 h-5" style={{ color: "#8A8DA8" }} />
             </button>
-            <div className="text-sm font-semibold" style={{ color: "#8A8DA8" }}>Pizza Hut Vietnam</div>
+            <div className="text-sm font-semibold" style={{ color: "#8A8DA8" }}>{partnerName}</div>
           </div>
         </header>
 
-        <main className="flex-1 overflow-auto" style={{ backgroundColor: C.eggshell }}>
+        <main className="flex-1 overflow-auto" style={{ backgroundColor: C.content }}>
           {children}
         </main>
       </div>

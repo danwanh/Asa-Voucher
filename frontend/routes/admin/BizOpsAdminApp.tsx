@@ -13,7 +13,7 @@ const ROLE: SubAdminRole = {
   id: "biz-ops",
   name: "Business Operations Admin",
   subtitle: "Vận hành Kinh doanh",
-  emoji: "📊",
+  icon: "dashboard",
   accent: "#E07A5F",
   accentBg: "#FDF0EC",
   sidebarBg: "#3D2820",

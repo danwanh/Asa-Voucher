@@ -7,13 +7,13 @@ import * as reportController from "../controllers/report.controller.js";
 export const reportRoutes = Router();
 
 reportRoutes.use(requireAuth);
-reportRoutes.use(requireRole("partner_owner", "partner_voucher_staff", "admin_content", "admin_account", "admin_security"));
+reportRoutes.use(requireRole("partner_owner", "partner_voucher_staff", "admin_content", "admin_operations", "admin_security"));
 
 reportRoutes.get("/reports/revenue", asyncHandler(reportController.getRevenueReport));
 reportRoutes.get("/reports/orders", asyncHandler(reportController.getOrderReport));
 reportRoutes.get("/reports/vouchers", asyncHandler(reportController.getVoucherReport));
 reportRoutes.get(
   "/reports/partners",
-  requireRole("admin_content", "admin_account", "admin_security"),
+  requireRole("admin_content", "admin_operations", "admin_security"),
   asyncHandler(reportController.getPartnerReport),
 );

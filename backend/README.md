@@ -87,35 +87,33 @@ npm run type-check
 - Cấu hình Supabase: dùng `SUPABASE_URL`, `SUPABASE_ANON_KEY`, và chỉ dùng `SUPABASE_SERVICE_ROLE_KEY` ở backend cho tác vụ tin cậy.
 - Row Level Security: bật RLS cho bảng chứa dữ liệu người dùng/đối tác/voucher; policy phải khớp với RBAC backend nếu dùng Supabase Auth trực tiếp.
 
-## Chạy migration và seed
+## Chạy migration mới đã pull về
 
-Nếu dùng Supabase hosted project với Prisma:
-
-Nếu database đã có schema từ SQL/Supabase migration cũ nhưng chưa có bảng `_prisma_migrations`, baseline một lần trước:
+Tất cả lệnh dưới đây chạy trong thư mục `backend`, với `DATABASE_URL` và `DIRECT_URL` đã được cấu hình:
 
 ```bash
-npm --workspace backend run prisma:migrate:baseline
+cd backend
 ```
 
-Sau đó deploy các migration Prisma còn lại:
+Kiểm tra migration đang chờ chạy:
 
 ```bash
-npm --workspace backend run prisma:migrate:deploy
+npx prisma migrate status
 ```
 
-Để tạo migration mới sau khi chỉnh `prisma/schema.prisma`:
+Chạy các migration mới đã được pull về:
 
 ```bash
-npm run prisma:migrate:dev -- --name <migration_name> --create-only
+npm run prisma:migrate:deploy
 ```
 
-Sau đó review file trong `prisma/migrations/` rồi deploy bằng `npm run prisma:migrate:deploy`.
+Không chỉnh sửa migration đã được apply. Nếu migration thất bại, dừng lại và kiểm tra log/database trước khi chạy lại.
 
 
 Seed users dùng chung mật khẩu:
 
 ```text
-Password123!
+User12345@
 ```
 
 Tài khoản seed chính:
@@ -127,7 +125,7 @@ Tài khoản seed chính:
 | `voucher.staff@asa.test` | `partner_voucher_staff` |
 | `store.staff@asa.test` | `partner_store_staff` |
 | `admin.content@asa.test` | `admin_content` |
-| `admin.account@asa.test` | `admin_account` |
+| `admin.operations@asa.test` | `admin_operations` |
 | `admin.security@asa.test` | `admin_security` |
 
 ## Chạy API và test nhanh
@@ -149,7 +147,7 @@ http://localhost:5000/api/v1
 ```bash
 curl -i -X POST http://localhost:5000/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"buyer@asa.test","password":"Password123!"}'
+  -d '{"email":"buyer@asa.test","password":"User12345@"}'
 ```
 
 Gọi API private:

@@ -1,44 +1,49 @@
 import { useState } from "react"
 import { Search, QrCode, CheckCircle, XCircle, AlertCircle, RefreshCw } from "lucide-react"
 import { C, fmtDate } from "@/utils/constants"
-import { MockQR } from "@/components/MockQR"
-import { VOUCHERS, ORDERS } from "@/data/mock"
+import { issuedVoucherService, type IssuedVoucherResult } from "@/services/issuedVoucherService"
 
 type VerifyResult = "idle" | "valid" | "used" | "invalid" | "expired"
 
-const MOCK_VERIFY: Record<string, VerifyResult> = {
-  "ASA-ABC123": "valid",
-  "ASA-DEF456": "used",
-  "ASA-EXPIRED": "expired",
-  "ASA-INVALID": "invalid",
-}
-
-export function VerifyVoucherPage({ initialCode = "" }: { initialCode?: string }) {
+export function VerifyVoucherPage({ initialCode = "", branchId = "" }: { initialCode?: string; branchId?: string }) {
   const [code, setCode] = useState(initialCode)
   const [result, setResult] = useState<VerifyResult>("idle")
   const [loading, setLoading] = useState(false)
   const [confirmed, setConfirmed] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
+  const [voucher, setVoucher] = useState<IssuedVoucherResult | null>(null)
 
-  const mockOrder = ORDERS.find((o) => o.code === code) ?? ORDERS[0]
-
-  const handleVerify = () => {
+  const handleVerify = async () => {
     if (!code.trim()) return
     setLoading(true)
     setConfirmed(false)
-    setTimeout(() => {
-      const r = MOCK_VERIFY[code.trim().toUpperCase()] ?? (code.length > 3 ? "valid" : "invalid")
-      setResult(r)
+    setVoucher(null)
+    try {
+      const response = await issuedVoucherService.validate(code.trim())
+      setVoucher(response)
+      setResult(response.redeemable ? "valid" : response.issued_voucher.status === "used" ? "used" : response.issued_voucher.status === "expired" ? "expired" : "invalid")
+    } catch {
+      setResult("invalid")
+    } finally {
       setLoading(false)
-    }, 600)
+    }
   }
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
+    if (!voucher || !branchId || !voucher.eligible_branch_ids.includes(branchId)) return
     setShowConfirmDialog(false)
-    setConfirmed(true)
+    setLoading(true)
+    try {
+      await issuedVoucherService.redeem(voucher.issued_voucher.id, branchId)
+      setConfirmed(true)
+    } catch {
+      setResult("invalid")
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const reset = () => { setCode(""); setResult("idle"); setConfirmed(false) }
+  const reset = () => { setCode(""); setResult("idle"); setConfirmed(false); setVoucher(null) }
 
   const resultConfig = {
     valid: { bg: "#E8F5EE", border: C.teal, text: "#2D7A52", icon: <CheckCircle className="w-6 h-6" />, label: "Voucher hợp lệ", desc: "Voucher này hợp lệ và có thể sử dụng." },
@@ -86,17 +91,6 @@ export function VerifyVoucherPage({ initialCode = "" }: { initialCode?: string }
           </button>
         </div>
 
-        {/* Quick test codes */}
-        <div className="mt-4 pt-4 border-t" style={{ borderColor: "#F0EDD8" }}>
-          <p className="text-xs font-semibold mb-2" style={{ color: "#8A8DA8" }}>Mã demo:</p>
-          <div className="flex flex-wrap gap-1.5">
-            {Object.entries(MOCK_VERIFY).map(([c, r]) => (
-              <button key={c} onClick={() => setCode(c)} className="text-xs px-2 py-1 rounded-lg font-mono font-bold" style={{ backgroundColor: C.eggshell, color: C.indigo }}>
-                {c}
-              </button>
-            ))}
-          </div>
-        </div>
       </div>
 
       {/* Result */}
@@ -110,22 +104,19 @@ export function VerifyVoucherPage({ initialCode = "" }: { initialCode?: string }
             </div>
           </div>
 
-          {result === "valid" && !confirmed && (
+          {result === "valid" && voucher && !confirmed && (
             <div className="p-5">
               <div className="flex items-start gap-4 mb-5">
-                <MockQR code={code} size={80} />
                 <div>
-                  <div className="font-black text-sm" style={{ color: C.indigo }}>{mockOrder.voucherTitle}</div>
-                  <div className="text-xs mt-1" style={{ color: "#8A8DA8" }}>{mockOrder.partnerName}</div>
-                  <code className="text-xs font-bold mt-2 block" style={{ color: C.indigo, fontFamily: "'Inter', monospace" }}>{code}</code>
+                  <div className="font-black text-sm" style={{ color: C.indigo }}>{voucher.issued_voucher.voucher_products?.name ?? "Voucher"}</div>
+                  <code className="text-xs font-bold mt-2 block" style={{ color: C.indigo, fontFamily: "'Inter', monospace" }}>{voucher.issued_voucher.voucher_code}</code>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3 text-xs mb-5">
                 {[
-                  { label: "Khách hàng", value: "Nguyễn Thị Mai" },
-                  { label: "Ngày mua", value: fmtDate(mockOrder.createdAt) },
-                  { label: "Ngày hết hạn", value: "31/12/2024" },
-                  { label: "Chi nhánh", value: "Tất cả chi nhánh" },
+                  { label: "Mã voucher", value: voucher.issued_voucher.voucher_code },
+                  { label: "Ngày hết hạn", value: fmtDate(voucher.issued_voucher.expired_date) },
+                  { label: "Chi nhánh", value: voucher.eligible_branch_ids.includes(branchId) ? "Được phép sử dụng" : "Không thuộc chi nhánh này" },
                 ].map((info) => (
                   <div key={info.label} className="p-2 rounded-lg" style={{ backgroundColor: C.eggshell }}>
                     <div style={{ color: "#8A8DA8" }}>{info.label}</div>
@@ -135,10 +126,11 @@ export function VerifyVoucherPage({ initialCode = "" }: { initialCode?: string }
               </div>
               <button
                 onClick={() => setShowConfirmDialog(true)}
+                disabled={!branchId || !voucher.eligible_branch_ids.includes(branchId) || loading}
                 className="w-full py-3 rounded-xl font-bold text-white"
-                style={{ backgroundColor: C.teal }}
+                style={{ backgroundColor: !branchId || !voucher.eligible_branch_ids.includes(branchId) ? "#D1D5DB" : C.teal }}
               >
-                Xác nhận sử dụng
+                {!branchId ? "Chưa có chi nhánh" : !voucher.eligible_branch_ids.includes(branchId) ? "Không thuộc chi nhánh này" : loading ? "Đang xác nhận..." : "Xác nhận sử dụng"}
               </button>
             </div>
           )}

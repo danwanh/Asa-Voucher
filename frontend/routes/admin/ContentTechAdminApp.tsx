@@ -14,7 +14,7 @@ const ROLE: SubAdminRole = {
   id: "content-tech",
   name: "Content & Tech Admin",
   subtitle: "Nội dung & Kỹ thuật",
-  emoji: "🛠️",
+  icon: "toolbox",
   accent: "#81B29A",
   accentBg: "#EBF5F0",
   sidebarBg: "#253830",

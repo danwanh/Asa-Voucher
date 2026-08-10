@@ -3,8 +3,17 @@ import { prisma } from "../config/prisma.js";
 import { adminRoles, type UserRole } from "../types/auth.types.js";
 import { requireData } from "../utils/db.js";
 import { HttpError } from "../utils/http-error.js";
+import {
+  capturePayPalPayment,
+  createPayPalPayment,
+  createVnpayPayment,
+  createSimulatedPayment,
+  verifyVnpayReturn,
+  type PaymentProvider,
+} from "./payment-provider.service.js";
+import { env } from "../config/env.js";
 
-type CurrentUser = { id: string; role: UserRole; partnerId?: string };
+type CurrentUser = { id: string; role: UserRole; partnerId?: string | null };
 type Voucher = Record<string, unknown> & {
   id: string;
   original_price: number | string;
@@ -38,6 +47,28 @@ function voucherCode() {
   return `VC${Date.now()}${crypto.randomInt(100000, 999999)}`;
 }
 
+const PAYMENT_HOLD_MINUTES = 15;
+
+async function resolveRecipient(userId: string, identifier?: string) {
+  if (!identifier) return { id: userId, isGift: false };
+  const value = identifier.trim();
+  const phone = value.replace(/\s/g, "");
+  const normalizedPhone = phone.startsWith("+84") ? `0${phone.slice(3)}` : phone;
+  const recipient = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { email: { equals: value, mode: "insensitive" } },
+        { phone: normalizedPhone },
+        { phone }
+      ],
+      is_active: true
+    }
+  });
+  if (!recipient) throw new HttpError(422, "Recipient account was not found", "RECIPIENT_NOT_FOUND");
+  const isGift = recipient.id !== userId;
+  return { id: recipient.id, isGift };
+}
+
 async function getOrCreateCart(userId: string) {
   return prisma.cart.upsert({
     where: { user_id: userId },
@@ -58,11 +89,14 @@ async function getSellableVoucher(id: string, quantity: number) {
   return voucher;
 }
 
-export async function getCart(userId: string) {
+export async function getCart(userId: string, cartItemIds?: string[]) {
   const cart = await getOrCreateCart(userId);
   const items = await prisma.cartItem.findMany({
-    where: { cart_id: cart.id as string },
-    include: { voucher_products: true },
+    where: {
+      cart_id: cart.id as string,
+      ...(cartItemIds ? { id: { in: cartItemIds } } : {}),
+    },
+    include: { voucher_products: { include: { partners: true } } },
     orderBy: { created_at: "desc" }
   });
   return { ...cart, items };
@@ -108,11 +142,19 @@ export async function clearCart(userId: string) {
   await prisma.cartItem.deleteMany({ where: { cart_id: cart.id as string } });
 }
 
-async function buildOrderItems(items: Array<{ voucher_product_id: string; quantity: number }>) {
+async function buildOrderItems(items: Array<{ voucher_product_id: string; quantity: number }>, expectedPrices?: Record<string, number>) {
   const orderItems = [];
   for (const item of items) {
     const voucher = await getSellableVoucher(item.voucher_product_id, item.quantity);
     const unitPrice = Number(voucher.selling_price);
+    const expectedPrice = expectedPrices?.[item.voucher_product_id];
+    if (expectedPrice !== undefined && expectedPrice !== unitPrice) {
+      throw new HttpError(409, "Voucher price has changed", "PRICE_CHANGED", {
+        voucherId: item.voucher_product_id,
+        oldPrice: expectedPrice,
+        newPrice: unitPrice,
+      });
+    }
     orderItems.push({
       voucher,
       quantity: item.quantity,
@@ -130,12 +172,21 @@ async function buildOrderItems(items: Array<{ voucher_product_id: string; quanti
   return orderItems;
 }
 
-async function createOrderFromItems(userId: string, items: Array<{ voucher_product_id: string; quantity: number }>, paymentMethod: string, note?: string) {
-  const builtItems = await buildOrderItems(items);
+async function createOrderFromItemsWithRecipient(
+  userId: string,
+  items: Array<{ voucher_product_id: string; quantity: number }>,
+  paymentMethod: string,
+  note: string | undefined,
+  recipientId: string,
+  isGift: boolean,
+  expectedPrices?: Record<string, number>,
+) {
+  const builtItems = await buildOrderItems(items, expectedPrices);
   const subtotal = builtItems.reduce((sum, item) => sum + Number(item.orderItem.subtotal), 0);
+  const paymentExpiresAt = new Date(Date.now() + PAYMENT_HOLD_MINUTES * 60 * 1000);
 
   return prisma.$transaction(async (tx) => {
-    const order = await tx.order.create({ data: { order_code: orderCode(), user_id: userId, subtotal, discount_amount: 0, total_amount: subtotal, payment_method: paymentMethod, note } });
+    const order = await tx.order.create({ data: { order_code: orderCode(), user_id: userId, recipient_id: recipientId, subtotal, discount_amount: 0, total_amount: subtotal, payment_method: paymentMethod, note, is_gift: isGift, payment_expires_at: paymentExpiresAt } });
     const orderItems = await Promise.all(builtItems.map((item) => tx.orderItem.create({ data: { ...item.orderItem, order_id: order.id } })));
     await tx.orderLog.create({ data: { order_id: order.id, user_id: userId, action: "CREATE_ORDER", description: "Order created" } });
     return { ...order, items: orderItems };
@@ -151,35 +202,51 @@ async function itemsFromCart(userId: string, cartItemIds?: string[]) {
   return { cart, cartItems: cartItems as unknown as Array<Record<string, unknown>> };
 }
 
-export async function checkout(userId: string, input: { cart_item_ids?: string[]; payment_method: string; note?: string }) {
+export async function checkout(userId: string, input: { cart_item_ids?: string[]; payment_method: string; note?: string; recipient_identifier?: string; expected_prices?: Record<string, number> }) {
+  const recipient = await resolveRecipient(userId, input.recipient_identifier);
   const { cart, cartItems } = await itemsFromCart(userId, input.cart_item_ids);
-  const order = await createOrderFromItems(
+  const order = await createOrderFromItemsWithRecipient(
     userId,
     cartItems.map((item) => ({ voucher_product_id: item.voucher_product_id as string, quantity: Number(item.quantity) })),
     input.payment_method,
-    input.note
+    input.note,
+    recipient.id,
+    recipient.isGift,
+    input.expected_prices,
   );
   await prisma.cartItem.deleteMany({ where: { cart_id: cart.id as string, id: { in: cartItems.map((item) => item.id as string) } } });
   return order;
 }
 
-export async function createOrder(userId: string, input: { items?: Array<{ voucher_product_id: string; quantity: number }>; cart_item_ids?: string[]; payment_method: string; note?: string }) {
+export async function createOrder(userId: string, input: { items?: Array<{ voucher_product_id: string; quantity: number }>; cart_item_ids?: string[]; payment_method: string; note?: string; recipient_identifier?: string; recipient_email?: string; is_gift?: boolean; expected_prices?: Record<string, number> }) {
+  const recipient = await resolveRecipient(userId, input.recipient_identifier ?? input.recipient_email);
   if (input.cart_item_ids?.length) {
-    const { cartItems } = await itemsFromCart(userId, input.cart_item_ids);
-    return createOrderFromItems(userId, cartItems.map((item) => ({ voucher_product_id: item.voucher_product_id as string, quantity: Number(item.quantity) })), input.payment_method, input.note);
+    const { cart, cartItems } = await itemsFromCart(userId, input.cart_item_ids);
+    const order = await createOrderFromItemsWithRecipient(userId, cartItems.map((item) => ({ voucher_product_id: item.voucher_product_id as string, quantity: Number(item.quantity) })), input.payment_method, input.note, recipient.id, recipient.isGift, input.expected_prices);
+    await prisma.cartItem.deleteMany({ where: { cart_id: cart.id as string, id: { in: cartItems.map((item) => item.id as string) } } });
+    return order;
   }
-  return createOrderFromItems(userId, input.items ?? [], input.payment_method, input.note);
+  return createOrderFromItemsWithRecipient(userId, input.items ?? [], input.payment_method, input.note, recipient.id, recipient.isGift, input.expected_prices);
 }
 
 async function getOrder(id: string) {
   return requireData<Record<string, unknown>>(await prisma.order.findUnique({
     where: { id },
-    include: { order_items: { include: { voucher_products: { select: { partner_id: true } } } } }
+    include: {
+      users: { select: { full_name: true } },
+      complaints: true,
+      order_items: {
+        include: {
+          voucher_products: { include: { partners: true } },
+          issued_vouchers: { include: { reviews: true, complaints: true } },
+        },
+      }
+    }
   }) as unknown as Record<string, unknown> | null, "Order not found");
 }
 
 function assertOrderAccess(user: CurrentUser, order: Record<string, unknown>) {
-  if (isAdmin(user) || order.user_id === user.id) return;
+  if (isAdmin(user) || order.user_id === user.id || order.recipient_id === user.id) return;
   const items = (order.order_items as Array<Record<string, unknown>> | undefined) ?? [];
   if (user.partnerId && items.some((item) => (item.voucher_products as Record<string, unknown>)?.partner_id === user.partnerId)) return;
   throw new HttpError(403, "Insufficient permissions", "FORBIDDEN");
@@ -187,8 +254,17 @@ function assertOrderAccess(user: CurrentUser, order: Record<string, unknown>) {
 
 export async function listOrders(user: CurrentUser) {
   const data = await prisma.order.findMany({
-    where: user.role === "buyer" ? { user_id: user.id } : {},
-    include: { order_items: { include: { voucher_products: { select: { partner_id: true } } } } },
+    where: user.role === "buyer" ? { OR: [{ user_id: user.id }, { recipient_id: user.id }] } : {},
+    include: {
+      users: { select: { full_name: true } },
+      complaints: true,
+      order_items: {
+        include: {
+          voucher_products: { include: { partners: true } },
+          issued_vouchers: { include: { reviews: true, complaints: true } },
+        },
+      }
+    },
     orderBy: { created_at: "desc" }
   });
   return data.filter((order) => {
@@ -231,6 +307,19 @@ export async function listOrderItems(user: CurrentUser, orderId: string) {
   return order.order_items ?? [];
 }
 
+async function cancelExpiredOrder(orderId: string, userId: string) {
+  return prisma.$transaction(async (tx) => {
+    const data = await tx.order.update({
+      where: { id: orderId },
+      data: { status: "cancelled", updated_at: new Date() },
+    });
+    await tx.orderLog.create({
+      data: { order_id: orderId, user_id: userId, action: "EXPIRE_ORDER", description: "Payment window expired" },
+    });
+    return data;
+  });
+}
+
 export async function getOrderItem(user: CurrentUser, id: string) {
   const item = requireData<Record<string, unknown>>(await prisma.orderItem.findUnique({
     where: { id },
@@ -250,11 +339,65 @@ export async function createPayment(user: CurrentUser, orderId: string, method?:
   const order = await getOrder(orderId);
   assertOrderAccess(user, order);
   if (order.payment_status === "paid") throw new HttpError(409, "Order already paid", "ORDER_ALREADY_PAID");
-  return prisma.$transaction(async (tx) => {
-    const data = await tx.payment.create({ data: { order_id: orderId, method: method ?? (order.payment_method as string), amount: order.total_amount as never } });
+  if (order.payment_expires_at && new Date(order.payment_expires_at as string | Date) <= new Date()) {
+    await cancelExpiredOrder(orderId, user.id);
+    throw new HttpError(409, "Order payment window has expired", "ORDER_PAYMENT_EXPIRED");
+  }
+  const provider = (method ?? order.payment_method) as PaymentProvider;
+  if (provider !== "vnpay" && provider !== "paypal" && provider !== "simulated") throw new HttpError(422, "Unsupported payment provider", "PAYMENT_METHOD_INVALID");
+  const payment = await prisma.$transaction(async (tx) => {
+    const data = await tx.payment.create({ data: { order_id: orderId, method: provider, amount: order.total_amount as never } });
+    await tx.order.update({ where: { id: orderId }, data: { payment_method: provider, updated_at: new Date() } });
     await tx.paymentLog.create({ data: { payment_id: data.id, order_id: orderId, user_id: user.id, action: "PAYMENT_CREATED", status: "pending", amount: data.amount } });
     return data;
   });
+
+  try {
+    if (provider === "simulated") {
+      const legacy = createSimulatedPayment(provider, orderId);
+      return { ...payment, transaction_ref: legacy.transactionRef, gateway_response: legacy.gatewayResponse, checkout_url: legacy.checkoutUrl };
+    }
+    const request = { paymentId: payment.id, orderCode: String(order.order_code), amountVnd: Number(order.total_amount) };
+    const gateway = provider === "paypal" ? await createPayPalPayment(request) : createVnpayPayment(request);
+    return prisma.payment.update({
+      where: { id: payment.id },
+      data: { transaction_ref: gateway.transactionRef, gateway_response: JSON.stringify(gateway.gatewayResponse) },
+    }).then((data) => ({ ...data, checkout_url: gateway.checkoutUrl }));
+  } catch (error) {
+    console.error(JSON.stringify({
+      event: "payment.provider.create.failed",
+      provider,
+      paymentId: payment.id,
+      orderId,
+      orderCode: order.order_code,
+      stage: "provider.create_or_payment.update",
+      error: errorForLog(error),
+    }));
+    try {
+      await markPaymentFailed(payment.id, user.id, "PAYMENT_PROVIDER_CREATE_FAILED");
+    } catch (markError) {
+      console.error(JSON.stringify({
+        event: "payment.failure.log.failed",
+        provider,
+        paymentId: payment.id,
+        orderId,
+        stage: "mark_payment_failed",
+        error: errorForLog(markError),
+      }));
+    }
+    throw error;
+  }
+}
+
+export async function getCartCount(userId: string) {
+  const cart = await getOrCreateCart(userId);
+  return prisma.cartItem.count({ where: { cart_id: cart.id as string } });
+}
+
+function errorForLog(error: unknown) {
+  if (error instanceof HttpError) return { name: error.name, message: error.message, code: error.code, details: error.details, stack: error.stack };
+  if (error instanceof Error) return { name: error.name, message: error.message, stack: error.stack };
+  return { name: "UnknownError", message: String(error) };
 }
 
 async function getPayment(id: string) {
@@ -275,13 +418,33 @@ export async function simulatePaymentSuccess(user: CurrentUser, id: string) {
   const order = payment.orders as Record<string, unknown>;
   assertOrderAccess(user, order);
   if (payment.status === "success" || order.payment_status === "paid") throw new HttpError(409, "Payment already completed", "PAYMENT_ALREADY_COMPLETED");
+  if (order.payment_expires_at && new Date(order.payment_expires_at as string | Date) <= new Date()) {
+    await cancelExpiredOrder(order.id as string, user.id);
+    throw new HttpError(409, "Order payment window has expired", "ORDER_PAYMENT_EXPIRED");
+  }
   const orderItems = (order.order_items as Array<Record<string, unknown>>) ?? [];
-  const now = new Date();
 
+  return completePayment(id, user.id, payment, order, orderItems);
+}
+
+async function completePayment(id: string, userId: string, payment: Record<string, unknown>, order: Record<string, unknown>, orderItems: Array<Record<string, unknown>>) {
+  const now = new Date();
   return prisma.$transaction(async (tx) => {
+    const claim = typeof tx.payment.updateMany === "function"
+      ? await tx.payment.updateMany({ where: { id, status: "pending" }, data: { status: "processing" } })
+      : { count: 1 };
+    if (claim.count === 0) {
+      const current = await tx.payment.findUnique({ where: { id } });
+      if (current?.status === "success") return current;
+      throw new HttpError(409, "Payment is already being processed", "PAYMENT_IN_PROGRESS");
+    }
+
     for (const item of orderItems) {
       const voucher = item.voucher_products as Voucher;
-      await getSellableVoucher(voucher.id, Number(item.quantity));
+      const today = todayIsoDate();
+      if (voucher.approval_status !== "approved" || voucher.status !== "active" || dateToIsoDate(voucher.sale_start_date) > today || dateToIsoDate(voucher.sale_end_date) < today) {
+        throw new HttpError(422, "Voucher product is no longer sellable", "VOUCHER_NOT_SELLABLE");
+      }
       const stockUpdate = await tx.voucherProduct.updateMany({
         where: { id: voucher.id, remaining_quantity: { gte: Number(item.quantity) } },
         data: { remaining_quantity: { decrement: Number(item.quantity) } }
@@ -290,15 +453,16 @@ export async function simulatePaymentSuccess(user: CurrentUser, id: string) {
 
       const issued = Array.from({ length: Number(item.quantity) }, () => {
         const code = voucherCode();
+        const qrPayload = `${env.FRONTEND_URL}/voucher/verify?code=${encodeURIComponent(code)}`;
         const issuedDate = new Date();
         const expiredDate = new Date(issuedDate);
         expiredDate.setDate(expiredDate.getDate() + Number(voucher.validity_days));
         return {
           voucher_code: code,
-          qr_code_payload: code,
+          qr_code_payload: qrPayload,
           order_item_id: item.id as string,
           voucher_product_id: voucher.id,
-          owner_id: order.user_id as string,
+          owner_id: (order.recipient_id ?? order.user_id) as string,
           issued_date: issuedDate,
           expired_date: expiredDate,
           status: "active"
@@ -307,9 +471,10 @@ export async function simulatePaymentSuccess(user: CurrentUser, id: string) {
       await tx.issuedVoucher.createMany({ data: issued });
     }
 
-    const data = await tx.payment.update({ where: { id }, data: { status: "success", paid_at: now, transaction_ref: `SIM-${Date.now()}`, gateway_response: "simulated success" } });
+    const data = await tx.payment.update({ where: { id }, data: { status: "success", paid_at: now } });
     await tx.order.update({ where: { id: order.id as string }, data: { payment_status: "paid", status: "confirmed", updated_at: now } });
-    await tx.paymentLog.create({ data: { payment_id: id, order_id: order.id as string, user_id: user.id, action: "PAYMENT_SUCCESS", status: "success", amount: payment.amount as never } });
+    await tx.orderLog.create({ data: { order_id: order.id as string, user_id: userId, action: "PAYMENT_SUCCESS", description: "Payment confirmed and vouchers issued" } });
+    await tx.paymentLog.create({ data: { payment_id: id, order_id: order.id as string, user_id: userId, action: "PAYMENT_SUCCESS", status: "success", amount: payment.amount as never } });
     return data;
   });
 }
@@ -318,10 +483,100 @@ export async function simulatePaymentFailed(user: CurrentUser, id: string) {
   const payment = await getPayment(id);
   const order = payment.orders as Record<string, unknown>;
   assertOrderAccess(user, order);
+  return markPaymentFailed(id, user.id, "simulated failed", payment);
+}
+
+async function markPaymentFailed(id: string, userId: string, reason: string, knownPayment?: Record<string, unknown>) {
   return prisma.$transaction(async (tx) => {
-    const data = await tx.payment.update({ where: { id }, data: { status: "failed", gateway_response: "simulated failed" } });
-    await tx.order.update({ where: { id: order.id as string }, data: { payment_status: "failed", updated_at: new Date() } });
-    await tx.paymentLog.create({ data: { payment_id: id, order_id: order.id as string, user_id: user.id, action: "PAYMENT_FAILED", status: "failed", amount: payment.amount as never } });
+    const payment = knownPayment ?? (typeof tx.payment.findUnique === "function" ? await tx.payment.findUnique({ where: { id } }) : undefined);
+    if (!payment) throw new HttpError(404, "Payment not found", "PAYMENT_NOT_FOUND");
+    if (payment.status === "success" || payment.status === "failed") return payment;
+    const data = await tx.payment.update({ where: { id }, data: { status: "failed", gateway_response: reason } });
+    await tx.paymentLog.create({ data: { payment_id: id, order_id: payment.order_id, user_id: userId, action: "PAYMENT_FAILED", status: "failed", amount: payment.amount } });
     return data;
   });
+}
+
+async function paymentByTransactionRef(transactionRef: string) {
+  return requireData<Record<string, unknown>>(await prisma.payment.findFirst({
+    where: { transaction_ref: transactionRef },
+    include: { orders: { include: { order_items: { include: { voucher_products: true } } } } },
+  }) as unknown as Record<string, unknown> | null, "Payment not found");
+}
+
+function redirectResult(orderId: string, status: "success" | "failed") {
+  return `${env.FRONTEND_URL}/checkout/payment/result?orderId=${encodeURIComponent(orderId)}&status=${status}`;
+}
+
+function paymentWindowExpired(order: Record<string, unknown>) {
+  return Boolean(order.payment_expires_at && new Date(order.payment_expires_at as string | Date) <= new Date());
+}
+
+export async function handleVnpayReturn(query: Record<string, unknown>) {
+  const result = verifyVnpayReturn(query);
+  const payment = await paymentByTransactionRef(result.transactionRef);
+  const order = payment.orders as Record<string, unknown>;
+  const successfulReturn = result.validSignature && result.validTmnCode && result.responseCode === "00" && result.transactionStatus === "00" && result.amount === Number(payment.amount);
+  if (successfulReturn && paymentWindowExpired(order)) {
+    await cancelExpiredOrder(order.id as string, order.user_id as string);
+    await markPaymentFailed(payment.id as string, order.user_id as string, "VNPAY_PAYMENT_EXPIRED");
+    return redirectResult(order.id as string, "failed");
+  }
+  if (successfulReturn) {
+    try {
+      await completePayment(payment.id as string, order.user_id as string, payment, order, order.order_items as Array<Record<string, unknown>>);
+      return redirectResult(order.id as string, "success");
+    } catch (error) {
+      console.error("VNPay fulfillment failed", error instanceof Error ? error.message : "UnknownError");
+      try {
+        await markPaymentFailed(payment.id as string, order.user_id as string, "VNPAY_FULFILLMENT_FAILED");
+      } catch (markError) {
+        console.error("Unable to record VNPay failure", markError instanceof Error ? markError.message : "UnknownError");
+      }
+      return redirectResult(order.id as string, "failed");
+    }
+  }
+  await markPaymentFailed(payment.id as string, order.user_id as string, `VNPAY_FAILED_${result.responseCode}`);
+  return redirectResult(order.id as string, "failed");
+}
+
+export async function handlePayPalReturn(token: string) {
+  const payment = await paymentByTransactionRef(token);
+  const order = payment.orders as Record<string, unknown>;
+  if (payment.status === "success" || order.payment_status === "paid") return redirectResult(order.id as string, "success");
+  if (paymentWindowExpired(order)) {
+    await cancelExpiredOrder(order.id as string, order.user_id as string);
+    await markPaymentFailed(payment.id as string, order.user_id as string, "PAYPAL_PAYMENT_EXPIRED");
+    return redirectResult(order.id as string, "failed");
+  }
+  try {
+    const captured = await capturePayPalPayment(token, Number(payment.amount));
+    await prisma.payment.update({ where: { id: payment.id as string }, data: { gateway_response: JSON.stringify(captured.gatewayResponse) } });
+    await completePayment(payment.id as string, order.user_id as string, payment, order, order.order_items as Array<Record<string, unknown>>);
+    return redirectResult(order.id as string, "success");
+  } catch (error) {
+    console.error(JSON.stringify({
+      event: "payment.paypal.callback.failed",
+      provider: "paypal",
+      paymentId: payment.id,
+      orderId: order.id,
+      transactionRef: token,
+      stage: "capture_or_fulfillment",
+      error: errorForLog(error),
+    }));
+    await markPaymentFailed(payment.id as string, order.user_id as string, "PAYPAL_PAYMENT_FAILED");
+    if (error instanceof HttpError && error.code === "PAYMENT_ALREADY_COMPLETED") return redirectResult(order.id as string, "success");
+    return redirectResult(order.id as string, "failed");
+  }
+}
+
+export async function handlePayPalCancel(token?: string) {
+  if (token) {
+    const payment = await prisma.payment.findFirst({ where: { transaction_ref: token }, include: { orders: true } });
+    if (payment) {
+      await markPaymentFailed(payment.id, payment.orders.user_id, "PAYPAL_CANCELLED");
+      return redirectResult(payment.order_id, "failed");
+    }
+  }
+  return `${env.FRONTEND_URL}/orders`;
 }

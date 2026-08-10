@@ -1,6 +1,8 @@
 import { useState } from "react"
 import { Shield, Check, Minus, Save, AlertTriangle } from "lucide-react"
+import { toast } from "sonner"
 import { C } from "@/utils/constants"
+import { AppIcon } from "@/components/AppIcon"
 
 interface Permission {
   id: string
@@ -11,7 +13,7 @@ interface Permission {
 interface RoleConfig {
   id: string
   name: string
-  emoji: string
+  icon: string
   color: string
   permissions: Set<string>
 }
@@ -50,27 +52,27 @@ const MODULES = [...new Set(ALL_PERMISSIONS.map((p) => p.module))]
 
 const INITIAL_ROLES: RoleConfig[] = [
   {
-    id: "admin-content", name: "Admin Nội dung", emoji: "📝", color: "#81B29A",
+    id: "admin-content", name: "Admin Nội dung", icon: "document", color: "#81B29A",
     permissions: new Set(["content.view","content.create","content.edit","content.delete","voucher.view","voucher.approve","voucher.reject"]),
   },
   {
-    id: "admin-account", name: "Admin Tài khoản", emoji: "👤", color: "#3D405B",
+    id: "admin-operations", name: "Admin Vận hành", icon: "user", color: "#3D405B",
     permissions: new Set(["user.view","user.lock","user.edit","partner.view","partner.approve","partner.lock","order.view","order.cancel","order.refund","voucher.view"]),
   },
   {
-    id: "admin-security", name: "Admin Bảo mật", emoji: "🔐", color: "#E07A5F",
+    id: "admin-security", name: "Admin Bảo mật", icon: "lock", color: "#E07A5F",
     permissions: new Set(["log.view","security.lock","rbac.manage","user.view","partner.view"]),
   },
   {
-    id: "partner-owner", name: "Đối tác chủ TK", emoji: "🏢", color: "#F2CC8F",
+    id: "partner-owner", name: "Đối tác chủ TK", icon: "building", color: "#F2CC8F",
     permissions: new Set(["voucher.view","voucher.create","voucher.edit"]),
   },
   {
-    id: "voucher-staff", name: "NV Tạo Voucher", emoji: "🏷️", color: "#9CA3AF",
+    id: "voucher-staff", name: "NV Tạo Voucher", icon: "tag", color: "#9CA3AF",
     permissions: new Set(["voucher.view","voucher.create","voucher.edit"]),
   },
   {
-    id: "store-staff", name: "NV Cửa hàng", emoji: "🔖", color: "#6B7280",
+    id: "store-staff", name: "NV Cửa hàng", icon: "ticket", color: "#6B7280",
     permissions: new Set([]),
   },
 ]
@@ -88,7 +90,7 @@ export function RBACManagementPage() {
       const secRole = roles.find((r) => r.id === "admin-security")!
       const othersHaveRbac = roles.some((r) => r.id !== "admin-security" && r.permissions.has("rbac.manage"))
       if (!othersHaveRbac && secRole.permissions.has("rbac.manage")) {
-        alert("Không thể gỡ bỏ quyền quản lý phân quyền cuối cùng trong hệ thống!")
+        toast.error("Không thể gỡ bỏ quyền quản lý phân quyền cuối cùng trong hệ thống!")
         return
       }
     }
@@ -138,7 +140,7 @@ export function RBACManagementPage() {
                   borderLeft: selectedRole === r.id ? `3px solid ${r.color}` : "3px solid transparent",
                 }}
               >
-                <span className="text-lg">{r.emoji}</span>
+                 <AppIcon name={r.icon} className="w-5 h-5" />
                 <div>
                   <div className="text-xs font-bold" style={{ color: selectedRole === r.id ? r.color : C.indigo }}>{r.name}</div>
                   <div className="text-xs" style={{ color: "#9CA3AF" }}>{r.permissions.size} quyền</div>
@@ -156,7 +158,7 @@ export function RBACManagementPage() {
         <div className="flex-1 bg-white rounded-2xl shadow-sm overflow-hidden">
           {/* Role header */}
           <div className="px-5 py-4 border-b flex items-center gap-3" style={{ borderColor: "#F0EDD8", backgroundColor: role.color + "0D" }}>
-            <span className="text-2xl">{role.emoji}</span>
+             <AppIcon name={role.icon} className="w-7 h-7" />
             <div>
               <div className="font-black text-sm" style={{ color: role.color }}>{role.name}</div>
               <div className="text-xs" style={{ color: "#6B7280" }}>{role.permissions.size} / {ALL_PERMISSIONS.length} quyền đang bật</div>

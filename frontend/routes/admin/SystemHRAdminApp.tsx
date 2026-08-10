@@ -13,7 +13,7 @@ const ROLE: SubAdminRole = {
   id: "system-hr",
   name: "System & HR Admin",
   subtitle: "Hệ thống & Nhân sự",
-  emoji: "🛡️",
+  icon: "shield",
   accent: "#3D405B",
   accentBg: "#ECEEF5",
   sidebarBg: "#2D2F45",

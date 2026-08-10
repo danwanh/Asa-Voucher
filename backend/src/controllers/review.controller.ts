@@ -20,6 +20,11 @@ export async function listPublicReviews(req: Request, res: Response) {
   sendSuccess(res, result);
 }
 
+export async function createMediaSignature(_req: Request, res: Response) {
+  const signature = await reviewService.createMediaSignature();
+  sendSuccess(res, signature);
+}
+
 export async function getReview(req: Request, res: Response) {
   const review = await reviewService.getReviewById(req.user, req.params.id);
   sendSuccess(res, review);

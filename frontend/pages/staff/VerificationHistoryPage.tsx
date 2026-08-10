@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { Search, Filter } from "lucide-react"
 import { C } from "@/utils/constants"
+import { AppIcon } from "@/components/AppIcon"
 
 const MOCK_HISTORY = [
   { id: "vh1", voucherCode: "ASA-ABC123", voucherTitle: "Pizza Hut Set 2 người", customerName: "Nguyễn Thị Mai", branchName: "CN Nguyễn Trãi", staffName: "Trần Văn Nam", verifiedAt: "2024-08-01T09:15:00", status: "valid" },
@@ -84,7 +85,7 @@ export function VerificationHistoryPage() {
         </div>
         {filtered.length === 0 && (
           <div className="text-center py-12">
-            <div className="text-3xl mb-2">📋</div>
+            <AppIcon name="document" className="w-8 h-8 mb-2 mx-auto" />
             <div className="font-bold text-sm" style={{ color: C.indigo }}>Không có lịch sử xác nhận</div>
           </div>
         )}

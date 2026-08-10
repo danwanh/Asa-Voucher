@@ -1,4 +1,5 @@
 import { Star } from "lucide-react"
+import { AppIcon } from "@/components/AppIcon"
 import { C, fmt } from "@/utils/constants"
 import { StatusBadge } from "./StatusBadge"
 import type { Voucher } from "@/types"
@@ -6,10 +7,10 @@ import type { Voucher } from "@/types"
 const FALLBACK = "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=600&h=400&fit=crop"
 
 const CAT_ICON: Record<string, string> = {
-  food: "🍽️",
-  travel: "✈️",
-  beauty: "💄",
-  entertainment: "🎭",
+  food: "gift",
+  travel: "location",
+  beauty: "heart",
+  entertainment: "ticket",
 }
 
 interface Props {
@@ -37,7 +38,7 @@ export function VoucherCard({ voucher: v, onBuy, onClick }: Props) {
           onError={(e) => { (e.target as HTMLImageElement).src = FALLBACK }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
-        <div className="absolute top-3 left-3 text-lg">{CAT_ICON[v.category] ?? "🏷️"}</div>
+        <AppIcon name={CAT_ICON[v.category] ?? "tag"} className="absolute top-3 left-3 w-5 h-5 text-white" />
         {v.status !== "active" && (
           <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
             <StatusBadge status={v.status} />

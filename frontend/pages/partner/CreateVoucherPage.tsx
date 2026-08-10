@@ -1,360 +1,408 @@
-import { useState } from "react"
-import { ArrowLeft, CheckCircle, FileEdit, Loader2 } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import { ArrowLeft, Loader2, Save } from "lucide-react"
+import { toast } from "sonner"
 import { C } from "@/utils/constants"
+import { partnerService, type PartnerBranch } from "@/services/partnerService"
 import { voucherService } from "@/services/voucherService"
+import { useAuthStore } from "@/stores/authStore"
 import type { Voucher } from "@/types"
+import { serializeApplicableAreas } from "@/utils/applicableArea"
 
 interface Props {
+  partnerId?: string
+  partnerName?: string
   onBack: () => void
-  onSaveDraft: (draft: Voucher) => void
+  onSaveDraft?: (draft: Voucher) => void
 }
 
-type SubmitMode = "draft" | "publish"
-type PageState = "form" | "success-draft" | "success-publish"
+type CategoryOption = {
+  id: string
+  name: string
+}
 
-const CATEGORIES = [
-  { value: "food",          label: "🍜 Ẩm thực" },
-  { value: "beauty",        label: "💅 Làm đẹp" },
-  { value: "travel",        label: "✈️ Du lịch" },
-  { value: "entertainment", label: "🎬 Giải trí" },
-]
+type FormState = {
+  name: string
+  categoryId: string
+  description: string
+  applicableArea: string
+  originalPrice: string
+  sellingPrice: string
+  totalQuantity: string
+  saleStartDate: string
+  saleEndDate: string
+  validityDays: string
+  terms: string
+  usageInstructions: string
+  branchIds: string[]
+}
 
-export function CreateVoucherPage({ onBack, onSaveDraft }: Props) {
-  const [pageState, setPageState] = useState<PageState>("form")
-  const [saving, setSaving] = useState(false)
-  const [apiError, setApiError] = useState<string | null>(null)
-  const [form, setForm] = useState({
-    title: "", category: "food", discountType: "percent", discount: "",
-    price: "", originalPrice: "", minOrder: "", quantity: "",
-    validFrom: "", validTo: "", validityDays: "",
-    description: "",
-  })
+const INITIAL_FORM: FormState = {
+  name: "",
+  categoryId: "",
+  description: "",
+  applicableArea: "",
+  originalPrice: "",
+  sellingPrice: "",
+  totalQuantity: "",
+  saleStartDate: "",
+  saleEndDate: "",
+  validityDays: "",
+  terms: "",
+  usageInstructions: "",
+  branchIds: []
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  const err = error as { response?: { data?: { error?: { message?: string } } } }
+  return err?.response?.data?.error?.message ?? fallback
+}
+
+function toLines(value: string) {
+  return value
+    .split("\n")
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
+export function CreateVoucherPage({ partnerId, onBack }: Props) {
+  const user = useAuthStore((state) => state.user)
+  const currentPartnerId = user?.partnerId ?? partnerId
+  const [categories, setCategories] = useState<CategoryOption[]>([])
+  const [branches, setBranches] = useState<PartnerBranch[]>([])
+  const [form, setForm] = useState<FormState>(INITIAL_FORM)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
+  const [confirmSave, setConfirmSave] = useState(false)
+  const [createdVoucherId, setCreatedVoucherId] = useState<string | null>(null)
+  const [assignedBranchIds, setAssignedBranchIds] = useState<string[]>([])
 
-  const up = (k: string, v: string) => { setForm((f) => ({ ...f, [k]: v })); setErrors((e) => ({ ...e, [k]: "" })); setApiError(null) }
+  useEffect(() => {
+    let isMounted = true
 
-  const validate = (): Record<string, string> => {
-    const e: Record<string, string> = {}
-    if (!form.title.trim()) e.title = "Vui lòng nhập tên voucher"
-    else if (form.title.length > 255) e.title = "Tên voucher không được vượt quá 255 ký tự"
-    if (!form.discount) e.discount = "Vui lòng nhập mức giảm"
-    if (!form.price || isNaN(Number(form.price))) e.price = "Giá bán không hợp lệ"
-    else if (Number(form.price) <= 0) e.price = "Giá bán phải lớn hơn 0"
-    if (form.originalPrice && form.price && Number(form.price) > Number(form.originalPrice)) {
-      e.price = "Giá bán không được lớn hơn giá gốc"
+    async function loadOptions() {
+      if (!currentPartnerId) {
+        setLoadError("Không tìm thấy đối tác hiện tại")
+        setIsLoading(false)
+        return
+      }
+
+      setIsLoading(true)
+      setLoadError(null)
+      try {
+        const [categoryResult, branchResult] = await Promise.all([
+          voucherService.listCategories(),
+          partnerService.listBranches(currentPartnerId)
+        ])
+        if (!isMounted) return
+        const activeBranches = branchResult.filter((branch) => branch.isActive)
+        setCategories(categoryResult.map((category) => ({ id: category.id, name: category.name })))
+        setBranches(activeBranches)
+        setForm((current) => ({
+          ...current,
+          categoryId: current.categoryId || categoryResult[0]?.id || ""
+        }))
+      } catch (error) {
+        if (!isMounted) return
+        setLoadError(getErrorMessage(error, "Không thể tải dữ liệu tạo voucher"))
+      } finally {
+        if (isMounted) setIsLoading(false)
+      }
     }
-    if (!form.quantity || isNaN(Number(form.quantity))) e.quantity = "Vui lòng nhập số lượng"
-    else if (Number(form.quantity) < 1) e.quantity = "Số lượng phải lớn hơn 0"
-    if (!form.validTo) e.validTo = "Vui lòng chọn ngày hết hạn"
-    if (form.validFrom && form.validTo && new Date(form.validTo) <= new Date(form.validFrom)) {
-      e.validTo = "Ngày hết hạn phải sau ngày bắt đầu"
+
+    loadOptions()
+    return () => {
+      isMounted = false
     }
-    if (form.validityDays && (isNaN(Number(form.validityDays)) || Number(form.validityDays) < 1)) {
-      e.validityDays = "Thời hạn sử dụng phải lớn hơn 0"
-    }
-    return e
+  }, [currentPartnerId])
+
+  const selectedBranches = useMemo(
+    () => branches.filter((branch) => form.branchIds.includes(branch.id)),
+    [branches, form.branchIds]
+  )
+
+  const derivedApplicableArea = useMemo(
+    () => serializeApplicableAreas(selectedBranches.map((branch) => branch.city)),
+    [selectedBranches]
+  )
+
+  const updateField = (key: keyof FormState, value: string | string[]) => {
+    setForm((current) => ({ ...current, [key]: value }))
+    setErrors((current) => ({ ...current, [key]: "" }))
   }
 
-  const buildDraftVoucher = (): Voucher => ({
-    id: "draft-" + Date.now(),
-    partnerId: "p1",
-    partnerName: "Pizza Hut Vietnam",
-    partnerLogo: "🍕",
-    title: form.title || "Voucher chưa đặt tên",
-    category: form.category,
-    discount: Number(form.discount) || 0,
-    discountType: form.discountType as "percent" | "fixed",
-    minOrder: Number(form.minOrder) || 0,
-    price: Number(form.price) || 0,
-    originalPrice: Number(form.originalPrice) || Number(form.price) || 0,
-    validFrom: form.validFrom || new Date().toISOString().split("T")[0],
-    validTo: form.validTo || "",
-    quantity: Number(form.quantity) || 0,
-    sold: 0,
-    status: "draft",
-    rating: 0,
-    reviews: 0,
-    description: form.description,
-    image: "",
-    tags: [],
-  })
+  const toggleBranch = (branchId: string) => {
+    setForm((current) => {
+      const exists = current.branchIds.includes(branchId)
+      return {
+        ...current,
+        branchIds: exists
+          ? current.branchIds.filter((id) => id !== branchId)
+          : [...current.branchIds, branchId]
+      }
+    })
+    setErrors((current) => ({ ...current, branchIds: "" }))
+  }
 
-  const handleSaveDraft = async () => {
-    if (!form.title.trim()) {
-      setErrors({ title: "Vui lòng nhập tên voucher để lưu nháp" })
+  const validate = () => {
+    const nextErrors: Record<string, string> = {}
+    const originalPrice = Number(form.originalPrice)
+    const sellingPrice = Number(form.sellingPrice)
+    const totalQuantity = Number(form.totalQuantity)
+    const validityDays = Number(form.validityDays)
+
+    if (!form.name.trim()) nextErrors.name = "Vui lòng nhập tên voucher"
+    if (!form.categoryId) nextErrors.categoryId = "Vui lòng chọn danh mục"
+    if (!form.description.trim()) nextErrors.description = "Vui lòng nhập mô tả"
+    if (!Number.isFinite(originalPrice) || originalPrice <= 0) nextErrors.originalPrice = "Giá gốc phải lớn hơn 0"
+    if (!Number.isFinite(sellingPrice) || sellingPrice <= 0) nextErrors.sellingPrice = "Giá bán phải lớn hơn 0"
+    if (Number.isFinite(originalPrice) && Number.isFinite(sellingPrice) && sellingPrice >= originalPrice) {
+      nextErrors.sellingPrice = "Giá bán phải nhỏ hơn giá gốc"
+    }
+    if (!Number.isInteger(totalQuantity) || totalQuantity <= 0) nextErrors.totalQuantity = "Số lượng phát hành phải là số nguyên dương"
+    if (!form.saleStartDate) nextErrors.saleStartDate = "Vui lòng chọn ngày bắt đầu bán"
+    if (!form.saleEndDate) nextErrors.saleEndDate = "Vui lòng chọn ngày kết thúc bán"
+    if (form.saleStartDate && form.saleEndDate && new Date(form.saleStartDate) > new Date(form.saleEndDate)) {
+      nextErrors.saleEndDate = "Ngày kết thúc bán phải sau ngày bắt đầu"
+    }
+    if (!Number.isInteger(validityDays) || validityDays <= 0) nextErrors.validityDays = "Số ngày sử dụng phải là số nguyên dương"
+    if (toLines(form.terms).length === 0) nextErrors.terms = "Vui lòng nhập điều kiện sử dụng"
+    if (form.branchIds.length === 0) nextErrors.branchIds = "Vui lòng chọn ít nhất một chi nhánh"
+
+    setErrors(nextErrors)
+    return Object.keys(nextErrors).length === 0
+  }
+
+  const requestSave = () => {
+    if (!validate()) return
+    setConfirmSave(true)
+  }
+
+  const assignMissingBranches = async (voucherId: string) => {
+    const missingBranchIds = form.branchIds.filter((branchId) => !assignedBranchIds.includes(branchId))
+    const newlyAssigned: string[] = []
+    for (const branchId of missingBranchIds) {
+      await voucherService.assignBranch(voucherId, branchId)
+      newlyAssigned.push(branchId)
+    }
+    setAssignedBranchIds((current) => Array.from(new Set([...current, ...newlyAssigned])))
+  }
+
+  const saveVoucher = async () => {
+    setIsSaving(true)
+    setConfirmSave(false)
+
+    let voucherId = createdVoucherId
+    try {
+      if (!voucherId) {
+        const created = await voucherService.createVoucher({
+          category_id: form.categoryId,
+          name: form.name.trim(),
+          description: form.description.trim(),
+          applicable_area: derivedApplicableArea || undefined,
+          original_price: Number(form.originalPrice),
+          selling_price: Number(form.sellingPrice),
+          total_quantity: Number(form.totalQuantity),
+          sale_start_date: form.saleStartDate,
+          sale_end_date: form.saleEndDate,
+          validity_days: Number(form.validityDays),
+          terms_and_conditions: toLines(form.terms),
+          usage_instructions: toLines(form.usageInstructions)
+        })
+        voucherId = created.id
+        setCreatedVoucherId(created.id)
+      }
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Không thể tạo voucher"))
+      setIsSaving(false)
       return
     }
-    setSaving(true)
-    setApiError(null)
+
     try {
-      const created = await voucherService.create({
-        category_id: form.category,
-        name: form.title || "Voucher chưa đặt tên",
-        description: form.description || undefined,
-        original_price: Number(form.originalPrice) || Number(form.price) || 70000,
-        selling_price: Number(form.price) || 49000,
-        total_quantity: Number(form.quantity) || 1,
-        sale_start_date: form.validFrom || new Date().toISOString().split("T")[0],
-        sale_end_date: form.validTo || new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0],
-        validity_days: Number(form.validityDays) || 30,
-        status: "draft",
-      })
-      onSaveDraft(buildDraftVoucher())
-      setPageState("success-draft")
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Lỗi khi tạo voucher"
-      setApiError(msg)
+      await assignMissingBranches(voucherId)
+      toast.success("Đã lưu voucher nháp")
+      onBack()
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Voucher đã được lưu nháp nhưng chưa lưu đủ chi nhánh. Vui lòng thử lại."))
     } finally {
-      setSaving(false)
+      setIsSaving(false)
     }
   }
 
-  const handlePublish = async () => {
-    const e = validate()
-    setErrors(e)
-    if (Object.keys(e).length > 0) return
-    setSaving(true)
-    setApiError(null)
-    try {
-      await voucherService.create({
-        category_id: form.category,
-        name: form.title,
-        description: form.description || undefined,
-        original_price: Number(form.originalPrice) || Number(form.price),
-        selling_price: Number(form.price),
-        total_quantity: Number(form.quantity),
-        sale_start_date: form.validFrom || new Date().toISOString().split("T")[0],
-        sale_end_date: form.validTo,
-        validity_days: Number(form.validityDays) || 30,
-        status: "draft",
-      })
-      // Submit for approval after creation
-      setPageState("success-publish")
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Lỗi khi tạo voucher"
-      setApiError(msg)
-    } finally {
-      setSaving(false)
-    }
-  }
+  const inputCls = (error?: string) =>
+    `w-full px-4 py-2.5 rounded-xl border text-sm outline-none bg-white ${error ? "border-red-400" : "border-[#E2DFC8]"}`
 
-  if (pageState === "success-draft") {
+  if (isLoading) {
     return (
-      <div className="p-6 flex flex-col items-center justify-center min-h-72">
-        <div className="w-16 h-16 rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: C.apricot + "30" }}>
-          <FileEdit className="w-8 h-8" style={{ color: "#856404" }} />
-        </div>
-        <h2 className="text-xl font-black mb-2" style={{ color: C.indigo }}>Đã lưu bản nháp!</h2>
-        <p className="text-sm text-center max-w-xs mb-2" style={{ color: "#8A8DA8" }}>
-          Voucher <strong style={{ color: C.indigo }}>{form.title}</strong> đã được lưu ở trạng thái <strong>Bản nháp</strong>.
-        </p>
-        <p className="text-xs text-center mb-7" style={{ color: "#8A8DA8" }}>
-          Bạn có thể tiếp tục chỉnh sửa và gửi duyệt khi sẵn sàng.
-        </p>
-        <div className="flex gap-3">
-          <button
-            onClick={() => setPageState("form")}
-            className="px-5 py-2.5 rounded-xl font-bold text-sm border-2"
-            style={{ borderColor: C.indigo + "30", color: C.indigo }}
-          >
-            Tiếp tục chỉnh sửa
-          </button>
-          <button
-            onClick={onBack}
-            className="px-5 py-2.5 rounded-xl font-bold text-white text-sm"
-            style={{ backgroundColor: C.peach }}
-          >
-            Xem danh sách voucher
-          </button>
+      <div className="p-6">
+        <div className="flex items-center gap-2 text-sm" style={{ color: "#8A8DA8" }}>
+          <Loader2 className="w-4 h-4 animate-spin" />
+          Đang tải dữ liệu tạo voucher...
         </div>
       </div>
     )
   }
 
-  if (pageState === "success-publish") {
+  if (loadError) {
     return (
-      <div className="p-6 flex flex-col items-center justify-center min-h-72">
-        <div className="w-16 h-16 rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: C.teal + "20" }}>
-          <CheckCircle className="w-8 h-8" style={{ color: C.teal }} />
-        </div>
-        <h2 className="text-xl font-black mb-2" style={{ color: C.indigo }}>Gửi duyệt thành công!</h2>
-        <p className="text-sm text-center mb-6" style={{ color: "#8A8DA8" }}>
-          Voucher <strong style={{ color: C.indigo }}>{form.title}</strong> đã được gửi.<br />
-          Quản trị viên sẽ xem xét và phê duyệt sớm nhất có thể.
-        </p>
-        <button onClick={onBack} className="px-6 py-3 rounded-2xl font-bold text-white" style={{ backgroundColor: C.peach }}>
-          Quay lại danh sách
+      <div className="p-6 max-w-2xl">
+        <button onClick={onBack} className="flex items-center gap-2 mb-5 text-sm font-semibold hover:underline" style={{ color: C.indigo }}>
+          <ArrowLeft className="w-4 h-4" /> Quay lại
         </button>
+        <div className="rounded-xl border bg-white p-5 text-sm" style={{ borderColor: "#F0EDD8", color: "#C0392B" }}>
+          {loadError}
+        </div>
       </div>
     )
   }
-
-  const inputCls = (err?: string) =>
-    `w-full px-4 py-3 rounded-2xl border text-sm outline-none transition-colors ${err ? "border-red-400" : ""}`
-  const inputStyle = (err?: string): React.CSSProperties => ({
-    borderColor: err ? "#EF4444" : "#E2DFC8",
-    backgroundColor: C.eggshell,
-    fontFamily: "'Inter', sans-serif",
-  })
 
   return (
-    <div className="p-6 max-w-2xl">
+    <div className="p-6 max-w-3xl">
       <button onClick={onBack} className="flex items-center gap-2 mb-5 text-sm font-semibold hover:underline" style={{ color: C.indigo }}>
         <ArrowLeft className="w-4 h-4" /> Quay lại
       </button>
+
       <h2 className="text-xl font-black mb-1" style={{ color: C.indigo }}>Tạo voucher mới</h2>
-      <p className="text-sm mb-6" style={{ color: "#8A8DA8" }}>Điền thông tin và chọn <strong>Lưu nháp</strong> để tiếp tục sau, hoặc <strong>Gửi duyệt</strong> khi đã hoàn chỉnh.</p>
+      <p className="text-sm mb-6" style={{ color: "#8A8DA8" }}>Voucher hợp lệ sẽ được lưu ở trạng thái Nháp.</p>
 
-      {/* Draft lifecycle reminder */}
-      <div className="flex items-center gap-3 mb-5 px-4 py-3 rounded-xl text-xs font-semibold" style={{ backgroundColor: C.apricot + "20", color: "#6B4F00" }}>
-        <span className="text-base">📋</span>
-        <span>Luồng: <strong>Bản nháp</strong> → Chỉnh sửa → <strong>Gửi duyệt</strong> → Được duyệt → Đang bán</span>
-      </div>
-
-      <div className="bg-card rounded-2xl p-6 shadow-sm space-y-4">
-        {/* Title */}
-        <div>
-          <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Tên voucher *</label>
-          <input
-            className={inputCls(errors.title)}
-            placeholder="VD: Giảm 30% pizza size L"
-            style={inputStyle(errors.title)}
-            value={form.title}
-            onChange={(e) => up("title", e.target.value)}
-          />
-          {errors.title && <p className="text-xs mt-1 text-red-500">{errors.title}</p>}
+      {createdVoucherId && (
+        <div className="mb-5 rounded-xl border px-4 py-3 text-sm font-semibold" style={{ borderColor: C.apricot, backgroundColor: C.apricot + "20", color: "#6B4F00" }}>
+          Voucher đã được tạo nháp. Vui lòng hoàn tất lưu chi nhánh áp dụng.
         </div>
+      )}
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Danh mục</label>
-            <select className={inputCls()} style={inputStyle()} value={form.category} onChange={(e) => up("category", e.target.value)}>
-              {CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-            </select>
+      <div className="space-y-5">
+        <section className="bg-white rounded-2xl p-6 border border-black/5">
+          <h3 className="font-bold text-sm mb-4" style={{ color: C.indigo }}>Thông tin voucher</h3>
+          <div className="space-y-4">
+            <Field label="Tên voucher *" error={errors.name}>
+              <input className={inputCls(errors.name)} value={form.name} onChange={(event) => updateField("name", event.target.value)} disabled={Boolean(createdVoucherId)} />
+            </Field>
+            <Field label="Danh mục *" error={errors.categoryId}>
+              <select className={inputCls(errors.categoryId)} value={form.categoryId} onChange={(event) => updateField("categoryId", event.target.value)} disabled={Boolean(createdVoucherId)}>
+                {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+              </select>
+            </Field>
+            <Field label="Mô tả *" error={errors.description}>
+              <textarea rows={3} className={`${inputCls(errors.description)} resize-none`} value={form.description} onChange={(event) => updateField("description", event.target.value)} disabled={Boolean(createdVoucherId)} />
+            </Field>
+            <Field label="Khu vực áp dụng">
+              <input className={inputCls()} value={derivedApplicableArea} readOnly placeholder="Tự động từ chi nhánh đã chọn" />
+              <p className="text-xs mt-1" style={{ color: "#8A8DA8" }}>
+                Hệ thống tự động lấy khu vực từ tỉnh/thành của chi nhánh áp dụng.
+              </p>
+            </Field>
           </div>
-          <div>
-            <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Loại giảm giá</label>
-            <select className={inputCls()} style={inputStyle()} value={form.discountType} onChange={(e) => up("discountType", e.target.value)}>
-              <option value="percent">Phần trăm (%)</option>
-              <option value="fixed">Số tiền cố định (đ)</option>
-            </select>
-          </div>
-        </div>
+        </section>
 
-        <div className="grid grid-cols-3 gap-4">
-          {[
-            { key: "discount",      label: `Mức giảm ${form.discountType === "percent" ? "(%)" : "(đ)"} *`, ph: "30" },
-            { key: "price",         label: "Giá bán (đ) *",  ph: "49000" },
-            { key: "originalPrice", label: "Giá gốc (đ)",    ph: "70000" },
-          ].map(({ key, label, ph }) => (
-            <div key={key}>
-              <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>{label}</label>
-              <input
-                type="number"
-                className={inputCls(errors[key])}
-                placeholder={ph}
-                style={inputStyle(errors[key])}
-                value={(form as Record<string, string>)[key]}
-                onChange={(e) => up(key, e.target.value)}
-              />
-              {errors[key] && <p className="text-xs mt-1 text-red-500">{errors[key]}</p>}
+        <section className="bg-white rounded-2xl p-6 border border-black/5">
+          <h3 className="font-bold text-sm mb-4" style={{ color: C.indigo }}>Giá và số lượng</h3>
+          <div className="grid sm:grid-cols-3 gap-4">
+            <Field label="Giá gốc (đ) *" error={errors.originalPrice}>
+              <input type="number" className={inputCls(errors.originalPrice)} value={form.originalPrice} onChange={(event) => updateField("originalPrice", event.target.value)} disabled={Boolean(createdVoucherId)} />
+            </Field>
+            <Field label="Giá bán (đ) *" error={errors.sellingPrice}>
+              <input type="number" className={inputCls(errors.sellingPrice)} value={form.sellingPrice} onChange={(event) => updateField("sellingPrice", event.target.value)} disabled={Boolean(createdVoucherId)} />
+            </Field>
+            <Field label="Số lượng phát hành *" error={errors.totalQuantity}>
+              <input type="number" className={inputCls(errors.totalQuantity)} value={form.totalQuantity} onChange={(event) => updateField("totalQuantity", event.target.value)} disabled={Boolean(createdVoucherId)} />
+            </Field>
+          </div>
+        </section>
+
+        <section className="bg-white rounded-2xl p-6 border border-black/5">
+          <h3 className="font-bold text-sm mb-4" style={{ color: C.indigo }}>Thời gian</h3>
+          <div className="grid sm:grid-cols-3 gap-4">
+            <Field label="Bắt đầu bán *" error={errors.saleStartDate}>
+              <input type="date" className={inputCls(errors.saleStartDate)} value={form.saleStartDate} onChange={(event) => updateField("saleStartDate", event.target.value)} disabled={Boolean(createdVoucherId)} />
+            </Field>
+            <Field label="Kết thúc bán *" error={errors.saleEndDate}>
+              <input type="date" className={inputCls(errors.saleEndDate)} value={form.saleEndDate} onChange={(event) => updateField("saleEndDate", event.target.value)} disabled={Boolean(createdVoucherId)} />
+            </Field>
+            <Field label="Số ngày sử dụng *" error={errors.validityDays}>
+              <input type="number" className={inputCls(errors.validityDays)} value={form.validityDays} onChange={(event) => updateField("validityDays", event.target.value)} disabled={Boolean(createdVoucherId)} />
+            </Field>
+          </div>
+        </section>
+
+        <section className="bg-white rounded-2xl p-6 border border-black/5">
+          <h3 className="font-bold text-sm mb-4" style={{ color: C.indigo }}>Điều kiện sử dụng</h3>
+          <div className="space-y-4">
+            <Field label="Điều kiện áp dụng *" error={errors.terms}>
+              <textarea rows={4} className={`${inputCls(errors.terms)} resize-none`} value={form.terms} onChange={(event) => updateField("terms", event.target.value)} disabled={Boolean(createdVoucherId)} />
+            </Field>
+            <Field label="Hướng dẫn sử dụng">
+              <textarea rows={3} className={`${inputCls()} resize-none`} value={form.usageInstructions} onChange={(event) => updateField("usageInstructions", event.target.value)} disabled={Boolean(createdVoucherId)} />
+            </Field>
+          </div>
+        </section>
+
+        <section className="bg-white rounded-2xl p-6 border border-black/5">
+          <h3 className="font-bold text-sm mb-4" style={{ color: C.indigo }}>Chi nhánh áp dụng *</h3>
+          {branches.length === 0 ? (
+            <div className="text-sm" style={{ color: "#8A8DA8" }}>Không có chi nhánh đang hoạt động</div>
+          ) : (
+            <div className="space-y-2">
+              {branches.map((branch) => (
+                <label key={branch.id} className="flex items-start gap-3 rounded-xl border px-3 py-3 cursor-pointer" style={{ borderColor: "#F0EDD8" }}>
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={form.branchIds.includes(branch.id)}
+                    onChange={() => toggleBranch(branch.id)}
+                  />
+                  <span>
+                    <span className="block text-sm font-bold" style={{ color: C.indigo }}>{branch.branchName}</span>
+                    <span className="block text-xs" style={{ color: "#8A8DA8" }}>{branch.address}, {branch.district ? `${branch.district}, ` : ""}{branch.city}</span>
+                  </span>
+                </label>
+              ))}
             </div>
-          ))}
-        </div>
+          )}
+          {errors.branchIds && <p className="text-xs mt-2" style={{ color: "#EF4444" }}>{errors.branchIds}</p>}
+          {selectedBranches.length > 0 && (
+            <p className="text-xs mt-3" style={{ color: "#8A8DA8" }}>{selectedBranches.length} chi nhánh được chọn</p>
+          )}
+        </section>
 
-        <div className="grid grid-cols-3 gap-4">
-          <div>
-            <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Số lượng *</label>
-            <input
-              type="number"
-              className={inputCls(errors.quantity)}
-              placeholder="200"
-              style={inputStyle(errors.quantity)}
-              value={form.quantity}
-              onChange={(e) => up("quantity", e.target.value)}
-              min="1"
-            />
-            {errors.quantity && <p className="text-xs mt-1 text-red-500">{errors.quantity}</p>}
-          </div>
-          <div>
-            <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Ngày bắt đầu</label>
-            <input
-              type="date"
-              className={inputCls()}
-              style={inputStyle()}
-              value={form.validFrom}
-              onChange={(e) => up("validFrom", e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Ngày hết hạn *</label>
-            <input
-              type="date"
-              className={inputCls(errors.validTo)}
-              style={inputStyle(errors.validTo)}
-              value={form.validTo}
-              onChange={(e) => up("validTo", e.target.value)}
-            />
-            {errors.validTo && <p className="text-xs mt-1 text-red-500">{errors.validTo}</p>}
-          </div>
-        </div>
-
-        <div>
-          <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Thời hạn sử dụng (ngày)</label>
-          <input
-            type="number"
-            className={inputCls(errors.validityDays)}
-            placeholder="30"
-            style={inputStyle(errors.validityDays)}
-            value={form.validityDays}
-            onChange={(e) => up("validityDays", e.target.value)}
-            min="1"
-            max="3650"
-          />
-          {errors.validityDays && <p className="text-xs mt-1 text-red-500">{errors.validityDays}</p>}
-        </div>
-
-        <div>
-          <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Mô tả</label>
-          <textarea
-            rows={3}
-            className={inputCls() + " resize-none"}
-            placeholder="Điều kiện sử dụng, chi tiết ưu đãi..."
-            style={inputStyle()}
-            value={form.description}
-            onChange={(e) => up("description", e.target.value)}
-          />
-        </div>
-
-        {/* Action buttons */}
-        {apiError && (
-          <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold"
-            style={{ backgroundColor: "#FCEAEA", color: "#C0392B" }}>
-            <span>⚠️</span><span>{apiError}</span>
-          </div>
-        )}
-        <div className="flex gap-3 pt-2">
-          <button
-            onClick={handleSaveDraft}
-            disabled={saving}
-            className="flex-1 py-3 rounded-2xl font-bold text-sm border-2 transition-all hover:opacity-90 disabled:opacity-50"
-            style={{ borderColor: C.apricot, color: "#856404", backgroundColor: C.apricot + "20" }}
-          >
-            {saving ? <Loader2 className="w-4 h-4 animate-spin inline" /> : "💾"} Lưu nháp
+        <div className="flex gap-3">
+          <button onClick={onBack} disabled={isSaving} className="px-5 py-3 rounded-2xl font-bold text-sm border-2 disabled:opacity-60" style={{ borderColor: "#E5E7EB", color: C.indigo }}>
+            Hủy
           </button>
-          <button
-            onClick={handlePublish}
-            disabled={saving}
-            className="flex-1 py-3 rounded-2xl font-bold text-white text-sm transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
-            style={{ backgroundColor: C.peach }}
-          >
-            {saving ? "Đang tạo..." : "🚀 Gửi duyệt"}
+          <button onClick={requestSave} disabled={isSaving || categories.length === 0 || branches.length === 0} className="flex-1 inline-flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm text-white disabled:opacity-60" style={{ backgroundColor: C.peach }}>
+            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            {createdVoucherId ? "Lưu chi nhánh" : "Lưu nháp"}
           </button>
         </div>
-        <p className="text-xs text-center" style={{ color: "#8A8DA8" }}>
-          Lưu nháp để chỉnh sửa tiếp. Gửi duyệt khi voucher hoàn chỉnh.
-        </p>
       </div>
+
+      {confirmSave && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl">
+            <h3 className="font-black text-lg mb-2" style={{ color: C.indigo }}>Xác nhận lưu voucher</h3>
+            <p className="text-sm mb-5" style={{ color: "#6B7280" }}>
+              Voucher sẽ được lưu ở trạng thái Nháp và chưa được công bố bán.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmSave(false)} disabled={isSaving} className="flex-1 py-2.5 rounded-xl font-bold text-sm border-2" style={{ borderColor: "#E5E7EB", color: C.indigo }}>Hủy</button>
+              <button onClick={saveVoucher} disabled={isSaving} className="flex-1 py-2.5 rounded-xl font-bold text-sm text-white disabled:opacity-60" style={{ backgroundColor: C.peach }}>
+                Đồng ý
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-sm font-bold mb-1.5" style={{ color: C.indigo }}>{label}</label>
+      {children}
+      {error && <p className="text-xs mt-1" style={{ color: "#EF4444" }}>{error}</p>}
     </div>
   )
 }

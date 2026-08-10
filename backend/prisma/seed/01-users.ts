@@ -1,0 +1,485 @@
+import type { SeedContext, UserRole } from "./shared.js";
+import { ids, now, daysFrom } from "./shared.js";
+
+type UserSeed = {
+  id: string;
+  email: string;
+  phone: string;
+  full_name: string;
+  role: UserRole;
+  dob: Date;
+  gender: "male" | "female" | "other";
+  address: string;
+  city: string;
+  district: string;
+  is_active: boolean;
+  is_verified: boolean;
+  partner_branches_id?: string;
+};
+
+const users: UserSeed[] = [
+  {
+    id: ids.users.adminContent,
+    email: "admin.content@asa.test",
+    phone: "0909000001",
+    full_name: "Nguyễn Khánh Duy",
+    role: "admin_content",
+    dob: new Date("1992-03-15"),
+    gender: "male",
+    address: "12 Nguyễn Huệ",
+    city: "TP. Hồ Chí Minh",
+    district: "Quận 1",
+    is_active: true,
+    is_verified: true
+  },
+  {
+    id: ids.users.adminOperations,
+    email: "admin.operations@asa.test",
+    phone: "0909000002",
+    full_name: "Trần Bảo Ngọc",
+    role: "admin_operations",
+    dob: new Date("1991-07-09"),
+    gender: "female",
+    address: "88 Lý Chính Thắng",
+    city: "TP. Hồ Chí Minh",
+    district: "Quận 3",
+    is_active: true,
+    is_verified: true
+  },
+  {
+    id: ids.users.adminSecurity,
+    email: "admin.security@asa.test",
+    phone: "0909000003",
+    full_name: "Lê Quốc Hưng",
+    role: "admin_security",
+    dob: new Date("1990-11-24"),
+    gender: "male",
+    address: "55 Hoàng Văn Thụ",
+    city: "TP. Hồ Chí Minh",
+    district: "Phú Nhuận",
+    is_active: true,
+    is_verified: true
+  },
+  {
+    id: ids.users.buyerMinhAnh,
+    email: "buyer@asa.test",
+    phone: "0911111101",
+    full_name: "Nguyễn Minh Anh",
+    role: "buyer",
+    dob: new Date("1998-01-08"),
+    gender: "female",
+    address: "21 Võ Văn Tần",
+    city: "TP. Hồ Chí Minh",
+    district: "Quận 3",
+    is_active: true,
+    is_verified: true
+  },
+  {
+    id: ids.users.buyerHoangNam,
+    email: "le.hoang.nam@asa.test",
+    phone: "0911111102",
+    full_name: "Lê Hoàng Nam",
+    role: "buyer",
+    dob: new Date("1996-05-21"),
+    gender: "male",
+    address: "9 Bạch Đằng",
+    city: "Đà Nẵng",
+    district: "Hải Châu",
+    is_active: true,
+    is_verified: true
+  },
+  {
+    id: ids.users.buyerGiaHan,
+    email: "tran.gia.han@asa.test",
+    phone: "0911111103",
+    full_name: "Trần Gia Hân",
+    role: "buyer",
+    dob: new Date("2000-09-13"),
+    gender: "female",
+    address: "102 Điện Biên Phủ",
+    city: "Hà Nội",
+    district: "Ba Đình",
+    is_active: true,
+    is_verified: true
+  },
+  {
+    id: ids.users.buyerQuocBao,
+    email: "pham.quoc.bao@asa.test",
+    phone: "0911111104",
+    full_name: "Phạm Quốc Bảo",
+    role: "buyer",
+    dob: new Date("1997-10-05"),
+    gender: "male",
+    address: "14 Trần Phú",
+    city: "Nha Trang",
+    district: "Lộc Thọ",
+    is_active: true,
+    is_verified: true
+  },
+  {
+    id: ids.users.buyerNgocLinh,
+    email: "huynh.ngoc.linh@asa.test",
+    phone: "0911111105",
+    full_name: "Huỳnh Ngọc Linh",
+    role: "buyer",
+    dob: new Date("1999-12-01"),
+    gender: "female",
+    address: "89 Nguyễn Oanh",
+    city: "TP. Hồ Chí Minh",
+    district: "Gò Vấp",
+    is_active: true,
+    is_verified: true
+  },
+  {
+    id: ids.users.buyerThuTrang,
+    email: "do.thu.trang@asa.test",
+    phone: "0911111106",
+    full_name: "Đỗ Thu Trang",
+    role: "buyer",
+    dob: new Date("1995-04-17"),
+    gender: "female",
+    address: "8 Nguyễn Du",
+    city: "Hà Nội",
+    district: "Hai Bà Trưng",
+    is_active: true,
+    is_verified: true
+  },
+  {
+    id: ids.users.buyerDucManh,
+    email: "vu.duc.manh@asa.test",
+    phone: "0911111107",
+    full_name: "Vũ Đức Mạnh",
+    role: "buyer",
+    dob: new Date("1994-08-11"),
+    gender: "male",
+    address: "170 Lê Duẩn",
+    city: "Đà Nẵng",
+    district: "Thanh Khê",
+    is_active: true,
+    is_verified: true
+  },
+  {
+    id: ids.users.buyerBaoVy,
+    email: "nguyen.bao.vy@asa.test",
+    phone: "0911111108",
+    full_name: "Nguyễn Bảo Vy",
+    role: "buyer",
+    dob: new Date("2001-02-20"),
+    gender: "female",
+    address: "45 Trần Hưng Đạo",
+    city: "Huế",
+    district: "Phú Hội",
+    is_active: true,
+    is_verified: true
+  },
+  {
+    id: ids.users.ownerHighlands,
+    email: "partner.owner@asa.test",
+    phone: "0922222201",
+    full_name: "Nguyễn Thành Trung",
+    role: "partner_owner",
+    dob: new Date("1988-03-30"),
+    gender: "male",
+    address: "95 Pasteur",
+    city: "TP. Hồ Chí Minh",
+    district: "Quận 1",
+    is_active: true,
+    is_verified: true
+  },
+  {
+    id: ids.users.ownerPhucLong,
+    email: "partner.phuclong@asa.test",
+    phone: "0922222202",
+    full_name: "Lê Thị Thanh Hương",
+    role: "partner_owner",
+    dob: new Date("1989-06-22"),
+    gender: "female",
+    address: "126 Nguyễn Thị Minh Khai",
+    city: "TP. Hồ Chí Minh",
+    district: "Quận 3",
+    is_active: true,
+    is_verified: true
+  },
+  {
+    id: ids.users.ownerPizzaHut,
+    email: "partner.pizzahut@asa.test",
+    phone: "0922222203",
+    full_name: "Phan Anh Khoa",
+    role: "partner_owner",
+    dob: new Date("1987-09-14"),
+    gender: "male",
+    address: "32 Nguyễn Hữu Cảnh",
+    city: "TP. Hồ Chí Minh",
+    district: "Bình Thạnh",
+    is_active: true,
+    is_verified: true
+  },
+  {
+    id: ids.users.ownerCGV,
+    email: "partner.cgv@asa.test",
+    phone: "0922222204",
+    full_name: "Đặng Minh Châu",
+    role: "partner_owner",
+    dob: new Date("1986-11-07"),
+    gender: "female",
+    address: "191 Bà Triệu",
+    city: "Hà Nội",
+    district: "Hai Bà Trưng",
+    is_active: true,
+    is_verified: true
+  },
+  {
+    id: ids.users.ownerGogi,
+    email: "partner.gogi@asa.test",
+    phone: "0922222205",
+    full_name: "Trương Nhật Nam",
+    role: "partner_owner",
+    dob: new Date("1985-01-29"),
+    gender: "male",
+    address: "233 Điện Biên Phủ",
+    city: "Đà Nẵng",
+    district: "Hải Châu",
+    is_active: true,
+    is_verified: true
+  },
+  {
+    id: ids.users.ownerVinpearl,
+    email: "partner.vinpearl@asa.test",
+    phone: "0922222206",
+    full_name: "Bùi Quỳnh Mai",
+    role: "partner_owner",
+    dob: new Date("1988-12-19"),
+    gender: "female",
+    address: "60 Trần Phú",
+    city: "Nha Trang",
+    district: "Lộc Thọ",
+    is_active: true,
+    is_verified: true
+  },
+  {
+    id: ids.users.voucherStaffHighlands,
+    email: "voucher.staff@asa.test",
+    phone: "0933333301",
+    full_name: "Ngô Văn Phúc",
+    role: "partner_voucher_staff",
+    dob: new Date("1994-07-01"),
+    gender: "male",
+    address: "98 Cống Quỳnh",
+    city: "TP. Hồ Chí Minh",
+    district: "Quận 1",
+    is_active: true,
+    is_verified: true
+  },
+  {
+    id: ids.users.voucherStaffPhucLong,
+    email: "voucher.phuclong@asa.test",
+    phone: "0933333302",
+    full_name: "Phạm Bích Trâm",
+    role: "partner_voucher_staff",
+    dob: new Date("1996-10-12"),
+    gender: "female",
+    address: "26 Nguyễn Đình Chiểu",
+    city: "TP. Hồ Chí Minh",
+    district: "Quận 3",
+    is_active: true,
+    is_verified: true
+  },
+  {
+    id: ids.users.voucherStaffPizzaHut,
+    email: "voucher.pizzahut@asa.test",
+    phone: "0933333303",
+    full_name: "Trần Hoài Phương",
+    role: "partner_voucher_staff",
+    dob: new Date("1993-03-18"),
+    gender: "female",
+    address: "17 Hoàng Diệu",
+    city: "Đà Nẵng",
+    district: "Hải Châu",
+    is_active: true,
+    is_verified: true
+  },
+  {
+    id: ids.users.voucherStaffCGV,
+    email: "voucher.cgv@asa.test",
+    phone: "0933333304",
+    full_name: "Đinh Quang Huy",
+    role: "partner_voucher_staff",
+    dob: new Date("1992-08-27"),
+    gender: "male",
+    address: "88 Trần Duy Hưng",
+    city: "Hà Nội",
+    district: "Cầu Giấy",
+    is_active: true,
+    is_verified: true
+  },
+  {
+    id: ids.users.voucherStaffGogi,
+    email: "voucher.gogi@asa.test",
+    phone: "0933333305",
+    full_name: "Lý Thu Hà",
+    role: "partner_voucher_staff",
+    dob: new Date("1995-05-06"),
+    gender: "female",
+    address: "24 Nguyễn Văn Linh",
+    city: "Đà Nẵng",
+    district: "Thanh Khê",
+    is_active: true,
+    is_verified: true
+  },
+  {
+    id: ids.users.voucherStaffVinpearl,
+    email: "voucher.vinpearl@asa.test",
+    phone: "0933333306",
+    full_name: "Nguyễn Thành Đạt",
+    role: "partner_voucher_staff",
+    dob: new Date("1991-04-03"),
+    gender: "male",
+    address: "10 Trần Phú",
+    city: "Nha Trang",
+    district: "Lộc Thọ",
+    is_active: true,
+    is_verified: true
+  },
+  {
+    id: ids.users.storeStaffHighlandsQ1,
+    email: "store.staff@asa.test",
+    phone: "0944444401",
+    full_name: "Võ Minh Tân",
+    role: "partner_store_staff",
+    dob: new Date("1998-02-25"),
+    gender: "male",
+    address: "23 Đồng Khởi",
+    city: "TP. Hồ Chí Minh",
+    district: "Quận 1",
+    is_active: true,
+    is_verified: true
+  },
+  {
+    id: ids.users.storeStaffHighlandsTDB,
+    email: "store.highlands.tdb@asa.test",
+    phone: "0944444402",
+    full_name: "Nguyễn Hoài An",
+    role: "partner_store_staff",
+    dob: new Date("1999-09-02"),
+    gender: "female",
+    address: "40 Tôn Đức Thắng",
+    city: "TP. Hồ Chí Minh",
+    district: "Quận 1",
+    is_active: true,
+    is_verified: true
+  },
+  {
+    id: ids.users.storeStaffPhucLongQ3,
+    email: "store.phuclong.q3@asa.test",
+    phone: "0944444403",
+    full_name: "Phùng Gia Bảo",
+    role: "partner_store_staff",
+    dob: new Date("1997-06-16"),
+    gender: "male",
+    address: "177 Nam Kỳ Khởi Nghĩa",
+    city: "TP. Hồ Chí Minh",
+    district: "Quận 3",
+    is_active: true,
+    is_verified: true
+  },
+  {
+    id: ids.users.storeStaffPizzaHutPMH,
+    email: "store.pizzahut.pmh@asa.test",
+    phone: "0944444404",
+    full_name: "Lâm Tường Vy",
+    role: "partner_store_staff",
+    dob: new Date("1996-11-12"),
+    gender: "female",
+    address: "R4-31 Hưng Phước 4",
+    city: "TP. Hồ Chí Minh",
+    district: "Quận 7",
+    is_active: true,
+    is_verified: true
+  },
+  {
+    id: ids.users.storeStaffCGVVincom,
+    email: "store.cgv.vincom@asa.test",
+    phone: "0944444405",
+    full_name: "Đào Anh Đức",
+    role: "partner_store_staff",
+    dob: new Date("1993-07-27"),
+    gender: "male",
+    address: "72 Lê Thánh Tôn",
+    city: "TP. Hồ Chí Minh",
+    district: "Quận 1",
+    is_active: true,
+    is_verified: true
+  },
+  {
+    id: ids.users.storeStaffCGVAeon,
+    email: "store.cgv.aeon@asa.test",
+    phone: "0944444406",
+    full_name: "Nguyễn Mỹ Duyên",
+    role: "partner_store_staff",
+    dob: new Date("1998-10-10"),
+    gender: "female",
+    address: "30 Bờ Bao Tân Thắng",
+    city: "TP. Hồ Chí Minh",
+    district: "Tân Phú",
+    is_active: true,
+    is_verified: true
+  },
+  {
+    id: ids.users.storeStaffGogiDN,
+    email: "store.gogi.dn@asa.test",
+    phone: "0944444407",
+    full_name: "Nguyễn Tuấn Kiệt",
+    role: "partner_store_staff",
+    dob: new Date("1992-12-03"),
+    gender: "male",
+    address: "258 Bạch Đằng",
+    city: "Đà Nẵng",
+    district: "Hải Châu",
+    is_active: true,
+    is_verified: true
+  },
+  {
+    id: ids.users.storeStaffVinpearlNT,
+    email: "store.vinpearl.nt@asa.test",
+    phone: "0944444408",
+    full_name: "Trịnh Kim Ngân",
+    role: "partner_store_staff",
+    dob: new Date("1997-04-26"),
+    gender: "female",
+    address: "Hòn Tre",
+    city: "Nha Trang",
+    district: "Vĩnh Nguyên",
+    is_active: true,
+    is_verified: true
+  }
+];
+
+export async function seedUsers({ prisma, passwordHash }: SeedContext) {
+  for (const user of users) {
+    await prisma.user.upsert({
+      where: { id: user.id },
+      create: {
+        ...user,
+        password_hash: passwordHash,
+        created_at: daysFrom(now, -90),
+        updated_at: daysFrom(now, -3)
+      },
+      update: {
+        email: user.email,
+        phone: user.phone,
+        full_name: user.full_name,
+        role: user.role,
+        dob: user.dob,
+        gender: user.gender,
+        address: user.address,
+        city: user.city,
+        district: user.district,
+        is_active: user.is_active,
+        is_verified: user.is_verified,
+        partner_branches_id: user.partner_branches_id ?? null,
+        password_hash: passwordHash,
+        updated_at: daysFrom(now, -3)
+      }
+    });
+  }
+}

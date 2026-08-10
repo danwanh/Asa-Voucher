@@ -1,174 +1,328 @@
-import { useState } from "react"
-import { Plus, Search, Edit2, Trash2, MapPin, Phone, Clock, X, CheckCircle } from "lucide-react"
-import { C, STATUS_LABEL, statusColor } from "@/utils/constants"
-import type { Branch } from "@/types"
+import { useEffect, useMemo, useState } from "react"
+import { Plus, Search, Edit2, Trash2, MapPin, Phone, X, CheckCircle, Loader2 } from "lucide-react"
+import { toast } from "sonner"
+import { C } from "@/utils/constants"
+import { AppIcon } from "@/components/AppIcon"
+import type { AppUser } from "@/types"
+import { partnerService, type PartnerBranch, type PartnerProfile } from "@/services/partnerService"
 
-const MOCK_BRANCHES: Branch[] = [
-  { id: "b1", partnerId: "p1", name: "Pizza Hut Nguyễn Trãi", address: "123 Nguyễn Trãi, Q1", city: "TP.HCM", district: "Quận 1", phone: "028 1234 5678", email: "q1@pizzahut.vn", openTime: "09:00", closeTime: "22:00", status: "active" },
-  { id: "b2", partnerId: "p1", name: "Pizza Hut Lê Văn Sỹ", address: "456 Lê Văn Sỹ, Q3", city: "TP.HCM", district: "Quận 3", phone: "028 2345 6789", email: "q3@pizzahut.vn", openTime: "10:00", closeTime: "22:30", status: "active" },
-  { id: "b3", partnerId: "p1", name: "Pizza Hut Hoàng Văn Thụ", address: "789 Hoàng Văn Thụ, Tân Bình", city: "TP.HCM", district: "Tân Bình", phone: "028 3456 7890", email: "tanbinh@pizzahut.vn", openTime: "10:00", closeTime: "22:00", status: "inactive" },
-]
+type Props = {
+  user: AppUser
+  partner: PartnerProfile | null
+  onPartnerUpdated: (partner: PartnerProfile | null) => void
+  embedded?: boolean
+}
 
-type FormData = Omit<Branch, "id" | "partnerId">
+type FormData = {
+  branchName: string
+  address: string
+  city: string
+  district: string
+  phone: string
+  isActive: boolean
+}
 
-const EMPTY_FORM: FormData = { name: "", address: "", city: "", district: "", phone: "", email: "", openTime: "08:00", closeTime: "22:00", status: "active" }
+const EMPTY_FORM: FormData = {
+  branchName: "",
+  address: "",
+  city: "",
+  district: "",
+  phone: "",
+  isActive: true,
+}
 
-export function BranchManagementPage() {
-  const [branches, setBranches] = useState(MOCK_BRANCHES)
+export function BranchManagementPage({ user, partner, embedded = false }: Props) {
+  const [branches, setBranches] = useState<PartnerBranch[]>([])
   const [search, setSearch] = useState("")
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState<FormData>(EMPTY_FORM)
   const [saved, setSaved] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
 
-  const filtered = branches.filter((b) =>
-    !search || b.name.toLowerCase().includes(search.toLowerCase()) || b.address.toLowerCase().includes(search.toLowerCase())
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadBranches() {
+      if (!partner?.id) {
+        if (!isMounted) return
+        setBranches([])
+        return
+      }
+
+      setIsLoading(true)
+      try {
+        const items = await partnerService.listBranches(partner.id)
+        if (!isMounted) return
+        setBranches(items)
+      } catch {
+        if (!isMounted) return
+        setBranches([])
+      } finally {
+        if (!isMounted) return
+        setIsLoading(false)
+      }
+    }
+
+    loadBranches()
+    return () => {
+      isMounted = false
+    }
+  }, [partner?.id])
+
+  const filtered = useMemo(
+    () =>
+      branches.filter((branch) =>
+        !search ||
+        branch.branchName.toLowerCase().includes(search.toLowerCase()) ||
+        branch.address.toLowerCase().includes(search.toLowerCase()),
+      ),
+    [branches, search],
   )
 
-  const openCreate = () => { setForm(EMPTY_FORM); setEditId(null); setShowForm(true) }
-  const openEdit = (b: Branch) => { setForm({ name: b.name, address: b.address, city: b.city, district: b.district, phone: b.phone, email: b.email, openTime: b.openTime, closeTime: b.closeTime, status: b.status }); setEditId(b.id); setShowForm(true) }
+  const openCreate = () => {
+    setForm(EMPTY_FORM)
+    setEditId(null)
+    setShowForm(true)
+  }
 
-  const saveForm = () => {
-    if (!form.name.trim()) return
-    if (editId) {
-      setBranches((prev) => prev.map((b) => b.id === editId ? { ...b, ...form } : b))
-    } else {
-      setBranches((prev) => [...prev, { ...form, id: "b" + Date.now(), partnerId: "p1" }])
-    }
+  const openEdit = (branch: PartnerBranch) => {
+    setForm({
+      branchName: branch.branchName,
+      address: branch.address,
+      city: branch.city,
+      district: branch.district,
+      phone: branch.phone,
+      isActive: branch.isActive,
+    })
+    setEditId(branch.id)
+    setShowForm(true)
+  }
+
+  const closeForm = () => {
     setShowForm(false)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+    setEditId(null)
+    setForm(EMPTY_FORM)
   }
 
-  const confirmDelete = () => {
-    if (deleteId) setBranches((prev) => prev.filter((b) => b.id !== deleteId))
-    setDeleteId(null)
+  const saveForm = async () => {
+    if (!partner?.id) {
+      toast.error("Không tìm thấy đối tác hiện tại")
+      return
+    }
+
+    if (!form.branchName.trim() || !form.address.trim() || !form.city.trim()) {
+      toast.error("Vui lòng nhập đầy đủ tên chi nhánh, địa chỉ và thành phố")
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      if (editId) {
+        const updated = await partnerService.updateBranch(editId, {
+          branch_name: form.branchName,
+          address: form.address,
+          city: form.city,
+          district: form.district || undefined,
+          phone: form.phone || undefined,
+          is_active: form.isActive,
+        })
+        setBranches((prev) => prev.map((item) => (item.id === editId ? updated : item)))
+      } else {
+        const created = await partnerService.createBranch(partner.id, {
+          branch_name: form.branchName,
+          address: form.address,
+          city: form.city,
+          district: form.district || undefined,
+          phone: form.phone || undefined,
+          is_active: form.isActive,
+        })
+        setBranches((prev) => [created, ...prev])
+      }
+
+      closeForm()
+      setSaved(true)
+      window.setTimeout(() => setSaved(false), 2000)
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { error?: { message?: string } } } }
+      toast.error(err?.response?.data?.error?.message ?? "Không thể lưu chi nhánh")
+    } finally {
+      setIsSaving(false)
+    }
   }
 
-  const set = (k: keyof FormData, v: string) => setForm((f) => ({ ...f, [k]: v }))
+  const confirmDelete = async () => {
+    if (!deleteId) return
+    try {
+      await partnerService.deleteBranch(deleteId)
+      setBranches((prev) => prev.filter((branch) => branch.id !== deleteId))
+      setDeleteId(null)
+      toast.success("Đã tắt hoạt động chi nhánh")
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { error?: { message?: string } } } }
+      toast.error(err?.response?.data?.error?.message ?? "Không thể xóa chi nhánh")
+    }
+  }
+
+  const isReadOnly = user.role !== "partner_owner" || !partner?.id
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-black" style={{ color: C.indigo }}>Quản lý Chi nhánh</h1>
-          <p className="text-sm mt-1" style={{ color: "#8A8DA8" }}>{branches.length} chi nhánh</p>
+    <div className={embedded ? "mt-6" : "p-6 max-w-5xl mx-auto"}>
+      <div className={embedded ? "bg-white rounded-2xl p-6 shadow-sm" : ""}>
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className={embedded ? "text-xl font-black" : "text-2xl font-black"} style={{ color: C.indigo }}>Quản lý Chi nhánh</h1>
+            <p className="text-sm mt-1" style={{ color: "#8A8DA8" }}>{branches.length} chi nhánh</p>
+          </div>
+          <button
+            onClick={openCreate}
+            disabled={isReadOnly}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-white text-sm disabled:opacity-50"
+            style={{ backgroundColor: C.peach }}
+          >
+            <Plus className="w-4 h-4" /> Thêm chi nhánh
+          </button>
         </div>
-        <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-white text-sm" style={{ backgroundColor: C.peach }}>
-          <Plus className="w-4 h-4" /> Thêm chi nhánh
-        </button>
-      </div>
 
-      {saved && (
-        <div className="mb-4 p-3 rounded-xl flex items-center gap-2 text-sm" style={{ backgroundColor: C.teal + "20", color: "#2D7A52" }}>
-          <CheckCircle className="w-4 h-4" /> Đã lưu thay đổi
+        {saved && (
+          <div className="mb-4 p-3 rounded-xl flex items-center gap-2 text-sm" style={{ backgroundColor: C.teal + "20", color: "#2D7A52" }}>
+            <CheckCircle className="w-4 h-4" /> Đã lưu thay đổi
+          </div>
+        )}
+
+        {isReadOnly && (
+          <div className="mb-4 rounded-xl p-3 text-sm" style={{ backgroundColor: "#FEF3C7", color: "#92400E" }}>
+            Chỉ tài khoản chủ đối tác mới được quản lý chi nhánh.
+          </div>
+        )}
+
+        <div className="relative mb-4">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "#8A8DA8" }} />
+          <input
+            className="w-full pl-9 pr-4 py-2.5 rounded-xl border text-sm outline-none bg-white"
+            style={{ borderColor: "#E2DFC8", fontFamily: "'Inter', sans-serif" }}
+            placeholder="Tìm chi nhánh..."
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
         </div>
-      )}
 
-      <div className="relative mb-4">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "#8A8DA8" }} />
-        <input
-          className="w-full pl-9 pr-4 py-2.5 rounded-xl border text-sm outline-none bg-white"
-          style={{ borderColor: "#E2DFC8", fontFamily: "'Inter', sans-serif" }}
-          placeholder="Tìm chi nhánh..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-4">
-        {filtered.map((b) => {
-          const sc = statusColor(b.status)
-          return (
-            <div key={b.id} className="bg-white rounded-2xl p-5 shadow-sm">
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <h3 className="font-black text-sm" style={{ color: C.indigo }}>{b.name}</h3>
-                  <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ backgroundColor: sc.bg, color: sc.text }}>{STATUS_LABEL[b.status]}</span>
+        {isLoading ? (
+          <div className="rounded-2xl p-6 bg-white flex items-center gap-2 text-sm" style={{ color: "#8A8DA8" }}>
+            <Loader2 className="w-4 h-4 animate-spin" /> Đang tải chi nhánh...
+          </div>
+        ) : (
+          <>
+            <div className="grid md:grid-cols-2 gap-4">
+            {filtered.map((branch) => (
+              <div key={branch.id} className="bg-white rounded-2xl p-5 shadow-sm">
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <h3 className="font-black text-sm" style={{ color: C.indigo }}>{branch.branchName}</h3>
+                    <span
+                      className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                      style={{
+                        backgroundColor: branch.isActive ? "#E8F5EE" : "#FEE2E2",
+                        color: branch.isActive ? "#2D7A52" : "#B91C1C",
+                      }}
+                    >
+                      {branch.isActive ? "Đang hoạt động" : "Ngưng hoạt động"}
+                    </span>
+                  </div>
+                  <div className="flex gap-1">
+                    <button disabled={isReadOnly} onClick={() => openEdit(branch)} className="p-1.5 rounded-lg hover:bg-muted disabled:opacity-40">
+                      <Edit2 className="w-4 h-4" style={{ color: C.indigo }} />
+                    </button>
+                    <button disabled={isReadOnly} onClick={() => setDeleteId(branch.id)} className="p-1.5 rounded-lg hover:bg-muted disabled:opacity-40">
+                      <Trash2 className="w-4 h-4" style={{ color: C.peach }} />
+                    </button>
+                  </div>
                 </div>
-                <div className="flex gap-1">
-                  <button onClick={() => openEdit(b)} className="p-1.5 rounded-lg hover:bg-muted"><Edit2 className="w-4 h-4" style={{ color: C.indigo }} /></button>
-                  <button onClick={() => setDeleteId(b.id)} className="p-1.5 rounded-lg hover:bg-muted"><Trash2 className="w-4 h-4" style={{ color: C.peach }} /></button>
+                <div className="space-y-1.5 text-xs" style={{ color: "#8A8DA8" }}>
+                  <div className="flex items-center gap-2"><MapPin className="w-3.5 h-3.5" />{branch.address}, {branch.city}</div>
+                  {branch.phone && <div className="flex items-center gap-2"><Phone className="w-3.5 h-3.5" />{branch.phone}</div>}
                 </div>
               </div>
-              <div className="space-y-1.5 text-xs" style={{ color: "#8A8DA8" }}>
-                <div className="flex items-center gap-2"><MapPin className="w-3.5 h-3.5" />{b.address}, {b.city}</div>
-                <div className="flex items-center gap-2"><Phone className="w-3.5 h-3.5" />{b.phone}</div>
-                <div className="flex items-center gap-2"><Clock className="w-3.5 h-3.5" />{b.openTime} – {b.closeTime}</div>
-              </div>
+            ))}
             </div>
-          )
-        })}
+
+            {filtered.length === 0 && (
+              <div className="text-center py-16">
+                <AppIcon name="building" className="w-10 h-10 mb-3 mx-auto" />
+                <div className="font-bold" style={{ color: C.indigo }}>Không tìm thấy chi nhánh</div>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
-      {filtered.length === 0 && (
-        <div className="text-center py-16"><div className="text-4xl mb-3">🏢</div><div className="font-bold" style={{ color: C.indigo }}>Không tìm thấy chi nhánh</div></div>
-      )}
-
-      {/* Form Modal */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
           <div className="bg-white rounded-3xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-lg font-black" style={{ color: C.indigo }}>{editId ? "Chỉnh sửa Chi nhánh" : "Thêm Chi nhánh"}</h2>
-              <button onClick={() => setShowForm(false)}><X className="w-5 h-5" style={{ color: "#8A8DA8" }} /></button>
+              <button onClick={closeForm}><X className="w-5 h-5" style={{ color: "#8A8DA8" }} /></button>
             </div>
             <div className="space-y-4">
               {[
-                { key: "name", label: "Tên chi nhánh *", ph: "Nhập tên chi nhánh" },
-                { key: "address", label: "Địa chỉ *", ph: "Số nhà, tên đường" },
-                { key: "city", label: "Tỉnh/Thành phố", ph: "TP.HCM" },
-                { key: "district", label: "Quận/Huyện", ph: "Quận 1" },
-                { key: "phone", label: "Số điện thoại", ph: "028 xxxx xxxx" },
-                { key: "email", label: "Email", ph: "branch@company.vn" },
-              ].map((f) => (
-                <div key={f.key}>
-                  <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>{f.label}</label>
+                { key: "branchName", label: "Tên chi nhánh *", placeholder: "Nhập tên chi nhánh" },
+                { key: "address", label: "Địa chỉ *", placeholder: "Nhập địa chỉ" },
+                { key: "city", label: "Thành phố *", placeholder: "VD: TP. Hồ Chí Minh" },
+                { key: "district", label: "Quận/Huyện", placeholder: "VD: Quận 1" },
+                { key: "phone", label: "Điện thoại", placeholder: "VD: 028 1234 5678" },
+              ].map((field) => (
+                <div key={field.key}>
+                  <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>{field.label}</label>
                   <input
                     className="w-full px-4 py-2.5 rounded-xl border text-sm outline-none"
                     style={{ borderColor: "#E2DFC8", fontFamily: "'Inter', sans-serif" }}
-                    placeholder={f.ph}
-                    value={form[f.key as keyof FormData] as string}
-                    onChange={(e) => set(f.key as keyof FormData, e.target.value)}
+                    placeholder={field.placeholder}
+                    value={form[field.key as keyof FormData] as string}
+                    onChange={(event) => setForm((prev) => ({ ...prev, [field.key]: event.target.value }))}
                   />
                 </div>
               ))}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Giờ mở cửa</label>
-                  <input type="time" className="w-full px-4 py-2.5 rounded-xl border text-sm outline-none" style={{ borderColor: "#E2DFC8" }} value={form.openTime} onChange={(e) => set("openTime", e.target.value)} />
-                </div>
-                <div>
-                  <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Giờ đóng cửa</label>
-                  <input type="time" className="w-full px-4 py-2.5 rounded-xl border text-sm outline-none" style={{ borderColor: "#E2DFC8" }} value={form.closeTime} onChange={(e) => set("closeTime", e.target.value)} />
-                </div>
-              </div>
-              <div>
-                <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Trạng thái</label>
-                <select className="w-full px-4 py-2.5 rounded-xl border text-sm outline-none" style={{ borderColor: "#E2DFC8" }} value={form.status} onChange={(e) => set("status", e.target.value as "active" | "inactive")}>
-                  <option value="active">Đang hoạt động</option>
-                  <option value="inactive">Không hoạt động</option>
-                </select>
-              </div>
+
+              <label className="flex items-center gap-2 text-sm" style={{ color: C.indigo }}>
+                <input
+                  type="checkbox"
+                  checked={form.isActive}
+                  onChange={(event) => setForm((prev) => ({ ...prev, isActive: event.target.checked }))}
+                />
+                Chi nhánh đang hoạt động
+              </label>
             </div>
-            <div className="flex gap-3 mt-6">
-              <button onClick={saveForm} className="flex-1 py-2.5 rounded-xl font-bold text-white" style={{ backgroundColor: C.peach }}>Lưu</button>
-              <button onClick={() => setShowForm(false)} className="px-6 py-2.5 rounded-xl font-bold border" style={{ borderColor: "#E2DFC8", color: C.indigo }}>Hủy</button>
+            <div className="mt-6 flex gap-3">
+              <button onClick={closeForm} className="flex-1 py-2.5 rounded-xl border-2 font-bold" style={{ borderColor: "#E2DFC8", color: C.indigo }}>
+                Hủy
+              </button>
+              <button
+                onClick={saveForm}
+                disabled={isSaving}
+                className="flex-1 py-2.5 rounded-xl font-bold text-white disabled:opacity-70"
+                style={{ backgroundColor: C.peach }}
+              >
+                {isSaving ? "Đang lưu..." : "Lưu"}
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Delete Confirm */}
       {deleteId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
-          <div className="bg-white rounded-3xl p-6 max-w-sm w-full">
-            <h3 className="font-black text-lg mb-2" style={{ color: C.indigo }}>Xóa chi nhánh?</h3>
-            <p className="text-sm mb-6" style={{ color: "#8A8DA8" }}>Hành động này không thể hoàn tác.</p>
-            <div className="flex gap-3">
-              <button onClick={confirmDelete} className="flex-1 py-2.5 rounded-xl font-bold text-white" style={{ backgroundColor: "#C0392B" }}>Xóa</button>
-              <button onClick={() => setDeleteId(null)} className="flex-1 py-2.5 rounded-xl font-bold border" style={{ borderColor: "#E2DFC8", color: C.indigo }}>Hủy</button>
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <h3 className="text-lg font-black mb-2" style={{ color: C.indigo }}>Tắt hoạt động chi nhánh?</h3>
+            <p className="text-sm" style={{ color: "#8A8DA8" }}>Chi nhánh sẽ không còn xuất hiện trong phạm vi sử dụng voucher.</p>
+            <div className="mt-5 flex gap-3">
+              <button onClick={() => setDeleteId(null)} className="flex-1 py-2.5 rounded-xl border-2 font-bold" style={{ borderColor: "#E2DFC8", color: C.indigo }}>
+                Hủy
+              </button>
+              <button onClick={confirmDelete} className="flex-1 py-2.5 rounded-xl font-bold text-white" style={{ backgroundColor: C.peach }}>
+                Xác nhận
+              </button>
             </div>
           </div>
         </div>

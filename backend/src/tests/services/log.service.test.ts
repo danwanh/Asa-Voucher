@@ -18,7 +18,7 @@ import * as logService from "../../services/log.service.js";
 
 const ADMIN_SECURITY: AuthUser = { id: "u-sec", email: "sec@test.com", role: "admin_security" };
 const BUYER: AuthUser = { id: "u-buyer", email: "b@test.com", role: "buyer" };
-const ADMIN: AuthUser = { id: "u-admin", email: "a@test.com", role: "admin_account" };
+const ADMIN: AuthUser = { id: "u-admin", email: "a@test.com", role: "admin_operations" };
 
 describe("Log Service", () => {
   beforeEach(() => {
@@ -45,7 +45,7 @@ describe("Log Service", () => {
       ).rejects.toThrow(HttpError);
     });
 
-    it("rejects admin_account users", async () => {
+    it("rejects admin_operations users", async () => {
       await expect(
         logService.listAuthenticationLogs(ADMIN, { page: 1, limit: 20 })
       ).rejects.toThrow(HttpError);

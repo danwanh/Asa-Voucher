@@ -1,4 +1,6 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+import { AppIcon } from "@/components/AppIcon"
 import { toast } from "sonner"
 import { GuestLayout, type GuestPage } from "@/layouts/GuestLayout"
 import { GuestHomePage } from "@/pages/guest/GuestHomePage"
@@ -6,13 +8,22 @@ import { GuestVoucherListPage } from "@/pages/guest/GuestVoucherListPage"
 import { GuestVoucherDetailPage } from "@/pages/guest/GuestVoucherDetailPage"
 import { CartPage } from "@/pages/customer/CartPage"
 import type { Voucher, CartItem } from "@/types"
+import { voucherService } from "@/services/voucherService"
 
 interface Props {
   onLogin: () => void
+  onRegister: () => void
   // Called when guest clicks "Tiến hành đặt hàng" — triggers login then redirects to create-order
-  onCheckout: () => void
+  onCheckout: (items?: CartItem[]) => void
   cartAdd: (v: Voucher) => void
-  cartCount: number
+  cartCount: number | null
+  cartCountLoading?: boolean
+  cart: CartItem[]
+  total: number
+  cartRemove: (id: string) => void
+  cartUpdate: (id: string, qty: number) => void
+  initialPage?: GuestPage
+  initialVoucherId?: string
 }
 
 // GuestApp manages the cart display only; cart state lives in App.tsx
@@ -22,18 +33,41 @@ interface Props {
 
 interface FullProps {
   onLogin: () => void
-  onCheckout: () => void
+  onRegister: () => void
+  onCheckout: (items?: CartItem[]) => void
   cartAdd: (v: Voucher) => void
-  cartCount: number
+  cartCount: number | null
+  cartCountLoading?: boolean
+  cart: CartItem[]
+  total: number
+  cartRemove: (id: string) => void
+  cartUpdate: (id: string, qty: number) => void
+  initialPage?: GuestPage
+  initialVoucherId?: string
 }
 
-export function GuestApp({ onLogin, onCheckout, cartAdd, cartCount }: FullProps) {
-  const [page, setPage] = useState<GuestPage>("home")
+export function GuestApp({ onLogin, onRegister, onCheckout, cartAdd, cartCount, cartCountLoading = false, cart, total, cartRemove, cartUpdate, initialPage, initialVoucherId }: FullProps) {
+  const router = useRouter()
+  const [page, setPage] = useState<GuestPage>(initialPage ?? "home")
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null)
 
+  useEffect(() => {
+    if (!initialVoucherId) return
+    void voucherService.getDetail(initialVoucherId).then((detail) => setSelectedVoucher(detail.voucher)).catch(() => {
+      toast.error("Không thể tải chi tiết voucher.")
+      router.push("/vouchers")
+    })
+  }, [initialVoucherId, router])
+
   const goDetail = (v: Voucher) => {
-    setSelectedVoucher(v)
-    setPage("detail")
+    router.push(`/vouchers/${v.id}`)
+  }
+
+  const navigate = (nextPage: GuestPage) => {
+    if (nextPage === "home") router.push("/")
+    else if (nextPage === "vouchers") router.push("/vouchers")
+    else if (nextPage === "categories") router.push("/categories")
+    else setPage(nextPage)
   }
 
   const handleAddToCart = (v: Voucher) => {
@@ -49,14 +83,15 @@ export function GuestApp({ onLogin, onCheckout, cartAdd, cartCount }: FullProps)
   return (
     <GuestLayout
       page={page}
-      onNavigate={setPage}
+      onNavigate={navigate}
       onLogin={onLogin}
-      onRegister={onLogin}
+       onRegister={onRegister}
       cartCount={cartCount}
+      cartCountLoading={cartCountLoading}
     >
       {page === "home" && (
         <GuestHomePage
-          onNavigate={setPage}
+          onNavigate={(nextPage) => setPage(nextPage as GuestPage)}
           onVoucherDetail={goDetail}
           onLogin={onLogin}
           onAddToCart={handleAddToCart}
@@ -69,10 +104,11 @@ export function GuestApp({ onLogin, onCheckout, cartAdd, cartCount }: FullProps)
           onAddToCart={handleAddToCart}
         />
       )}
+      {page === "detail" && !selectedVoucher && <div className="max-w-3xl mx-auto px-4 py-20 text-center font-semibold" style={{ color: "#3D405B" }}>Đang tải chi tiết voucher...</div>}
       {page === "detail" && selectedVoucher && (
         <GuestVoucherDetailPage
           voucher={selectedVoucher}
-          onBack={() => setPage("vouchers")}
+          onBack={() => router.push("/vouchers")}
           onLogin={onLogin}
           onDetail={goDetail}
           onAddToCart={handleAddToCart}
@@ -80,11 +116,13 @@ export function GuestApp({ onLogin, onCheckout, cartAdd, cartCount }: FullProps)
         />
       )}
       {page === "cart" && (
-        <GuestCartPage
-          cartCount={cartCount}
+        <CartPage
+          cart={cart}
+          total={total}
+          onRemove={cartRemove}
+          onUpdate={cartUpdate}
           onCheckout={onCheckout}
           onContinue={() => setPage("vouchers")}
-          onLogin={onLogin}
         />
       )}
       {page === "categories" && (
@@ -92,14 +130,14 @@ export function GuestApp({ onLogin, onCheckout, cartAdd, cartCount }: FullProps)
           <h1 className="text-2xl font-black mb-6" style={{ fontFamily: "'Nunito', sans-serif", color: "#3D405B" }}>Tất cả danh mục</h1>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {[
-              { icon: "🍜", name: "Ẩm thực", count: 45, color: "#FDEBD0" },
-              { icon: "💅", name: "Làm đẹp", count: 32, color: "#FCE4EC" },
-              { icon: "✈️", name: "Du lịch", count: 28, color: "#E3F2FD" },
-              { icon: "🎬", name: "Giải trí", count: 21, color: "#EDE7F6" },
-              { icon: "⚽", name: "Thể thao", count: 8, color: "#E8F5E9" },
-              { icon: "📚", name: "Giáo dục", count: 5, color: "#FFF8E1" },
-              { icon: "🏥", name: "Sức khỏe", count: 14, color: "#E0F7FA" },
-              { icon: "🛍️", name: "Mua sắm", count: 19, color: "#F3E5F5" },
+               { icon: "gift", name: "Ẩm thực", count: 45, color: "#FDEBD0" },
+               { icon: "heart", name: "Làm đẹp", count: 32, color: "#FCE4EC" },
+               { icon: "location", name: "Du lịch", count: 28, color: "#E3F2FD" },
+               { icon: "ticket", name: "Giải trí", count: 21, color: "#EDE7F6" },
+               { icon: "shield", name: "Thể thao", count: 8, color: "#E8F5E9" },
+               { icon: "document", name: "Giáo dục", count: 5, color: "#FFF8E1" },
+               { icon: "shield", name: "Sức khỏe", count: 14, color: "#E0F7FA" },
+               { icon: "shoppingCart", name: "Mua sắm", count: 19, color: "#F3E5F5" },
             ].map((cat) => (
               <button
                 key={cat.name}
@@ -107,7 +145,7 @@ export function GuestApp({ onLogin, onCheckout, cartAdd, cartCount }: FullProps)
                 className="flex flex-col items-center gap-3 p-6 rounded-2xl hover:shadow-md transition-all"
                 style={{ backgroundColor: cat.color }}
               >
-                <div className="text-5xl">{cat.icon}</div>
+                <AppIcon name={cat.icon} className="w-12 h-12" />
                 <div className="font-black text-sm" style={{ color: "#3D405B" }}>{cat.name}</div>
                 <div className="text-xs" style={{ color: "#6B7280" }}>{cat.count} voucher</div>
               </button>
@@ -117,7 +155,7 @@ export function GuestApp({ onLogin, onCheckout, cartAdd, cartCount }: FullProps)
       )}
       {page === "about" && (
         <div className="max-w-3xl mx-auto px-4 py-16 text-center">
-          <div className="text-6xl mb-4">🎫</div>
+          <AppIcon name="ticket" className="w-16 h-16 mb-4 mx-auto" />
           <h1 className="text-3xl font-black mb-4" style={{ fontFamily: "'Nunito', sans-serif", color: "#3D405B" }}>Về ASA Voucher</h1>
           <p className="text-base leading-relaxed" style={{ color: "#4B5563" }}>
             ASA Voucher là nền tảng mua bán voucher điện tử hàng đầu Việt Nam, kết nối hàng trăm thương hiệu uy tín với hàng triệu khách hàng. Chúng tôi cung cấp trải nghiệm mua voucher đơn giản, an toàn và tiết kiệm nhất.
@@ -171,7 +209,7 @@ function GuestCartPage({
   if (cartCount === 0) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-20 text-center">
-        <div className="text-6xl mb-4">🛒</div>
+        <AppIcon name="shoppingCart" className="w-16 h-16 mb-4 mx-auto" />
         <h2 className="text-xl font-black mb-2" style={{ color: C_indigo }}>Giỏ hàng trống</h2>
         <p className="text-sm mb-6" style={{ color: "#8A8DA8" }}>Hãy khám phá và thêm voucher bạn yêu thích vào giỏ hàng</p>
         <button onClick={onContinue} className="px-6 py-3 rounded-2xl font-bold text-white" style={{ backgroundColor: C_peach }}>
@@ -183,7 +221,7 @@ function GuestCartPage({
 
   return (
     <div className="max-w-md mx-auto px-4 py-16 text-center">
-      <div className="text-6xl mb-4">🛒</div>
+      <AppIcon name="shoppingCart" className="w-16 h-16 mb-4 mx-auto" />
       <h2 className="text-2xl font-black mb-2" style={{ color: C_indigo }}>Giỏ hàng của bạn</h2>
       <div
         className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl mb-6 font-bold text-sm"

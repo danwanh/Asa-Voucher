@@ -1,16 +1,12 @@
+import { useEffect, useMemo, useState } from "react"
 import { ArrowLeft, MapPin, Star, PenLine } from "lucide-react"
 import { C, fmt, fmtDate } from "@/utils/constants"
+import { AppIcon } from "@/components/AppIcon"
 import { StatusBadge } from "@/components/StatusBadge"
 import type { Voucher } from "@/types"
+import { voucherService, type VoucherApplicableBranch, type VoucherDetailData, type VoucherPublicReview } from "@/services/voucherService"
 
 const FALLBACK = "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=600&h=400&fit=crop"
-
-// Public reviews — identical to what guests see; never gated by auth
-const MOCK_REVIEWS = [
-  { name: "Nguyễn Lan", rating: 5, text: "Voucher chất lượng, sử dụng rất dễ dàng!", date: "05/07/2026" },
-  { name: "Trần Hùng", rating: 4, text: "Giảm giá tốt, nhân viên nhiệt tình.", date: "03/07/2026" },
-  { name: "Lê Mai", rating: 5, text: "Sẽ mua lại lần sau!", date: "01/07/2026" },
-]
 
 interface Props {
   voucher: Voucher
@@ -24,7 +20,83 @@ interface Props {
 }
 
 export function VoucherDetailPage({ voucher: v, onBuy, onBuyNow, onBack, onWriteReview, hasReviewed, onEditReview }: Props) {
-  const pct = Math.round((v.sold / v.quantity) * 100)
+  const [detailVoucher, setDetailVoucher] = useState<Voucher>(v)
+  const [reviews, setReviews] = useState<VoucherPublicReview[]>([])
+  const [branches, setBranches] = useState<VoucherApplicableBranch[]>([])
+  const [detailMeta, setDetailMeta] = useState<Pick<VoucherDetailData, "conditions" | "usageInstructions" | "applicableArea" | "partnerId" | "categoryName">>({
+    conditions: [],
+    usageInstructions: [],
+    applicableArea: null,
+    partnerId: "",
+    categoryName: ""
+  })
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadDetail() {
+      setIsLoading(true)
+      setError(null)
+      try {
+        const detail = await voucherService.getDetail(v.id)
+        if (!isMounted) return
+        setDetailVoucher(detail.voucher)
+        setReviews(detail.reviews)
+        setBranches(detail.branches)
+        setDetailMeta({
+          conditions: detail.conditions,
+          usageInstructions: detail.usageInstructions,
+          applicableArea: detail.applicableArea,
+          partnerId: detail.partnerId,
+          categoryName: detail.categoryName
+        })
+      } catch {
+        if (!isMounted) return
+        setError("Không thể tải chi tiết voucher từ hệ thống. Vui lòng thử lại.")
+      } finally {
+        if (isMounted) setIsLoading(false)
+      }
+    }
+
+    loadDetail()
+    return () => {
+      isMounted = false
+    }
+  }, [v])
+
+  const pct = useMemo(() => {
+    if (detailVoucher.quantity <= 0) return 0
+    return Math.round((detailVoucher.sold / detailVoucher.quantity) * 100)
+  }, [detailVoucher.quantity, detailVoucher.sold])
+
+  if (isLoading) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <button onClick={onBack} className="flex items-center gap-2 mb-6 font-semibold text-sm hover:underline" style={{ color: C.indigo }}>
+          <ArrowLeft className="w-4 h-4" /> Quay lại
+        </button>
+        <div className="bg-white rounded-2xl p-6 border border-black/5 text-center" style={{ color: "#6B7280" }}>
+          Đang tải dữ liệu voucher...
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <button onClick={onBack} className="flex items-center gap-2 mb-6 font-semibold text-sm hover:underline" style={{ color: C.indigo }}>
+          <ArrowLeft className="w-4 h-4" /> Quay lại
+        </button>
+        <div className="bg-white rounded-2xl p-6 border border-black/5 text-center">
+          <p className="font-bold" style={{ color: C.indigo }}>{error}</p>
+          <p className="text-sm mt-2" style={{ color: "#8A8DA8" }}>Bạn vẫn có thể quay lại danh sách voucher để chọn mã khác.</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
@@ -37,8 +109,8 @@ export function VoucherDetailPage({ voucher: v, onBuy, onBuyNow, onBack, onWrite
         <div>
           <div className="rounded-3xl overflow-hidden shadow-md mb-4 h-64">
             <img
-              src={v.image}
-              alt={v.title}
+              src={detailVoucher.image}
+              alt={detailVoucher.title}
               className="w-full h-full object-cover"
               onError={(e) => { (e.target as HTMLImageElement).src = FALLBACK }}
             />
@@ -46,22 +118,22 @@ export function VoucherDetailPage({ voucher: v, onBuy, onBuyNow, onBack, onWrite
 
           <div className="bg-card rounded-2xl p-4 flex items-center gap-4 shadow-sm">
             <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl" style={{ backgroundColor: C.eggshell }}>
-              {v.partnerLogo}
+              {detailVoucher.partnerLogo}
             </div>
             <div>
-              <div className="font-bold" style={{ color: C.indigo }}>{v.partnerName}</div>
+              <div className="font-bold" style={{ color: C.indigo }}>{detailMeta.partnerId || detailVoucher.partnerName}</div>
               <div className="text-xs flex items-center gap-1 mt-0.5" style={{ color: "#8A8DA8" }}>
-                <MapPin className="w-3 h-3" /> Toàn quốc
+                <MapPin className="w-3 h-3" /> {detailMeta.applicableArea || (branches.length > 0 ? `${branches.length} chi nhánh áp dụng` : "Đang cập nhật")}
               </div>
             </div>
-            {v.rating > 0 && (
+            {detailVoucher.rating > 0 && (
               <div className="ml-auto text-right">
                 <div className="flex justify-end" style={{ color: "#F4C430" }}>
                   {Array.from({ length: 5 }, (_, i) => (
-                    <Star key={i} className={`w-3.5 h-3.5 ${i < Math.floor(v.rating) ? "fill-current" : ""}`} />
+                    <Star key={i} className={`w-3.5 h-3.5 ${i < Math.floor(detailVoucher.rating) ? "fill-current" : ""}`} />
                   ))}
                 </div>
-                <div className="text-xs mt-0.5" style={{ color: "#8A8DA8" }}>{v.reviews} đánh giá</div>
+                <div className="text-xs mt-0.5" style={{ color: "#8A8DA8" }}>{detailVoucher.reviews} đánh giá</div>
               </div>
             )}
           </div>
@@ -69,21 +141,21 @@ export function VoucherDetailPage({ voucher: v, onBuy, onBuyNow, onBack, onWrite
 
         {/* Right */}
         <div>
-          <StatusBadge status={v.status} />
-          <h1 className="text-2xl font-black mt-3 mb-1 leading-tight" style={{ color: C.indigo }}>{v.title}</h1>
+          <StatusBadge status={detailVoucher.status} />
+          <h1 className="text-2xl font-black mt-3 mb-1 leading-tight" style={{ color: C.indigo }}>{detailVoucher.title}</h1>
 
           <div className="flex items-baseline gap-2 mt-4 mb-5">
-            <span className="text-3xl font-black" style={{ color: C.peach }}>{fmt(v.price)}</span>
-            <span className="text-base line-through" style={{ color: "#B0B3C8" }}>{fmt(v.originalPrice)}</span>
+            <span className="text-3xl font-black" style={{ color: C.peach }}>{fmt(detailVoucher.price)}</span>
+            <span className="text-base line-through" style={{ color: "#B0B3C8" }}>{fmt(detailVoucher.originalPrice)}</span>
             <span className="px-2 py-0.5 rounded-lg text-xs font-bold" style={{ backgroundColor: C.peach + "15", color: C.peach }}>
-              -{v.discountType === "percent" ? `${v.discount}%` : fmt(v.discount)}
+              -{detailVoucher.discount}%
             </span>
           </div>
 
           {/* Progress */}
           <div className="mb-5">
             <div className="flex justify-between text-xs font-semibold mb-1.5" style={{ color: "#8A8DA8" }}>
-              <span>Đã bán: {v.sold}/{v.quantity}</span>
+              <span>Đã bán: {detailVoucher.sold}/{detailVoucher.quantity}</span>
               <span>{pct}%</span>
             </div>
             <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
@@ -94,7 +166,7 @@ export function VoucherDetailPage({ voucher: v, onBuy, onBuyNow, onBack, onWrite
             </div>
             {pct > 80 && (
               <div className="text-xs font-semibold mt-1" style={{ color: C.peach }}>
-                🔥 Sắp hết! Chỉ còn {v.quantity - v.sold} voucher
+                <AppIcon name="flame" className="w-4 h-4 inline-block mr-1" /> Sắp hết! Chỉ còn {detailVoucher.quantity - detailVoucher.sold} voucher
               </div>
             )}
           </div>
@@ -102,10 +174,10 @@ export function VoucherDetailPage({ voucher: v, onBuy, onBuyNow, onBack, onWrite
           {/* Info grid */}
           <div className="grid grid-cols-2 gap-3 mb-5">
             {[
-              { label: "Đơn tối thiểu", value: v.minOrder > 0 ? fmt(v.minOrder) : "Không giới hạn" },
-              { label: "Hạn sử dụng", value: fmtDate(v.validTo) },
-              { label: "Loại giảm", value: v.discountType === "percent" ? "Phần trăm" : "Số tiền cố định" },
-              { label: "Danh mục", value: { food: "Ẩm thực", beauty: "Làm đẹp", travel: "Du lịch", entertainment: "Giải trí" }[v.category] ?? v.category },
+              { label: "Đơn tối thiểu", value: detailVoucher.minOrder > 0 ? fmt(detailVoucher.minOrder) : "Không giới hạn" },
+              { label: "Hạn sử dụng", value: fmtDate(detailVoucher.validTo) },
+              { label: "Loại giảm", value: "Phần trăm" },
+              { label: "Danh mục", value: detailMeta.categoryName || detailVoucher.category },
             ].map((r) => (
               <div key={r.label} className="bg-muted rounded-2xl p-3">
                 <div className="text-xs" style={{ color: "#8A8DA8" }}>{r.label}</div>
@@ -118,20 +190,27 @@ export function VoucherDetailPage({ voucher: v, onBuy, onBuyNow, onBack, onWrite
           <div className="mb-6">
             <h3 className="font-bold mb-2" style={{ color: C.indigo }}>Mô tả</h3>
             <p className="text-sm leading-relaxed" style={{ color: "#6B6E8A", fontFamily: "'Inter', sans-serif" }}>
-              {v.description}
+              {detailVoucher.description}
             </p>
           </div>
 
-          {/* Tags */}
-          <div className="flex flex-wrap gap-2 mb-6">
-            {v.tags.map((t) => (
-              <span key={t} className="px-3 py-1 rounded-full text-xs font-semibold" style={{ backgroundColor: C.eggshell, color: C.indigo }}>
-                #{t}
-              </span>
-            ))}
+          <div className="mb-6">
+            <h3 className="font-bold mb-2" style={{ color: C.indigo }}>Điều kiện sử dụng</h3>
+            {detailMeta.conditions.length === 0 && detailMeta.usageInstructions.length === 0 ? (
+              <p className="text-sm" style={{ color: "#8A8DA8" }}>Chưa cập nhật điều kiện sử dụng</p>
+            ) : (
+              <ul className="list-disc pl-5 space-y-1 text-sm" style={{ color: "#6B6E8A" }}>
+                {detailMeta.conditions.map((item) => (
+                  <li key={`condition-${item}`}>{item}</li>
+                ))}
+                {detailMeta.usageInstructions.map((item) => (
+                  <li key={`usage-${item}`}>{item}</li>
+                ))}
+              </ul>
+            )}
           </div>
 
-          {v.status === "active" ? (
+          {detailVoucher.status === "active" ? (
             <div className="flex flex-col gap-3">
               {onBuyNow && (
                 <button
@@ -139,7 +218,7 @@ export function VoucherDetailPage({ voucher: v, onBuy, onBuyNow, onBack, onWrite
                   className="w-full py-4 rounded-2xl font-bold text-white text-base transition-all hover:opacity-90 active:scale-95"
                   style={{ backgroundColor: C.peach }}
                 >
-                  Mua ngay — {fmt(v.price)}
+                  Mua ngay — {fmt(detailVoucher.price)}
                 </button>
               )}
               <button
@@ -162,7 +241,7 @@ export function VoucherDetailPage({ voucher: v, onBuy, onBuyNow, onBack, onWrite
       <div className="mt-8 bg-white rounded-2xl p-6 border border-black/5 shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-black text-lg" style={{ color: C.indigo, fontFamily: "'Nunito', sans-serif" }}>
-            Đánh giá ({v.reviews})
+            Đánh giá ({detailVoucher.reviews})
           </h3>
           {/* Write/edit review — only shown to eligible logged-in customers */}
           {hasReviewed && onEditReview ? (
@@ -184,9 +263,12 @@ export function VoucherDetailPage({ voucher: v, onBuy, onBuyNow, onBack, onWrite
           ) : null}
         </div>
 
-        <div className="grid sm:grid-cols-3 gap-4">
-          {MOCK_REVIEWS.map((r, i) => (
-            <div key={i} className="p-4 rounded-2xl border border-black/5" style={{ backgroundColor: C.eggshell }}>
+        {reviews.length === 0 ? (
+          <div className="text-sm" style={{ color: "#8A8DA8" }}>Chưa có đánh giá</div>
+        ) : (
+          <div className="grid sm:grid-cols-3 gap-4">
+            {reviews.map((r) => (
+              <div key={r.id} className="p-4 rounded-2xl border border-black/5" style={{ backgroundColor: C.eggshell }}>
               <div className="flex items-center gap-2 mb-2">
                 <div
                   className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-black"
@@ -204,10 +286,27 @@ export function VoucherDetailPage({ voucher: v, onBuy, onBuyNow, onBack, onWrite
                 </div>
               </div>
               <p className="text-xs leading-relaxed" style={{ color: "#4B5563", fontFamily: "'Inter', sans-serif" }}>{r.text}</p>
-              <div className="text-xs mt-2" style={{ color: "#9CA3AF" }}>{r.date}</div>
-            </div>
-          ))}
-        </div>
+                <div className="text-xs mt-2" style={{ color: "#9CA3AF" }}>{fmtDate(r.date)}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="mt-4 bg-white rounded-2xl p-6 border border-black/5 shadow-sm">
+        <h3 className="font-black text-lg mb-4" style={{ color: C.indigo, fontFamily: "'Nunito', sans-serif" }}>Chi nhánh áp dụng</h3>
+        {branches.length === 0 ? (
+          <p className="text-sm" style={{ color: "#8A8DA8" }}>Chưa cập nhật chi nhánh áp dụng</p>
+        ) : (
+          <div className="grid sm:grid-cols-2 gap-3">
+            {branches.map((branch) => (
+              <div key={branch.id} className="rounded-2xl p-3" style={{ backgroundColor: C.eggshell }}>
+                <div className="text-sm font-bold" style={{ color: C.indigo }}>{branch.name}</div>
+                <div className="text-xs mt-1" style={{ color: "#6B7280" }}>{branch.address}</div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

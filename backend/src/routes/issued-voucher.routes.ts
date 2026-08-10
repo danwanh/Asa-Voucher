@@ -12,18 +12,18 @@ issuedVoucherRoutes.get("/issued-vouchers", asyncHandler(issuedVoucherController
 issuedVoucherRoutes.get("/issued-vouchers/:id", asyncHandler(issuedVoucherController.getIssuedVoucher));
 issuedVoucherRoutes.patch(
   "/issued-vouchers/:id/status",
-  requireRole("admin_content", "admin_account"),
+  requireRole("admin_content", "admin_operations"),
   asyncHandler(issuedVoucherController.updateIssuedVoucherStatus),
 );
 
 issuedVoucherRoutes.post(
   "/issued-vouchers/validate",
-  requireRole("partner_owner", "partner_voucher_staff", "partner_store_staff", "admin_content", "admin_account"),
+  requireRole("partner_owner", "partner_voucher_staff", "partner_store_staff", "admin_content", "admin_operations"),
   asyncHandler(issuedVoucherController.validateVoucher),
 );
 issuedVoucherRoutes.post(
   "/issued-vouchers/:id/redeem",
-  requireRole("partner_owner", "partner_voucher_staff", "partner_store_staff"),
+  requireRole("partner_store_staff"),
   asyncHandler(issuedVoucherController.redeemVoucher),
 );
 

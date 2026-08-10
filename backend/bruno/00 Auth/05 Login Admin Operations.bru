@@ -16,7 +16,7 @@ headers {
 
 body:json {
   {
-    "email": "admin.account@asa.test",
+    "email": "admin.operations@asa.test",
     "password": "{{password}}"
   }
 }
@@ -26,8 +26,8 @@ script:post-response {
 }
 
 tests {
-  test("login admin account", function () {
+    test("login admin operations", function () {
     expect(res.status).to.equal(200);
-    expect(res.body.data.user.role).to.equal("admin_account");
+    expect(res.body.data.user.role).to.equal("admin_operations");
   });
 }

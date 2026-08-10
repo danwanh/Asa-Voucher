@@ -1,15 +1,17 @@
 import { useState } from "react"
-import { Search, Star, MessageSquare } from "lucide-react"
+import { Search, Star, CreditCard, MessageSquare } from "lucide-react"
 import { C, fmt, fmtDate } from "@/utils/constants"
+import { AppIcon } from "@/components/AppIcon"
 import { StatusBadge } from "@/components/StatusBadge"
-import { VOUCHERS } from "@/data/mock"
 import type { Order, OrderStatus } from "@/types"
 
 interface Props {
   orders: Order[]
   pendingOrderId?: string
   onDetail?: (o: Order) => void
-  onReview?: (o: Order) => void
+  onReview?: (o: Order, existing?: { rating: number; content: string }) => void
+  onComplaint?: (o: Order) => void
+  onPayAgain?: (o: Order) => void
 }
 
 const TABS: { label: string; value: string }[] = [
@@ -25,7 +27,7 @@ function deriveVoucherCodes(orderId: string, qty: number, baseCode: string): str
   return Array.from({ length: qty }, (_, i) => `${base}-${String(i + 1).padStart(3, "0")}`)
 }
 
-export function OrderHistoryPage({ orders, pendingOrderId, onDetail, onReview }: Props) {
+export function OrderHistoryPage({ orders, pendingOrderId, onDetail, onReview, onComplaint, onPayAgain }: Props) {
   const [tab, setTab] = useState("all")
   const [search, setSearch] = useState("")
 
@@ -103,10 +105,12 @@ export function OrderHistoryPage({ orders, pendingOrderId, onDetail, onReview }:
 
       <div className="space-y-3">
         {filtered.map((o) => {
-          const voucher = VOUCHERS.find((v) => v.id === o.voucherId)
-          const qty = 1 // default qty since Order type doesn't track it
-          const codes = deriveVoucherCodes(o.id, qty, o.code)
-          const canReview = o.status === "completed" || o.status === "used"
+          const qty = o.items?.reduce((sum, item) => sum + item.quantity, 0) ?? 1
+          const issuedCodes = o.items?.flatMap((item) => item.issuedVouchers ?? []).map((item) => item.code) ?? []
+          const codes = issuedCodes.length > 0 ? issuedCodes : deriveVoucherCodes(o.id, qty, o.code)
+          const hasIssuedCodes = issuedCodes.length > 0 || o.paymentStatus === "paid" || (o.status !== "pending" && o.status !== "cancelled")
+          const canReview = o.paymentStatus === "paid" || o.status === "completed" || o.status === "confirmed" || o.status === "used"
+          const canPayAgain = o.status === "pending" && o.paymentStatus !== "paid" && (!o.paymentExpiresAt || new Date(o.paymentExpiresAt).getTime() > Date.now())
 
           return (
             <div
@@ -141,7 +145,7 @@ export function OrderHistoryPage({ orders, pendingOrderId, onDetail, onReview }:
                   <p className="text-xs mt-0.5" style={{ color: "#8A8DA8" }}>{o.partnerName}</p>
 
                   {/* Voucher codes */}
-                  {o.code && (
+                  {hasIssuedCodes && o.code && (
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {codes.map((c) => (
                         <span
@@ -161,12 +165,6 @@ export function OrderHistoryPage({ orders, pendingOrderId, onDetail, onReview }:
                 <div className="flex flex-col items-end gap-1 shrink-0">
                   <span className="font-black text-sm" style={{ color: C.peach }}>{fmt(o.amount)}</span>
                   <span className="text-xs" style={{ color: "#8A8DA8" }}>{o.paymentMethod}</span>
-                  {/* Expiry date from voucher */}
-                  {voucher && (
-                    <span className="text-xs" style={{ color: "#8A8DA8" }}>
-                      HSD: {fmtDate(voucher.validTo)}
-                    </span>
-                  )}
                   <span className="text-xs" style={{ color: "#8A8DA8" }}>SL: {qty}</span>
                 </div>
               </div>
@@ -190,14 +188,22 @@ export function OrderHistoryPage({ orders, pendingOrderId, onDetail, onReview }:
                     Đánh giá
                   </button>
                 )}
-                {canReview && onReview && (
+                {onComplaint && (o.complaints?.[0] || canReview) && (
                   <button
-                    onClick={() => onReview(o, { rating: 4, content: "Voucher chất lượng, dịch vụ tốt!" })}
+                    onClick={() => onComplaint(o)}
                     className="text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors"
-                    style={{ backgroundColor: C.teal + "15", color: C.teal }}
+                    style={{ backgroundColor: o.complaints?.[0] ? "#DBEAFE" : "#EFF6FF", color: "#2563EB" }}
                   >
-                    <MessageSquare className="w-3 h-3" />
-                    Sửa đánh giá
+                    <MessageSquare className="w-3 h-3" /> {o.complaints?.[0] ? "Xem khiếu nại đơn" : "Khiếu nại đơn"}
+                  </button>
+                )}
+                {canPayAgain && onPayAgain && (
+                  <button
+                    onClick={() => onPayAgain(o)}
+                    className="text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-white"
+                    style={{ backgroundColor: C.peach }}
+                  >
+                    <CreditCard className="w-3 h-3" /> Thanh toán lại
                   </button>
                 )}
               </div>
@@ -207,7 +213,7 @@ export function OrderHistoryPage({ orders, pendingOrderId, onDetail, onReview }:
 
         {filtered.length === 0 && (
           <div className="text-center py-16 bg-white rounded-2xl">
-            <div className="text-4xl mb-3">📦</div>
+            <AppIcon name="package" className="w-10 h-10 mb-3 mx-auto" />
             <div className="font-bold" style={{ color: C.indigo }}>
               {search ? "Không tìm thấy đơn hàng phù hợp" : "Chưa có đơn hàng nào"}
             </div>

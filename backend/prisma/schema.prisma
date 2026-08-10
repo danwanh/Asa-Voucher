@@ -23,20 +23,27 @@ model User {
   district            String?   @db.VarChar(100)
   is_active           Boolean   @default(true)
   is_verified         Boolean   @default(false)
+  failed_login_attempts Int      @default(0)
+  locked_until        DateTime? @db.Timestamptz(6)
+  auth_version        Int       @default(0)
   partner_branches_id String?   @db.Uuid
   created_at          DateTime  @default(now()) @db.Timestamptz(6)
   updated_at          DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
 
   partner_branches     PartnerBranch?      @relation("UserBranch", fields: [partner_branches_id], references: [id], onDelete: SetNull)
   refresh_tokens       RefreshToken[]
+  auth_tokens          AuthToken[]
   authentication_logs  AuthenticationLog[]
   admin_logs           AdminLog[]          @relation("AdminLogAdmin")
   targeted_admin_logs  AdminLog[]          @relation("AdminLogTargetUser")
   represented_partners Partner[]           @relation("PartnerRepresentative")
   approved_partners    Partner[]           @relation("PartnerApprover")
   approved_vouchers    VoucherProduct[]    @relation("VoucherApprover")
+  created_vouchers     VoucherProduct[]    @relation("VoucherCreator")
+  submitted_vouchers   VoucherProduct[]    @relation("VoucherSubmitter")
   carts                Cart?
-  orders               Order[]
+  orders               Order[]           @relation("CreatedOrders")
+  received_orders      Order[]           @relation("ReceivedOrders")
   order_logs           OrderLog[]
   payment_logs         PaymentLog[]
   issued_vouchers      IssuedVoucher[]
@@ -62,6 +69,21 @@ model RefreshToken {
   users User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@map("refresh_tokens")
+}
+
+model AuthToken {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id    String    @db.Uuid
+  token_hash String    @unique
+  type       String    @db.VarChar(30)
+  expires_at DateTime  @db.Timestamptz(6)
+  used_at    DateTime? @db.Timestamptz(6)
+  created_at DateTime  @default(now()) @db.Timestamptz(6)
+
+  users User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, type, expires_at], map: "auth_tokens_lookup_idx")
+  @@map("auth_tokens")
 }
 
 model AuthenticationLog {
@@ -179,6 +201,9 @@ model VoucherProduct {
   validity_days        Int
   status               String    @default("draft") @db.VarChar(20)
   approval_status      String    @default("pending") @db.VarChar(20)
+  created_by           String?   @db.Uuid
+  submitted_by         String?   @db.Uuid
+  submitted_at         DateTime? @db.Timestamptz(6)
   approved_by          String?   @db.Uuid
   approved_at          DateTime? @db.Timestamptz(6)
   created_at           DateTime  @default(now()) @db.Timestamptz(6)
@@ -186,6 +211,8 @@ model VoucherProduct {
 
   partners                 Partner                @relation(fields: [partner_id], references: [id], onDelete: Cascade)
   categories               Category               @relation(fields: [category_id], references: [id], onDelete: Restrict)
+  creator                  User?                  @relation("VoucherCreator", fields: [created_by], references: [id], onDelete: SetNull)
+  submitter                User?                  @relation("VoucherSubmitter", fields: [submitted_by], references: [id], onDelete: SetNull)
   approver                 User?                  @relation("VoucherApprover", fields: [approved_by], references: [id], onDelete: SetNull)
   voucher_product_images   VoucherProductImage[]
   voucher_product_branches VoucherProductBranch[]
@@ -256,6 +283,7 @@ model Order {
   id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   order_code      String   @unique @db.VarChar(30)
   user_id         String   @db.Uuid
+  recipient_id    String   @db.Uuid
   subtotal        Decimal  @db.Decimal(15, 0)
   discount_amount Decimal  @default(0) @db.Decimal(15, 0)
   total_amount    Decimal  @db.Decimal(15, 0)
@@ -263,10 +291,13 @@ model Order {
   payment_status  String   @default("pending") @db.VarChar(20)
   status          String   @default("pending") @db.VarChar(20)
   note            String?
+  is_gift         Boolean  @default(false)
+  payment_expires_at DateTime? @db.Timestamptz(6)
   created_at      DateTime @default(now()) @db.Timestamptz(6)
   updated_at      DateTime @default(now()) @updatedAt @db.Timestamptz(6)
 
-  users        User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  users        User         @relation("CreatedOrders", fields: [user_id], references: [id], onDelete: Cascade)
+  recipient    User         @relation("ReceivedOrders", fields: [recipient_id], references: [id], onDelete: Restrict)
   order_items  OrderItem[]
   payments     Payment[]
   complaints   Complaint[]
@@ -274,6 +305,7 @@ model Order {
   payment_logs PaymentLog[]
 
   @@index([user_id], map: "orders_user_id_idx")
+  @@index([recipient_id], map: "orders_recipient_id_idx")
   @@map("orders")
 }
 
@@ -407,6 +439,7 @@ model Review {
 
   @@index([voucher_product_id], map: "reviews_voucher_product_id_idx")
   @@index([user_id], map: "reviews_user_id_idx")
+  @@unique([issued_voucher_id])
   @@map("reviews")
 }
 
@@ -447,6 +480,7 @@ model Complaint {
 
   @@index([user_id], map: "complaints_user_id_idx")
   @@index([status], map: "complaints_status_idx")
+  @@unique([user_id, issued_voucher_id])
   @@map("complaints")
 }
 
