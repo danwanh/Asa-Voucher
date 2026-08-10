@@ -35,12 +35,14 @@ interface Props {
   // When set, start directly at this page (e.g. "create-order" after guest checkout redirect)
   initialPage?: CustomerPage
   initialOrderId?: string
+  initialPaymentStatus?: string
   onInitialPageConsumed?: () => void
 }
 
 interface PendingOrder {
   id: string
   recipient: RecipientInfo
+  order?: Order
 }
 
 type VoucherListFilters = {
@@ -66,6 +68,7 @@ export function CustomerApp({
   cart, total, count, add, remove, update, clear,
   initialPage, onInitialPageConsumed,
   initialOrderId,
+  initialPaymentStatus,
 }: Props) {
   const router = useRouter()
   const [page, setPage] = useState<CustomerPage>(initialPage ?? "home")
@@ -88,8 +91,15 @@ export function CustomerApp({
       }).catch(() => undefined)
       return
     }
-    setPendingOrder({ id: initialOrderId, recipient: { name: "", identifier: "", note: "", forSelf: false } })
+    void orderService.get(initialOrderId).then((order) => {
+      setPendingOrder({ id: initialOrderId, order, recipient: { name: "", identifier: "", note: "", forSelf: true } })
+    }).catch(() => setPendingOrder({ id: initialOrderId, recipient: { name: "", identifier: "", note: "", forSelf: false } }))
   }, [initialOrderId, initialPage])
+
+  useEffect(() => {
+    if (initialPaymentStatus === "success") toast.success("Thanh toán thành công, voucher đã được phát hành.")
+    if (initialPaymentStatus === "failed") toast.error("Thanh toán thất bại. Đơn hàng vẫn được giữ để bạn thanh toán lại.")
+  }, [initialPaymentStatus])
 
   const navigate = (p: CustomerPage) => {
     setPage(p)
@@ -160,8 +170,13 @@ export function CustomerApp({
   const handlePayment = async (method: "vnpay" | "paypal") => {
     if (!pendingOrder) return
     const payment = await paymentService.create(pendingOrder.id, method)
-    await paymentService.simulateSuccess(payment.id)
-    await handlePaymentSuccess()
+    window.location.assign(payment.checkout_url)
+  }
+
+  const handlePayAgain = (order: Order) => {
+    setPendingOrder({ id: order.id, order, recipient: { name: "", identifier: "", note: "", forSelf: true } })
+    setSelectedOrder(null)
+    router.push(`/checkout/payment/${order.id}`)
   }
 
   const handlePaymentBack = () => {
@@ -230,8 +245,9 @@ export function CustomerApp({
       {page === "payment" && pendingOrder && (
         <PaymentPage
           cart={cart}
-          total={total}
-          orderId={pendingOrder.id}
+          total={pendingOrder.order?.amount ?? total}
+           orderId={pendingOrder.id}
+           order={pendingOrder.order}
            onPay={handlePayment}
            onBack={handlePaymentBack}
         />
@@ -253,10 +269,11 @@ export function CustomerApp({
           pendingOrderId={pendingOrder?.id}
           onDetail={goOrderDetail}
           onReview={(o) => goReview(o)}
+          onPayAgain={handlePayAgain}
         />
       )}
       {page === "order-detail" && selectedOrder && (
-        <OrderDetailPage order={selectedOrder} onBack={() => navigate("orders")} onReview={(o) => goReview(o)} />
+         <OrderDetailPage order={selectedOrder} onBack={() => navigate("orders")} onReview={(o) => goReview(o)} onPayAgain={handlePayAgain} />
       )}
       {page === "review" && reviewOrder && (
         <ReviewPage

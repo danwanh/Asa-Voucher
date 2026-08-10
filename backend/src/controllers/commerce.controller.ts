@@ -81,3 +81,15 @@ export async function simulatePaymentSuccess(req: Request, res: Response) {
 export async function simulatePaymentFailed(req: Request, res: Response) {
   ok(res, await commerceService.simulatePaymentFailed(req.user!, req.params.id), "Payment failed");
 }
+
+export async function vnpayReturn(req: Request, res: Response) {
+  res.redirect(await commerceService.handleVnpayReturn(req.query as Record<string, unknown>));
+}
+
+export async function paypalReturn(req: Request, res: Response) {
+  res.redirect(await commerceService.handlePayPalReturn(String(req.query.token ?? "")));
+}
+
+export async function paypalCancel(req: Request, res: Response) {
+  res.redirect(await commerceService.handlePayPalCancel(req.query.token ? String(req.query.token) : undefined));
+}

@@ -30,7 +30,7 @@ function LogoutConfirmDialog({ onCancel, onConfirm }: { onCancel: () => void; on
   )
 }
 
-export default function App({ initialPage, initialOrderId, initialStaffCode }: { initialPage?: CustomerPage | "profile" | "cart"; initialOrderId?: string; initialStaffCode?: string } = {}) {
+export default function App({ initialPage, initialOrderId, initialStaffCode, initialPaymentStatus }: { initialPage?: CustomerPage | "profile" | "cart"; initialOrderId?: string; initialStaffCode?: string; initialPaymentStatus?: string } = {}) {
   const user = useAuthStore((s) => s.user)
   const isInitialized = useAuthStore((s) => s.isInitialized)
   const initialize = useAuthStore((s) => s.initialize)
@@ -127,8 +127,9 @@ export default function App({ initialPage, initialOrderId, initialStaffCode }: {
       remove={remove}
       update={update}
       clear={clear}
-       initialPage={pendingCheckout ? "create-order" : initialPage}
-       initialOrderId={initialOrderId}
+      initialPage={pendingCheckout ? "create-order" : initialPage}
+      initialOrderId={initialOrderId}
+      initialPaymentStatus={initialPaymentStatus}
       onInitialPageConsumed={() => setPendingCheckout(false)}
     />
   )

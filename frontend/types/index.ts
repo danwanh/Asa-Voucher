@@ -185,6 +185,7 @@ export interface Payment {
   amount: number
   status: "pending" | "success" | "failed" | "refunded"
   transactionRef?: string
+  checkout_url?: string
 }
 
 export interface CartItem {

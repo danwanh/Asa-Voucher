@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { ArrowLeft, Copy, CheckCircle2, Download, Star, MessageSquare } from "lucide-react"
+import { ArrowLeft, Copy, CheckCircle2, Download, Star, MessageSquare, CreditCard } from "lucide-react"
 import { C, fmt, fmtDate, STATUS_LABEL, statusColor } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import type { Order } from "@/types"
@@ -9,9 +9,10 @@ interface Props {
   order: Order
   onBack: () => void
   onReview: (order: Order) => void
+  onPayAgain?: (order: Order) => void
 }
 
-export function OrderDetailPage({ order, onBack, onReview }: Props) {
+export function OrderDetailPage({ order, onBack, onReview, onPayAgain }: Props) {
   const [copied, setCopied] = useState(false)
   const sc = statusColor(order.status)
 
@@ -127,6 +128,15 @@ export function OrderDetailPage({ order, onBack, onReview }: Props) {
 
       {/* Actions */}
       <div className="flex gap-3">
+        {order.status === "pending" && order.paymentStatus !== "paid" && (!order.paymentExpiresAt || new Date(order.paymentExpiresAt).getTime() > Date.now()) && onPayAgain && (
+          <button
+            onClick={() => onPayAgain(order)}
+            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm text-white"
+            style={{ backgroundColor: C.peach }}
+          >
+            <CreditCard className="w-4 h-4" /> Thanh toán lại
+          </button>
+        )}
         {(order.status === "confirmed" || order.status === "completed") && (
           <button
             onClick={() => onReview(order)}

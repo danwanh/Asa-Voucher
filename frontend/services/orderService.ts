@@ -97,7 +97,7 @@ export const orderService = {
 export const paymentService = {
   async create(orderId: string, method: "vnpay" | "paypal") {
     const response = await api.post(`/orders/${orderId}/payments`, { method })
-    return data<Payment>(response)
+    return data<Payment & { checkout_url: string }>(response)
   },
 
   async simulateSuccess(paymentId: string) {

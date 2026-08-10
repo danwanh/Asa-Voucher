@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { addCartItem, cancelOrder, checkout, clearCart, createOrder, createPayment, deleteCartItem, deleteOrder, getCart, getOrderController, getOrderItem, getPaymentController, listOrderItems, listOrders, listPayments, simulatePaymentFailed, simulatePaymentSuccess, updateCartItem, updateOrder } from "../controllers/commerce.controller.js";
+import { addCartItem, cancelOrder, checkout, clearCart, createOrder, createPayment, deleteCartItem, deleteOrder, getCart, getOrderController, getOrderItem, getPaymentController, listOrderItems, listOrders, listPayments, paypalCancel, paypalReturn, simulatePaymentFailed, simulatePaymentSuccess, updateCartItem, updateOrder, vnpayReturn } from "../controllers/commerce.controller.js";
 import { requireAuth } from "../middlewares/auth.js";
 import { requireRole } from "../middlewares/require-role.js";
 import { validateBody, validateParams } from "../middlewares/validate.js";
@@ -8,6 +8,11 @@ import { checkoutSchema, createOrderSchema, createPaymentSchema, cartItemSchema,
 import { idParamSchema, orderIdParamSchema } from "../validations/common.validation.js";
 
 export const commerceRoutes = Router();
+
+// Gateway return URLs are intentionally public; each provider response is verified server-side.
+commerceRoutes.get("/payments/vnpay/return", asyncHandler(vnpayReturn));
+commerceRoutes.get("/payments/paypal/return", asyncHandler(paypalReturn));
+commerceRoutes.get("/payments/paypal/cancel", asyncHandler(paypalCancel));
 
 commerceRoutes.get("/cart", requireAuth, requireRole(["buyer"]), asyncHandler(getCart));
 commerceRoutes.post("/cart/items", requireAuth, requireRole(["buyer"]), validateBody(cartItemSchema), asyncHandler(addCartItem));

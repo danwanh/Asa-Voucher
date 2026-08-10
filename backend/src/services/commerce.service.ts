@@ -3,7 +3,14 @@ import { prisma } from "../config/prisma.js";
 import { adminRoles, type UserRole } from "../types/auth.types.js";
 import { requireData } from "../utils/db.js";
 import { HttpError } from "../utils/http-error.js";
-import { createSimulatedPayment, type PaymentProvider } from "./payment-provider.service.js";
+import {
+  capturePayPalPayment,
+  createPayPalPayment,
+  createVnpayPayment,
+  createSimulatedPayment,
+  verifyVnpayReturn,
+  type PaymentProvider,
+} from "./payment-provider.service.js";
 import { env } from "../config/env.js";
 
 type CurrentUser = { id: string; role: UserRole; partnerId?: string | null };
@@ -316,12 +323,55 @@ export async function createPayment(user: CurrentUser, orderId: string, method?:
     throw new HttpError(409, "Order payment window has expired", "ORDER_PAYMENT_EXPIRED");
   }
   const provider = (method ?? order.payment_method) as PaymentProvider;
-  const simulated = createSimulatedPayment(provider, orderId);
-  return prisma.$transaction(async (tx) => {
-    const data = await tx.payment.create({ data: { order_id: orderId, method: provider, amount: order.total_amount as never, transaction_ref: simulated.transactionRef, gateway_response: simulated.gatewayResponse } });
+  if (provider !== "vnpay" && provider !== "paypal" && provider !== "simulated") throw new HttpError(422, "Unsupported payment provider", "PAYMENT_METHOD_INVALID");
+  const payment = await prisma.$transaction(async (tx) => {
+    const data = await tx.payment.create({ data: { order_id: orderId, method: provider, amount: order.total_amount as never } });
+    await tx.order.update({ where: { id: orderId }, data: { payment_method: provider, updated_at: new Date() } });
     await tx.paymentLog.create({ data: { payment_id: data.id, order_id: orderId, user_id: user.id, action: "PAYMENT_CREATED", status: "pending", amount: data.amount } });
     return data;
   });
+
+  try {
+    if (provider === "simulated") {
+      const legacy = createSimulatedPayment(provider, orderId);
+      return { ...payment, transaction_ref: legacy.transactionRef, gateway_response: legacy.gatewayResponse, checkout_url: legacy.checkoutUrl };
+    }
+    const request = { paymentId: payment.id, orderCode: String(order.order_code), amountVnd: Number(order.total_amount) };
+    const gateway = provider === "paypal" ? await createPayPalPayment(request) : createVnpayPayment(request);
+    return prisma.payment.update({
+      where: { id: payment.id },
+      data: { transaction_ref: gateway.transactionRef, gateway_response: JSON.stringify(gateway.gatewayResponse) },
+    }).then((data) => ({ ...data, checkout_url: gateway.checkoutUrl }));
+  } catch (error) {
+    console.error(JSON.stringify({
+      event: "payment.provider.create.failed",
+      provider,
+      paymentId: payment.id,
+      orderId,
+      orderCode: order.order_code,
+      stage: "provider.create_or_payment.update",
+      error: errorForLog(error),
+    }));
+    try {
+      await markPaymentFailed(payment.id, user.id, "PAYMENT_PROVIDER_CREATE_FAILED");
+    } catch (markError) {
+      console.error(JSON.stringify({
+        event: "payment.failure.log.failed",
+        provider,
+        paymentId: payment.id,
+        orderId,
+        stage: "mark_payment_failed",
+        error: errorForLog(markError),
+      }));
+    }
+    throw error;
+  }
+}
+
+function errorForLog(error: unknown) {
+  if (error instanceof HttpError) return { name: error.name, message: error.message, code: error.code, details: error.details, stack: error.stack };
+  if (error instanceof Error) return { name: error.name, message: error.message, stack: error.stack };
+  return { name: "UnknownError", message: String(error) };
 }
 
 async function getPayment(id: string) {
@@ -347,9 +397,22 @@ export async function simulatePaymentSuccess(user: CurrentUser, id: string) {
     throw new HttpError(409, "Order payment window has expired", "ORDER_PAYMENT_EXPIRED");
   }
   const orderItems = (order.order_items as Array<Record<string, unknown>>) ?? [];
-  const now = new Date();
 
+  return completePayment(id, user.id, payment, order, orderItems);
+}
+
+async function completePayment(id: string, userId: string, payment: Record<string, unknown>, order: Record<string, unknown>, orderItems: Array<Record<string, unknown>>) {
+  const now = new Date();
   return prisma.$transaction(async (tx) => {
+    const claim = typeof tx.payment.updateMany === "function"
+      ? await tx.payment.updateMany({ where: { id, status: "pending" }, data: { status: "processing" } })
+      : { count: 1 };
+    if (claim.count === 0) {
+      const current = await tx.payment.findUnique({ where: { id } });
+      if (current?.status === "success") return current;
+      throw new HttpError(409, "Payment is already being processed", "PAYMENT_IN_PROGRESS");
+    }
+
     for (const item of orderItems) {
       const voucher = item.voucher_products as Voucher;
       const today = todayIsoDate();
@@ -382,9 +445,10 @@ export async function simulatePaymentSuccess(user: CurrentUser, id: string) {
       await tx.issuedVoucher.createMany({ data: issued });
     }
 
-    const data = await tx.payment.update({ where: { id }, data: { status: "success", paid_at: now, transaction_ref: `SIM-${Date.now()}`, gateway_response: "simulated success" } });
+    const data = await tx.payment.update({ where: { id }, data: { status: "success", paid_at: now } });
     await tx.order.update({ where: { id: order.id as string }, data: { payment_status: "paid", status: "confirmed", updated_at: now } });
-    await tx.paymentLog.create({ data: { payment_id: id, order_id: order.id as string, user_id: user.id, action: "PAYMENT_SUCCESS", status: "success", amount: payment.amount as never } });
+    await tx.orderLog.create({ data: { order_id: order.id as string, user_id: userId, action: "PAYMENT_SUCCESS", description: "Payment confirmed and vouchers issued" } });
+    await tx.paymentLog.create({ data: { payment_id: id, order_id: order.id as string, user_id: userId, action: "PAYMENT_SUCCESS", status: "success", amount: payment.amount as never } });
     return data;
   });
 }
@@ -393,10 +457,100 @@ export async function simulatePaymentFailed(user: CurrentUser, id: string) {
   const payment = await getPayment(id);
   const order = payment.orders as Record<string, unknown>;
   assertOrderAccess(user, order);
+  return markPaymentFailed(id, user.id, "simulated failed", payment);
+}
+
+async function markPaymentFailed(id: string, userId: string, reason: string, knownPayment?: Record<string, unknown>) {
   return prisma.$transaction(async (tx) => {
-    const data = await tx.payment.update({ where: { id }, data: { status: "failed", gateway_response: "simulated failed" } });
-    await tx.order.update({ where: { id: order.id as string }, data: { payment_status: "failed", updated_at: new Date() } });
-    await tx.paymentLog.create({ data: { payment_id: id, order_id: order.id as string, user_id: user.id, action: "PAYMENT_FAILED", status: "failed", amount: payment.amount as never } });
+    const payment = knownPayment ?? (typeof tx.payment.findUnique === "function" ? await tx.payment.findUnique({ where: { id } }) : undefined);
+    if (!payment) throw new HttpError(404, "Payment not found", "PAYMENT_NOT_FOUND");
+    if (payment.status === "success" || payment.status === "failed") return payment;
+    const data = await tx.payment.update({ where: { id }, data: { status: "failed", gateway_response: reason } });
+    await tx.paymentLog.create({ data: { payment_id: id, order_id: payment.order_id, user_id: userId, action: "PAYMENT_FAILED", status: "failed", amount: payment.amount } });
     return data;
   });
+}
+
+async function paymentByTransactionRef(transactionRef: string) {
+  return requireData<Record<string, unknown>>(await prisma.payment.findFirst({
+    where: { transaction_ref: transactionRef },
+    include: { orders: { include: { order_items: { include: { voucher_products: true } } } } },
+  }) as unknown as Record<string, unknown> | null, "Payment not found");
+}
+
+function redirectResult(orderId: string, status: "success" | "failed") {
+  return `${env.FRONTEND_URL}/checkout/payment/result?orderId=${encodeURIComponent(orderId)}&status=${status}`;
+}
+
+function paymentWindowExpired(order: Record<string, unknown>) {
+  return Boolean(order.payment_expires_at && new Date(order.payment_expires_at as string | Date) <= new Date());
+}
+
+export async function handleVnpayReturn(query: Record<string, unknown>) {
+  const result = verifyVnpayReturn(query);
+  const payment = await paymentByTransactionRef(result.transactionRef);
+  const order = payment.orders as Record<string, unknown>;
+  const successfulReturn = result.validSignature && result.validTmnCode && result.responseCode === "00" && result.transactionStatus === "00" && result.amount === Number(payment.amount);
+  if (successfulReturn && paymentWindowExpired(order)) {
+    await cancelExpiredOrder(order.id as string, order.user_id as string);
+    await markPaymentFailed(payment.id as string, order.user_id as string, "VNPAY_PAYMENT_EXPIRED");
+    return redirectResult(order.id as string, "failed");
+  }
+  if (successfulReturn) {
+    try {
+      await completePayment(payment.id as string, order.user_id as string, payment, order, order.order_items as Array<Record<string, unknown>>);
+      return redirectResult(order.id as string, "success");
+    } catch (error) {
+      console.error("VNPay fulfillment failed", error instanceof Error ? error.message : "UnknownError");
+      try {
+        await markPaymentFailed(payment.id as string, order.user_id as string, "VNPAY_FULFILLMENT_FAILED");
+      } catch (markError) {
+        console.error("Unable to record VNPay failure", markError instanceof Error ? markError.message : "UnknownError");
+      }
+      return redirectResult(order.id as string, "failed");
+    }
+  }
+  await markPaymentFailed(payment.id as string, order.user_id as string, `VNPAY_FAILED_${result.responseCode}`);
+  return redirectResult(order.id as string, "failed");
+}
+
+export async function handlePayPalReturn(token: string) {
+  const payment = await paymentByTransactionRef(token);
+  const order = payment.orders as Record<string, unknown>;
+  if (payment.status === "success" || order.payment_status === "paid") return redirectResult(order.id as string, "success");
+  if (paymentWindowExpired(order)) {
+    await cancelExpiredOrder(order.id as string, order.user_id as string);
+    await markPaymentFailed(payment.id as string, order.user_id as string, "PAYPAL_PAYMENT_EXPIRED");
+    return redirectResult(order.id as string, "failed");
+  }
+  try {
+    const captured = await capturePayPalPayment(token, Number(payment.amount));
+    await prisma.payment.update({ where: { id: payment.id as string }, data: { gateway_response: JSON.stringify(captured.gatewayResponse) } });
+    await completePayment(payment.id as string, order.user_id as string, payment, order, order.order_items as Array<Record<string, unknown>>);
+    return redirectResult(order.id as string, "success");
+  } catch (error) {
+    console.error(JSON.stringify({
+      event: "payment.paypal.callback.failed",
+      provider: "paypal",
+      paymentId: payment.id,
+      orderId: order.id,
+      transactionRef: token,
+      stage: "capture_or_fulfillment",
+      error: errorForLog(error),
+    }));
+    await markPaymentFailed(payment.id as string, order.user_id as string, "PAYPAL_PAYMENT_FAILED");
+    if (error instanceof HttpError && error.code === "PAYMENT_ALREADY_COMPLETED") return redirectResult(order.id as string, "success");
+    return redirectResult(order.id as string, "failed");
+  }
+}
+
+export async function handlePayPalCancel(token?: string) {
+  if (token) {
+    const payment = await prisma.payment.findFirst({ where: { transaction_ref: token }, include: { orders: true } });
+    if (payment) {
+      await markPaymentFailed(payment.id, payment.orders.user_id, "PAYPAL_CANCELLED");
+      return redirectResult(payment.order_id, "failed");
+    }
+  }
+  return `${env.FRONTEND_URL}/orders`;
 }

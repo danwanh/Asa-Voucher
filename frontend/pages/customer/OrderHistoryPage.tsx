@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Search, Star, MessageSquare } from "lucide-react"
+import { Search, Star, MessageSquare, CreditCard } from "lucide-react"
 import { C, fmt, fmtDate } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import { StatusBadge } from "@/components/StatusBadge"
@@ -10,6 +10,7 @@ interface Props {
   pendingOrderId?: string
   onDetail?: (o: Order) => void
   onReview?: (o: Order, existing?: { rating: number; content: string }) => void
+  onPayAgain?: (o: Order) => void
 }
 
 const TABS: { label: string; value: string }[] = [
@@ -25,7 +26,7 @@ function deriveVoucherCodes(orderId: string, qty: number, baseCode: string): str
   return Array.from({ length: qty }, (_, i) => `${base}-${String(i + 1).padStart(3, "0")}`)
 }
 
-export function OrderHistoryPage({ orders, pendingOrderId, onDetail, onReview }: Props) {
+export function OrderHistoryPage({ orders, pendingOrderId, onDetail, onReview, onPayAgain }: Props) {
   const [tab, setTab] = useState("all")
   const [search, setSearch] = useState("")
 
@@ -106,7 +107,9 @@ export function OrderHistoryPage({ orders, pendingOrderId, onDetail, onReview }:
           const qty = o.items?.reduce((sum, item) => sum + item.quantity, 0) ?? 1
           const issuedCodes = o.items?.flatMap((item) => item.issuedVouchers ?? []).map((item) => item.code) ?? []
           const codes = issuedCodes.length > 0 ? issuedCodes : deriveVoucherCodes(o.id, qty, o.code)
+          const hasIssuedCodes = issuedCodes.length > 0 || o.paymentStatus === "paid" || (o.status !== "pending" && o.status !== "cancelled")
           const canReview = o.status === "completed" || o.status === "confirmed" || o.status === "used"
+          const canPayAgain = o.status === "pending" && o.paymentStatus !== "paid" && (!o.paymentExpiresAt || new Date(o.paymentExpiresAt).getTime() > Date.now())
 
           return (
             <div
@@ -141,7 +144,7 @@ export function OrderHistoryPage({ orders, pendingOrderId, onDetail, onReview }:
                   <p className="text-xs mt-0.5" style={{ color: "#8A8DA8" }}>{o.partnerName}</p>
 
                   {/* Voucher codes */}
-                  {o.code && (
+                  {hasIssuedCodes && o.code && (
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {codes.map((c) => (
                         <span
@@ -182,6 +185,15 @@ export function OrderHistoryPage({ orders, pendingOrderId, onDetail, onReview }:
                   >
                     <Star className="w-3 h-3" />
                     Đánh giá
+                  </button>
+                )}
+                {canPayAgain && onPayAgain && (
+                  <button
+                    onClick={() => onPayAgain(o)}
+                    className="text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-white"
+                    style={{ backgroundColor: C.peach }}
+                  >
+                    <CreditCard className="w-3 h-3" /> Thanh toán lại
                   </button>
                 )}
                 {canReview && onReview && (

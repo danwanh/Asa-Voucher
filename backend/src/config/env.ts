@@ -25,6 +25,8 @@ const envSchema = z.object({
   PAYPAL_CLIENT_ID: z.string().optional(),
   PAYPAL_CLIENT_SECRET: z.string().optional(),
   PAYPAL_ENVIRONMENT: z.enum(["sandbox", "live"]).default("sandbox"),
+  PAYPAL_CURRENCY: z.string().length(3).default("USD"),
+  PAYPAL_VND_TO_USD_RATE: z.coerce.number().positive().default(25000),
   PAYPAL_RETURN_URL: z.string().url().optional(),
   PAYPAL_CANCEL_URL: z.string().url().optional()
 });

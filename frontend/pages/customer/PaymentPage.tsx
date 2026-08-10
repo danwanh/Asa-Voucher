@@ -2,27 +2,28 @@ import { useState } from "react"
 import { ArrowLeft, CheckCircle2 } from "lucide-react"
 import { C, fmt } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
-import type { CartItem } from "@/types"
+import type { CartItem, Order } from "@/types"
 import { toast } from "sonner"
 
 type PaymentMethod = "vnpay" | "paypal"
 
 const PAYMENT_METHODS: { id: PaymentMethod; label: string; icon: string; desc: string }[] = [
   { id: "vnpay", label: "VNPay", icon: "creditCard", desc: "Thẻ ATM / Internet Banking" },
-  { id: "paypal", label: "PayPal", icon: "wallet", desc: "Thanh toán mô phỏng qua PayPal" },
+  { id: "paypal", label: "PayPal", icon: "wallet", desc: "Thanh toán qua PayPal Sandbox" },
 ]
 
 interface Props {
   cart: CartItem[]
   total: number
   orderId: string
+  order?: Order
   onPay: (method: PaymentMethod) => Promise<void>
   onBack: () => void
 }
 
 const FALLBACK = "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=200&h=150&fit=crop"
 
-export function PaymentPage({ cart, total, orderId, onPay, onBack }: Props) {
+export function PaymentPage({ cart, total, order, orderId, onPay, onBack }: Props) {
   const [payment, setPayment] = useState<PaymentMethod>("vnpay")
   const [processing, setProcessing] = useState(false)
 
@@ -30,8 +31,9 @@ export function PaymentPage({ cart, total, orderId, onPay, onBack }: Props) {
     setProcessing(true)
     try {
       await onPay(payment)
-    } catch {
-      toast.error("Giao dịch không thành công, vui lòng kiểm tra lại phương thức thanh toán")
+    } catch (error) {
+      const apiError = error as { response?: { data?: { error?: { message?: string } } } }
+      toast.error(apiError.response?.data?.error?.message ?? "Giao dịch không thành công, vui lòng kiểm tra lại phương thức thanh toán")
       setProcessing(false)
     }
   }
@@ -127,7 +129,10 @@ export function PaymentPage({ cart, total, orderId, onPay, onBack }: Props) {
               Tóm tắt
             </h2>
             <div className="space-y-3 mb-4">
-              {cart.map((item) => (
+              {(cart.length > 0 ? cart : (order?.items ?? []).map((item) => ({
+                voucher: { id: item.voucherId, title: item.voucherTitle ?? "Voucher", image: FALLBACK, price: item.unitPrice },
+                qty: item.quantity,
+              }))).map((item) => (
                 <div key={item.voucher.id} className="flex items-start gap-3">
                   <div className="w-12 h-10 rounded-lg overflow-hidden flex-shrink-0">
                     <img
