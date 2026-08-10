@@ -30,7 +30,7 @@ function LogoutConfirmDialog({ onCancel, onConfirm }: { onCancel: () => void; on
   )
 }
 
-export default function App({ initialPage, initialOrderId, initialStaffCode, initialPaymentStatus }: { initialPage?: CustomerPage | "profile" | "cart"; initialOrderId?: string; initialStaffCode?: string; initialPaymentStatus?: string } = {}) {
+export default function App({ initialPage, initialOrderId, initialVoucherId, initialStaffCode, initialPaymentStatus }: { initialPage?: CustomerPage | "profile" | "cart"; initialOrderId?: string; initialVoucherId?: string; initialStaffCode?: string; initialPaymentStatus?: string } = {}) {
   const user = useAuthStore((s) => s.user)
   const isInitialized = useAuthStore((s) => s.isInitialized)
   const initialize = useAuthStore((s) => s.initialize)
@@ -93,7 +93,7 @@ export default function App({ initialPage, initialOrderId, initialStaffCode, ini
     </>
   )
 
-  const guestInitialPage = initialPage === "cart" || initialPage === "vouchers" || initialPage === "categories"
+  const guestInitialPage = initialPage === "cart" || initialPage === "vouchers" || initialPage === "detail" || initialPage === "categories"
     ? initialPage
     : undefined
 
@@ -121,6 +121,7 @@ export default function App({ initialPage, initialOrderId, initialStaffCode, ini
       cartRemove={remove}
       cartUpdate={update}
        initialPage={guestInitialPage}
+       initialVoucherId={initialVoucherId}
     />
   )
 
@@ -150,7 +151,8 @@ export default function App({ initialPage, initialOrderId, initialStaffCode, ini
        setCheckoutSelection={setCheckoutSelection}
        clearCheckoutSelection={clearCheckoutSelection}
       initialPage={pendingCheckout ? "create-order" : initialPage}
-      initialOrderId={initialOrderId}
+       initialOrderId={initialOrderId}
+       initialVoucherId={initialVoucherId}
       initialPaymentStatus={initialPaymentStatus}
       onInitialPageConsumed={() => setPendingCheckout(false)}
     />

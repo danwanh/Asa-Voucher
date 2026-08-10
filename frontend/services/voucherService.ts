@@ -47,6 +47,10 @@ type BackendVoucherList = {
 type BackendReview = {
   id: string
   user_id: string
+  users?: {
+    full_name?: string | null
+    avatar_url?: string | null
+  } | null
   rating: number
   comment: string | null
   created_at: string
@@ -147,9 +151,16 @@ function mapVoucherProduct(product: BackendVoucherProduct, categorySlug: string)
 }
 
 function mapReview(review: BackendReview): VoucherPublicReview {
+  const fullName = review.users?.full_name?.trim() || "Khách hàng"
+  const nameParts = fullName.split(/\s+/).filter(Boolean)
+  const lastName = nameParts.pop() ?? "K"
+  const maskedName = nameParts.length > 0
+    ? `${nameParts.join(" ")} ${lastName.charAt(0)}***`
+    : `${lastName.charAt(0)}***`
+
   return {
     id: review.id,
-    name: "Khách hàng",
+    name: maskedName,
     rating: review.rating,
     text: review.comment?.trim() || "",
     date: review.created_at

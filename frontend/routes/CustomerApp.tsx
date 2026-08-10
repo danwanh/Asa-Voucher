@@ -23,6 +23,7 @@ import { customerPagePath } from "@/utils/customerRoutes"
 import type { AppUser, CartItem, IssuedVoucher, Voucher, Order } from "@/types"
 import { orderService, paymentService } from "@/services/orderService"
 import { issuedVoucherService } from "@/services/issuedVoucherService"
+import { voucherService } from "@/services/voucherService"
 
 interface Props {
   user: AppUser
@@ -45,6 +46,7 @@ interface Props {
   // When set, start directly at this page (e.g. "create-order" after guest checkout redirect)
   initialPage?: CustomerPage
   initialOrderId?: string
+  initialVoucherId?: string
   initialPaymentStatus?: string
   onInitialPageConsumed?: () => void
 }
@@ -79,6 +81,7 @@ export function CustomerApp({
   checkoutSelectionIds, checkoutItems, setCheckoutSelection, clearCheckoutSelection,
   initialPage, onInitialPageConsumed,
   initialOrderId,
+  initialVoucherId,
   initialPaymentStatus,
 }: Props) {
   const router = useRouter()
@@ -125,6 +128,17 @@ export function CustomerApp({
   }, [initialOrderId, initialPage])
 
   useEffect(() => {
+    if (!initialVoucherId) return
+    void voucherService.getDetail(initialVoucherId).then((detail) => {
+      setSelectedVoucher(detail.voucher)
+      setPage("detail")
+    }).catch(() => {
+      toast.error("Không thể tải chi tiết voucher.")
+      router.push("/vouchers")
+    })
+  }, [initialVoucherId, router])
+
+  useEffect(() => {
     if (initialPaymentStatus === "success") toast.success("Thanh toán thành công, voucher đã được phát hành.")
     if (initialPaymentStatus === "failed") toast.error("Thanh toán thất bại. Đơn hàng vẫn được giữ để bạn thanh toán lại.")
   }, [initialPaymentStatus])
@@ -149,7 +163,7 @@ export function CustomerApp({
     if (page !== "vouchers") setPage("vouchers")
   }
 
-  const goDetail = (v: Voucher) => { setSelectedVoucher(v); navigate("detail") }
+  const goDetail = (v: Voucher) => router.push(`/vouchers/${v.id}`)
   const goOrderDetail = (o: Order) => {
     setSelectedOrder(o)
     router.push(`/orders/${o.id}`)
@@ -299,7 +313,7 @@ export function CustomerApp({
             toast.success(`Đã thêm "${selectedVoucher.title.slice(0, 30)}..." vào giỏ hàng`)
           }}
           onBuyNow={() => handleBuyNow(selectedVoucher)}
-          onBack={() => navigate("vouchers")}
+           onBack={() => router.push("/vouchers")}
         />
       )}
       {page === "cart" && (

@@ -4,6 +4,7 @@ import type { CreateReviewInput, UpdateReviewInput } from "../validations/review
 
 const INCLUDE = {
   voucher_products: { select: { id: true, name: true, partner_id: true } },
+  users: { select: { full_name: true, avatar_url: true } },
 } as const;
 
 export async function listReviews(
