@@ -23,8 +23,13 @@ function resolvePartnerScope(user: AuthUser, query: ReportQuery): string | undef
   throw new HttpError(403, "Bạn không có quyền xem báo cáo");
 }
 
-function toDateKey(isoTimestamp: string): string {
-  return isoTimestamp.slice(0, 10);
+function toDateKey(value: Date | string): string {
+  if (value instanceof Date) {
+    // Keep UTC day stable regardless of local server timezone.
+    return value.toISOString().slice(0, 10);
+  }
+
+  return value.slice(0, 10);
 }
 
 export async function getRevenueReport(user: AuthUser, query: ReportQuery): Promise<RevenuePoint[]> {
