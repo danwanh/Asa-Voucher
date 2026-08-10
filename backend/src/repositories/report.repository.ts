@@ -91,7 +91,10 @@ export interface VoucherProductStatsRow {
 
 export async function listVoucherProductStats(partnerId?: string): Promise<VoucherProductStatsRow[]> {
   return prisma.voucherProduct.findMany({
-    where: partnerId ? { partner_id: partnerId } : undefined,
+    where: {
+      approval_status: "approved",
+      ...(partnerId ? { partner_id: partnerId } : {}),
+    },
     select: { id: true, name: true, partner_id: true, total_quantity: true, remaining_quantity: true },
   }) as Promise<VoucherProductStatsRow[]>;
 }
