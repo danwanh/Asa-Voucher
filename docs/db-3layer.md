@@ -17,7 +17,7 @@
 
 ## 0. Ghi chú rà soát (Review Notes)
 
-Đối chiếu Data Dictionary với **Yêu cầu đồ án (DR-01 → DR-06)**: đầy đủ nghiệp vụ (users/orders/các bảng log cho DR-01; partners/partner_branches cho DR-02; voucher_products cho DR-03; carts/cart_items/orders/order_items cho DR-04; issued_vouchers/voucher_usages cho DR-05; reviews/review_responses/complaints/complaint_responses cho DR-06).
+Đối chiếu Data Dictionary với **Yêu cầu đồ án (DR-01 → DR-06)**: đầy đủ nghiệp vụ (users/orders/các bảng log cho DR-01; partners/partner_branches cho DR-02; voucher_products cho DR-03; carts/cart_items/orders/order_items cho DR-04; issued_vouchers/voucher_usages cho DR-05; reviews/complaints/complaint_responses cho DR-06).
 
 ---
 
@@ -155,11 +155,6 @@ erDiagram
         boolean is_published
     }
 
-    review_responses {
-        uuid id       PK
-        text content
-    }
-
     complaints {
         uuid      id               PK
         string    reason
@@ -254,9 +249,6 @@ partner_branches   ||--o{ voucher_usages         : "redeems at"
 users              ||--o{ voucher_usages         : "verified by"
 
 users              ||--o{ reviews                : "writes"
-reviews            ||--o{ review_responses       : "has responses"
-users              ||--o{ review_responses       : "responds"
-
 users              ||--o{ complaints             : "submits"
 users              ||--o{ complaints             : "handles"
 complaints         ||--o{ complaint_responses    : "has responses"
@@ -430,13 +422,6 @@ erDiagram
         boolean is_published
     }
 
-    review_responses {
-        uuid id            PK
-        uuid review_id     FK
-        uuid responded_by  FK
-        text content
-    }
-
     complaints {
         uuid      id                 PK
         uuid      order_id           FK
@@ -550,9 +535,6 @@ erDiagram
     users                   ||--o{ voucher_usages             : "confirmed by"
 
     users                   ||--o{ reviews                    : "writes"
-    reviews                 ||--o{ review_responses           : "replied by"
-    users                   ||--o{ review_responses           : "responds"
-
     users                   ||--o{ complaints                 : "files"
     users                   ||--o{ complaints                 : "handles"
     complaints              ||--o{ complaint_responses        : "replied by"
@@ -848,14 +830,6 @@ erDiagram
         timestamp updated_at
     }
 
-    review_responses {
-        uuid      id              PK
-        uuid      review_id       FK
-        uuid      responded_by    FK
-        text      content
-        timestamp created_at
-    }
-
     complaints {
         uuid      id                  PK
         uuid      order_id            FK
@@ -932,7 +906,6 @@ erDiagram
     partner_branches        ||--o{ voucher_usages             : "redeemed at"
     users        ||--o{ voucher_usages             : "confirmed by"
 
-    reviews                 ||--o{ review_responses           : "replied by"
     complaints              ||--o{ complaint_responses        : "replied by"
 ```
 
@@ -1235,16 +1208,6 @@ Gợi ý ràng buộc: UNIQUE (`order_id`, `voucher_product_id`) để mỗi vou
 | `is_published`       | BOOLEAN   | DEFAULT true         | Kiểm duyệt trước khi hiển thị    |
 | `created_at`         | TIMESTAMP | NOT NULL             |                                  |
 | `updated_at`         | TIMESTAMP | NOT NULL             |                                  |
-
-### DR-06 · review_responses
-
-| Column         | Type      | Constraint  | Mô tả                   |
-| -------------- | --------- | ----------- | ----------------------- |
-| `id`           | UUID      | PK          |                         |
-| `review_id`    | UUID      | FK NOT NULL | Tham chiếu `reviews.id` |
-| `responded_by` | UUID      | FK NOT NULL | Tham chiếu `users.id`   |
-| `content`      | TEXT      | NOT NULL    | Nội dung phản hồi       |
-| `created_at`   | TIMESTAMP | NOT NULL    |                         |
 
 ### DR-06 · complaints
 
