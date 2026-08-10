@@ -720,6 +720,12 @@ const vouchers: VoucherSeed[] = [
 ];
 
 const staffAssignments: Array<{ userId: string; branchId: string }> = [
+  { userId: ids.users.voucherStaffHighlands, branchId: ids.branches.highlandsQ1 },
+  { userId: ids.users.voucherStaffPhucLong, branchId: ids.branches.phucLongQ3 },
+  { userId: ids.users.voucherStaffPizzaHut, branchId: ids.branches.pizzaHutBaTrieu },
+  { userId: ids.users.voucherStaffCGV, branchId: ids.branches.cgvVincom },
+  { userId: ids.users.voucherStaffGogi, branchId: ids.branches.gogiDN },
+  { userId: ids.users.voucherStaffVinpearl, branchId: ids.branches.vinpearlNT },
   { userId: ids.users.storeStaffHighlandsQ1, branchId: ids.branches.highlandsQ1 },
   { userId: ids.users.storeStaffHighlandsTDB, branchId: ids.branches.highlandsTDB },
   { userId: ids.users.storeStaffPhucLongQ3, branchId: ids.branches.phucLongQ3 },
