@@ -78,9 +78,18 @@ async function getUserByIdentifier(identifier: string) {
   }) as unknown as Promise<UserRow | null>;
 }
 
-async function getPartnerId(userId: string) {
+async function getPartnerId(userId: string, branchId?: string | null) {
   const partner = await prisma.partner.findFirst({ where: { representative_user_id: userId }, select: { id: true } });
-  return partner?.id;
+  if (partner?.id) {
+    return partner.id;
+  }
+
+  if (branchId) {
+    const branch = await prisma.partnerBranch.findUnique({ where: { id: branchId }, select: { partner_id: true } });
+    return branch?.partner_id;
+  }
+
+  return undefined;
 }
 
 async function persistRefreshToken(userId: string, refreshToken: string) {
@@ -98,7 +107,7 @@ async function persistRefreshToken(userId: string, refreshToken: string) {
 }
 
 export async function issueTokens(user: UserRow) {
-  const partnerId = await getPartnerId(user.id);
+  const partnerId = await getPartnerId(user.id, user.partner_branches_id ?? null);
   const accessToken = signAccessToken({
     user_id: user.id,
     email: user.email,
@@ -113,7 +122,7 @@ export async function issueTokens(user: UserRow) {
 }
 
 async function publicUser(user: UserRow) {
-  const partnerId = await getPartnerId(user.id);
+  const partnerId = await getPartnerId(user.id, user.partner_branches_id ?? null);
   return { ...sanitizeUser(user), partnerId, branchId: user.partner_branches_id ?? undefined };
 }
 

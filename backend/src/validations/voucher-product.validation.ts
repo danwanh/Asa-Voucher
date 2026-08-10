@@ -3,13 +3,14 @@ import { z } from "zod";
 export const voucherProductQuerySchema = z.object({
   category_id: z.string().uuid().optional(),
   partner_id: z.string().uuid().optional(),
+  area: z.string().trim().min(1).optional(),
   search: z.string().trim().optional(),
+  scope: z.enum(["mine"]).optional(),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20)
 });
 
 export const createVoucherProductSchema = z.object({
-  partner_id: z.string().uuid().optional(),
   category_id: z.string().uuid(),
   name: z.string().trim().min(1),
   description: z.string().optional(),
@@ -22,11 +23,10 @@ export const createVoucherProductSchema = z.object({
   usage_instructions: z.unknown().optional(),
   sale_start_date: z.string(),
   sale_end_date: z.string(),
-  validity_days: z.number().int().positive(),
-  status: z.enum(["draft", "active", "paused", "sold_out", "expired"]).optional()
+  validity_days: z.number().int().positive()
 });
 
-export const updateVoucherProductSchema = createVoucherProductSchema.partial().omit({ partner_id: true });
+export const updateVoucherProductSchema = createVoucherProductSchema.partial();
 
 export const approvalSchema = z.object({ approval_status: z.enum(["approved", "rejected"]) });
 export const voucherStatusSchema = z.object({ status: z.enum(["draft", "active", "paused", "sold_out", "expired"]) });

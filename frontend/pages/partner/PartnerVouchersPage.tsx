@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react"
-import { Plus, Edit, FileEdit } from "lucide-react"
-import { C, fmt, fmtDate, statusColor, STATUS_LABEL } from "@/utils/constants"
+import { useEffect, useMemo, useState } from "react"
+import { Plus, Edit, Loader2, RefreshCw, Send } from "lucide-react"
+import { toast } from "sonner"
+import { C, fmt, fmtDate } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import { StatusBadge } from "@/components/StatusBadge"
 import type { Voucher } from "@/types"
@@ -24,34 +25,38 @@ const TAB_LABELS: Record<FilterTab, string> = {
 export function PartnerVouchersPage({ partnerId, onCreateNew, onEdit, onDetail, sessionDrafts = [], onEditDraft }: Props) {
   const [tab, setTab] = useState<FilterTab>("all")
   const [baseVouchers, setBaseVouchers] = useState<Voucher[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [submittingVoucher, setSubmittingVoucher] = useState<Voucher | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const loadVouchers = async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const items = await voucherService.listMyVouchers({ limit: 100 })
+      setBaseVouchers(items)
+    } catch (loadError) {
+      const err = loadError as { response?: { data?: { error?: { message?: string } } } }
+      setBaseVouchers([])
+      setError(err?.response?.data?.error?.message ?? "Không thể tải danh sách voucher")
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
-    let isMounted = true
-
-    async function loadVouchers() {
-      if (!partnerId) {
-        if (!isMounted) return
-        setBaseVouchers([])
-        return
-      }
-
-      try {
-        const items = await voucherService.listPublicVouchers({ limit: 100, partnerId })
-        if (!isMounted) return
-        setBaseVouchers(items)
-      } catch {
-        if (!isMounted) return
-        setBaseVouchers([])
-      }
-    }
-
-    loadVouchers()
-    return () => {
-      isMounted = false
-    }
+    void loadVouchers()
   }, [partnerId])
 
-  const allVouchers: Voucher[] = [...sessionDrafts, ...baseVouchers]
+  const allVouchers: Voucher[] = useMemo(() => {
+    const merged = [...sessionDrafts, ...baseVouchers]
+    const deduped = new Map<string, Voucher>()
+    for (const voucher of merged) {
+      deduped.set(voucher.id, voucher)
+    }
+    return Array.from(deduped.values())
+  }, [sessionDrafts, baseVouchers])
 
   const visibleVouchers = tab === "all"
     ? allVouchers
@@ -65,6 +70,27 @@ export function PartnerVouchersPage({ partnerId, onCreateNew, onEdit, onDetail, 
 
   const draftCount = allVouchers.filter((v) => v.status === "draft").length
   const pendingCount = allVouchers.filter((v) => v.status === "pending").length
+  const rejectedCount = allVouchers.filter((v) => v.status === "rejected").length
+
+  const submitVoucher = async () => {
+    if (!submittingVoucher) return
+    if (submittingVoucher.status !== "draft") {
+      toast.error("Chỉ voucher Nháp mới được gửi duyệt")
+      return
+    }
+    setIsSubmitting(true)
+    try {
+      await voucherService.submitVoucher(submittingVoucher.id)
+      toast.success("Gửi duyệt voucher thành công")
+      setSubmittingVoucher(null)
+      await loadVouchers()
+    } catch (submitError) {
+      const err = submitError as { response?: { data?: { error?: { message?: string } } } }
+      toast.error(err?.response?.data?.error?.message ?? "Không thể gửi duyệt voucher")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   return (
     <div className="p-6">
@@ -73,14 +99,30 @@ export function PartnerVouchersPage({ partnerId, onCreateNew, onEdit, onDetail, 
           <h2 className="font-black text-lg" style={{ color: C.indigo }}>Danh sách voucher</h2>
           <p className="text-sm mt-0.5" style={{ color: "#8A8DA8" }}>{allVouchers.length} voucher</p>
         </div>
-        <button
-          onClick={onCreateNew}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl font-bold text-white text-sm"
-          style={{ backgroundColor: C.peach }}
-        >
-          <Plus className="w-4 h-4" /> Tạo mới
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={loadVouchers}
+            disabled={isLoading}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl font-bold text-sm border disabled:opacity-60"
+            style={{ borderColor: "#E2DFC8", color: C.indigo }}
+          >
+            {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Tải lại
+          </button>
+          <button
+            onClick={onCreateNew}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl font-bold text-white text-sm"
+            style={{ backgroundColor: C.peach }}
+          >
+            <Plus className="w-4 h-4" /> Tạo mới
+          </button>
+        </div>
       </div>
+
+      {error && (
+        <div className="mb-4 rounded-xl border bg-white px-4 py-3 text-sm" style={{ borderColor: "#F0EDD8", color: "#C0392B" }}>
+          {error}
+        </div>
+      )}
 
       {/* Draft / Pending alerts */}
       {draftCount > 0 && (
@@ -103,6 +145,14 @@ export function PartnerVouchersPage({ partnerId, onCreateNew, onEdit, onDetail, 
         >
           <span className="text-base">⏳</span>
           <span>{pendingCount} voucher đang chờ quản trị viên phê duyệt.</span>
+        </div>
+      )}
+      {rejectedCount > 0 && (
+        <div
+          className="flex items-center gap-3 mb-4 px-4 py-3 rounded-xl text-sm font-semibold"
+          style={{ backgroundColor: "#FCEAEA", color: "#C0392B" }}
+        >
+          <span>{rejectedCount} voucher bị từ chối có thể chỉnh sửa và gửi duyệt lại.</span>
         </div>
       )}
 
@@ -153,19 +203,30 @@ export function PartnerVouchersPage({ partnerId, onCreateNew, onEdit, onDetail, 
               </tr>
             </thead>
             <tbody>
-              {visibleVouchers.map((v) => {
+              {isLoading && (
+                <tr>
+                  <td colSpan={7} className="px-4 py-12 text-center">
+                    <div className="inline-flex items-center gap-2 text-sm" style={{ color: "#8A8DA8" }}>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Đang tải voucher...
+                    </div>
+                  </td>
+                </tr>
+              )}
+              {!isLoading && visibleVouchers.map((v) => {
                 const isDraft = v.status === "draft"
+                const canSubmit = v.status === "draft"
                 return (
                   <tr
                     key={v.id}
-                    onClick={() => !isDraft && onDetail(v)}
+                    onClick={() => onDetail(v)}
                     className="border-t transition-colors"
                     style={{
                       borderColor: "#F0EDD8",
-                      cursor: isDraft ? "default" : "pointer",
+                      cursor: "pointer",
                       backgroundColor: isDraft ? C.apricot + "08" : undefined,
                     }}
-                    onMouseEnter={(e) => { if (!isDraft) e.currentTarget.style.backgroundColor = "rgba(0,0,0,0.02)" }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(0,0,0,0.02)" }}
                     onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = isDraft ? C.apricot + "08" : "" }}
                   >
                     <td className="px-4 py-3">
@@ -197,14 +258,15 @@ export function PartnerVouchersPage({ partnerId, onCreateNew, onEdit, onDetail, 
                     </td>
                     <td className="px-4 py-3"><StatusBadge status={v.status} /></td>
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                      {isDraft ? (
+                      {canSubmit ? (
                         <button
-                          onClick={() => (onEditDraft ?? onEdit)(v)}
+                          onClick={() => setSubmittingVoucher(v)}
+                          disabled={isSubmitting}
                           className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-colors"
                           style={{ backgroundColor: C.apricot + "25", color: "#6B4F00" }}
-                          title="Tiếp tục chỉnh sửa bản nháp"
+                          title="Gửi duyệt"
                         >
-                          <FileEdit className="w-3 h-3" /> Tiếp tục
+                          <Send className="w-3 h-3" /> Gửi duyệt
                         </button>
                       ) : (
                         <button onClick={() => onEdit(v)} className="p-1.5 rounded-lg hover:bg-muted transition-colors" title="Chỉnh sửa">
@@ -217,7 +279,7 @@ export function PartnerVouchersPage({ partnerId, onCreateNew, onEdit, onDetail, 
               })}
             </tbody>
           </table>
-          {visibleVouchers.length === 0 && (
+          {!isLoading && visibleVouchers.length === 0 && (
             <div className="text-center py-12">
               <AppIcon name="document" className="w-8 h-8 mb-2 mx-auto" />
               <div className="font-bold text-sm" style={{ color: C.indigo }}>Không có voucher nào</div>
@@ -226,6 +288,24 @@ export function PartnerVouchersPage({ partnerId, onCreateNew, onEdit, onDetail, 
           )}
         </div>
       </div>
+
+      {submittingVoucher && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl">
+            <h3 className="font-black text-lg mb-2" style={{ color: C.indigo }}>Xác nhận gửi duyệt</h3>
+            <p className="text-sm mb-5" style={{ color: "#6B7280" }}>
+              Voucher sẽ được chuyển sang trạng thái Chờ duyệt và chưa được công bố bán.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setSubmittingVoucher(null)} disabled={isSubmitting} className="flex-1 py-2.5 rounded-xl font-bold text-sm border-2" style={{ borderColor: "#E5E7EB", color: C.indigo }}>Hủy</button>
+              <button onClick={submitVoucher} disabled={isSubmitting} className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 rounded-xl font-bold text-sm text-white disabled:opacity-60" style={{ backgroundColor: C.peach }}>
+                {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                Đồng ý
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
