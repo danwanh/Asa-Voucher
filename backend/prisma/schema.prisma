@@ -9,49 +9,51 @@ datasource db {
 }
 
 model User {
-  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  email               String    @unique @db.VarChar(255)
-  phone               String?   @unique @db.VarChar(20)
-  password_hash       String    @db.VarChar(255)
-  full_name           String    @db.VarChar(100)
-  avatar_url          String?
-  role                String    @db.VarChar(50)
-  dob                 DateTime? @db.Date
-  gender              String?   @db.VarChar(20)
-  address             String?
-  city                String?   @db.VarChar(100)
-  district            String?   @db.VarChar(100)
-  is_active           Boolean   @default(true)
-  is_verified         Boolean   @default(false)
-  failed_login_attempts Int      @default(0)
-  locked_until        DateTime? @db.Timestamptz(6)
-  auth_version        Int       @default(0)
-  partner_branches_id String?   @db.Uuid
-  created_at          DateTime  @default(now()) @db.Timestamptz(6)
-  updated_at          DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
+  id                                                    String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email                                                 String              @unique @db.VarChar(255)
+  phone                                                 String?             @unique @db.VarChar(20)
+  password_hash                                         String              @db.VarChar(255)
+  full_name                                             String              @db.VarChar(100)
+  avatar_url                                            String?
+  role                                                  String              @db.VarChar(50)
+  dob                                                   DateTime?           @db.Date
+  gender                                                String?             @db.VarChar(20)
+  address                                               String?
+  city                                                  String?             @db.VarChar(100)
+  district                                              String?             @db.VarChar(100)
+  is_active                                             Boolean             @default(true)
+  is_verified                                           Boolean             @default(false)
+  partner_branches_id                                   String?             @db.Uuid
+  created_at                                            DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at                                            DateTime            @default(now()) @updatedAt @db.Timestamptz(6)
+  failed_login_attempts                                 Int                 @default(0)
+  locked_until                                          DateTime?           @db.Timestamptz(6)
+  auth_version                                          Int                 @default(0)
+  admin_logs                                            AdminLog[]          @relation("AdminLogAdmin")
+  targeted_admin_logs                                   AdminLog[]          @relation("AdminLogTargetUser")
+  auth_tokens                                           AuthToken[]
+  authentication_logs                                   AuthenticationLog[]
+  carts                                                 Cart?
+  complaint_responses                                   ComplaintResponse[]
+  assigned_complaints                                   Complaint[]         @relation("ComplaintAssignee")
+  complaints                                            Complaint[]         @relation("ComplaintUser")
+  issued_vouchers                                       IssuedVoucher[]
+  order_logs                                            OrderLog[]
+  orders_orders_recipient_idTousers                     Order[]             @relation("orders_recipient_idTousers")
+  orders                                                Order[]
+  approved_partners                                     Partner[]           @relation("PartnerApprover")
+  represented_partners                                  Partner[]           @relation("PartnerRepresentative")
+  payment_logs                                          PaymentLog[]
+  refresh_tokens                                        RefreshToken[]
+  review_responses                                      ReviewResponse[]
+  reviews                                               Review[]
+  partner_branches                                      PartnerBranch?      @relation("UserBranch", fields: [partner_branches_id], references: [id], onUpdate: NoAction, map: "users_partner_branch_fk")
+  approved_vouchers                                     VoucherProduct[]    @relation("VoucherApprover")
+  voucher_products_voucher_products_created_byTousers   VoucherProduct[]    @relation("voucher_products_created_byTousers")
+  voucher_products_voucher_products_submitted_byTousers VoucherProduct[]    @relation("voucher_products_submitted_byTousers")
+  voucher_usages                                        VoucherUsage[]      @relation("VoucherUsageRedeemer")
 
-  partner_branches     PartnerBranch?      @relation("UserBranch", fields: [partner_branches_id], references: [id], onDelete: SetNull)
-  refresh_tokens       RefreshToken[]
-  auth_tokens          AuthToken[]
-  authentication_logs  AuthenticationLog[]
-  admin_logs           AdminLog[]          @relation("AdminLogAdmin")
-  targeted_admin_logs  AdminLog[]          @relation("AdminLogTargetUser")
-  represented_partners Partner[]           @relation("PartnerRepresentative")
-  approved_partners    Partner[]           @relation("PartnerApprover")
-  approved_vouchers    VoucherProduct[]    @relation("VoucherApprover")
-  carts                Cart?
-  orders               Order[]
-  order_logs           OrderLog[]
-  payment_logs         PaymentLog[]
-  issued_vouchers      IssuedVoucher[]
-  voucher_usages       VoucherUsage[]      @relation("VoucherUsageRedeemer")
-  reviews              Review[]
-  review_responses     ReviewResponse[]
-  complaints           Complaint[]         @relation("ComplaintUser")
-  assigned_complaints  Complaint[]         @relation("ComplaintAssignee")
-  complaint_responses  ComplaintResponse[]
-
-  @@index([role], map: "users_role_idx")
+  @@index([role])
   @@map("users")
 }
 
@@ -62,8 +64,7 @@ model RefreshToken {
   expires_at DateTime  @db.Timestamptz(6)
   revoked_at DateTime? @db.Timestamptz(6)
   created_at DateTime  @default(now()) @db.Timestamptz(6)
-
-  users User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  users      User      @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@map("refresh_tokens")
 }
@@ -76,8 +77,7 @@ model AuthToken {
   expires_at DateTime  @db.Timestamptz(6)
   used_at    DateTime? @db.Timestamptz(6)
   created_at DateTime  @default(now()) @db.Timestamptz(6)
-
-  users User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  users      User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@index([user_id, type, expires_at], map: "auth_tokens_lookup_idx")
   @@map("auth_tokens")
@@ -91,71 +91,69 @@ model AuthenticationLog {
   ip_address  String?  @db.VarChar(45)
   user_agent  String?
   occurred_at DateTime @default(now()) @db.Timestamptz(6)
-
-  users User? @relation(fields: [user_id], references: [id], onDelete: SetNull)
+  users       User?    @relation(fields: [user_id], references: [id], onUpdate: NoAction)
 
   @@map("authentication_logs")
 }
 
 model AdminLog {
-  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  admin_id          String   @db.Uuid
-  target_user_id    String?  @db.Uuid
-  target_partner_id String?  @db.Uuid
-  target_voucher_id String?  @db.Uuid
-  action            String   @db.VarChar(100)
+  id                String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  admin_id          String          @db.Uuid
+  target_user_id    String?         @db.Uuid
+  target_partner_id String?         @db.Uuid
+  target_voucher_id String?         @db.Uuid
+  target_order_id   String?         @db.Uuid
+  action            String          @db.VarChar(100)
   description       String?
-  occurred_at       DateTime @default(now()) @db.Timestamptz(6)
-
-  admin          User            @relation("AdminLogAdmin", fields: [admin_id], references: [id], onDelete: Cascade)
-  target_user    User?           @relation("AdminLogTargetUser", fields: [target_user_id], references: [id], onDelete: SetNull)
-  target_partner Partner?        @relation(fields: [target_partner_id], references: [id], onDelete: SetNull)
-  target_voucher VoucherProduct? @relation(fields: [target_voucher_id], references: [id], onDelete: SetNull)
+  occurred_at       DateTime        @default(now()) @db.Timestamptz(6)
+  admin             User            @relation("AdminLogAdmin", fields: [admin_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  target_partner    Partner?        @relation(fields: [target_partner_id], references: [id], onUpdate: NoAction, map: "admin_logs_target_partner_fk")
+  target_user       User?           @relation("AdminLogTargetUser", fields: [target_user_id], references: [id], onUpdate: NoAction)
+  target_voucher    VoucherProduct? @relation(fields: [target_voucher_id], references: [id], onUpdate: NoAction, map: "admin_logs_target_voucher_fk")
+  target_order      Order?          @relation(fields: [target_order_id], references: [id], onDelete: SetNull)
 
   @@map("admin_logs")
 }
 
 model Partner {
-  id                     String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  representative_user_id String    @db.Uuid
-  business_name          String    @db.VarChar(255)
-  business_code          String    @unique @db.VarChar(50)
-  business_type          String?   @db.VarChar(100)
-  tax_number             String?   @unique @db.VarChar(20)
+  id                     String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  representative_user_id String           @db.Uuid
+  business_name          String           @db.VarChar(255)
+  business_code          String           @unique @db.VarChar(50)
+  business_type          String?          @db.VarChar(100)
+  tax_number             String?          @unique @db.VarChar(20)
   logo_url               String?
   website_url            String?
   description            String?
-  approval_status        String    @default("pending") @db.VarChar(20)
-  status                 String    @default("active") @db.VarChar(20)
-  approved_by            String?   @db.Uuid
-  approved_at            DateTime? @db.Timestamptz(6)
-  created_at             DateTime  @default(now()) @db.Timestamptz(6)
-  updated_at             DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
+  approval_status        String           @default("pending") @db.VarChar(20)
+  status                 String           @default("active") @db.VarChar(20)
+  approved_by            String?          @db.Uuid
+  approved_at            DateTime?        @db.Timestamptz(6)
+  created_at             DateTime         @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime         @default(now()) @updatedAt @db.Timestamptz(6)
+  admin_logs             AdminLog[]
+  partner_branches       PartnerBranch[]
+  approver               User?            @relation("PartnerApprover", fields: [approved_by], references: [id], onUpdate: NoAction)
+  representative_user    User             @relation("PartnerRepresentative", fields: [representative_user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  voucher_products       VoucherProduct[]
 
-  representative_user User             @relation("PartnerRepresentative", fields: [representative_user_id], references: [id], onDelete: Cascade)
-  approver            User?            @relation("PartnerApprover", fields: [approved_by], references: [id], onDelete: SetNull)
-  partner_branches    PartnerBranch[]
-  voucher_products    VoucherProduct[]
-  admin_logs          AdminLog[]
-
-  @@index([representative_user_id], map: "partners_representative_user_id_idx")
+  @@index([representative_user_id])
   @@map("partners")
 }
 
 model PartnerBranch {
-  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  partner_id  String   @db.Uuid
-  branch_name String   @db.VarChar(255)
-  address     String
-  city        String   @db.VarChar(100)
-  district    String?  @db.VarChar(100)
-  phone       String?  @db.VarChar(20)
-  latitude    Float?
-  longitude   Float?
-  is_active   Boolean  @default(true)
-  created_at  DateTime @default(now()) @db.Timestamptz(6)
-
-  partners                 Partner                @relation(fields: [partner_id], references: [id], onDelete: Cascade)
+  id                       String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  partner_id               String                 @db.Uuid
+  branch_name              String                 @db.VarChar(255)
+  address                  String
+  city                     String                 @db.VarChar(100)
+  district                 String?                @db.VarChar(100)
+  phone                    String?                @db.VarChar(20)
+  latitude                 Float?
+  longitude                Float?
+  is_active                Boolean                @default(true)
+  created_at               DateTime               @default(now()) @db.Timestamptz(6)
+  partners                 Partner                @relation(fields: [partner_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   users                    User[]                 @relation("UserBranch")
   voucher_product_branches VoucherProductBranch[]
   voucher_usages           VoucherUsage[]
@@ -164,14 +162,13 @@ model PartnerBranch {
 }
 
 model Category {
-  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  parent_id   String? @db.Uuid
-  name        String  @db.VarChar(100)
-  slug        String  @unique @db.VarChar(100)
-  description String?
-  sort_order  Int     @default(0)
-
-  parent           Category?        @relation("CategoryTree", fields: [parent_id], references: [id], onDelete: SetNull)
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  parent_id        String?          @db.Uuid
+  name             String           @db.VarChar(100)
+  slug             String           @unique @db.VarChar(100)
+  description      String?
+  sort_order       Int              @default(0)
+  parent           Category?        @relation("CategoryTree", fields: [parent_id], references: [id], onUpdate: NoAction)
   children         Category[]       @relation("CategoryTree")
   voucher_products VoucherProduct[]
 
@@ -179,158 +176,161 @@ model Category {
 }
 
 model VoucherProduct {
-  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  partner_id           String    @db.Uuid
-  category_id          String    @db.Uuid
-  name                 String    @db.VarChar(255)
-  description          String?
-  thumbnail_url        String?
-  original_price       Decimal   @db.Decimal(15, 0)
-  selling_price        Decimal   @db.Decimal(15, 0)
-  discount_rate        Float     @default(0)
-  applicable_area      String?   @db.VarChar(255)
-  total_quantity       Int
-  remaining_quantity   Int
-  terms_and_conditions Json?
-  usage_instructions   Json?
-  sale_start_date      DateTime  @db.Date
-  sale_end_date        DateTime  @db.Date
-  validity_days        Int
-  status               String    @default("draft") @db.VarChar(20)
-  approval_status      String    @default("pending") @db.VarChar(20)
-  approved_by          String?   @db.Uuid
-  approved_at          DateTime? @db.Timestamptz(6)
-  created_at           DateTime  @default(now()) @db.Timestamptz(6)
-  updated_at           DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
+  id                                         String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  partner_id                                 String                 @db.Uuid
+  category_id                                String                 @db.Uuid
+  name                                       String                 @db.VarChar(255)
+  description                                String?
+  thumbnail_url                              String?
+  original_price                             Decimal                @db.Decimal(15, 0)
+  selling_price                              Decimal                @db.Decimal(15, 0)
+  discount_rate                              Float                  @default(0)
+  applicable_area                            String?                @db.VarChar(255)
+  total_quantity                             Int
+  remaining_quantity                         Int
+  terms_and_conditions                       Json?
+  usage_instructions                         Json?
+  sale_start_date                            DateTime               @db.Date
+  sale_end_date                              DateTime               @db.Date
+  validity_days                              Int
+  status                                     String                 @default("draft") @db.VarChar(20)
+  approval_status                            String                 @default("pending") @db.VarChar(20)
+  approved_by                                String?                @db.Uuid
+  approved_at                                DateTime?              @db.Timestamptz(6)
+  created_at                                 DateTime               @default(now()) @db.Timestamptz(6)
+  updated_at                                 DateTime               @default(now()) @updatedAt @db.Timestamptz(6)
+  created_by                                 String?                @db.Uuid
+  submitted_by                               String?                @db.Uuid
+  submitted_at                               DateTime?              @db.Timestamptz(6)
+  admin_logs                                 AdminLog[]
+  cart_items                                 CartItem[]
+  issued_vouchers                            IssuedVoucher[]
+  order_items                                OrderItem[]
+  reviews                                    Review[]
+  voucher_product_branches                   VoucherProductBranch[]
+  voucher_product_images                     VoucherProductImage[]
+  approver                                   User?                  @relation("VoucherApprover", fields: [approved_by], references: [id], onUpdate: NoAction)
+  categories                                 Category               @relation(fields: [category_id], references: [id], onUpdate: NoAction)
+  users_voucher_products_created_byTousers   User?                  @relation("voucher_products_created_byTousers", fields: [created_by], references: [id])
+  partners                                   Partner                @relation(fields: [partner_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users_voucher_products_submitted_byTousers User?                  @relation("voucher_products_submitted_byTousers", fields: [submitted_by], references: [id])
 
-  partners                 Partner                @relation(fields: [partner_id], references: [id], onDelete: Cascade)
-  categories               Category               @relation(fields: [category_id], references: [id], onDelete: Restrict)
-  approver                 User?                  @relation("VoucherApprover", fields: [approved_by], references: [id], onDelete: SetNull)
-  voucher_product_images   VoucherProductImage[]
-  voucher_product_branches VoucherProductBranch[]
-  cart_items               CartItem[]
-  order_items              OrderItem[]
-  issued_vouchers          IssuedVoucher[]
-  reviews                  Review[]
-  admin_logs               AdminLog[]
-
-  @@index([partner_id], map: "voucher_products_partner_id_idx")
+  @@index([partner_id])
   @@index([approval_status, status, sale_start_date, sale_end_date], map: "voucher_products_public_listing_idx")
   @@map("voucher_products")
 }
 
 model VoucherProductImage {
-  id                 String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  voucher_product_id String  @db.Uuid
+  id                 String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  voucher_product_id String         @db.Uuid
   image_url          String
-  is_primary         Boolean @default(false)
-  sort_order         Int     @default(0)
-
-  voucher_products VoucherProduct @relation(fields: [voucher_product_id], references: [id], onDelete: Cascade)
+  is_primary         Boolean        @default(false)
+  sort_order         Int            @default(0)
+  voucher_products   VoucherProduct @relation(fields: [voucher_product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@map("voucher_product_images")
 }
 
 model VoucherProductBranch {
-  id                 String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  voucher_product_id String @db.Uuid
-  branch_id          String @db.Uuid
-
-  voucher_products VoucherProduct @relation(fields: [voucher_product_id], references: [id], onDelete: Cascade)
-  partner_branches PartnerBranch  @relation(fields: [branch_id], references: [id], onDelete: Cascade)
+  id                 String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  voucher_product_id String         @db.Uuid
+  branch_id          String         @db.Uuid
+  partner_branches   PartnerBranch  @relation(fields: [branch_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  voucher_products   VoucherProduct @relation(fields: [voucher_product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([voucher_product_id, branch_id])
   @@map("voucher_product_branches")
 }
 
 model Cart {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id    String   @unique @db.Uuid
-  created_at DateTime @default(now()) @db.Timestamptz(6)
-  updated_at DateTime @default(now()) @updatedAt @db.Timestamptz(6)
-
-  users      User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  id         String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id    String     @unique @db.Uuid
+  created_at DateTime   @default(now()) @db.Timestamptz(6)
+  updated_at DateTime   @default(now()) @updatedAt @db.Timestamptz(6)
   cart_items CartItem[]
+  users      User       @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@map("carts")
 }
 
 model CartItem {
-  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  cart_id            String   @db.Uuid
-  voucher_product_id String   @db.Uuid
+  id                 String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cart_id            String         @db.Uuid
+  voucher_product_id String         @db.Uuid
   quantity           Int
-  created_at         DateTime @default(now()) @db.Timestamptz(6)
-  updated_at         DateTime @default(now()) @updatedAt @db.Timestamptz(6)
-
-  carts            Cart           @relation(fields: [cart_id], references: [id], onDelete: Cascade)
-  voucher_products VoucherProduct @relation(fields: [voucher_product_id], references: [id], onDelete: Cascade)
+  created_at         DateTime       @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime       @default(now()) @updatedAt @db.Timestamptz(6)
+  carts              Cart           @relation(fields: [cart_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  voucher_products   VoucherProduct @relation(fields: [voucher_product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([cart_id, voucher_product_id])
-  @@index([cart_id], map: "cart_items_cart_id_idx")
+  @@index([cart_id])
   @@map("cart_items")
 }
 
 model Order {
-  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  order_code      String   @unique @db.VarChar(30)
-  user_id         String   @db.Uuid
-  subtotal        Decimal  @db.Decimal(15, 0)
-  discount_amount Decimal  @default(0) @db.Decimal(15, 0)
-  total_amount    Decimal  @db.Decimal(15, 0)
-  payment_method  String   @db.VarChar(30)
-  payment_status  String   @default("pending") @db.VarChar(20)
-  status          String   @default("pending") @db.VarChar(20)
-  note            String?
-  created_at      DateTime @default(now()) @db.Timestamptz(6)
-  updated_at      DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+  id                               String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  order_code                       String       @unique @db.VarChar(30)
+  user_id                          String       @db.Uuid
+  subtotal                         Decimal      @db.Decimal(15, 0)
+  discount_amount                  Decimal      @default(0) @db.Decimal(15, 0)
+  total_amount                     Decimal      @db.Decimal(15, 0)
+  payment_method                   String       @db.VarChar(30)
+  payment_status                   String       @default("pending") @db.VarChar(20)
+  status                           String       @default("pending") @db.VarChar(20)
+  note                             String?
+  created_at                       DateTime     @default(now()) @db.Timestamptz(6)
+  updated_at                       DateTime     @default(now()) @updatedAt @db.Timestamptz(6)
+  recipient_id                     String       @db.Uuid
+  is_gift                          Boolean      @default(false)
+  payment_expires_at               DateTime?    @db.Timestamptz(6)
+  complaints                       Complaint[]
+  order_items                      OrderItem[]
+  order_logs                       OrderLog[]
+  users_orders_recipient_idTousers User         @relation("orders_recipient_idTousers", fields: [recipient_id], references: [id])
+  users                            User         @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  payment_logs                     PaymentLog[]
+  payments                         Payment[]
+  admin_logs                       AdminLog[]
 
-  users        User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  order_items  OrderItem[]
-  payments     Payment[]
-  complaints   Complaint[]
-  order_logs   OrderLog[]
-  payment_logs PaymentLog[]
-
-  @@index([user_id], map: "orders_user_id_idx")
+  @@index([user_id])
+  @@index([recipient_id])
   @@map("orders")
 }
 
 model OrderItem {
-  id                     String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  order_id               String   @db.Uuid
-  voucher_product_id     String   @db.Uuid
+  id                     String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  order_id               String          @db.Uuid
+  voucher_product_id     String          @db.Uuid
   quantity               Int
-  unit_price             Decimal  @db.Decimal(15, 0)
-  snapped_original_price Decimal  @db.Decimal(15, 0)
-  snapped_selling_price  Decimal  @db.Decimal(15, 0)
+  unit_price             Decimal         @db.Decimal(15, 0)
+  snapped_original_price Decimal         @db.Decimal(15, 0)
+  snapped_selling_price  Decimal         @db.Decimal(15, 0)
   snapped_discount_rate  Float
-  subtotal               Decimal  @db.Decimal(15, 0)
-  created_at             DateTime @default(now()) @db.Timestamptz(6)
+  subtotal               Decimal         @db.Decimal(15, 0)
+  created_at             DateTime        @default(now()) @db.Timestamptz(6)
+  issued_vouchers        IssuedVoucher[]
+  orders                 Order           @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  voucher_products       VoucherProduct  @relation(fields: [voucher_product_id], references: [id], onUpdate: NoAction)
 
-  orders           Order           @relation(fields: [order_id], references: [id], onDelete: Cascade)
-  voucher_products VoucherProduct  @relation(fields: [voucher_product_id], references: [id], onDelete: Restrict)
-  issued_vouchers  IssuedVoucher[]
-
-  @@index([order_id], map: "order_items_order_id_idx")
+  @@index([order_id])
   @@map("order_items")
 }
 
 model Payment {
-  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  order_id         String    @db.Uuid
-  method           String    @db.VarChar(30)
-  amount           Decimal   @db.Decimal(15, 0)
-  status           String    @default("pending") @db.VarChar(20)
-  transaction_ref  String?   @db.VarChar(255)
+  id               String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  order_id         String       @db.Uuid
+  method           String       @db.VarChar(30)
+  amount           Decimal      @db.Decimal(15, 0)
+  status           String       @default("pending") @db.VarChar(20)
+  transaction_ref  String?      @db.VarChar(255)
   gateway_response String?
-  paid_at          DateTime? @db.Timestamptz(6)
-  created_at       DateTime  @default(now()) @db.Timestamptz(6)
+  paid_at          DateTime?    @db.Timestamptz(6)
+  created_at       DateTime     @default(now()) @db.Timestamptz(6)
+  payment_logs     PaymentLog[]
+  orders           Order        @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  orders       Order        @relation(fields: [order_id], references: [id], onDelete: Cascade)
-  payment_logs PaymentLog[]
-
-  @@index([order_id], map: "payments_order_id_idx")
+  @@index([order_id])
   @@map("payments")
 }
 
@@ -341,9 +341,8 @@ model OrderLog {
   action      String   @db.VarChar(100)
   description String?
   occurred_at DateTime @default(now()) @db.Timestamptz(6)
-
-  orders Order @relation(fields: [order_id], references: [id], onDelete: Cascade)
-  users  User  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  orders      Order    @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users       User     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@map("order_logs")
 }
@@ -357,75 +356,71 @@ model PaymentLog {
   status      String   @db.VarChar(50)
   amount      Decimal  @db.Decimal(15, 0)
   occurred_at DateTime @default(now()) @db.Timestamptz(6)
-
-  payments Payment @relation(fields: [payment_id], references: [id], onDelete: Cascade)
-  orders   Order   @relation(fields: [order_id], references: [id], onDelete: Cascade)
-  users    User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  orders      Order    @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  payments    Payment  @relation(fields: [payment_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users       User     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@map("payment_logs")
 }
 
 model IssuedVoucher {
-  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  voucher_code       String   @unique @db.VarChar(50)
-  qr_code_payload    String   @unique @db.VarChar(255)
+  id                 String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  voucher_code       String         @unique @db.VarChar(50)
+  qr_code_payload    String         @unique @db.VarChar(255)
   qr_code_image_url  String?
-  order_item_id      String   @db.Uuid
-  voucher_product_id String   @db.Uuid
-  owner_id           String   @db.Uuid
-  issued_date        DateTime @default(now()) @db.Date
-  expired_date       DateTime @db.Date
-  status             String   @default("active") @db.VarChar(20)
-  created_at         DateTime @default(now()) @db.Timestamptz(6)
-  updated_at         DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+  order_item_id      String         @db.Uuid
+  voucher_product_id String         @db.Uuid
+  owner_id           String         @db.Uuid
+  issued_date        DateTime       @default(dbgenerated("CURRENT_DATE")) @db.Date
+  expired_date       DateTime       @db.Date
+  status             String         @default("active") @db.VarChar(20)
+  created_at         DateTime       @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime       @default(now()) @updatedAt @db.Timestamptz(6)
+  complaints         Complaint[]
+  order_items        OrderItem      @relation(fields: [order_item_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  owners             User           @relation(fields: [owner_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  voucher_products   VoucherProduct @relation(fields: [voucher_product_id], references: [id], onUpdate: NoAction)
+  reviews            Review[]
+  voucher_usages     VoucherUsage[]
 
-  order_items      OrderItem      @relation(fields: [order_item_id], references: [id], onDelete: Cascade)
-  voucher_products VoucherProduct @relation(fields: [voucher_product_id], references: [id], onDelete: Restrict)
-  owners           User           @relation(fields: [owner_id], references: [id], onDelete: Cascade)
-  voucher_usages   VoucherUsage[]
-  reviews          Review[]
-  complaints       Complaint[]
-
-  @@index([owner_id], map: "issued_vouchers_owner_id_idx")
+  @@index([owner_id])
   @@map("issued_vouchers")
 }
 
 model VoucherUsage {
-  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  issued_voucher_id String   @db.Uuid
-  branch_id         String   @db.Uuid
-  redeemed_by       String   @db.Uuid
-  redemption_code   String?  @db.VarChar(50)
-  used_at           DateTime @db.Timestamptz(6)
+  id                String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  issued_voucher_id String        @db.Uuid
+  branch_id         String        @db.Uuid
+  redeemed_by       String        @db.Uuid
+  redemption_code   String?       @db.VarChar(50)
+  used_at           DateTime      @db.Timestamptz(6)
   note              String?
+  partner_branches  PartnerBranch @relation(fields: [branch_id], references: [id], onDelete: Cascade)
+  issued_vouchers   IssuedVoucher @relation(fields: [issued_voucher_id], references: [id], onDelete: Cascade)
+  redeemer          User          @relation("VoucherUsageRedeemer", fields: [redeemed_by], references: [id], onDelete: Cascade)
 
-  issued_vouchers  IssuedVoucher @relation(fields: [issued_voucher_id], references: [id], onDelete: Cascade)
-  partner_branches PartnerBranch @relation(fields: [branch_id], references: [id], onDelete: Cascade)
-  redeemer         User          @relation("VoucherUsageRedeemer", fields: [redeemed_by], references: [id], onDelete: Cascade)
-
-  @@index([issued_voucher_id], map: "voucher_usages_issued_voucher_id_idx")
+  @@index([issued_voucher_id])
   @@map("voucher_usages")
 }
 
 model Review {
-  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  voucher_product_id String   @db.Uuid
-  user_id            String   @db.Uuid
-  issued_voucher_id  String   @db.Uuid
+  id                 String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  voucher_product_id String           @db.Uuid
+  user_id            String           @db.Uuid
+  issued_voucher_id  String           @db.Uuid
   rating             Int
   comment            String?
   media_urls         Json?
-  is_published       Boolean  @default(true)
-  created_at         DateTime @default(now()) @db.Timestamptz(6)
-  updated_at         DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+  is_published       Boolean          @default(true)
+  created_at         DateTime         @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime         @default(now()) @updatedAt @db.Timestamptz(6)
+  review_responses   ReviewResponse[]
+  issued_vouchers    IssuedVoucher    @relation(fields: [issued_voucher_id], references: [id], onDelete: Cascade)
+  users              User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  voucher_products   VoucherProduct   @relation(fields: [voucher_product_id], references: [id], onDelete: Cascade)
 
-  voucher_products VoucherProduct   @relation(fields: [voucher_product_id], references: [id], onDelete: Cascade)
-  users            User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  issued_vouchers  IssuedVoucher    @relation(fields: [issued_voucher_id], references: [id], onDelete: Cascade)
-  review_responses ReviewResponse[]
-
-  @@index([voucher_product_id], map: "reviews_voucher_product_id_idx")
-  @@index([user_id], map: "reviews_user_id_idx")
+  @@index([voucher_product_id])
+  @@index([user_id])
   @@map("reviews")
 }
 
@@ -435,51 +430,48 @@ model ReviewResponse {
   responded_by String   @db.Uuid
   content      String
   created_at   DateTime @default(now()) @db.Timestamptz(6)
+  responder    User     @relation(fields: [responded_by], references: [id], onDelete: Cascade)
+  reviews      Review   @relation(fields: [review_id], references: [id], onDelete: Cascade)
 
-  reviews   Review @relation(fields: [review_id], references: [id], onDelete: Cascade)
-  responder User   @relation(fields: [responded_by], references: [id], onDelete: Cascade)
-
-  @@index([review_id], map: "review_responses_review_id_idx")
+  @@index([review_id])
   @@map("review_responses")
 }
 
 model Complaint {
-  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  order_id          String?   @db.Uuid
-  issued_voucher_id String?   @db.Uuid
-  user_id           String    @db.Uuid
-  reason            String    @db.VarChar(100)
-  description       String
-  evidence_urls     Json?
-  status            String    @default("open") @db.VarChar(20)
-  assigned_to       String?   @db.Uuid
-  resolution_note   String?
-  resolution_type   String?   @db.VarChar(50)
-  created_at        DateTime  @default(now()) @db.Timestamptz(6)
-  resolved_at       DateTime? @db.Timestamptz(6)
-
-  orders              Order?              @relation(fields: [order_id], references: [id], onDelete: SetNull)
-  issued_vouchers     IssuedVoucher?      @relation(fields: [issued_voucher_id], references: [id], onDelete: SetNull)
-  users               User                @relation("ComplaintUser", fields: [user_id], references: [id], onDelete: Cascade)
-  assignee            User?               @relation("ComplaintAssignee", fields: [assigned_to], references: [id], onDelete: SetNull)
+  id                  String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  order_id            String?             @db.Uuid
+  issued_voucher_id   String?             @db.Uuid
+  user_id             String              @db.Uuid
+  reason              String              @db.VarChar(100)
+  description         String
+  evidence_urls       Json?
+  status              String              @default("open") @db.VarChar(20)
+  assigned_to         String?             @db.Uuid
+  resolution_note     String?
+  resolution_type     String?             @db.VarChar(50)
+  created_at          DateTime            @default(now()) @db.Timestamptz(6)
+  resolved_at         DateTime?           @db.Timestamptz(6)
   complaint_responses ComplaintResponse[]
+  assignee            User?               @relation("ComplaintAssignee", fields: [assigned_to], references: [id])
+  issued_vouchers     IssuedVoucher?      @relation(fields: [issued_voucher_id], references: [id])
+  orders              Order?              @relation(fields: [order_id], references: [id])
+  users               User                @relation("ComplaintUser", fields: [user_id], references: [id], onDelete: Cascade)
 
-  @@index([user_id], map: "complaints_user_id_idx")
-  @@index([status], map: "complaints_status_idx")
+  @@index([user_id])
+  @@index([status])
   @@map("complaints")
 }
 
 model ComplaintResponse {
-  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  complaint_id   String   @db.Uuid
-  responded_by   String   @db.Uuid
-  responder_role String   @db.VarChar(50)
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  complaint_id   String    @db.Uuid
+  responded_by   String    @db.Uuid
+  responder_role String    @db.VarChar(50)
   content        String
-  created_at     DateTime @default(now()) @db.Timestamptz(6)
+  created_at     DateTime  @default(now()) @db.Timestamptz(6)
+  complaints     Complaint @relation(fields: [complaint_id], references: [id], onDelete: Cascade)
+  responder      User      @relation(fields: [responded_by], references: [id], onDelete: Cascade)
 
-  complaints Complaint @relation(fields: [complaint_id], references: [id], onDelete: Cascade)
-  responder  User      @relation(fields: [responded_by], references: [id], onDelete: Cascade)
-
-  @@index([complaint_id], map: "complaint_responses_complaint_id_idx")
+  @@index([complaint_id])
   @@map("complaint_responses")
 }
