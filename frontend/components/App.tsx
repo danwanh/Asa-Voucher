@@ -93,6 +93,10 @@ export default function App({ initialPage, initialOrderId, initialStaffCode, ini
     </>
   )
 
+  const guestInitialPage = initialPage === "cart" || initialPage === "vouchers" || initialPage === "categories"
+    ? initialPage
+    : undefined
+
   if (!isInitialized) {
     return (
       <div className="min-h-screen flex items-center justify-center px-6" style={{ backgroundColor: "#F4F1DE" }} role="status" aria-live="polite">
@@ -104,7 +108,7 @@ export default function App({ initialPage, initialOrderId, initialStaffCode, ini
     )
   }
 
-  if (!user && !showLogin && (!initialPage || initialPage === "cart")) return (
+  if (!user && !showLogin && (!initialPage || guestInitialPage)) return (
     <GuestApp
       onLogin={handleRequestLogin}
       onRegister={handleRequestRegister}
@@ -116,7 +120,7 @@ export default function App({ initialPage, initialOrderId, initialStaffCode, ini
       total={total}
       cartRemove={remove}
       cartUpdate={update}
-      initialPage={initialPage === "cart" ? "cart" : undefined}
+       initialPage={guestInitialPage}
     />
   )
 

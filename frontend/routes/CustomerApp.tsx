@@ -18,6 +18,7 @@ import { ProfilePage } from "@/pages/customer/ProfilePage"
 import { NotificationsPage } from "@/pages/customer/NotificationsPage"
 import { CustomerSettingsPage } from "@/pages/customer/CustomerSettingsPage"
 import { C } from "@/utils/constants"
+import { customerPagePath } from "@/utils/customerRoutes"
 import type { AppUser, CartItem, Voucher, Order } from "@/types"
 import { orderService, paymentService } from "@/services/orderService"
 
@@ -93,6 +94,10 @@ export function CustomerApp({
   const [voucherFilters, setVoucherFilters] = useState<VoucherListFilters>(DEFAULT_VOUCHER_FILTERS)
 
   useEffect(() => {
+    if (initialPage) setPage(initialPage)
+  }, [initialPage])
+
+  useEffect(() => {
     if (!initialOrderId) {
       setPendingOrderLoading(false)
       return
@@ -116,6 +121,12 @@ export function CustomerApp({
   }, [initialPaymentStatus])
 
   const navigate = (p: CustomerPage) => {
+    const path = customerPagePath(p, user.role)
+    if (path) {
+      onInitialPageConsumed?.()
+      router.push(path)
+      return
+    }
     setPage(p)
     onInitialPageConsumed?.()
   }

@@ -3,6 +3,7 @@ import { useRouter } from "next/navigation"
 import { ShoppingCart, Search, Menu, Home, Tag, Package, User, Bell, Grid3x3, LogOut } from "lucide-react"
 import { C } from "@/utils/constants"
 import type { AppUser } from "@/types"
+import { customerPagePath } from "@/utils/customerRoutes"
 
 export type CustomerPage =
   | "home" | "vouchers" | "categories" | "detail" | "cart"
@@ -85,7 +86,11 @@ export function CustomerLayout({
             {DESKTOP_NAV.map((n) => (
               <button
                 key={n.pg}
-                onClick={() => n.pg === "profile" ? router.push(`/${user.role}/profile`) : n.pg === "cart" ? router.push("/cart") : onNavigate(n.pg)}
+                onClick={() => {
+                  const path = customerPagePath(n.pg, user.role)
+                  if (path) router.push(path)
+                  else onNavigate(n.pg)
+                }}
                 className="px-3 py-2 rounded-xl text-sm font-semibold flex items-center gap-1.5 transition-colors"
                 style={{
                   color: page === n.pg ? C.apricot : "rgba(244,241,222,0.75)",
@@ -144,7 +149,12 @@ export function CustomerLayout({
             {DESKTOP_NAV.map((n) => (
               <button
                 key={n.pg}
-                onClick={() => { n.pg === "profile" ? router.push(`/${user.role}/profile`) : n.pg === "cart" ? router.push("/cart") : onNavigate(n.pg); setMobileOpen(false) }}
+                onClick={() => {
+                  const path = customerPagePath(n.pg, user.role)
+                  if (path) router.push(path)
+                  else onNavigate(n.pg)
+                  setMobileOpen(false)
+                }}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold"
                 style={{ backgroundColor: page === n.pg ? C.peach : "rgba(255,255,255,0.1)", color: "white" }}
               >
@@ -173,7 +183,11 @@ export function CustomerLayout({
           return (
             <button
               key={n.pg}
-              onClick={() => n.pg === "profile" ? router.push(`/${user.role}/profile`) : n.pg === "cart" ? router.push("/cart") : onNavigate(n.pg)}
+              onClick={() => {
+                const path = customerPagePath(n.pg, user.role)
+                if (path) router.push(path)
+                else onNavigate(n.pg)
+              }}
               className="flex flex-col items-center gap-0.5 px-3 py-2 relative"
               style={{ color: isActive ? C.peach : "#8A8DA8" }}
             >

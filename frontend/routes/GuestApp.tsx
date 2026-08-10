@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { AppIcon } from "@/components/AppIcon"
 import { toast } from "sonner"
 import { GuestLayout, type GuestPage } from "@/layouts/GuestLayout"
@@ -43,12 +44,20 @@ interface FullProps {
 }
 
 export function GuestApp({ onLogin, onRegister, onCheckout, cartAdd, cartCount, cartCountLoading = false, cart, total, cartRemove, cartUpdate, initialPage }: FullProps) {
+  const router = useRouter()
   const [page, setPage] = useState<GuestPage>(initialPage ?? "home")
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null)
 
   const goDetail = (v: Voucher) => {
     setSelectedVoucher(v)
     setPage("detail")
+  }
+
+  const navigate = (nextPage: GuestPage) => {
+    if (nextPage === "home") router.push("/")
+    else if (nextPage === "vouchers") router.push("/vouchers")
+    else if (nextPage === "categories") router.push("/categories")
+    else setPage(nextPage)
   }
 
   const handleAddToCart = (v: Voucher) => {
@@ -64,7 +73,7 @@ export function GuestApp({ onLogin, onRegister, onCheckout, cartAdd, cartCount, 
   return (
     <GuestLayout
       page={page}
-      onNavigate={setPage}
+      onNavigate={navigate}
       onLogin={onLogin}
        onRegister={onRegister}
       cartCount={cartCount}
