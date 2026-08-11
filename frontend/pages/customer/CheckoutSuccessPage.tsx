@@ -5,10 +5,11 @@ import { MockQR } from "@/components/MockQR"
 
 interface Props {
   code: string
+  qrPayload?: string
   onDone: () => void
 }
 
-export function CheckoutSuccessPage({ code, onDone }: Props) {
+export function CheckoutSuccessPage({ code, qrPayload, onDone }: Props) {
   const [copied, setCopied] = useState(false)
 
   const copy = () => {
@@ -27,7 +28,7 @@ export function CheckoutSuccessPage({ code, onDone }: Props) {
 
       <div className="bg-card rounded-3xl p-6 shadow-md mb-6">
         <div className="flex justify-center mb-4">
-          <MockQR code={code} />
+           <MockQR code={qrPayload || code.split(", ")[0]} />
         </div>
         <div className="text-xs font-semibold mb-1" style={{ color: "#8A8DA8" }}>Mã voucher</div>
         <div className="flex items-center justify-center gap-2">

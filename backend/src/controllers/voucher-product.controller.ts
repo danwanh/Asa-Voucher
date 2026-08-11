@@ -3,7 +3,7 @@ import * as voucherProductService from "../services/voucher-product.service.js";
 import { created, noContent, ok } from "../utils/response.js";
 
 export async function listVoucherProducts(req: Request, res: Response) {
-  ok(res, await voucherProductService.listVoucherProducts(req.query as Record<string, string | number>));
+  ok(res, await voucherProductService.listVoucherProducts(req.user, req.query as Record<string, string | number>));
 }
 
 export async function createVoucherProduct(req: Request, res: Response) {

@@ -5,6 +5,7 @@ import { AppIcon } from "@/components/AppIcon"
 import { VoucherCard } from "@/components/VoucherCard"
 import type { Voucher } from "@/types"
 import { voucherService } from "@/services/voucherService"
+import { parseApplicableAreas } from "@/utils/applicableArea"
 
 interface Props {
   onBuy: (v: Voucher) => void
@@ -131,9 +132,10 @@ export function VoucherListPage({ onBuy, onDetail, searchQuery, filters, onFilte
           search: searchQuery.trim() || undefined,
           categoryId: filters.categoryId !== "all" ? filters.categoryId : undefined,
           partnerId: filters.partnerId !== "all" ? filters.partnerId : undefined,
+          area: filters.area !== "all" ? filters.area : undefined,
         })
 
-        // TODO(backend): add server-side filters for area/price/discount/effective_status
+        // TODO(backend): add server-side filters for price/discount/effective_status
         // in GET /voucher-products to avoid client-side filtering for large datasets.
         if (!isMounted) return
         setSource(items)
@@ -150,7 +152,7 @@ export function VoucherListPage({ onBuy, onDetail, searchQuery, filters, onFilte
     return () => {
       isMounted = false
     }
-  }, [searchQuery, filters.categoryId, filters.partnerId])
+  }, [searchQuery, filters.categoryId, filters.partnerId, filters.area])
 
   const categoryOptions = useMemo(() => {
     const map = new Map<string, { id: string; label: string }>()
@@ -176,8 +178,13 @@ export function VoucherListPage({ onBuy, onDetail, searchQuery, filters, onFilte
   }, [catalog])
 
   const areaOptions = useMemo(() => {
-    const values = Array.from(new Set(catalog.map((voucher) => voucher.applicableArea).filter(Boolean)))
-    return ["all", ...values] as string[]
+    const values = new Set<string>()
+    for (const voucher of catalog) {
+      for (const area of parseApplicableAreas(voucher.applicableArea)) {
+        values.add(area)
+      }
+    }
+    return ["all", ...Array.from(values).sort((a, b) => a.localeCompare(b, "vi"))]
   }, [catalog])
 
   const hasActiveFilters =
@@ -201,7 +208,6 @@ export function VoucherListPage({ onBuy, onDetail, searchQuery, filters, onFilte
 
   const filtered = useMemo(() => {
     let list = source
-    if (filters.area !== "all") list = list.filter((v) => (v.applicableArea ?? "") === filters.area)
     list = list.filter((v) => inPriceRange(v.price, filters.priceRange))
     list = list.filter((v) => inDiscountRange(v.discount, filters.discountRange))
     list = list.filter((v) => inEffectiveStatus(v, filters.effectiveStatus))
@@ -211,7 +217,7 @@ export function VoucherListPage({ onBuy, onDetail, searchQuery, filters, onFilte
       sort === "price-asc" ? a.price - b.price :
       b.price - a.price
     )
-  }, [source, filters.area, filters.priceRange, filters.discountRange, filters.effectiveStatus, sort])
+  }, [source, filters.priceRange, filters.discountRange, filters.effectiveStatus, sort])
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">

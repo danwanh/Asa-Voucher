@@ -2,10 +2,22 @@ import type { ErrorRequestHandler } from "express";
 import { ZodError } from "zod";
 import { HttpError } from "../utils/http-error.js";
 
-export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
-  if (!(error instanceof HttpError) && !(error instanceof ZodError)) {
-    console.error("Unhandled request error", error instanceof Error ? error.name : "UnknownError");
-  }
+export const errorHandler: ErrorRequestHandler = (error, req, res, _next) => {
+  const errorRecord = error instanceof Error ? error : new Error("UnknownError");
+  const statusCode = error instanceof HttpError ? error.statusCode : error instanceof ZodError ? 400 : 500;
+  console.error(JSON.stringify({
+    event: "http.error",
+    method: req.method,
+    path: req.originalUrl,
+    statusCode,
+    error: {
+      name: errorRecord.name,
+      message: errorRecord.message,
+      stack: errorRecord.stack,
+      code: error instanceof HttpError ? error.code : undefined,
+      details: error instanceof HttpError ? error.details : error instanceof ZodError ? error.flatten() : undefined,
+    },
+  }));
   if (error instanceof ZodError) {
     res.status(400).json({
       success: false,

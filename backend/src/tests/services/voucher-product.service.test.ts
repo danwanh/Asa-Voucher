@@ -21,10 +21,15 @@ const { mockPrisma } = vi.hoisted(() => ({
     voucherProductBranch: {
       findMany: vi.fn(),
       create: vi.fn(),
+      count: vi.fn(),
       deleteMany: vi.fn(),
     },
     partner: {
       findFirst: vi.fn(),
+      findUnique: vi.fn(),
+    },
+    partnerBranch: {
+      findUnique: vi.fn(),
     },
     $transaction: vi.fn(),
   },
@@ -36,10 +41,11 @@ import { prisma } from "../../config/prisma.js";
 import * as voucherProductService from "../../services/voucher-product.service.js";
 import type { UserRole } from "../../types/auth.types.js";
 
-type CurrentUser = { id: string; role: UserRole; partnerId?: string };
+type CurrentUser = { id: string; role: UserRole; partnerId?: string; branchId?: string };
 
 const ADMIN_CONTENT: CurrentUser = { id: "u-admin", role: "admin_content" };
 const PARTNER_OWNER: CurrentUser = { id: "u-owner", role: "partner_owner", partnerId: "p1" };
+const VOUCHER_STAFF_WITH_BRANCH: CurrentUser = { id: "u-staff", role: "partner_voucher_staff", branchId: "b1" };
 const OTHER_PARTNER: CurrentUser = { id: "u-other", role: "partner_owner", partnerId: "p2" };
 const BUYER: CurrentUser = { id: "u-buyer", role: "buyer" };
 
@@ -48,20 +54,81 @@ function makeVoucher(overrides: Record<string, unknown> = {}) {
     id: "vp1", partner_id: "p1", name: "Voucher A", original_price: 100000,
     selling_price: 80000, discount_rate: 20, total_quantity: 100, remaining_quantity: 80,
     approval_status: "approved", status: "active", sale_start_date: "2026-01-01",
-    sale_end_date: "2026-12-31", validity_days: 30, ...overrides,
+    sale_end_date: "2026-12-31", validity_days: 30, description: "Desc",
+    category_id: "cat1", terms_and_conditions: ["Term"], submitted_at: null, ...overrides,
+  };
+}
+
+function makeCreateInput(overrides: Record<string, unknown> = {}) {
+  return {
+    category_id: "cat1",
+    name: "Voucher A",
+    description: "Desc",
+    original_price: 100000,
+    selling_price: 80000,
+    total_quantity: 100,
+    sale_start_date: "2026-01-01",
+    sale_end_date: "2026-12-31",
+    validity_days: 30,
+    terms_and_conditions: ["Term"],
+    ...overrides,
   };
 }
 
 describe("Voucher Product Service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrisma.partner.findUnique.mockResolvedValue({
+      id: "p1", approval_status: "approved", status: "active",
+    } as any);
   });
 
   describe("listVoucherProducts", () => {
     it("returns paginated sellable vouchers", async () => {
       mockPrisma.$transaction.mockResolvedValue([[makeVoucher()], 1]);
-      const result = await voucherProductService.listVoucherProducts({ page: 1, limit: 20 });
+      const result = await voucherProductService.listVoucherProducts(undefined, { page: 1, limit: 20 });
       expect(result.items).toHaveLength(1);
+    });
+
+    it("resolves mine scope partner from voucher staff branch", async () => {
+      vi.mocked(prisma.partnerBranch.findUnique).mockResolvedValue({ partner_id: "p1" } as any);
+      mockPrisma.$transaction.mockResolvedValue([[makeVoucher({ status: "draft", approval_status: "pending" })], 1]);
+
+      const result = await voucherProductService.listVoucherProducts(VOUCHER_STAFF_WITH_BRANCH, { page: 1, limit: 20, scope: "mine" });
+
+      expect(result.items).toHaveLength(1);
+      expect(prisma.partnerBranch.findUnique).toHaveBeenCalledWith({ where: { id: "b1" }, select: { partner_id: true } });
+      expect(prisma.voucherProduct.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ partner_id: "p1" }) })
+      );
+    });
+
+    it("applies area filter through branch city relation", async () => {
+      mockPrisma.$transaction.mockResolvedValue([[makeVoucher()], 1]);
+
+      await voucherProductService.listVoucherProducts(undefined, {
+        page: 1,
+        limit: 20,
+        area: "TP.HCM"
+      });
+
+      expect(prisma.voucherProduct.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            voucher_product_branches: expect.objectContaining({
+              some: expect.objectContaining({
+                partner_branches: expect.objectContaining({
+                  OR: expect.arrayContaining([
+                    expect.objectContaining({
+                      city: expect.objectContaining({ equals: "TP. Hồ Chí Minh", mode: "insensitive" })
+                    })
+                  ])
+                })
+              })
+            })
+          })
+        })
+      );
     });
   });
 
@@ -70,19 +137,35 @@ describe("Voucher Product Service", () => {
       const created = { ...makeVoucher(), approval_status: "pending", remaining_quantity: 100 };
       vi.mocked(prisma.voucherProduct.create).mockResolvedValue(created as any);
 
-      const result = await voucherProductService.createVoucherProduct(PARTNER_OWNER, {
-        name: "Voucher A", original_price: 100000, selling_price: 80000, total_quantity: 100,
-      });
+      const result = await voucherProductService.createVoucherProduct(PARTNER_OWNER, makeCreateInput());
       expect(result.approval_status).toBe("pending");
       expect(result.remaining_quantity).toBe(100);
+      expect(prisma.voucherProduct.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            partner_id: "p1",
+            created_by: "u-owner",
+            status: "draft",
+            approval_status: "pending",
+            submitted_at: null,
+            sale_start_date: expect.any(Date),
+            sale_end_date: expect.any(Date),
+          }),
+        })
+      );
     });
 
-    it("rejects if selling_price > original_price", async () => {
+    it("rejects if selling_price >= original_price", async () => {
       await expect(
-        voucherProductService.createVoucherProduct(PARTNER_OWNER, {
-          name: "Voucher A", original_price: 50000, selling_price: 80000, total_quantity: 100,
-        })
+        voucherProductService.createVoucherProduct(PARTNER_OWNER, makeCreateInput({ original_price: 50000, selling_price: 50000 }))
       ).rejects.toThrow(HttpError);
+    });
+
+    it("rejects invalid sale date before Prisma create", async () => {
+      await expect(
+        voucherProductService.createVoucherProduct(PARTNER_OWNER, makeCreateInput({ sale_start_date: "not-a-date" }))
+      ).rejects.toThrow(HttpError);
+      expect(prisma.voucherProduct.create).not.toHaveBeenCalled();
     });
 
     it("rejects if partner not approved (no partnerId on user)", async () => {
@@ -92,9 +175,7 @@ describe("Voucher Product Service", () => {
       } as any);
 
       await expect(
-        voucherProductService.createVoucherProduct(userNoPartner, {
-          name: "Voucher A", original_price: 100000, selling_price: 80000, total_quantity: 100,
-        })
+        voucherProductService.createVoucherProduct(userNoPartner, makeCreateInput())
       ).rejects.toThrow(HttpError);
     });
 
@@ -103,9 +184,7 @@ describe("Voucher Product Service", () => {
       vi.mocked(prisma.partner.findFirst).mockResolvedValue(null);
 
       await expect(
-        voucherProductService.createVoucherProduct(userNoPartner, {
-          name: "Voucher A", original_price: 100000, selling_price: 80000, total_quantity: 100,
-        })
+        voucherProductService.createVoucherProduct(userNoPartner, makeCreateInput())
       ).rejects.toThrow(HttpError);
     });
   });
@@ -181,11 +260,43 @@ describe("Voucher Product Service", () => {
 
   describe("submitVoucherProduct", () => {
     it("owner can submit own voucher", async () => {
-      vi.mocked(prisma.voucherProduct.findUnique).mockResolvedValue(makeVoucher({ approval_status: "draft" }) as any);
-      vi.mocked(prisma.voucherProduct.update).mockResolvedValue(makeVoucher({ approval_status: "pending" }) as any);
+      vi.mocked(prisma.voucherProduct.findUnique).mockResolvedValue(makeVoucher({ status: "draft", approval_status: "pending", submitted_at: null }) as any);
+      vi.mocked(prisma.voucherProductBranch.count).mockResolvedValue(1);
+      vi.mocked(prisma.voucherProduct.update).mockResolvedValue(makeVoucher({ status: "draft", approval_status: "pending", submitted_at: new Date() }) as any);
 
       const result = await voucherProductService.submitVoucherProduct(PARTNER_OWNER, "vp1");
       expect(result.approval_status).toBe("pending");
+      expect(result.workflow_status).toBe("pending_approval");
+      expect(prisma.voucherProduct.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ submitted_by: "u-owner", approved_by: null, approved_at: null }),
+        })
+      );
+    });
+
+    it("rejects submitting voucher without branch", async () => {
+      vi.mocked(prisma.voucherProduct.findUnique).mockResolvedValue(makeVoucher({ status: "draft", approval_status: "pending", submitted_at: null }) as any);
+      vi.mocked(prisma.voucherProductBranch.count).mockResolvedValue(0);
+
+      await expect(voucherProductService.submitVoucherProduct(PARTNER_OWNER, "vp1")).rejects.toThrow(HttpError);
+    });
+
+    it("rejects submitting rejected voucher", async () => {
+      vi.mocked(prisma.voucherProduct.findUnique).mockResolvedValue(makeVoucher({
+        status: "draft",
+        approval_status: "rejected",
+        approved_by: "u-admin",
+        approved_at: new Date(),
+      }) as any);
+      await expect(voucherProductService.submitVoucherProduct(PARTNER_OWNER, "vp1")).rejects.toThrow(HttpError);
+      expect(prisma.voucherProduct.update).not.toHaveBeenCalled();
+    });
+
+    it("rejects submitting voucher with invalid status", async () => {
+      vi.mocked(prisma.voucherProduct.findUnique).mockResolvedValue(makeVoucher({ status: "active", approval_status: "pending", submitted_at: null }) as any);
+
+      await expect(voucherProductService.submitVoucherProduct(PARTNER_OWNER, "vp1")).rejects.toThrow(HttpError);
+      expect(prisma.voucherProduct.update).not.toHaveBeenCalled();
     });
   });
 
@@ -211,6 +322,12 @@ describe("Voucher Product Service", () => {
       vi.mocked(prisma.voucherProduct.findUnique).mockResolvedValue(makeVoucher({ approval_status: "pending" }) as any);
 
       await expect(voucherProductService.updateVoucherStatus(PARTNER_OWNER, "vp1", "active")).rejects.toThrow(HttpError);
+    });
+
+    it("rejects status update by non-owner", async () => {
+      vi.mocked(prisma.voucherProduct.findUnique).mockResolvedValue(makeVoucher() as any);
+
+      await expect(voucherProductService.updateVoucherStatus(OTHER_PARTNER, "vp1", "paused")).rejects.toThrow(HttpError);
     });
   });
 
@@ -254,10 +371,18 @@ describe("Voucher Product Service", () => {
 
     it("createVoucherBranch", async () => {
       vi.mocked(prisma.voucherProduct.findUnique).mockResolvedValue(makeVoucher() as any);
+      vi.mocked(prisma.partnerBranch.findUnique).mockResolvedValue({ partner_id: "p1", is_active: true } as any);
       vi.mocked(prisma.voucherProductBranch.create).mockResolvedValue({} as any);
 
       await voucherProductService.createVoucherBranch(PARTNER_OWNER, "vp1", "b1");
       expect(prisma.voucherProductBranch.create).toHaveBeenCalled();
+    });
+
+    it("rejects assigning branch from another partner", async () => {
+      vi.mocked(prisma.voucherProduct.findUnique).mockResolvedValue(makeVoucher() as any);
+      vi.mocked(prisma.partnerBranch.findUnique).mockResolvedValue({ partner_id: "p2", is_active: true } as any);
+
+      await expect(voucherProductService.createVoucherBranch(PARTNER_OWNER, "vp1", "b1")).rejects.toThrow(HttpError);
     });
 
     it("deleteVoucherBranch", async () => {

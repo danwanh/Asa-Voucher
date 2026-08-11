@@ -17,12 +17,12 @@ type OrderSeed = {
   id: string;
   order_code: string;
   user_id: string;
+  recipient_id?: string;
   subtotal: number;
   discount_amount: number;
   total_amount: number;
-  payment_method: "momo" | "vnpay" | "zalopay" | "bank_transfer";
-  payment_status: "pending" | "paid" | "failed" | "refunded";
-  status: "pending" | "confirmed" | "completed" | "cancelled";
+  payment_method: "vnpay" | "paypal";
+  status: "pending_payment" | "payment_failed" | "confirmed" | "completed" | "cancelled" | "refunded";
   note: string;
   created_at: Date;
 };
@@ -43,7 +43,7 @@ type OrderItemSeed = {
 type PaymentSeed = {
   id: string;
   order_id: string;
-  method: "momo" | "vnpay" | "zalopay" | "bank_transfer";
+  method: "vnpay" | "paypal";
   amount: number;
   status: "pending" | "success" | "failed" | "refunded";
   transaction_ref: string;
@@ -99,8 +99,7 @@ const orders: OrderSeed[] = [
     subtotal: 318000,
     discount_amount: 49000,
     total_amount: 269000,
-    payment_method: "momo",
-    payment_status: "paid",
+    payment_method: "vnpay",
     status: "completed",
     note: "Mua voucher xem phim cuối tuần",
     created_at: daysFrom(now, -15)
@@ -113,7 +112,6 @@ const orders: OrderSeed[] = [
     discount_amount: 20000,
     total_amount: 198000,
     payment_method: "vnpay",
-    payment_status: "paid",
     status: "confirmed",
     note: "Mua voucher đồ uống trong tuần",
     created_at: daysFrom(now, -12)
@@ -125,8 +123,7 @@ const orders: OrderSeed[] = [
     subtotal: 429000,
     discount_amount: 30000,
     total_amount: 399000,
-    payment_method: "zalopay",
-    payment_status: "paid",
+    payment_method: "paypal",
     status: "completed",
     note: "Buffet cuối tuần",
     created_at: daysFrom(now, -10)
@@ -138,9 +135,8 @@ const orders: OrderSeed[] = [
     subtotal: 229000,
     discount_amount: 0,
     total_amount: 229000,
-    payment_method: "bank_transfer",
-    payment_status: "pending",
-    status: "pending",
+    payment_method: "paypal",
+    status: "pending_payment",
     note: "Chờ chuyển khoản",
     created_at: daysFrom(now, -5)
   },
@@ -151,9 +147,8 @@ const orders: OrderSeed[] = [
     subtotal: 160000,
     discount_amount: 0,
     total_amount: 160000,
-    payment_method: "momo",
-    payment_status: "failed",
-    status: "cancelled",
+    payment_method: "vnpay",
+    status: "payment_failed",
     note: "Thanh toán thất bại do ví không đủ tiền",
     created_at: daysFrom(now, -8)
   },
@@ -165,8 +160,7 @@ const orders: OrderSeed[] = [
     discount_amount: 0,
     total_amount: 2890000,
     payment_method: "vnpay",
-    payment_status: "refunded",
-    status: "completed",
+    status: "refunded",
     note: "Hoàn tiền do đối tác ngừng cung cấp dịch vụ",
     created_at: daysFrom(now, -25)
   },
@@ -177,8 +171,7 @@ const orders: OrderSeed[] = [
     subtotal: 498000,
     discount_amount: 50000,
     total_amount: 448000,
-    payment_method: "momo",
-    payment_status: "paid",
+    payment_method: "vnpay",
     status: "completed",
     note: "Combo điện ảnh cho nhóm bạn",
     created_at: daysFrom(now, -6)
@@ -312,7 +305,7 @@ const payments: PaymentSeed[] = [
   {
     id: ids.payments.paid01,
     order_id: ids.orders.paid01,
-    method: "momo",
+    method: "vnpay",
     amount: 269000,
     status: "success",
     transaction_ref: "MOMO-DH0001",
@@ -334,7 +327,7 @@ const payments: PaymentSeed[] = [
   {
     id: ids.payments.paid03,
     order_id: ids.orders.paid03,
-    method: "zalopay",
+    method: "paypal",
     amount: 399000,
     status: "success",
     transaction_ref: "ZALO-DH0003",
@@ -345,7 +338,7 @@ const payments: PaymentSeed[] = [
   {
     id: ids.payments.pending01,
     order_id: ids.orders.pending01,
-    method: "bank_transfer",
+    method: "paypal",
     amount: 229000,
     status: "pending",
     transaction_ref: "BANK-DH0004",
@@ -355,7 +348,7 @@ const payments: PaymentSeed[] = [
   {
     id: ids.payments.failed01,
     order_id: ids.orders.failed01,
-    method: "momo",
+    method: "vnpay",
     amount: 160000,
     status: "failed",
     transaction_ref: "MOMO-DH0005",
@@ -376,7 +369,7 @@ const payments: PaymentSeed[] = [
   {
     id: ids.payments.paid04,
     order_id: ids.orders.paid04,
-    method: "momo",
+    method: "vnpay",
     amount: 448000,
     status: "success",
     transaction_ref: "MOMO-DH0007",
@@ -536,6 +529,7 @@ export async function seedCommerce({ prisma }: SeedContext) {
       where: { id: order.id },
       create: {
         ...order,
+        recipient_id: order.recipient_id ?? order.user_id,
         subtotal: money(order.subtotal),
         discount_amount: money(order.discount_amount),
         total_amount: money(order.total_amount),
@@ -544,11 +538,11 @@ export async function seedCommerce({ prisma }: SeedContext) {
       update: {
         order_code: order.order_code,
         user_id: order.user_id,
+        recipient_id: order.recipient_id ?? order.user_id,
         subtotal: money(order.subtotal),
         discount_amount: money(order.discount_amount),
         total_amount: money(order.total_amount),
         payment_method: order.payment_method,
-        payment_status: order.payment_status,
         status: order.status,
         note: order.note,
         created_at: order.created_at,

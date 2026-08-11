@@ -4,7 +4,6 @@ export interface PaidOrderRow {
   id: string;
   total_amount: number;
   status: string;
-  payment_status: string;
   created_at: string;
 }
 
@@ -12,7 +11,7 @@ export interface PartnerScopedOrderItemRow {
   order_id: string;
   subtotal: number;
   created_at: string;
-  orders: { payment_status: string; status: string; created_at: string } | null;
+  orders: { status: string; created_at: string } | null;
   voucher_products: { partner_id: string } | null;
 }
 
@@ -26,8 +25,8 @@ function dateRangeFilter(column: string, dateFrom?: string, dateTo?: string) {
 /** Toàn bộ đơn đã thanh toán thành công trong khoảng thời gian (dùng khi không lọc theo partner). */
 export async function listPaidOrders(dateFrom?: string, dateTo?: string): Promise<PaidOrderRow[]> {
   return prisma.order.findMany({
-    where: { payment_status: "paid", ...dateRangeFilter("created_at", dateFrom, dateTo) },
-    select: { id: true, total_amount: true, status: true, payment_status: true, created_at: true },
+    where: { status: { in: ["confirmed", "completed"] }, ...dateRangeFilter("created_at", dateFrom, dateTo) },
+    select: { id: true, total_amount: true, status: true, created_at: true },
   }) as Promise<PaidOrderRow[]>;
 }
 
@@ -46,7 +45,7 @@ export async function listOrderItemsForPartner(
       order_id: true,
       subtotal: true,
       created_at: true,
-      orders: { select: { payment_status: true, status: true, created_at: true } },
+      orders: { select: { status: true, created_at: true } },
       voucher_products: { select: { partner_id: true } },
     },
   }) as Promise<PartnerScopedOrderItemRow[]>;
@@ -56,11 +55,11 @@ export async function listOrderItemsForPartner(
 export async function listAllOrders(dateFrom?: string, dateTo?: string): Promise<PaidOrderRow[]> {
   return prisma.order.findMany({
     where: dateRangeFilter("created_at", dateFrom, dateTo),
-    select: { id: true, total_amount: true, status: true, payment_status: true, created_at: true },
+    select: { id: true, total_amount: true, status: true, created_at: true },
   }) as Promise<PaidOrderRow[]>;
 }
 
-/** order_items thuộc voucher của một partner, không lọc payment_status, dùng cho thống kê đơn hàng theo partner. */
+/** order_items thuộc voucher của một partner, dùng cho thống kê đơn hàng theo partner. */
 export async function listAllOrderItemsForPartner(
   partnerId: string,
   dateFrom?: string,
@@ -75,7 +74,7 @@ export async function listAllOrderItemsForPartner(
       order_id: true,
       subtotal: true,
       created_at: true,
-      orders: { select: { payment_status: true, status: true, created_at: true } },
+      orders: { select: { status: true, created_at: true } },
       voucher_products: { select: { partner_id: true } },
     },
   }) as Promise<PartnerScopedOrderItemRow[]>;
@@ -91,7 +90,10 @@ export interface VoucherProductStatsRow {
 
 export async function listVoucherProductStats(partnerId?: string): Promise<VoucherProductStatsRow[]> {
   return prisma.voucherProduct.findMany({
-    where: partnerId ? { partner_id: partnerId } : undefined,
+    where: {
+      approval_status: "approved",
+      ...(partnerId ? { partner_id: partnerId } : {}),
+    },
     select: { id: true, name: true, partner_id: true, total_quantity: true, remaining_quantity: true },
   }) as Promise<VoucherProductStatsRow[]>;
 }

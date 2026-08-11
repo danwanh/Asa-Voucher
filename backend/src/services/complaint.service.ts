@@ -55,13 +55,30 @@ export async function createComplaint(user: AuthUser, input: CreateComplaintInpu
   if (input.order_id) {
     const order = await complaintRepo.findOrderOwner(input.order_id);
     if (!order) throw new HttpError(404, "Không tìm thấy đơn hàng");
-    if (order.user_id !== user.id) throw new HttpError(403, "Bạn chỉ được khiếu nại đơn hàng của mình");
+    if (!input.issued_voucher_id && order.user_id !== user.id && order.recipient_id !== user.id) {
+      throw new HttpError(403, "Bạn chỉ được khiếu nại đơn hàng của mình");
+    }
+    if (!input.issued_voucher_id && await complaintRepo.findOrderLevelComplaint(user.id, input.order_id)) {
+      throw new HttpError(409, "Đơn hàng này đã có khiếu nại");
+    }
   }
 
   if (input.issued_voucher_id) {
     const voucher = await issuedVoucherRepo.findIssuedVoucherById(input.issued_voucher_id);
     if (!voucher) throw new HttpError(404, "Không tìm thấy voucher đã mua");
     if (voucher.owner_id !== user.id) throw new HttpError(403, "Bạn chỉ được khiếu nại voucher của mình");
+    if (input.order_id && voucher.order_items?.order_id !== input.order_id) {
+      throw new HttpError(422, "Voucher không thuộc đơn hàng đã chọn");
+    }
+
+    const order = voucher.order_items?.orders;
+    const isPaid = order?.status === "confirmed" || order?.status === "completed";
+    if (!isPaid && voucher.status !== "used") {
+      throw new HttpError(422, "Chỉ được khiếu nại voucher đã thanh toán hoặc đã sử dụng");
+    }
+
+    const existing = await complaintRepo.findComplaintByIssuedVoucherId(user.id, input.issued_voucher_id);
+    if (existing) throw new HttpError(409, "Voucher này đã có khiếu nại");
   }
 
   return complaintRepo.createComplaint(user.id, input);
@@ -75,13 +92,7 @@ export async function updateComplaint(user: AuthUser, id: string, input: UpdateC
   const isAdmin = isAdminRole(user.role);
 
   if (!isOwner && !isAdmin) throw new HttpError(403, "Bạn không có quyền cập nhật khiếu nại này");
-
-  if (isOwner && !isAdmin) {
-    if (complaint.status !== "open") {
-      throw new HttpError(422, "Chỉ được cập nhật khiếu nại khi đang ở trạng thái open");
-    }
-    if (input.status) throw new HttpError(403, "Bạn không được tự đổi trạng thái xử lý khiếu nại");
-  }
+  if (isOwner && !isAdmin) throw new HttpError(403, "Khiếu nại đã gửi không thể chỉnh sửa");
 
   return complaintRepo.updateComplaint(id, input);
 }

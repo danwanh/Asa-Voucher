@@ -2,38 +2,39 @@ import { useState } from "react"
 import { ArrowLeft, CheckCircle2 } from "lucide-react"
 import { C, fmt } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
-import type { CartItem } from "@/types"
+import type { Order } from "@/types"
+import { toast } from "sonner"
 
-type PaymentMethod = "vnpay" | "momo" | "zalopay" | "bank" | "qr"
+type PaymentMethod = "vnpay" | "paypal"
 
 const PAYMENT_METHODS: { id: PaymentMethod; label: string; icon: string; desc: string }[] = [
   { id: "vnpay", label: "VNPay", icon: "creditCard", desc: "Thẻ ATM / Internet Banking" },
-  { id: "momo", label: "MoMo", icon: "wallet", desc: "Ví điện tử MoMo" },
-  { id: "zalopay", label: "ZaloPay", icon: "wallet", desc: "Ví điện tử ZaloPay" },
-  { id: "bank", label: "Thẻ ngân hàng", icon: "building", desc: "Visa / Mastercard / JCB" },
-  { id: "qr", label: "QR Banking", icon: "smartphone", desc: "Quét mã QR ngân hàng" },
+  { id: "paypal", label: "PayPal", icon: "wallet", desc: "Thanh toán qua PayPal Sandbox" },
 ]
 
 interface Props {
-  cart: CartItem[]
   total: number
   orderId: string
-  onSuccess: (code: string) => void
+  order?: Order
+  onPay: (method: PaymentMethod) => Promise<void>
   onBack: () => void
 }
 
 const FALLBACK = "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=200&h=150&fit=crop"
 
-export function PaymentPage({ cart, total, orderId, onSuccess, onBack }: Props) {
+export function PaymentPage({ total, order, orderId, onPay, onBack }: Props) {
   const [payment, setPayment] = useState<PaymentMethod>("vnpay")
   const [processing, setProcessing] = useState(false)
 
-  const handlePay = () => {
+  const handlePay = async () => {
     setProcessing(true)
-    setTimeout(() => {
-      const code = "ASA-" + Math.random().toString(36).slice(2, 9).toUpperCase()
-      onSuccess(code)
-    }, 1500)
+    try {
+      await onPay(payment)
+    } catch (error) {
+      const apiError = error as { response?: { data?: { error?: { message?: string } } } }
+      toast.error(apiError.response?.data?.error?.message ?? "Giao dịch không thành công, vui lòng kiểm tra lại phương thức thanh toán")
+      setProcessing(false)
+    }
   }
 
   if (processing) {
@@ -127,11 +128,11 @@ export function PaymentPage({ cart, total, orderId, onSuccess, onBack }: Props) 
               Tóm tắt
             </h2>
             <div className="space-y-3 mb-4">
-              {cart.map((item) => (
-                <div key={item.voucher.id} className="flex items-start gap-3">
+              {(order?.items ?? []).map((item) => (
+                <div key={item.id} className="flex items-start gap-3">
                   <div className="w-12 h-10 rounded-lg overflow-hidden flex-shrink-0">
                     <img
-                      src={item.voucher.image}
+                      src={FALLBACK}
                       alt=""
                       className="w-full h-full object-cover"
                       onError={(e) => { (e.target as HTMLImageElement).src = FALLBACK }}
@@ -139,12 +140,12 @@ export function PaymentPage({ cart, total, orderId, onSuccess, onBack }: Props) 
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-xs font-semibold line-clamp-2 leading-tight" style={{ color: C.indigo }}>
-                      {item.voucher.title}
+                      {item.voucherTitle ?? "Voucher"}
                     </div>
-                    <div className="text-xs" style={{ color: "#6B7280" }}>x{item.qty}</div>
+                    <div className="text-xs" style={{ color: "#6B7280" }}>x{item.quantity}</div>
                   </div>
                   <div className="text-xs font-bold whitespace-nowrap" style={{ color: C.peach }}>
-                    {fmt(item.voucher.price * item.qty)}
+                    {fmt(item.subtotal)}
                   </div>
                 </div>
               ))}

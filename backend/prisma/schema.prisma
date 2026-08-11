@@ -39,8 +39,8 @@ model User {
   complaints                                            Complaint[]         @relation("ComplaintUser")
   issued_vouchers                                       IssuedVoucher[]
   order_logs                                            OrderLog[]
-  orders_orders_recipient_idTousers                     Order[]             @relation("orders_recipient_idTousers")
   orders                                                Order[]
+  received_orders                                       Order[]           @relation("ReceivedOrders")
   approved_partners                                     Partner[]           @relation("PartnerApprover")
   represented_partners                                  Partner[]           @relation("PartnerRepresentative")
   payment_logs                                          PaymentLog[]
@@ -49,11 +49,11 @@ model User {
   reviews                                               Review[]
   partner_branches                                      PartnerBranch?      @relation("UserBranch", fields: [partner_branches_id], references: [id], onUpdate: NoAction, map: "users_partner_branch_fk")
   approved_vouchers                                     VoucherProduct[]    @relation("VoucherApprover")
-  voucher_products_voucher_products_created_byTousers   VoucherProduct[]    @relation("voucher_products_created_byTousers")
-  voucher_products_voucher_products_submitted_byTousers VoucherProduct[]    @relation("voucher_products_submitted_byTousers")
+  created_vouchers                                      VoucherProduct[]    @relation("VoucherCreator")
+  submitted_vouchers                                    VoucherProduct[]    @relation("VoucherSubmitter")
   voucher_usages                                        VoucherUsage[]      @relation("VoucherUsageRedeemer")
 
-  @@index([role])
+  @@index([role], map: "users_role_idx")
   @@map("users")
 }
 
@@ -210,12 +210,12 @@ model VoucherProduct {
   voucher_product_branches                   VoucherProductBranch[]
   voucher_product_images                     VoucherProductImage[]
   approver                                   User?                  @relation("VoucherApprover", fields: [approved_by], references: [id], onUpdate: NoAction)
-  categories                                 Category               @relation(fields: [category_id], references: [id], onUpdate: NoAction)
-  users_voucher_products_created_byTousers   User?                  @relation("voucher_products_created_byTousers", fields: [created_by], references: [id])
   partners                                   Partner                @relation(fields: [partner_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  users_voucher_products_submitted_byTousers User?                  @relation("voucher_products_submitted_byTousers", fields: [submitted_by], references: [id])
-
-  @@index([partner_id])
+  categories                                 Category               @relation(fields: [category_id], references: [id], onDelete: Restrict)
+  creator                                    User?                  @relation("VoucherCreator", fields: [created_by], references: [id], onDelete: SetNull)
+  submitter                                  User?                  @relation("VoucherSubmitter", fields: [submitted_by], references: [id], onDelete: SetNull)
+  
+  @@index([partner_id], map: "voucher_products_partner_id_idx")
   @@index([approval_status, status, sale_start_date, sale_end_date], map: "voucher_products_public_listing_idx")
   @@map("voucher_products")
 }
@@ -272,28 +272,28 @@ model Order {
   id                               String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   order_code                       String       @unique @db.VarChar(30)
   user_id                          String       @db.Uuid
+  recipient_id                     String       @db.Uuid
   subtotal                         Decimal      @db.Decimal(15, 0)
   discount_amount                  Decimal      @default(0) @db.Decimal(15, 0)
   total_amount                     Decimal      @db.Decimal(15, 0)
   payment_method                   String       @db.VarChar(30)
   status                           String       @default("pending") @db.VarChar(20)
   note                             String?
-  created_at                       DateTime     @default(now()) @db.Timestamptz(6)
-  updated_at                       DateTime     @default(now()) @updatedAt @db.Timestamptz(6)
-  recipient_id                     String       @db.Uuid
   is_gift                          Boolean      @default(false)
   payment_expires_at               DateTime?    @db.Timestamptz(6)
+  created_at                       DateTime     @default(now()) @db.Timestamptz(6)
+  updated_at                       DateTime     @default(now()) @updatedAt @db.Timestamptz(6)
   admin_logs                       AdminLog[]
   complaints                       Complaint[]
   order_items                      OrderItem[]
   order_logs                       OrderLog[]
-  users_orders_recipient_idTousers User         @relation("orders_recipient_idTousers", fields: [recipient_id], references: [id])
-  users                            User         @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  recipient                        User         @relation("ReceivedOrders", fields: [recipient_id], references: [id], onDelete: Restrict)
+  users                            User         @relation("CreatedOrders", fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   payment_logs                     PaymentLog[]
   payments                         Payment[]
 
-  @@index([user_id])
-  @@index([recipient_id])
+  @@index([user_id], map: "orders_user_id_idx")
+  @@index([recipient_id], map: "orders_recipient_id_idx")
   @@map("orders")
 }
 
@@ -410,16 +410,18 @@ model Review {
   rating             Int
   comment            String?
   media_urls         Json?
-  is_published       Boolean          @default(true)
-  created_at         DateTime         @default(now()) @db.Timestamptz(6)
-  updated_at         DateTime         @default(now()) @updatedAt @db.Timestamptz(6)
-  review_responses   ReviewResponse[]
-  issued_vouchers    IssuedVoucher    @relation(fields: [issued_voucher_id], references: [id], onDelete: Cascade)
-  users              User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  voucher_products   VoucherProduct   @relation(fields: [voucher_product_id], references: [id], onDelete: Cascade)
+  is_published       Boolean  @default(true)
+  created_at         DateTime @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime @default(now()) @updatedAt @db.Timestamptz(6)
 
-  @@index([voucher_product_id])
-  @@index([user_id])
+  voucher_products VoucherProduct   @relation(fields: [voucher_product_id], references: [id], onDelete: Cascade)
+  users            User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  issued_vouchers  IssuedVoucher    @relation(fields: [issued_voucher_id], references: [id], onDelete: Cascade)
+  review_responses ReviewResponse[]
+
+  @@index([voucher_product_id], map: "reviews_voucher_product_id_idx")
+  @@index([user_id], map: "reviews_user_id_idx")
+  @@unique([issued_voucher_id])
   @@map("reviews")
 }
 
@@ -456,9 +458,9 @@ model Complaint {
   orders              Order?              @relation(fields: [order_id], references: [id])
   users               User                @relation("ComplaintUser", fields: [user_id], references: [id], onDelete: Cascade)
 
+  @@index([user_id], map: "complaints_user_id_idx")
+  @@index([status], map: "complaints_status_idx")
   @@unique([user_id, issued_voucher_id])
-  @@index([user_id])
-  @@index([status])
   @@map("complaints")
 }
 

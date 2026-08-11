@@ -3,7 +3,14 @@ import * as commerceService from "../services/commerce.service.js";
 import { created, noContent, ok } from "../utils/response.js";
 
 export async function getCart(req: Request, res: Response) {
-  ok(res, await commerceService.getCart(req.user!.id));
+  const hasItemFilter = req.query.item_ids !== undefined;
+  const rawItemIds = typeof req.query.item_ids === "string" ? req.query.item_ids : "";
+  const itemIds = hasItemFilter ? rawItemIds.split(",").filter(Boolean) : undefined;
+  ok(res, await commerceService.getCart(req.user!.id, itemIds));
+}
+
+export async function getCartCount(req: Request, res: Response) {
+  ok(res, await commerceService.getCartCount(req.user!.id));
 }
 
 export async function addCartItem(req: Request, res: Response) {
@@ -80,4 +87,16 @@ export async function simulatePaymentSuccess(req: Request, res: Response) {
 
 export async function simulatePaymentFailed(req: Request, res: Response) {
   ok(res, await commerceService.simulatePaymentFailed(req.user!, req.params.id), "Payment failed");
+}
+
+export async function vnpayReturn(req: Request, res: Response) {
+  res.redirect(await commerceService.handleVnpayReturn(req.query as Record<string, unknown>));
+}
+
+export async function paypalReturn(req: Request, res: Response) {
+  res.redirect(await commerceService.handlePayPalReturn(String(req.query.token ?? "")));
+}
+
+export async function paypalCancel(req: Request, res: Response) {
+  res.redirect(await commerceService.handlePayPalCancel(req.query.token ? String(req.query.token) : undefined));
 }

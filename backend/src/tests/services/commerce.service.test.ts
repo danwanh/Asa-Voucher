@@ -13,6 +13,10 @@ const { mockPrisma, mockTx } = vi.hoisted(() => {
   };
   return {
     mockPrisma: {
+      user: {
+        findUnique: vi.fn(),
+        findFirst: vi.fn(),
+      },
       cart: {
         findUnique: vi.fn(),
         upsert: vi.fn(),
@@ -204,6 +208,46 @@ describe("Commerce Service", () => {
       });
       expect(result.total_amount).toBe(80000);
     });
+
+    it("resolves a gift recipient and stores the recipient on the order", async () => {
+      vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: "u-recipient" } as any);
+      vi.mocked(prisma.voucherProduct.findUnique).mockResolvedValue(makeVoucher() as any);
+      mockTx.order.create.mockResolvedValue({ id: "order1", total_amount: 80000 });
+      mockTx.orderItem.create.mockResolvedValue({ id: "oi1" });
+      mockTx.orderLog.create.mockResolvedValue({});
+
+      await commerceService.createOrder("u-buyer", {
+        items: [{ voucher_product_id: "vp1", quantity: 1 }],
+        payment_method: "vnpay",
+        recipient_email: "recipient@example.com",
+        is_gift: true,
+      });
+
+      expect(mockTx.order.create).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ recipient_id: "u-recipient", is_gift: true }),
+      }));
+    });
+
+    it("rejects a gift recipient that does not exist", async () => {
+      vi.mocked(prisma.user.findFirst).mockResolvedValue(null);
+
+      await expect(commerceService.createOrder("u-buyer", {
+        items: [{ voucher_product_id: "vp1", quantity: 1 }],
+        payment_method: "vnpay",
+        recipient_email: "missing@example.com",
+        is_gift: true,
+      })).rejects.toThrow(HttpError);
+    });
+
+    it("rejects a stale cart price", async () => {
+      vi.mocked(prisma.voucherProduct.findUnique).mockResolvedValue(makeVoucher() as any);
+
+      await expect(commerceService.createOrder("u-buyer", {
+        items: [{ voucher_product_id: "vp1", quantity: 1 }],
+        payment_method: "vnpay",
+        expected_prices: { vp1: 70000 },
+      })).rejects.toThrow(HttpError);
+    });
   });
 
   describe("listOrders", () => {
@@ -215,7 +259,7 @@ describe("Commerce Service", () => {
       const result = await commerceService.listOrders(BUYER);
       expect(result).toHaveLength(1);
       expect(prisma.order.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { user_id: "u-buyer" } })
+        expect.objectContaining({ where: { OR: [{ user_id: "u-buyer" }, { recipient_id: "u-buyer" }] } })
       );
     });
 
@@ -252,7 +296,7 @@ describe("Commerce Service", () => {
   describe("cancelOrder", () => {
     it("cancels unpaid order", async () => {
       vi.mocked(prisma.order.findUnique).mockResolvedValue({
-        id: "o1", user_id: "u-buyer", payment_status: "pending", order_items: [],
+        id: "o1", user_id: "u-buyer", status: "pending_payment", order_items: [],
       } as any);
       mockTx.order.update.mockResolvedValue({ id: "o1", status: "cancelled" });
       mockTx.orderLog.create.mockResolvedValue({});
@@ -263,7 +307,7 @@ describe("Commerce Service", () => {
 
     it("rejects cancelling paid order", async () => {
       vi.mocked(prisma.order.findUnique).mockResolvedValue({
-        id: "o1", user_id: "u-buyer", payment_status: "paid", order_items: [],
+        id: "o1", user_id: "u-buyer", status: "confirmed", order_items: [],
       } as any);
 
       await expect(commerceService.cancelOrder(BUYER, "o1")).rejects.toThrow(HttpError);
@@ -273,7 +317,7 @@ describe("Commerce Service", () => {
   describe("createPayment", () => {
     it("creates payment for unpaid order", async () => {
       vi.mocked(prisma.order.findUnique).mockResolvedValue({
-        id: "o1", user_id: "u-buyer", payment_status: "pending",
+        id: "o1", user_id: "u-buyer", status: "pending_payment",
         total_amount: 100000, payment_method: "simulated", order_items: [],
       } as any);
       mockTx.payment.create.mockResolvedValue({ id: "pay1", amount: 100000 });
@@ -285,7 +329,7 @@ describe("Commerce Service", () => {
 
     it("rejects payment for already paid order", async () => {
       vi.mocked(prisma.order.findUnique).mockResolvedValue({
-        id: "o1", user_id: "u-buyer", payment_status: "paid", order_items: [],
+        id: "o1", user_id: "u-buyer", status: "confirmed", order_items: [],
       } as any);
 
       await expect(commerceService.createPayment(BUYER, "o1")).rejects.toThrow(HttpError);
@@ -296,7 +340,7 @@ describe("Commerce Service", () => {
     it("simulates success, issues vouchers, updates order", async () => {
       vi.mocked(prisma.payment.findUnique).mockResolvedValue({
         id: "pay1", status: "pending", amount: 160000, orders: {
-          id: "o1", user_id: "u-buyer", payment_status: "pending",
+          id: "o1", user_id: "u-buyer", recipient_id: "u-recipient", status: "pending_payment",
           order_items: [{ id: "oi1", quantity: 2, voucher_products: makeVoucher() }],
         },
       } as any);
@@ -309,12 +353,13 @@ describe("Commerce Service", () => {
       const result = await commerceService.simulatePaymentSuccess(BUYER, "pay1");
       expect(result.status).toBe("success");
       expect(mockTx.issuedVoucher.createMany).toHaveBeenCalled();
+      expect(mockTx.issuedVoucher.createMany.mock.calls[0][0].data[0].owner_id).toBe("u-recipient");
     });
 
     it("rejects if already paid", async () => {
       vi.mocked(prisma.payment.findUnique).mockResolvedValue({
         id: "pay1", status: "success", orders: {
-          id: "o1", user_id: "u-buyer", payment_status: "paid", order_items: [],
+          id: "o1", user_id: "u-buyer", status: "confirmed", order_items: [],
         },
       } as any);
 
@@ -326,7 +371,7 @@ describe("Commerce Service", () => {
     it("simulates payment failure", async () => {
       vi.mocked(prisma.payment.findUnique).mockResolvedValue({
         id: "pay1", status: "pending", amount: 100000, orders: {
-          id: "o1", user_id: "u-buyer", payment_status: "pending", order_items: [],
+          id: "o1", user_id: "u-buyer", status: "pending_payment", order_items: [],
         },
       } as any);
       mockTx.payment.update.mockResolvedValue({ id: "pay1", status: "failed" });

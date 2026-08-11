@@ -9,9 +9,10 @@ import { PartnerApp } from "@/routes/PartnerApp"
 import { VoucherStaffApp } from "@/routes/VoucherStaffApp"
 import { StaffApp } from "@/routes/StaffApp"
 import { AdminApp } from "@/routes/AdminApp"
-import { useCart } from "@/hooks/useCart"
+import { useCartContext } from "@/components/CartProvider"
 import { useAuthStore } from "@/stores/authStore"
-import type { AppUser } from "@/types"
+import type { AppUser, CartItem } from "@/types"
+import type { CustomerPage } from "@/layouts/CustomerLayout"
 import { toast } from "sonner"
 
 function LogoutConfirmDialog({ onCancel, onConfirm }: { onCancel: () => void; onConfirm: () => void }) {
@@ -29,7 +30,7 @@ function LogoutConfirmDialog({ onCancel, onConfirm }: { onCancel: () => void; on
   )
 }
 
-export default function App({ initialPage }: { initialPage?: "profile" } = {}) {
+export default function App({ initialPage, initialOrderId, initialVoucherId, initialStaffCode, initialPaymentStatus }: { initialPage?: CustomerPage | "profile" | "cart"; initialOrderId?: string; initialVoucherId?: string; initialStaffCode?: string; initialPaymentStatus?: string } = {}) {
   const user = useAuthStore((s) => s.user)
   const isInitialized = useAuthStore((s) => s.isInitialized)
   const initialize = useAuthStore((s) => s.initialize)
@@ -40,16 +41,25 @@ export default function App({ initialPage }: { initialPage?: "profile" } = {}) {
   const [pendingCheckout, setPendingCheckout] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
-  const { cart, add, remove, update, clear, total, count } = useCart()
+  const {
+    cart, add, remove, update, clear, removeMany, total, count, cartCount, cartCountLoading, isLoading: cartLoading,
+    checkoutSelectionIds, checkoutItems, setCheckoutSelection, clearCheckoutSelection,
+  } = useCartContext()
 
   useEffect(() => {
     initialize()
   }, [initialize])
 
+  useEffect(() => {
+    if (!pendingCheckout || !user || cartLoading) return
+    const cartItemIds = cart.map((item) => item.cartItemId).filter((id): id is string => Boolean(id))
+    if (cartItemIds.length > 0) setCheckoutSelection(cartItemIds)
+  }, [pendingCheckout, user, cartLoading, cart, setCheckoutSelection])
+
   const handleRequestLogin = () => router.push("/login")
   const handleRequestRegister = () => router.push("/signup")
 
-  const handleCheckoutAsGuest = () => {
+  const handleCheckoutAsGuest = (_items?: CartItem[]) => {
     setPendingCheckout(true)
     setShowLogin(true)
   }
@@ -70,6 +80,7 @@ export default function App({ initialPage }: { initialPage?: "profile" } = {}) {
     try {
       await logout()
       clear()
+      clearCheckoutSelection()
     } catch {
       toast.error("Đăng xuất thất bại. Vui lòng thử lại.")
     }
@@ -82,21 +93,35 @@ export default function App({ initialPage }: { initialPage?: "profile" } = {}) {
     </>
   )
 
+  const guestInitialPage = initialPage === "cart" || initialPage === "vouchers" || initialPage === "detail" || initialPage === "categories"
+    ? initialPage
+    : undefined
+
   if (!isInitialized) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#F4F1DE" }}>
-        <div className="w-10 h-10 rounded-2xl flex items-center justify-center font-black text-lg animate-pulse" style={{ backgroundColor: "#E07A5F", color: "white" }}>A</div>
+      <div className="min-h-screen flex items-center justify-center px-6" style={{ backgroundColor: "#F4F1DE" }} role="status" aria-live="polite">
+        <div className="text-center">
+          <div className="w-12 h-12 mx-auto mb-4 rounded-2xl flex items-center justify-center font-black text-lg animate-pulse" style={{ backgroundColor: "#E07A5F", color: "white" }}>A</div>
+          <p className="text-sm font-semibold" style={{ color: "#3D405B" }}>Đang kiểm tra phiên đăng nhập...</p>
+        </div>
       </div>
     )
   }
 
-  if (!user && !showLogin && !initialPage) return (
+  if (!user && !showLogin && (!initialPage || guestInitialPage)) return (
     <GuestApp
       onLogin={handleRequestLogin}
       onRegister={handleRequestRegister}
       onCheckout={handleCheckoutAsGuest}
       cartAdd={add}
-      cartCount={count}
+       cartCount={cartCount}
+       cartCountLoading={cartCountLoading}
+      cart={cart}
+      total={total}
+      cartRemove={remove}
+      cartUpdate={update}
+       initialPage={guestInitialPage}
+       initialVoucherId={initialVoucherId}
     />
   )
 
@@ -113,20 +138,30 @@ export default function App({ initialPage }: { initialPage?: "profile" } = {}) {
       onLogout={handleLogout}
       cart={cart}
       total={total}
-      count={count}
+       count={count}
+       cartCount={cartCount}
+       cartCountLoading={cartCountLoading}
       add={add}
       remove={remove}
       update={update}
-      clear={clear}
-       initialPage={pendingCheckout ? "create-order" : initialPage}
+       removeMany={removeMany}
+       cartLoading={cartLoading}
+       checkoutSelectionIds={checkoutSelectionIds}
+       checkoutItems={checkoutItems}
+       setCheckoutSelection={setCheckoutSelection}
+       clearCheckoutSelection={clearCheckoutSelection}
+      initialPage={pendingCheckout ? "create-order" : initialPage}
+       initialOrderId={initialOrderId}
+       initialVoucherId={initialVoucherId}
+      initialPaymentStatus={initialPaymentStatus}
       onInitialPageConsumed={() => setPendingCheckout(false)}
     />
   )
 
-  if (user.role === "partner_owner")         return withLogoutDialog(<PartnerApp user={user} onLogout={handleLogout} initialPage={initialPage} />)
-  if (user.role === "partner_voucher_staff") return withLogoutDialog(<VoucherStaffApp user={user} onLogout={handleLogout} initialPage={initialPage} />)
-  if (user.role === "partner_store_staff")   return withLogoutDialog(<StaffApp user={user} onLogout={handleLogout} initialPage={initialPage} />)
+  if (user.role === "partner_owner")         return withLogoutDialog(<PartnerApp user={user} onLogout={handleLogout} initialPage={initialPage === "profile" ? initialPage : undefined} />)
+  if (user.role === "partner_voucher_staff") return withLogoutDialog(<VoucherStaffApp user={user} onLogout={handleLogout} initialPage={initialPage === "profile" ? initialPage : undefined} />)
+  if (user.role === "partner_store_staff")   return withLogoutDialog(<StaffApp user={user} onLogout={handleLogout} initialPage={initialStaffCode ? "verify" : initialPage === "profile" ? initialPage : undefined} initialCode={initialStaffCode} />)
   if (user.role === "admin_content" || user.role === "admin_operations" || user.role === "admin_security")
-    return withLogoutDialog(<AdminApp user={user} onLogout={handleLogout} initialPage={initialPage} />)
+    return withLogoutDialog(<AdminApp user={user} onLogout={handleLogout} initialPage={initialPage === "profile" ? initialPage : undefined} />)
   return null
 }
