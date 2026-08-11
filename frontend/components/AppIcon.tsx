@@ -86,9 +86,10 @@ interface AppIconProps {
   className?: string
   size?: number
   strokeWidth?: number
+  style?: React.CSSProperties
 }
 
-export function AppIcon({ name, className, size, strokeWidth }: AppIconProps) {
+export function AppIcon({ name, className, size, strokeWidth, style }: AppIconProps) {
   const Icon = ICONS[name] ?? CircleHelp
-  return <Icon aria-hidden="true" className={className} size={size} strokeWidth={strokeWidth} />
+  return <Icon aria-hidden="true" className={className} size={size} strokeWidth={strokeWidth} style={style} />
 }
