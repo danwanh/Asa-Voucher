@@ -163,6 +163,8 @@ export interface Order {
   complaints?: Complaint[]
   paymentExpiresAt?: string
   items?: OrderItem[]
+  payments?: Payment[]
+  note?: string
 }
 
 export interface OrderItem {

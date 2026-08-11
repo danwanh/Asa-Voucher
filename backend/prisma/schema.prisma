@@ -9,51 +9,51 @@ datasource db {
 }
 
 model User {
-  id                                                    String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  email                                                 String              @unique @db.VarChar(255)
-  phone                                                 String?             @unique @db.VarChar(20)
-  password_hash                                         String              @db.VarChar(255)
-  full_name                                             String              @db.VarChar(100)
-  avatar_url                                            String?
-  role                                                  String              @db.VarChar(50)
-  dob                                                   DateTime?           @db.Date
-  gender                                                String?             @db.VarChar(20)
-  address                                               String?
-  city                                                  String?             @db.VarChar(100)
-  district                                              String?             @db.VarChar(100)
-  is_active                                             Boolean             @default(true)
-  is_verified                                           Boolean             @default(false)
-  partner_branches_id                                   String?             @db.Uuid
-  created_at                                            DateTime            @default(now()) @db.Timestamptz(6)
-  updated_at                                            DateTime            @default(now()) @updatedAt @db.Timestamptz(6)
-  failed_login_attempts                                 Int                 @default(0)
-  locked_until                                          DateTime?           @db.Timestamptz(6)
-  auth_version                                          Int                 @default(0)
-  admin_logs                                            AdminLog[]          @relation("AdminLogAdmin")
-  targeted_admin_logs                                   AdminLog[]          @relation("AdminLogTargetUser")
-  auth_tokens                                           AuthToken[]
-  authentication_logs                                   AuthenticationLog[]
-  carts                                                 Cart?
-  complaint_responses                                   ComplaintResponse[]
-  assigned_complaints                                   Complaint[]         @relation("ComplaintAssignee")
-  complaints                                            Complaint[]         @relation("ComplaintUser")
-  issued_vouchers                                       IssuedVoucher[]
-  order_logs                                            OrderLog[]
-  orders                                                Order[]
-  received_orders                                       Order[]           @relation("ReceivedOrders")
-  approved_partners                                     Partner[]           @relation("PartnerApprover")
-  represented_partners                                  Partner[]           @relation("PartnerRepresentative")
-  payment_logs                                          PaymentLog[]
-  refresh_tokens                                        RefreshToken[]
-  review_responses                                      ReviewResponse[]
-  reviews                                               Review[]
-  partner_branches                                      PartnerBranch?      @relation("UserBranch", fields: [partner_branches_id], references: [id], onUpdate: NoAction, map: "users_partner_branch_fk")
-  approved_vouchers                                     VoucherProduct[]    @relation("VoucherApprover")
-  created_vouchers                                      VoucherProduct[]    @relation("VoucherCreator")
-  submitted_vouchers                                    VoucherProduct[]    @relation("VoucherSubmitter")
-  voucher_usages                                        VoucherUsage[]      @relation("VoucherUsageRedeemer")
+  id                    String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email                 String              @unique @db.VarChar(255)
+  phone                 String?             @unique @db.VarChar(20)
+  password_hash         String              @db.VarChar(255)
+  full_name             String              @db.VarChar(100)
+  avatar_url            String?
+  role                  String              @db.VarChar(50)
+  dob                   DateTime?           @db.Date
+  gender                String?             @db.VarChar(20)
+  address               String?
+  city                  String?             @db.VarChar(100)
+  district              String?             @db.VarChar(100)
+  is_active             Boolean             @default(true)
+  is_verified           Boolean             @default(false)
+  partner_branches_id   String?             @db.Uuid
+  created_at            DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime            @default(now()) @updatedAt @db.Timestamptz(6)
+  failed_login_attempts Int                 @default(0)
+  locked_until          DateTime?           @db.Timestamptz(6)
+  auth_version          Int                 @default(0)
+  admin_logs            AdminLog[]          @relation("AdminLogAdmin")
+  targeted_admin_logs   AdminLog[]          @relation("AdminLogTargetUser")
+  auth_tokens           AuthToken[]
+  authentication_logs   AuthenticationLog[]
+  carts                 Cart?
+  complaint_responses   ComplaintResponse[]
+  assigned_complaints   Complaint[]         @relation("ComplaintAssignee")
+  complaints            Complaint[]         @relation("ComplaintUser")
+  issued_vouchers       IssuedVoucher[]
+  order_logs            OrderLog[]
+  received_orders       Order[]             @relation("ReceivedOrders")
+  orders                Order[]             @relation("CreatedOrders")
+  approved_partners     Partner[]           @relation("PartnerApprover")
+  represented_partners  Partner[]           @relation("PartnerRepresentative")
+  payment_logs          PaymentLog[]
+  refresh_tokens        RefreshToken[]
+  review_responses      ReviewResponse[]
+  reviews               Review[]
+  partner_branches      PartnerBranch?      @relation("UserBranch", fields: [partner_branches_id], references: [id], onUpdate: NoAction, map: "users_partner_branch_fk")
+  approved_vouchers     VoucherProduct[]    @relation("VoucherApprover")
+  created_vouchers      VoucherProduct[]    @relation("VoucherCreator")
+  submitted_vouchers    VoucherProduct[]    @relation("VoucherSubmitter")
+  voucher_usages        VoucherUsage[]      @relation("VoucherUsageRedeemer")
 
-  @@index([role], map: "users_role_idx")
+  @@index([role])
   @@map("users")
 }
 
@@ -176,46 +176,46 @@ model Category {
 }
 
 model VoucherProduct {
-  id                                         String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  partner_id                                 String                 @db.Uuid
-  category_id                                String                 @db.Uuid
-  name                                       String                 @db.VarChar(255)
-  description                                String?
-  thumbnail_url                              String?
-  original_price                             Decimal                @db.Decimal(15, 0)
-  selling_price                              Decimal                @db.Decimal(15, 0)
-  discount_rate                              Float                  @default(0)
-  applicable_area                            String?                @db.VarChar(255)
-  total_quantity                             Int
-  remaining_quantity                         Int
-  terms_and_conditions                       Json?
-  usage_instructions                         Json?
-  sale_start_date                            DateTime               @db.Date
-  sale_end_date                              DateTime               @db.Date
-  validity_days                              Int
-  status                                     String                 @default("draft") @db.VarChar(20)
-  approval_status                            String                 @default("pending") @db.VarChar(20)
-  approved_by                                String?                @db.Uuid
-  approved_at                                DateTime?              @db.Timestamptz(6)
-  created_at                                 DateTime               @default(now()) @db.Timestamptz(6)
-  updated_at                                 DateTime               @default(now()) @updatedAt @db.Timestamptz(6)
-  created_by                                 String?                @db.Uuid
-  submitted_by                               String?                @db.Uuid
-  submitted_at                               DateTime?              @db.Timestamptz(6)
-  admin_logs                                 AdminLog[]
-  cart_items                                 CartItem[]
-  issued_vouchers                            IssuedVoucher[]
-  order_items                                OrderItem[]
-  reviews                                    Review[]
-  voucher_product_branches                   VoucherProductBranch[]
-  voucher_product_images                     VoucherProductImage[]
-  approver                                   User?                  @relation("VoucherApprover", fields: [approved_by], references: [id], onUpdate: NoAction)
-  partners                                   Partner                @relation(fields: [partner_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  categories                                 Category               @relation(fields: [category_id], references: [id], onDelete: Restrict)
-  creator                                    User?                  @relation("VoucherCreator", fields: [created_by], references: [id], onDelete: SetNull)
-  submitter                                  User?                  @relation("VoucherSubmitter", fields: [submitted_by], references: [id], onDelete: SetNull)
-  
-  @@index([partner_id], map: "voucher_products_partner_id_idx")
+  id                       String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  partner_id               String                 @db.Uuid
+  category_id              String                 @db.Uuid
+  name                     String                 @db.VarChar(255)
+  description              String?
+  thumbnail_url            String?
+  original_price           Decimal                @db.Decimal(15, 0)
+  selling_price            Decimal                @db.Decimal(15, 0)
+  discount_rate            Float                  @default(0)
+  applicable_area          String?                @db.VarChar(255)
+  total_quantity           Int
+  remaining_quantity       Int
+  terms_and_conditions     Json?
+  usage_instructions       Json?
+  sale_start_date          DateTime               @db.Date
+  sale_end_date            DateTime               @db.Date
+  validity_days            Int
+  status                   String                 @default("draft") @db.VarChar(20)
+  approval_status          String                 @default("pending") @db.VarChar(20)
+  approved_by              String?                @db.Uuid
+  approved_at              DateTime?              @db.Timestamptz(6)
+  created_at               DateTime               @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime               @default(now()) @updatedAt @db.Timestamptz(6)
+  created_by               String?                @db.Uuid
+  submitted_by             String?                @db.Uuid
+  submitted_at             DateTime?              @db.Timestamptz(6)
+  admin_logs               AdminLog[]
+  cart_items               CartItem[]
+  issued_vouchers          IssuedVoucher[]
+  order_items              OrderItem[]
+  reviews                  Review[]
+  voucher_product_branches VoucherProductBranch[]
+  voucher_product_images   VoucherProductImage[]
+  approver                 User?                  @relation("VoucherApprover", fields: [approved_by], references: [id], onUpdate: NoAction)
+  categories               Category               @relation(fields: [category_id], references: [id], onUpdate: NoAction)
+  creator                  User?                  @relation("VoucherCreator", fields: [created_by], references: [id])
+  partners                 Partner                @relation(fields: [partner_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  submitter                User?                  @relation("VoucherSubmitter", fields: [submitted_by], references: [id])
+
+  @@index([partner_id])
   @@index([approval_status, status, sale_start_date, sale_end_date], map: "voucher_products_public_listing_idx")
   @@map("voucher_products")
 }
@@ -269,31 +269,31 @@ model CartItem {
 }
 
 model Order {
-  id                               String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  order_code                       String       @unique @db.VarChar(30)
-  user_id                          String       @db.Uuid
-  recipient_id                     String       @db.Uuid
-  subtotal                         Decimal      @db.Decimal(15, 0)
-  discount_amount                  Decimal      @default(0) @db.Decimal(15, 0)
-  total_amount                     Decimal      @db.Decimal(15, 0)
-  payment_method                   String       @db.VarChar(30)
-  status                           String       @default("pending") @db.VarChar(20)
-  note                             String?
-  is_gift                          Boolean      @default(false)
-  payment_expires_at               DateTime?    @db.Timestamptz(6)
-  created_at                       DateTime     @default(now()) @db.Timestamptz(6)
-  updated_at                       DateTime     @default(now()) @updatedAt @db.Timestamptz(6)
-  admin_logs                       AdminLog[]
-  complaints                       Complaint[]
-  order_items                      OrderItem[]
-  order_logs                       OrderLog[]
-  recipient                        User         @relation("ReceivedOrders", fields: [recipient_id], references: [id], onDelete: Restrict)
-  users                            User         @relation("CreatedOrders", fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  payment_logs                     PaymentLog[]
-  payments                         Payment[]
+  id                 String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  order_code         String       @unique @db.VarChar(30)
+  user_id            String       @db.Uuid
+  subtotal           Decimal      @db.Decimal(15, 0)
+  discount_amount    Decimal      @default(0) @db.Decimal(15, 0)
+  total_amount       Decimal      @db.Decimal(15, 0)
+  payment_method     String       @db.VarChar(30)
+  status             String       @default("pending") @db.VarChar(20)
+  note               String?
+  created_at         DateTime     @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime     @default(now()) @updatedAt @db.Timestamptz(6)
+  recipient_id       String       @db.Uuid
+  is_gift            Boolean      @default(false)
+  payment_expires_at DateTime?    @db.Timestamptz(6)
+  admin_logs         AdminLog[]
+  complaints         Complaint[]
+  order_items        OrderItem[]
+  order_logs         OrderLog[]
+  recipient          User         @relation("ReceivedOrders", fields: [recipient_id], references: [id])
+  users              User         @relation("CreatedOrders", fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  payment_logs       PaymentLog[]
+  payments           Payment[]
 
-  @@index([user_id], map: "orders_user_id_idx")
-  @@index([recipient_id], map: "orders_recipient_id_idx")
+  @@index([user_id])
+  @@index([recipient_id])
   @@map("orders")
 }
 
@@ -410,18 +410,16 @@ model Review {
   rating             Int
   comment            String?
   media_urls         Json?
-  is_published       Boolean  @default(true)
-  created_at         DateTime @default(now()) @db.Timestamptz(6)
-  updated_at         DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+  is_published       Boolean          @default(true)
+  created_at         DateTime         @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime         @default(now()) @updatedAt @db.Timestamptz(6)
+  review_responses   ReviewResponse[]
+  issued_vouchers    IssuedVoucher    @relation(fields: [issued_voucher_id], references: [id], onDelete: Cascade)
+  users              User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  voucher_products   VoucherProduct   @relation(fields: [voucher_product_id], references: [id], onDelete: Cascade)
 
-  voucher_products VoucherProduct   @relation(fields: [voucher_product_id], references: [id], onDelete: Cascade)
-  users            User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  issued_vouchers  IssuedVoucher    @relation(fields: [issued_voucher_id], references: [id], onDelete: Cascade)
-  review_responses ReviewResponse[]
-
-  @@index([voucher_product_id], map: "reviews_voucher_product_id_idx")
-  @@index([user_id], map: "reviews_user_id_idx")
-  @@unique([issued_voucher_id])
+  @@index([voucher_product_id])
+  @@index([user_id])
   @@map("reviews")
 }
 
@@ -458,9 +456,9 @@ model Complaint {
   orders              Order?              @relation(fields: [order_id], references: [id])
   users               User                @relation("ComplaintUser", fields: [user_id], references: [id], onDelete: Cascade)
 
-  @@index([user_id], map: "complaints_user_id_idx")
-  @@index([status], map: "complaints_status_idx")
   @@unique([user_id, issued_voucher_id])
+  @@index([user_id])
+  @@index([status])
   @@map("complaints")
 }
 

@@ -24,7 +24,7 @@ interface Props {
   children: React.ReactNode
 }
 
-function SidebarContent({ user, page, pendingVouchers, onNavigate, onLogout, onClose }: Props & { onClose?: () => void }) {
+function SidebarContent({ user, page, pendingVouchers, onNavigate, onLogout, onClose }: Omit<Props, "children"> & { onClose?: () => void }) {
   const router = useRouter()
   const navItems: NavItem[] = [
     { label: "Tổng quan", pg: "dashboard", icon: <Home className="w-4 h-4" /> },

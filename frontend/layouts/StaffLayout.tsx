@@ -23,7 +23,7 @@ interface Props {
   children: React.ReactNode
 }
 
-function SidebarContent({ user, page, onNavigate, onLogout, onClose }: Props & { onClose?: () => void }) {
+function SidebarContent({ user, page, onNavigate, onLogout, onClose }: Omit<Props, "children"> & { onClose?: () => void }) {
   const router = useRouter()
   return (
     <div className="flex flex-col h-full">
