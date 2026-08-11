@@ -16,7 +16,7 @@ Khach hang tao don tu cac item trong gio hang. `orders.user_id` la tai khoan tao
 
 - Voucher phai duoc duyet, dang active, dang trong thoi gian ban va con du ton kho.
 - Gia duoc snapshot vao `order_items` tai thoi diem tao don.
-- Don moi tao co `status = pending`, `payment_status = pending`.
+- Don moi tao co `status = pending_payment`.
 - `payment_expires_at` duoc dat bang thoi diem tao don cong 15 phut.
 - Backend ghi log `CREATE_ORDER`.
 

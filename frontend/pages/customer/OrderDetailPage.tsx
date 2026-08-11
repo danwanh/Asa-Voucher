@@ -13,11 +13,13 @@ interface Props {
   onPayAgain?: (order: Order) => void
 }
 
-function paymentStatusLabel(status?: Order["paymentStatus"]) {
-  if (status === "paid") return "Đã thanh toán"
-  if (status === "failed") return "Thanh toán thất bại"
+function orderStatusLabel(status: Order["status"]) {
+  if (status === "pending_payment") return "Chờ thanh toán"
+  if (status === "payment_failed") return "Thanh toán thất bại"
+  if (status === "confirmed") return "Đã xác nhận"
+  if (status === "completed") return "Hoàn thành"
   if (status === "refunded") return "Đã hoàn tiền"
-  return "Chờ thanh toán"
+  return "Đã hủy"
 }
 
 function issuedVoucherStatusLabel(status: string) {
@@ -30,9 +32,9 @@ function issuedVoucherStatusLabel(status: string) {
 export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAgain }: Props) {
   const [copied, setCopied] = useState(false)
   const issuedVouchers = (order.items ?? []).flatMap((item) => item.issuedVouchers ?? [])
-  const isRefunded = order.paymentStatus === "refunded"
-  const hasPaid = order.paymentStatus === "paid"
-  const paymentStepDone = order.paymentStatus === "paid" || order.paymentStatus === "refunded"
+  const isRefunded = order.status === "refunded"
+  const hasPaid = order.status === "confirmed" || order.status === "completed" || order.status === "refunded"
+  const paymentStepDone = hasPaid
   const voucherReceiveDone = issuedVouchers.length > 0 && !isRefunded
 
   const copy = () => {
@@ -61,8 +63,8 @@ export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAga
             <div className="font-black text-xl" style={{ color: C.indigo, fontFamily: "'Nunito', sans-serif" }}>{order.orderCode ?? order.id}</div>
             <div className="text-xs mt-1" style={{ color: "#9CA3AF" }}>Ngày đặt: {fmtDate(order.createdAt)}</div>
           </div>
-          <span className="px-3 py-1.5 rounded-xl text-sm font-bold" style={{ backgroundColor: order.paymentStatus === "paid" ? C.teal + "20" : order.paymentStatus === "failed" ? "#FEE2E2" : order.paymentStatus === "refunded" ? "#E0EEFF" : C.apricot + "25", color: order.paymentStatus === "paid" ? C.teal : order.paymentStatus === "failed" ? "#DC2626" : order.paymentStatus === "refunded" ? "#1A5FAD" : "#D97706" }}>
-            {paymentStatusLabel(order.paymentStatus)}
+          <span className="px-3 py-1.5 rounded-xl text-sm font-bold" style={{ backgroundColor: order.status === "confirmed" || order.status === "completed" ? C.teal + "20" : order.status === "payment_failed" || order.status === "cancelled" ? "#FEE2E2" : order.status === "refunded" ? "#E0EEFF" : C.apricot + "25", color: order.status === "confirmed" || order.status === "completed" ? C.teal : order.status === "payment_failed" || order.status === "cancelled" ? "#DC2626" : order.status === "refunded" ? "#1A5FAD" : "#D97706" }}>
+            {orderStatusLabel(order.status)}
           </span>
         </div>
       </div>
@@ -184,13 +186,13 @@ export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAga
         <h3 className="font-bold text-sm mb-3" style={{ color: C.indigo }}>Thông tin thanh toán</h3>
         <div className="space-y-2 text-sm">
           <div className="flex justify-between"><span style={{ color: "#6B7280" }}>Phương thức</span><span className="font-semibold" style={{ color: C.indigo }}>{order.paymentMethod}</span></div>
-          <div className="flex justify-between"><span style={{ color: "#6B7280" }}>Thanh toán</span><span className="font-semibold" style={{ color: C.indigo }}>{paymentStatusLabel(order.paymentStatus)}</span></div>
+          <div className="flex justify-between"><span style={{ color: "#6B7280" }}>Trạng thái</span><span className="font-semibold" style={{ color: C.indigo }}>{orderStatusLabel(order.status)}</span></div>
           <div className="flex justify-between"><span style={{ color: "#6B7280" }}>Số tiền</span><span className="font-black" style={{ color: C.peach }}>{fmt(order.amount)}</span></div>
         </div>
       </div>
 
       <div className="flex gap-3">
-        {(order.paymentStatus === "pending" || order.paymentStatus === "failed") && (!order.paymentExpiresAt || new Date(order.paymentExpiresAt).getTime() > Date.now()) && onPayAgain && (
+        {(order.status === "pending_payment" || order.status === "payment_failed") && (!order.paymentExpiresAt || new Date(order.paymentExpiresAt).getTime() > Date.now()) && onPayAgain && (
           <button
             onClick={() => onPayAgain(order)}
             className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm text-white"
@@ -199,7 +201,7 @@ export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAga
             <CreditCard className="w-4 h-4" /> Thanh toán lại
           </button>
         )}
-        {order.paymentStatus === "paid" && (
+        {(order.status === "confirmed" || order.status === "completed") && (
           <button
             onClick={() => onReview(order)}
             className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm border-2"
@@ -208,7 +210,7 @@ export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAga
             <Star className="w-4 h-4" style={{ color: C.apricot }} /> Đánh giá
           </button>
         )}
-        {onComplaint && (order.complaints?.[0] || order.paymentStatus === "paid") && (
+        {onComplaint && (order.complaints?.[0] || order.status === "confirmed" || order.status === "completed") && (
           <button onClick={() => onComplaint(order)} className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm border-2" style={{ borderColor: "#93C5FD", color: "#2563EB" }}>
             <MessageSquare className="w-4 h-4" /> {order.complaints?.[0] ? "Xem khiếu nại đơn hàng" : "Khiếu nại đơn hàng"}
           </button>

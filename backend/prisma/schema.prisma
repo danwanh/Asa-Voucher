@@ -288,8 +288,7 @@ model Order {
   discount_amount Decimal  @default(0) @db.Decimal(15, 0)
   total_amount    Decimal  @db.Decimal(15, 0)
   payment_method  String   @db.VarChar(30)
-  payment_status  String   @default("pending") @db.VarChar(20)
-  status          String   @default("pending") @db.VarChar(20)
+  status          String   @default("pending_payment") @db.VarChar(20)
   note            String?
   is_gift         Boolean  @default(false)
   payment_expires_at DateTime? @db.Timestamptz(6)

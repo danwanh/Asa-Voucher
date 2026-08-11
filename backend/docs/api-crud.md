@@ -304,7 +304,7 @@ QR payload được phát hành dưới dạng URL `FRONTEND_URL/voucher/verify?
 - Tổng tiền đơn hàng tính từ `order_items`, không tin dữ liệu giá từ client.
 - Chỉ cho mua voucher đang bán hợp lệ.
 - Số lượng mua không vượt `remaining_quantity`.
-- Khi thanh toán thành công: cập nhật `payment_status = paid`, `status = confirmed/completed`, giảm tồn kho và phát hành voucher điện tử.
+- Khi thanh toán thành công: cập nhật `payments.status = success`, `orders.status = confirmed`, giảm tồn kho và phát hành voucher điện tử.
 - Thanh toán thật nằm ngoài phạm vi, chỉ cần mô phỏng.
 - Provider mô phỏng được giới hạn ở `vnpay` và `paypal`; không dùng secret khi các biến môi trường để trống.
 

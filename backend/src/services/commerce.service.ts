@@ -186,7 +186,7 @@ async function createOrderFromItemsWithRecipient(
   const paymentExpiresAt = new Date(Date.now() + PAYMENT_HOLD_MINUTES * 60 * 1000);
 
   return prisma.$transaction(async (tx) => {
-    const order = await tx.order.create({ data: { order_code: orderCode(), user_id: userId, recipient_id: recipientId, subtotal, discount_amount: 0, total_amount: subtotal, payment_method: paymentMethod, note, is_gift: isGift, payment_expires_at: paymentExpiresAt } });
+    const order = await tx.order.create({ data: { order_code: orderCode(), user_id: userId, recipient_id: recipientId, subtotal, discount_amount: 0, total_amount: subtotal, payment_method: paymentMethod, status: "pending_payment", note, is_gift: isGift, payment_expires_at: paymentExpiresAt } });
     const orderItems = await Promise.all(builtItems.map((item) => tx.orderItem.create({ data: { ...item.orderItem, order_id: order.id } })));
     await tx.orderLog.create({ data: { order_id: order.id, user_id: userId, action: "CREATE_ORDER", description: "Order created" } });
     return { ...order, items: orderItems };
@@ -293,7 +293,7 @@ export async function updateOrder(user: CurrentUser, id: string, input: Record<s
 export async function cancelOrder(user: CurrentUser, id: string) {
   const order = await getOrder(id);
   assertOrderAccess(user, order);
-  if (order.payment_status === "paid") throw new HttpError(409, "Paid order cannot be cancelled", "ORDER_ALREADY_PAID");
+  if (["confirmed", "completed", "refunded"].includes(String(order.status))) throw new HttpError(409, "Paid order cannot be cancelled", "ORDER_ALREADY_PAID");
   return prisma.$transaction(async (tx) => {
     const data = await tx.order.update({ where: { id }, data: { status: "cancelled", updated_at: new Date() } });
     await tx.orderLog.create({ data: { order_id: id, user_id: user.id, action: "CANCEL_ORDER", description: "Order cancelled" } });
@@ -338,7 +338,13 @@ export async function listPayments(user: CurrentUser, orderId: string) {
 export async function createPayment(user: CurrentUser, orderId: string, method?: string) {
   const order = await getOrder(orderId);
   assertOrderAccess(user, order);
-  if (order.payment_status === "paid") throw new HttpError(409, "Order already paid", "ORDER_ALREADY_PAID");
+  if (![
+    "pending_payment",
+    "payment_failed",
+  ].includes(String(order.status))) {
+    const isPaid = ["confirmed", "completed", "refunded"].includes(String(order.status));
+    throw new HttpError(409, isPaid ? "Order already paid" : "Order is not payable", isPaid ? "ORDER_ALREADY_PAID" : "ORDER_NOT_PAYABLE");
+  }
   if (order.payment_expires_at && new Date(order.payment_expires_at as string | Date) <= new Date()) {
     await cancelExpiredOrder(orderId, user.id);
     throw new HttpError(409, "Order payment window has expired", "ORDER_PAYMENT_EXPIRED");
@@ -417,7 +423,8 @@ export async function simulatePaymentSuccess(user: CurrentUser, id: string) {
   const payment = await getPayment(id);
   const order = payment.orders as Record<string, unknown>;
   assertOrderAccess(user, order);
-  if (payment.status === "success" || order.payment_status === "paid") throw new HttpError(409, "Payment already completed", "PAYMENT_ALREADY_COMPLETED");
+  if (payment.status === "success" || ["confirmed", "completed", "refunded"].includes(String(order.status))) throw new HttpError(409, "Payment already completed", "PAYMENT_ALREADY_COMPLETED");
+  if (!["pending_payment", "payment_failed"].includes(String(order.status))) throw new HttpError(409, "Order is not payable", "ORDER_NOT_PAYABLE");
   if (order.payment_expires_at && new Date(order.payment_expires_at as string | Date) <= new Date()) {
     await cancelExpiredOrder(order.id as string, user.id);
     throw new HttpError(409, "Order payment window has expired", "ORDER_PAYMENT_EXPIRED");
@@ -472,7 +479,7 @@ async function completePayment(id: string, userId: string, payment: Record<strin
     }
 
     const data = await tx.payment.update({ where: { id }, data: { status: "success", paid_at: now } });
-    await tx.order.update({ where: { id: order.id as string }, data: { payment_status: "paid", status: "confirmed", updated_at: now } });
+    await tx.order.update({ where: { id: order.id as string }, data: { status: "confirmed", updated_at: now } });
     await tx.orderLog.create({ data: { order_id: order.id as string, user_id: userId, action: "PAYMENT_SUCCESS", description: "Payment confirmed and vouchers issued" } });
     await tx.paymentLog.create({ data: { payment_id: id, order_id: order.id as string, user_id: userId, action: "PAYMENT_SUCCESS", status: "success", amount: payment.amount as never } });
     return data;
@@ -492,7 +499,8 @@ async function markPaymentFailed(id: string, userId: string, reason: string, kno
     if (!payment) throw new HttpError(404, "Payment not found", "PAYMENT_NOT_FOUND");
     if (payment.status === "success" || payment.status === "failed") return payment;
     const data = await tx.payment.update({ where: { id }, data: { status: "failed", gateway_response: reason } });
-    await tx.paymentLog.create({ data: { payment_id: id, order_id: payment.order_id, user_id: userId, action: "PAYMENT_FAILED", status: "failed", amount: payment.amount } });
+    await tx.order.update({ where: { id: payment.order_id as string }, data: { status: "payment_failed", updated_at: new Date() } });
+    await tx.paymentLog.create({ data: { payment_id: id, order_id: payment.order_id as string, user_id: userId, action: "PAYMENT_FAILED", status: "failed", amount: payment.amount as never } });
     return data;
   });
 }
@@ -518,8 +526,8 @@ export async function handleVnpayReturn(query: Record<string, unknown>) {
   const order = payment.orders as Record<string, unknown>;
   const successfulReturn = result.validSignature && result.validTmnCode && result.responseCode === "00" && result.transactionStatus === "00" && result.amount === Number(payment.amount);
   if (successfulReturn && paymentWindowExpired(order)) {
-    await cancelExpiredOrder(order.id as string, order.user_id as string);
     await markPaymentFailed(payment.id as string, order.user_id as string, "VNPAY_PAYMENT_EXPIRED");
+    await cancelExpiredOrder(order.id as string, order.user_id as string);
     return redirectResult(order.id as string, "failed");
   }
   if (successfulReturn) {
@@ -543,10 +551,10 @@ export async function handleVnpayReturn(query: Record<string, unknown>) {
 export async function handlePayPalReturn(token: string) {
   const payment = await paymentByTransactionRef(token);
   const order = payment.orders as Record<string, unknown>;
-  if (payment.status === "success" || order.payment_status === "paid") return redirectResult(order.id as string, "success");
+  if (payment.status === "success" || ["confirmed", "completed", "refunded"].includes(String(order.status))) return redirectResult(order.id as string, "success");
   if (paymentWindowExpired(order)) {
-    await cancelExpiredOrder(order.id as string, order.user_id as string);
     await markPaymentFailed(payment.id as string, order.user_id as string, "PAYPAL_PAYMENT_EXPIRED");
+    await cancelExpiredOrder(order.id as string, order.user_id as string);
     return redirectResult(order.id as string, "failed");
   }
   try {

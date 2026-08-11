@@ -19,7 +19,7 @@ export type VoucherStatus =
   | "locked"
   | "cancelled"
   | "used"
-export type OrderStatus = "pending" | "confirmed" | "completed" | "cancelled" | "used"
+export type OrderStatus = "pending_payment" | "payment_failed" | "confirmed" | "completed" | "cancelled" | "refunded"
 
 // Kept for pages that still reference the old admin sub-role concept;
 // no longer used on AppUser (admin_content/admin_operations/admin_security are
@@ -154,7 +154,6 @@ export interface Order {
   updatedAt?: string
   code: string
   qrPayload?: string
-  paymentStatus?: "pending" | "paid" | "failed" | "refunded"
   recipientId?: string
   isGift?: boolean
   giverName?: string

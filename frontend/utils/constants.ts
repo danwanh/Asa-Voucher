@@ -30,6 +30,8 @@ export const STATUS_LABEL: Record<string, string> = {
   locked: "Đã khóa",
   cancelled: "Đã hủy",
   used: "Đã dùng",
+  pending_payment: "Chờ thanh toán",
+  payment_failed: "Thanh toán thất bại",
   confirmed: "Đã thanh toán",
   completed: "Hoàn thành",
   banned: "Bị khóa",
@@ -68,7 +70,7 @@ export function statusColor(s: string): { bg: string; text: string } {
     s === "selling"
   )
     return { bg: "#E8F5EE", text: "#2D7A52" };
-  if (s === "pending" || s === "draft")
+  if (s === "pending" || s === "pending_payment" || s === "draft")
     return { bg: "#FFF3CD", text: "#856404" };
   if (s === "used") return { bg: "#E0EEFF", text: "#1A5FAD" };
   if (s === "suspended") {

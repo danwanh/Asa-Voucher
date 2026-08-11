@@ -30,7 +30,7 @@ export const createOrderSchema = z.object({
 
 export const updateOrderSchema = z.object({
   note: z.string().nullable().optional(),
-  status: z.enum(["pending", "confirmed", "completed", "cancelled"]).optional()
+  status: z.enum(["pending_payment", "payment_failed", "confirmed", "completed", "cancelled", "refunded"]).optional()
 });
 
 export const createPaymentSchema = z.object({
