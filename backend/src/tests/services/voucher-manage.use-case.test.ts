@@ -62,7 +62,7 @@ function vp(overrides: Record<string, unknown> = {}) {
     sale_start_date: "2026-01-01", sale_end_date: "2026-12-31",
     validity_days: 30, terms_and_conditions: ["T&C"],
     submitted_at: null, submitted_by: null,
-    approved_by: null, approved_at: null, updated_by: null,
+    approved_by: null, approved_at: null,
     created_at: new Date("2026-01-01"), updated_at: new Date("2026-01-01"),
     partners: { business_name: "Highlands" },
     ...overrides,
@@ -137,16 +137,16 @@ describe("Main Flow — Xem chi tiet", () => {
 });
 
 describe("Main Flow — Chinh sua & Cap nhat", () => {
-  it("owner updates own voucher and sets updated_by", async () => {
+  it("owner updates own voucher and sets updated_at", async () => {
     vi.mocked(mockPrisma.voucherProduct.findUnique).mockResolvedValue(vp() as any);
     vi.mocked(mockPrisma.voucherProduct.update).mockResolvedValue(
-      vp({ name: "Updated", updated_by: "owner-a" }) as any
+      vp({ name: "Updated" }) as any
     );
     const result = await svc.updateVoucherProduct(PARTNER_A, "vp-1", { name: "Updated" });
     expect(result.name).toBe("Updated");
     expect(mockPrisma.voucherProduct.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ updated_by: "owner-a", updated_at: expect.any(Date) }),
+        data: expect.objectContaining({ updated_at: expect.any(Date) }),
       })
     );
   });
