@@ -6,16 +6,14 @@ import * as logController from "../controllers/log.controller.js";
 
 export const logRoutes = Router();
 
-logRoutes.use(requireAuth, requireRole("admin_security"));
+logRoutes.get("/authentication-logs", requireAuth, requireRole("admin_security"), asyncHandler(logController.listAuthenticationLogs));
+logRoutes.get("/authentication-logs/:id", requireAuth, requireRole("admin_security"), asyncHandler(logController.getAuthenticationLog));
 
-logRoutes.get("/authentication-logs", asyncHandler(logController.listAuthenticationLogs));
-logRoutes.get("/authentication-logs/:id", asyncHandler(logController.getAuthenticationLog));
+logRoutes.get("/admin-logs", requireAuth, requireRole("admin_security"), asyncHandler(logController.listAdminLogs));
+logRoutes.get("/admin-logs/:id", requireAuth, requireRole("admin_security"), asyncHandler(logController.getAdminLog));
 
-logRoutes.get("/admin-logs", asyncHandler(logController.listAdminLogs));
-logRoutes.get("/admin-logs/:id", asyncHandler(logController.getAdminLog));
+logRoutes.get("/order-logs", requireAuth, requireRole("admin_security"), asyncHandler(logController.listOrderLogs));
+logRoutes.get("/order-logs/:id", requireAuth, requireRole("admin_security"), asyncHandler(logController.getOrderLog));
 
-logRoutes.get("/order-logs", asyncHandler(logController.listOrderLogs));
-logRoutes.get("/order-logs/:id", asyncHandler(logController.getOrderLog));
-
-logRoutes.get("/payment-logs", asyncHandler(logController.listPaymentLogs));
-logRoutes.get("/payment-logs/:id", asyncHandler(logController.getPaymentLog));
+logRoutes.get("/payment-logs", requireAuth, requireRole("admin_security"), asyncHandler(logController.listPaymentLogs));
+logRoutes.get("/payment-logs/:id", requireAuth, requireRole("admin_security"), asyncHandler(logController.getPaymentLog));

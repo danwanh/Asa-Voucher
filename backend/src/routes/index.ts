@@ -11,6 +11,7 @@ import { reviewRoutes } from "./review.routes.js";
 import { complaintRoutes } from "./complaint.routes.js";
 import { logRoutes } from "./log.routes.js";
 import { reportRoutes } from "./report.routes.js";
+import {dashboardRoutes} from "./dashboard.routes.js"
 
 export const apiRoutes = Router();
 
@@ -26,3 +27,4 @@ apiRoutes.use(reviewRoutes);
 apiRoutes.use(complaintRoutes);
 apiRoutes.use(logRoutes);
 apiRoutes.use(reportRoutes);
+apiRoutes.use(dashboardRoutes);

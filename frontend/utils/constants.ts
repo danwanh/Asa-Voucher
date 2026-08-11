@@ -18,7 +18,7 @@ export const fmtDate = (s: string) => new Date(s).toLocaleDateString("vi-VN");
 
 export const STATUS_LABEL: Record<string, string> = {
   draft: "Bản nháp",
-  pending: "Chờ duyệt",
+  pending: "Chờ xử lý",
   approved: "Đã duyệt",
   rejected: "Bị từ chối",
   selling: "Đang bán",
@@ -28,12 +28,24 @@ export const STATUS_LABEL: Record<string, string> = {
   sold_out: "Hết số lượng",
   expired: "Hết hạn",
   locked: "Đã khóa",
+  confirmed: "Đã xác nhận",
   cancelled: "Đã hủy",
+  pending_manual: "Chờ xử lý HC",
+  refunded: "Đã hoàn tiền",
   used: "Đã dùng",
   completed: "Hoàn thành",
   banned: "Bị khóa",
   inactive: "Không hoạt động",
 };
+
+export const STATUS_DESCRIPTION: Record<string, string> = {
+  all: "Tất cả đơn hàng",
+  pending: "Đơn chờ xác nhận thanh toán",
+  confirmed: "Đơn đã xác nhận thanh toán, voucher đã phát hành",
+  completed: "Đơn đã hoàn thành, voucher đã sử dụng",
+  cancelled: "Đơn đã hủy",
+  pending_manual: "Đơn hủy nhưng voucher đã dùng, cần xử lý tay",
+}
 
 const CATEGORY_LABELS: Record<string, string> = {
   "an-uong": "Ăn uống",
@@ -67,9 +79,10 @@ export function statusColor(s: string): { bg: string; text: string } {
     s === "selling"
   )
     return { bg: "#E8F5EE", text: "#2D7A52" };
-  if (s === "pending" || s === "draft")
+  if (s === "pending" || s === "draft" || s === "pending_manual")
     return { bg: "#FFF3CD", text: "#856404" };
-  if (s === "used") return { bg: "#E0EEFF", text: "#1A5FAD" };
+  if (s === "used" || s === "confirmed") return { bg: "#E0EEFF", text: "#1A5FAD" };
+  if (s === "refunded") return { bg: "#E8F5EE", text: "#2D7A52" };
   if (s === "suspended") {
     return { bg: "#FFF3CD", text: "#856404" };
   }

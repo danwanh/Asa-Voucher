@@ -19,7 +19,7 @@ export type VoucherStatus =
   | "locked"
   | "cancelled"
   | "used"
-export type OrderStatus = "pending" | "completed" | "cancelled" | "used"
+export type OrderStatus = "pending" | "confirmed" | "completed" | "cancelled" | "pending_manual" | "used" | "refunded"
 
 // Kept for pages that still reference the old admin sub-role concept;
 // no longer used on AppUser (admin_content/admin_operations/admin_security are
@@ -143,11 +143,14 @@ export interface StaffMember {
 export interface Order {
   id: string
   userId: string
+  userName?: string
   voucherId: string
   voucherTitle: string
+  partnerId?: string
   partnerName: string
   amount: number
   status: OrderStatus
+  paymentStatus: string
   paymentMethod: string
   createdAt: string
   code: string

@@ -102,15 +102,15 @@ model AdminLog {
   target_user_id    String?         @db.Uuid
   target_partner_id String?         @db.Uuid
   target_voucher_id String?         @db.Uuid
-  target_order_id   String?         @db.Uuid
   action            String          @db.VarChar(100)
   description       String?
   occurred_at       DateTime        @default(now()) @db.Timestamptz(6)
+  target_order_id   String?         @db.Uuid
   admin             User            @relation("AdminLogAdmin", fields: [admin_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  target_order      Order?          @relation(fields: [target_order_id], references: [id])
   target_partner    Partner?        @relation(fields: [target_partner_id], references: [id], onUpdate: NoAction, map: "admin_logs_target_partner_fk")
   target_user       User?           @relation("AdminLogTargetUser", fields: [target_user_id], references: [id], onUpdate: NoAction)
   target_voucher    VoucherProduct? @relation(fields: [target_voucher_id], references: [id], onUpdate: NoAction, map: "admin_logs_target_voucher_fk")
-  target_order      Order?          @relation(fields: [target_order_id], references: [id], onDelete: SetNull)
 
   @@map("admin_logs")
 }
@@ -276,7 +276,6 @@ model Order {
   discount_amount                  Decimal      @default(0) @db.Decimal(15, 0)
   total_amount                     Decimal      @db.Decimal(15, 0)
   payment_method                   String       @db.VarChar(30)
-  payment_status                   String       @default("pending") @db.VarChar(20)
   status                           String       @default("pending") @db.VarChar(20)
   note                             String?
   created_at                       DateTime     @default(now()) @db.Timestamptz(6)
@@ -284,6 +283,7 @@ model Order {
   recipient_id                     String       @db.Uuid
   is_gift                          Boolean      @default(false)
   payment_expires_at               DateTime?    @db.Timestamptz(6)
+  admin_logs                       AdminLog[]
   complaints                       Complaint[]
   order_items                      OrderItem[]
   order_logs                       OrderLog[]
@@ -291,7 +291,6 @@ model Order {
   users                            User         @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   payment_logs                     PaymentLog[]
   payments                         Payment[]
-  admin_logs                       AdminLog[]
 
   @@index([user_id])
   @@index([recipient_id])
@@ -380,7 +379,7 @@ model IssuedVoucher {
   order_items        OrderItem      @relation(fields: [order_item_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   owners             User           @relation(fields: [owner_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   voucher_products   VoucherProduct @relation(fields: [voucher_product_id], references: [id], onUpdate: NoAction)
-  reviews            Review[]
+  reviews            Review?
   voucher_usages     VoucherUsage[]
 
   @@index([owner_id])
@@ -407,7 +406,7 @@ model Review {
   id                 String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   voucher_product_id String           @db.Uuid
   user_id            String           @db.Uuid
-  issued_voucher_id  String           @db.Uuid
+  issued_voucher_id  String           @unique @db.Uuid
   rating             Int
   comment            String?
   media_urls         Json?
@@ -457,6 +456,7 @@ model Complaint {
   orders              Order?              @relation(fields: [order_id], references: [id])
   users               User                @relation("ComplaintUser", fields: [user_id], references: [id], onDelete: Cascade)
 
+  @@unique([user_id, issued_voucher_id])
   @@index([user_id])
   @@index([status])
   @@map("complaints")
