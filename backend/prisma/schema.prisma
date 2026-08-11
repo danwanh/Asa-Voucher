@@ -41,6 +41,7 @@ model User {
   approved_vouchers    VoucherProduct[]    @relation("VoucherApprover")
   created_vouchers     VoucherProduct[]    @relation("VoucherCreator")
   submitted_vouchers   VoucherProduct[]    @relation("VoucherSubmitter")
+  updated_vouchers     VoucherProduct[]    @relation("VoucherUpdater")
   carts                Cart?
   orders               Order[]           @relation("CreatedOrders")
   received_orders      Order[]           @relation("ReceivedOrders")
@@ -206,6 +207,7 @@ model VoucherProduct {
   submitted_at         DateTime? @db.Timestamptz(6)
   approved_by          String?   @db.Uuid
   approved_at          DateTime? @db.Timestamptz(6)
+  updated_by           String?   @db.Uuid
   created_at           DateTime  @default(now()) @db.Timestamptz(6)
   updated_at           DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
 
@@ -214,6 +216,7 @@ model VoucherProduct {
   creator                  User?                  @relation("VoucherCreator", fields: [created_by], references: [id], onDelete: SetNull)
   submitter                User?                  @relation("VoucherSubmitter", fields: [submitted_by], references: [id], onDelete: SetNull)
   approver                 User?                  @relation("VoucherApprover", fields: [approved_by], references: [id], onDelete: SetNull)
+  updater                  User?                  @relation("VoucherUpdater", fields: [updated_by], references: [id], onDelete: SetNull)
   voucher_product_images   VoucherProductImage[]
   voucher_product_branches VoucherProductBranch[]
   cart_items               CartItem[]
