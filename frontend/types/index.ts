@@ -263,3 +263,75 @@ export interface VerificationRecord {
   verifiedAt: string
   status: "valid" | "invalid" | "used"
 }
+
+// ── FC-PAV-MANAGE: VoucherProduct types (match backend Prisma) ──────
+export interface VoucherProduct {
+  id: string
+  partner_id: string
+  category_id: string
+  name: string
+  description: string | null
+  thumbnail_url: string | null
+  original_price: number
+  selling_price: number
+  discount_rate: number
+  applicable_area: string | null
+  total_quantity: number
+  remaining_quantity: number
+  terms_and_conditions: unknown | null
+  usage_instructions: unknown | null
+  sale_start_date: string
+  sale_end_date: string
+  validity_days: number
+  status: VoucherProductStatus
+  approval_status: ApprovalStatus
+  approved_by: string | null
+  approved_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type VoucherProductStatus = "draft" | "active" | "paused" | "sold_out" | "expired"
+export type ApprovalStatus = "pending" | "approved" | "rejected"
+
+export interface VoucherProductImage {
+  id: string
+  voucher_product_id: string
+  image_url: string
+  is_primary: boolean
+  sort_order: number
+}
+
+export interface VoucherProductBranch {
+  id: string
+  voucher_product_id: string
+  branch_id: string
+  partner_branches?: {
+    id: string
+    branch_name: string
+    address: string
+    city: string
+    district: string | null
+    phone: string | null
+  }
+}
+
+// ── FC-PAV-MANAGE: Field locking rules ─────────────────────────────
+export const LOCKED_FIELDS_BY_STATUS: Record<string, string[]> = {
+  draft: [],
+  pending: [],
+  approved: ["total_quantity", "remaining_quantity"],
+  active: ["total_quantity", "remaining_quantity", "original_price", "selling_price"],
+  sold_out: ["total_quantity", "remaining_quantity", "original_price", "selling_price", "name", "category_id"],
+  expired: ["*"],
+}
+
+export function getLockedFields(status: string): string[] {
+  return LOCKED_FIELDS_BY_STATUS[status] ?? ["*"]
+}
+
+export function isFieldLocked(status: string, field: string): boolean {
+  const locked = getLockedFields(status)
+  if (locked.includes("*")) return true
+  return locked.includes(field)
+}

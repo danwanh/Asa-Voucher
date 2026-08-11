@@ -1,5 +1,4 @@
-// Base URL — thay bằng URL backend thật khi tích hợp
-const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5000/api"
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5000/api/v1"
 
 export const API = {
   // ── Auth ────────────────────────────────────────────────────
@@ -12,23 +11,23 @@ export const API = {
   // GET  /auth/me            → AppUser
   AUTH_ME: `${BASE_URL}/auth/me`,
 
-  // ── Vouchers ────────────────────────────────────────────────
-  // GET  /vouchers           ?category=&search=&sort= → Voucher[]
-  VOUCHERS: `${BASE_URL}/vouchers`,
-  // GET  /vouchers/:id       → Voucher
-  VOUCHER: (id: string) => `${BASE_URL}/vouchers/${id}`,
-  // POST /vouchers           (Partner) { ...VoucherPayload } → Voucher
-  VOUCHER_CREATE: `${BASE_URL}/vouchers`,
-  // PUT  /vouchers/:id       (Partner) → Voucher
-  VOUCHER_UPDATE: (id: string) => `${BASE_URL}/vouchers/${id}`,
-  // DELETE /vouchers/:id     (Partner/Admin)
-  VOUCHER_DELETE: (id: string) => `${BASE_URL}/vouchers/${id}`,
-  // POST /vouchers/:id/submit-review   (Partner) gửi duyệt
-  VOUCHER_SUBMIT: (id: string) => `${BASE_URL}/vouchers/${id}/submit-review`,
-  // POST /vouchers/:id/approve         (Admin)
-  VOUCHER_APPROVE: (id: string) => `${BASE_URL}/vouchers/${id}/approve`,
-  // POST /vouchers/:id/reject          (Admin) { reason }
-  VOUCHER_REJECT: (id: string) => `${BASE_URL}/vouchers/${id}/reject`,
+  // ── Voucher Products ────────────────────────────────────────
+  // GET  /voucher-products           ?category=&search=&sort= → VoucherProduct[]
+  VOUCHERS: `${BASE_URL}/voucher-products`,
+  // GET  /voucher-products/:id       → VoucherProduct
+  VOUCHER: (id: string) => `${BASE_URL}/voucher-products/${id}`,
+  // POST /voucher-products           (Partner) { ...VoucherPayload } → VoucherProduct
+  VOUCHER_CREATE: `${BASE_URL}/voucher-products`,
+  // PATCH /voucher-products/:id      (Partner) → VoucherProduct
+  VOUCHER_UPDATE: (id: string) => `${BASE_URL}/voucher-products/${id}`,
+  // DELETE /voucher-products/:id     (Partner/Admin)
+  VOUCHER_DELETE: (id: string) => `${BASE_URL}/voucher-products/${id}`,
+  // PATCH /voucher-products/:id/submit   (Partner) gửi duyệt
+  VOUCHER_SUBMIT: (id: string) => `${BASE_URL}/voucher-products/${id}/submit`,
+  // PATCH /voucher-products/:id/approval (Admin) approve/reject
+  VOUCHER_APPROVE: (id: string) => `${BASE_URL}/voucher-products/${id}/approval`,
+  // PATCH /voucher-products/:id/status   (Admin) update status
+  VOUCHER_REJECT: (id: string) => `${BASE_URL}/voucher-products/${id}/status`,
 
   // ── Orders ──────────────────────────────────────────────────
   // GET  /orders             (Customer) → Order[]
@@ -46,10 +45,10 @@ export const API = {
   PAYMENT_FAILED: (id: string) => `${BASE_URL}/payments/${id}/simulate-failed`,
 
   // ── Voucher Code Verification ────────────────────────────────
-  // POST /vouchers/verify    (Partner) { code } → { order, valid }
-  VOUCHER_VERIFY: `${BASE_URL}/vouchers/verify`,
-  // POST /vouchers/redeem    (Partner) { code } → Order (status=used)
-  VOUCHER_REDEEM: `${BASE_URL}/vouchers/redeem`,
+  // POST /issued-vouchers/validate    (Partner) { code } → { order, valid }
+  VOUCHER_VERIFY: `${BASE_URL}/issued-vouchers/validate`,
+  // POST /issued-vouchers/:id/redeem  (Partner) → Order (status=used)
+  VOUCHER_REDEEM: (id: string) => `${BASE_URL}/issued-vouchers/${id}/redeem`,
 
   // ── Users ────────────────────────────────────────────────────
   // GET  /users              (Admin) ?role=&status= → User[]

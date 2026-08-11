@@ -105,6 +105,7 @@ export function PartnerApp({ user, onLogout, initialPage }: Props) {
           onDetail={goDetail}
           sessionDrafts={sessionDrafts}
           onEditDraft={handleEditDraft}
+          partnerId={user.partnerId}
         />
       )}
       {page === "create" && (

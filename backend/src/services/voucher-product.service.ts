@@ -109,6 +109,40 @@ function assertPartnerCanManageVouchers(partner: Record<string, unknown> | null)
   }
 }
 
+/**
+ * FC-PAV-MANAGE: Field locking by voucher status.
+ * BR-PAV-03 / BR-PAR-04: Partner may only edit fields permitted for the current status.
+ * RB-11: total_quantity/remaining_quantity must not be altered after approval.
+ */
+const LOCKED_FIELDS_BY_STATUS: Record<string, string[]> = {
+  draft: [],
+  pending: [],
+  approved: ["total_quantity", "remaining_quantity"],
+  active: ["total_quantity", "remaining_quantity", "original_price", "selling_price"],
+  sold_out: ["total_quantity", "remaining_quantity", "original_price", "selling_price", "name", "category_id"],
+  expired: ["*"],
+};
+
+function getLockedFields(status: string): string[] {
+  return LOCKED_FIELDS_BY_STATUS[status] ?? ["*"];
+}
+
+function assertFieldsNotLocked(status: string, inputKeys: string[]) {
+  const locked = getLockedFields(status);
+  if (locked.includes("*")) {
+    throw new HttpError(403, `Cannot edit voucher in "${status}" status`, "STATUS_LOCKED");
+  }
+  const blocked = inputKeys.filter((k) => locked.includes(k));
+  if (blocked.length > 0) {
+    throw new HttpError(
+      403,
+      `Field(s) not editable in "${status}" status: ${blocked.join(", ")}`,
+      "FIELD_LOCKED",
+      { locked_fields: blocked }
+    );
+  }
+}
+
 function requirePositiveNumber(value: unknown, message: string, code: string) {
   const numberValue = Number(value);
   if (!Number.isFinite(numberValue) || numberValue <= 0) {
@@ -303,8 +337,30 @@ export async function getVoucherProduct(user: CurrentUser | undefined, id: strin
 export async function updateVoucherProduct(user: CurrentUser, id: string, input: Record<string, unknown>) {
   const voucher = await getVoucher(id);
   await assertVoucherOwnerOrAdmin(user, voucher, false);
+
+  // FC-PAV-MANAGE: Field locking — reject edits to locked fields based on current status
+  const inputKeys = Object.keys(input).filter((k) => input[k] !== undefined);
+  assertFieldsNotLocked(String(voucher.status), inputKeys);
+
+  // RB-02: selling price must not exceed original price
   if (input.selling_price && Number(input.selling_price) >= Number(input.original_price ?? voucher.original_price)) {
     throw new HttpError(400, "Selling price must be less than original price", "INVALID_PRICE");
+  }
+
+  // RB-11: remaining_quantity must track with total_quantity changes
+  if (input.total_quantity !== undefined) {
+    const newTotal = Number(input.total_quantity);
+    const currentSold = Number(voucher.total_quantity) - Number(voucher.remaining_quantity);
+    if (newTotal < currentSold) {
+      throw new HttpError(
+        400,
+        `Total quantity (${newTotal}) cannot be less than already sold quantity (${currentSold})`,
+        "INVALID_QUANTITY",
+        { sold: currentSold, requested: newTotal }
+      );
+    }
+    // Auto-update remaining_quantity to maintain sold count
+    (input as Record<string, unknown>).remaining_quantity = newTotal - currentSold;
   }
   const originalPrice = Number(input.original_price ?? voucher.original_price);
   const sellingPrice = Number(input.selling_price ?? voucher.selling_price);
