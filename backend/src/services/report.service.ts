@@ -39,7 +39,7 @@ export async function getRevenueReport(user: AuthUser, query: ReportQuery): Prom
   if (partnerId) {
     const items = await reportRepo.listOrderItemsForPartner(partnerId, query.date_from, query.date_to);
     for (const item of items) {
-      if (item.orders?.payment_status !== "paid") continue;
+      if (!item.orders || !["confirmed", "completed"].includes(item.orders.status)) continue;
       const key = toDateKey(item.orders.created_at);
       const bucket = buckets.get(key) ?? { revenue: 0, orderIds: new Set<string>() };
       bucket.revenue += Number(item.subtotal);
@@ -115,7 +115,7 @@ export async function getPartnerReport(user: AuthUser, query: ReportQuery): Prom
     let revenue = 0;
     const paidOrderIds = new Set<string>();
     for (const item of items) {
-      if (item.orders?.payment_status !== "paid") continue;
+      if (!item.orders || !["confirmed", "completed"].includes(item.orders.status)) continue;
       revenue += Number(item.subtotal);
       paidOrderIds.add(item.order_id);
     }

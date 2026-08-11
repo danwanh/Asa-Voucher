@@ -22,7 +22,6 @@ const INCLUDE = {
           recipient_id: true,
           total_amount: true,
           payment_method: true,
-          payment_status: true,
           status: true,
           is_gift: true,
           created_at: true,
@@ -37,7 +36,7 @@ const INCLUDE = {
 
 type IssuedVoucherWithRelations = IssuedVoucherRow & {
   voucher_products: { partner_id: string };
-  order_items: { order_id: string; orders: { payment_status: string; status: string } | null };
+  order_items?: { order_id: string; orders?: { status: string } | null };
 };
 
 export async function listIssuedVouchers(

@@ -61,7 +61,7 @@ export async function createReview(user: AuthUser, input: CreateReviewInput) {
     throw new HttpError(403, "Bạn chỉ được đánh giá voucher của chính mình");
   }
   const order = issuedVoucher.order_items?.orders;
-  const isPaid = order?.payment_status === "paid" || order?.status === "confirmed" || order?.status === "completed";
+  const isPaid = order?.status === "confirmed" || order?.status === "completed";
   if (!isPaid && issuedVoucher.status !== "used") {
     throw new HttpError(422, "Chỉ được đánh giá voucher đã thanh toán hoặc đã sử dụng");
   }

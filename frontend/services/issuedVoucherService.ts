@@ -80,7 +80,6 @@ function mapMineVoucher(value: BackendRecord): Order {
     createdAt: order.created_at ?? value.issued_date,
     code: issuedVoucher.code,
     qrPayload: issuedVoucher.qrPayload,
-    paymentStatus: order.payment_status,
     recipientId: String(order.recipient_id ?? value.owner_id),
     isGift: Boolean(order.is_gift),
     giverName: order.users?.full_name,

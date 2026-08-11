@@ -101,7 +101,7 @@ export function MyVouchersPage({ orders, ownerId, loading = false, onReview, onC
           {filtered.map(({ order, item, issuedVoucher }) => {
             const title = item.voucherTitle ?? order.voucherTitle
             const partner = item.partnerName ?? order.partnerName
-            const canAct = order.paymentStatus === "paid" || order.status === "confirmed" || order.status === "completed" || issuedVoucher.status === "used"
+            const canAct = order.status === "confirmed" || order.status === "completed" || issuedVoucher.status === "used"
             const complaintStatus = issuedVoucher.complaint ? COMPLAINT_STATUS[issuedVoucher.complaint.status] : null
             return (
               <div key={issuedVoucher.id} className="bg-card rounded-3xl overflow-hidden shadow-sm" style={{ opacity: issuedVoucher.status === "expired" || issuedVoucher.status === "refunded" ? 0.7 : 1 }}>

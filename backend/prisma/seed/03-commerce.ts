@@ -22,8 +22,7 @@ type OrderSeed = {
   discount_amount: number;
   total_amount: number;
   payment_method: "vnpay" | "paypal";
-  payment_status: "pending" | "paid" | "failed" | "refunded";
-  status: "pending" | "confirmed" | "completed" | "cancelled";
+  status: "pending_payment" | "payment_failed" | "confirmed" | "completed" | "cancelled" | "refunded";
   note: string;
   created_at: Date;
 };
@@ -101,7 +100,6 @@ const orders: OrderSeed[] = [
     discount_amount: 49000,
     total_amount: 269000,
     payment_method: "vnpay",
-    payment_status: "paid",
     status: "completed",
     note: "Mua voucher xem phim cuối tuần",
     created_at: daysFrom(now, -15)
@@ -114,7 +112,6 @@ const orders: OrderSeed[] = [
     discount_amount: 20000,
     total_amount: 198000,
     payment_method: "vnpay",
-    payment_status: "paid",
     status: "confirmed",
     note: "Mua voucher đồ uống trong tuần",
     created_at: daysFrom(now, -12)
@@ -127,7 +124,6 @@ const orders: OrderSeed[] = [
     discount_amount: 30000,
     total_amount: 399000,
     payment_method: "paypal",
-    payment_status: "paid",
     status: "completed",
     note: "Buffet cuối tuần",
     created_at: daysFrom(now, -10)
@@ -140,8 +136,7 @@ const orders: OrderSeed[] = [
     discount_amount: 0,
     total_amount: 229000,
     payment_method: "paypal",
-    payment_status: "pending",
-    status: "pending",
+    status: "pending_payment",
     note: "Chờ chuyển khoản",
     created_at: daysFrom(now, -5)
   },
@@ -153,8 +148,7 @@ const orders: OrderSeed[] = [
     discount_amount: 0,
     total_amount: 160000,
     payment_method: "vnpay",
-    payment_status: "failed",
-    status: "cancelled",
+    status: "payment_failed",
     note: "Thanh toán thất bại do ví không đủ tiền",
     created_at: daysFrom(now, -8)
   },
@@ -166,8 +160,7 @@ const orders: OrderSeed[] = [
     discount_amount: 0,
     total_amount: 2890000,
     payment_method: "vnpay",
-    payment_status: "refunded",
-    status: "completed",
+    status: "refunded",
     note: "Hoàn tiền do đối tác ngừng cung cấp dịch vụ",
     created_at: daysFrom(now, -25)
   },
@@ -179,7 +172,6 @@ const orders: OrderSeed[] = [
     discount_amount: 50000,
     total_amount: 448000,
     payment_method: "vnpay",
-    payment_status: "paid",
     status: "completed",
     note: "Combo điện ảnh cho nhóm bạn",
     created_at: daysFrom(now, -6)
@@ -551,7 +543,6 @@ export async function seedCommerce({ prisma }: SeedContext) {
         discount_amount: money(order.discount_amount),
         total_amount: money(order.total_amount),
         payment_method: order.payment_method,
-        payment_status: order.payment_status,
         status: order.status,
         note: order.note,
         created_at: order.created_at,

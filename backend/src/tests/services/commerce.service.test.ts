@@ -296,7 +296,7 @@ describe("Commerce Service", () => {
   describe("cancelOrder", () => {
     it("cancels unpaid order", async () => {
       vi.mocked(prisma.order.findUnique).mockResolvedValue({
-        id: "o1", user_id: "u-buyer", payment_status: "pending", order_items: [],
+        id: "o1", user_id: "u-buyer", status: "pending_payment", order_items: [],
       } as any);
       mockTx.order.update.mockResolvedValue({ id: "o1", status: "cancelled" });
       mockTx.orderLog.create.mockResolvedValue({});
@@ -307,7 +307,7 @@ describe("Commerce Service", () => {
 
     it("rejects cancelling paid order", async () => {
       vi.mocked(prisma.order.findUnique).mockResolvedValue({
-        id: "o1", user_id: "u-buyer", payment_status: "paid", order_items: [],
+        id: "o1", user_id: "u-buyer", status: "confirmed", order_items: [],
       } as any);
 
       await expect(commerceService.cancelOrder(BUYER, "o1")).rejects.toThrow(HttpError);
@@ -317,7 +317,7 @@ describe("Commerce Service", () => {
   describe("createPayment", () => {
     it("creates payment for unpaid order", async () => {
       vi.mocked(prisma.order.findUnique).mockResolvedValue({
-        id: "o1", user_id: "u-buyer", payment_status: "pending",
+        id: "o1", user_id: "u-buyer", status: "pending_payment",
         total_amount: 100000, payment_method: "simulated", order_items: [],
       } as any);
       mockTx.payment.create.mockResolvedValue({ id: "pay1", amount: 100000 });
@@ -329,7 +329,7 @@ describe("Commerce Service", () => {
 
     it("rejects payment for already paid order", async () => {
       vi.mocked(prisma.order.findUnique).mockResolvedValue({
-        id: "o1", user_id: "u-buyer", payment_status: "paid", order_items: [],
+        id: "o1", user_id: "u-buyer", status: "confirmed", order_items: [],
       } as any);
 
       await expect(commerceService.createPayment(BUYER, "o1")).rejects.toThrow(HttpError);
@@ -340,7 +340,7 @@ describe("Commerce Service", () => {
     it("simulates success, issues vouchers, updates order", async () => {
       vi.mocked(prisma.payment.findUnique).mockResolvedValue({
         id: "pay1", status: "pending", amount: 160000, orders: {
-          id: "o1", user_id: "u-buyer", recipient_id: "u-recipient", payment_status: "pending",
+          id: "o1", user_id: "u-buyer", recipient_id: "u-recipient", status: "pending_payment",
           order_items: [{ id: "oi1", quantity: 2, voucher_products: makeVoucher() }],
         },
       } as any);
@@ -359,7 +359,7 @@ describe("Commerce Service", () => {
     it("rejects if already paid", async () => {
       vi.mocked(prisma.payment.findUnique).mockResolvedValue({
         id: "pay1", status: "success", orders: {
-          id: "o1", user_id: "u-buyer", payment_status: "paid", order_items: [],
+          id: "o1", user_id: "u-buyer", status: "confirmed", order_items: [],
         },
       } as any);
 
@@ -371,7 +371,7 @@ describe("Commerce Service", () => {
     it("simulates payment failure", async () => {
       vi.mocked(prisma.payment.findUnique).mockResolvedValue({
         id: "pay1", status: "pending", amount: 100000, orders: {
-          id: "o1", user_id: "u-buyer", payment_status: "pending", order_items: [],
+          id: "o1", user_id: "u-buyer", status: "pending_payment", order_items: [],
         },
       } as any);
       mockTx.payment.update.mockResolvedValue({ id: "pay1", status: "failed" });

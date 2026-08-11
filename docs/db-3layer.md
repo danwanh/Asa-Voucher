@@ -103,7 +103,6 @@ erDiagram
         uuid   recipient_id
         string order_code
         string payment_method
-        string payment_status
         string status
         text   note
         boolean is_gift
@@ -356,7 +355,6 @@ erDiagram
         uuid      user_id             FK
         uuid      recipient_id       FK
         string    payment_method
-        string    payment_status
         string    status
         text      note
         timestamp payment_expires_at
@@ -727,8 +725,7 @@ erDiagram
         decimal   discount_amount
         decimal   total_amount
         string    payment_method
-        string    payment_status
-        string    status
+         string    status
         string    note
         boolean   is_gift
         timestamp payment_expires_at
@@ -1122,8 +1119,7 @@ Gợi ý ràng buộc: UNIQUE (`cart_id`, `voucher_product_id`) để mỗi vouc
 | `discount_amount` | DECIMAL(15,0) | DEFAULT 0       | Số tiền được giảm                                        |
 | `total_amount`    | DECIMAL(15,0) | NOT NULL        | Tổng thanh toán _(suy diễn: subtotal − discount_amount)_ |
 | `payment_method`  | ENUM          | NOT NULL        | `vnpay` · `paypal`                                       |
-| `payment_status`  | ENUM          | NOT NULL        | `pending` · `paid` · `failed` · `refunded`               |
-| `status`          | ENUM          | NOT NULL        | `pending` · `confirmed` · `completed` · `cancelled`      |
+| `status`          | ENUM          | NOT NULL        | `pending_payment` · `payment_failed` · `confirmed` · `completed` · `cancelled` · `refunded` |
 | `note`            | TEXT          |                 | Ghi chú của người mua                                    |
 | `is_gift`         | BOOLEAN       | DEFAULT false   | Đơn tặng người dùng khác hay không                      |
 | `payment_expires_at` | TIMESTAMPTZ(6) |               | Thời hạn hoàn tất thanh toán                            |
@@ -1255,8 +1251,7 @@ Gợi ý ràng buộc: UNIQUE (`order_id`, `voucher_product_id`) để mỗi vou
 | `voucher_products`     | `status`          | `draft` · `active` · `paused` · `sold_out` · `expired`                                             |
 | `voucher_products`     | `approval_status` | `pending` · `approved` · `rejected`                                                                |
 | `orders`               | `payment_method`  | `vnpay` · `paypal`                                                                                  |
-| `orders`               | `payment_status`  | `pending` · `paid` · `failed` · `refunded`                                                         |
-| `orders`               | `status`          | `pending` · `confirmed` · `completed` · `cancelled`                                                |
+| `orders`               | `status`          | `pending_payment` · `payment_failed` · `confirmed` · `completed` · `cancelled` · `refunded`                                                               |
 | `order_logs`           | `action`          | `CREATE_ORDER` · `CANCEL_ORDER` · `UPDATE_STATUS` · `PAYMENT_SUCCESS` · `EXPIRE_ORDER`                |
 | `payments`             | `method`          | `vnpay` · `paypal`                                                                                  |
 | `payments`             | `status`          | `pending` · `processing` · `success` · `failed` · `refunded`                                         |

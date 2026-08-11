@@ -72,7 +72,7 @@ export async function createComplaint(user: AuthUser, input: CreateComplaintInpu
     }
 
     const order = voucher.order_items?.orders;
-    const isPaid = order?.payment_status === "paid" || order?.status === "confirmed" || order?.status === "completed";
+    const isPaid = order?.status === "confirmed" || order?.status === "completed";
     if (!isPaid && voucher.status !== "used") {
       throw new HttpError(422, "Chỉ được khiếu nại voucher đã thanh toán hoặc đã sử dụng");
     }

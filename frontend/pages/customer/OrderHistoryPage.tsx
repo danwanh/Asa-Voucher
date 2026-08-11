@@ -13,19 +13,23 @@ interface Props {
   onPayAgain?: (o: Order) => void
 }
 
-const PAYMENT_TABS: { label: string; value: NonNullable<Order["paymentStatus"]> | "all" }[] = [
+const ORDER_TABS: { label: string; value: Order["status"] | "all" }[] = [
   { label: "Tất cả", value: "all" },
-  { label: "Chờ thanh toán", value: "pending" },
-  { label: "Đã thanh toán", value: "paid" },
-  { label: "Thanh toán thất bại", value: "failed" },
+  { label: "Chờ thanh toán", value: "pending_payment" },
+  { label: "Thanh toán thất bại", value: "payment_failed" },
+  { label: "Đã xác nhận", value: "confirmed" },
+  { label: "Hoàn thành", value: "completed" },
+  { label: "Đã hủy", value: "cancelled" },
   { label: "Đã hoàn tiền", value: "refunded" },
 ]
 
-function paymentStatusLabel(status?: Order["paymentStatus"]) {
-  if (status === "paid") return "Đã thanh toán"
-  if (status === "failed") return "Thanh toán thất bại"
+function orderStatusLabel(status: Order["status"]) {
+  if (status === "pending_payment") return "Chờ thanh toán"
+  if (status === "payment_failed") return "Thanh toán thất bại"
+  if (status === "confirmed") return "Đã xác nhận"
+  if (status === "completed") return "Hoàn thành"
   if (status === "refunded") return "Đã hoàn tiền"
-  return "Chờ thanh toán"
+  return "Đã hủy"
 }
 
 function itemSummary(order: Order) {
@@ -35,11 +39,11 @@ function itemSummary(order: Order) {
 }
 
 export function OrderHistoryPage({ orders, onDetail, onReview, onComplaint, onPayAgain }: Props) {
-  const [tab, setTab] = useState("all")
+  const [tab, setTab] = useState<Order["status"] | "all">("all")
   const [search, setSearch] = useState("")
 
   const filtered = orders.filter((order) => {
-    const matchTab = tab === "all" || order.paymentStatus === tab
+    const matchTab = tab === "all" || order.status === tab
     const matchSearch =
       !search ||
       order.voucherTitle.toLowerCase().includes(search.toLowerCase()) ||
@@ -57,10 +61,10 @@ export function OrderHistoryPage({ orders, onDetail, onReview, onComplaint, onPa
       </div>
 
       <div className="flex gap-1 overflow-x-auto pb-2 mb-4 scrollbar-hide">
-        {PAYMENT_TABS.map((tabItem) => {
+        {ORDER_TABS.map((tabItem) => {
           const count = tabItem.value === "all"
             ? orders.length
-            : orders.filter((order) => order.paymentStatus === tabItem.value).length
+            : orders.filter((order) => order.status === tabItem.value).length
 
           return (
             <button
@@ -100,9 +104,9 @@ export function OrderHistoryPage({ orders, onDetail, onReview, onComplaint, onPa
           const totalQuantity = order.items?.reduce((sum, item) => sum + item.quantity, 0) ?? 1
           const issuedCount = order.items?.flatMap((item) => item.issuedVouchers ?? []).length ?? 0
           const hasIssuedCodes = issuedCount > 0
-          const isRefunded = order.paymentStatus === "refunded"
-          const canReview = order.paymentStatus === "paid"
-          const canPayAgain = (order.paymentStatus === "pending" || order.paymentStatus === "failed") && (!order.paymentExpiresAt || new Date(order.paymentExpiresAt).getTime() > Date.now())
+          const isRefunded = order.status === "refunded"
+          const canReview = order.status === "confirmed" || order.status === "completed"
+          const canPayAgain = (order.status === "pending_payment" || order.status === "payment_failed") && (!order.paymentExpiresAt || new Date(order.paymentExpiresAt).getTime() > Date.now())
           const voucherSummary = itemSummary(order)
 
           return (
@@ -117,9 +121,9 @@ export function OrderHistoryPage({ orders, onDetail, onReview, onComplaint, onPa
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs" style={{ color: "#8A8DA8" }}>{fmtDate(order.createdAt)}</span>
-                  <span className="text-xs" style={{ color: "#6B7280" }}>Thanh toán:</span>
-                  <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{ backgroundColor: order.paymentStatus === "paid" ? C.teal + "20" : order.paymentStatus === "failed" ? "#FEE2E2" : order.paymentStatus === "refunded" ? "#E0EEFF" : C.apricot + "25", color: order.paymentStatus === "paid" ? C.teal : order.paymentStatus === "failed" ? "#DC2626" : order.paymentStatus === "refunded" ? "#1A5FAD" : "#D97706" }}>
-                    {paymentStatusLabel(order.paymentStatus)}
+                  <span className="text-xs" style={{ color: "#6B7280" }}>Trạng thái:</span>
+                  <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{ backgroundColor: order.status === "confirmed" || order.status === "completed" ? C.teal + "20" : order.status === "payment_failed" || order.status === "cancelled" ? "#FEE2E2" : order.status === "refunded" ? "#E0EEFF" : C.apricot + "25", color: order.status === "confirmed" || order.status === "completed" ? C.teal : order.status === "payment_failed" || order.status === "cancelled" ? "#DC2626" : order.status === "refunded" ? "#1A5FAD" : "#D97706" }}>
+                     {orderStatusLabel(order.status)}
                   </span>
                 </div>
               </div>
@@ -163,7 +167,7 @@ export function OrderHistoryPage({ orders, onDetail, onReview, onComplaint, onPa
                     Đánh giá
                   </button>
                 )}
-                {onComplaint && (order.complaints?.[0] || order.paymentStatus === "paid") && (
+                {onComplaint && (order.complaints?.[0] || order.status === "confirmed" || order.status === "completed") && (
                   <button
                     onClick={() => onComplaint(order)}
                     className="text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors"

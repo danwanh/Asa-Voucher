@@ -33,7 +33,7 @@ describe("Report Service", () => {
       vi.mocked(reportRepo.listOrderItemsForPartner).mockResolvedValue([
         {
           order_id: "order-date-1", subtotal: 150000, created_at: new Date("2026-08-10T11:29:16.071Z"),
-          orders: { payment_status: "paid", status: "confirmed", created_at: new Date("2026-08-10T11:29:16.071Z") },
+          orders: { status: "confirmed", created_at: new Date("2026-08-10T11:29:16.071Z") },
           voucher_products: { partner_id: "partner-1" },
         },
       ] as unknown as PartnerItemsResult);
@@ -47,7 +47,7 @@ describe("Report Service", () => {
       vi.mocked(reportRepo.listOrderItemsForPartner).mockResolvedValue([
         {
           order_id: "order-1", subtotal: 100000, created_at: "2026-01-15T10:00:00Z",
-          orders: { payment_status: "paid", status: "confirmed", created_at: "2026-01-15T10:00:00Z" },
+          orders: { status: "confirmed", created_at: "2026-01-15T10:00:00Z" },
           voucher_products: { partner_id: "partner-1" },
         },
       ]);
@@ -60,7 +60,7 @@ describe("Report Service", () => {
 
     it("returns revenue for admin (system-wide)", async () => {
       vi.mocked(reportRepo.listPaidOrders).mockResolvedValue([
-        { id: "order-1", total_amount: 200000, status: "confirmed", payment_status: "paid", created_at: "2026-01-15T10:00:00Z" },
+        { id: "order-1", total_amount: 200000, status: "confirmed", created_at: "2026-01-15T10:00:00Z" },
       ]);
 
       const result = await reportService.getRevenueReport(ADMIN, {});
@@ -70,7 +70,7 @@ describe("Report Service", () => {
 
     it("preserves ISO string behavior for date key", async () => {
       vi.mocked(reportRepo.listPaidOrders).mockResolvedValue([
-        { id: "order-iso-1", total_amount: 120000, status: "confirmed", payment_status: "paid", created_at: "2026-08-10T11:29:16.071Z" },
+        { id: "order-iso-1", total_amount: 120000, status: "confirmed", created_at: "2026-08-10T11:29:16.071Z" },
       ]);
 
       const result = await reportService.getRevenueReport(ADMIN, {});
@@ -83,12 +83,12 @@ describe("Report Service", () => {
       vi.mocked(reportRepo.listOrderItemsForPartner).mockResolvedValue([
         {
           order_id: "order-a", subtotal: 100000, created_at: new Date("2026-08-10T11:29:16.071Z"),
-          orders: { payment_status: "paid", status: "completed", created_at: new Date("2026-08-10T11:29:16.071Z") },
+          orders: { status: "completed", created_at: new Date("2026-08-10T11:29:16.071Z") },
           voucher_products: { partner_id: "partner-1" },
         },
         {
           order_id: "order-b", subtotal: 25000, created_at: new Date("2026-08-10T12:29:16.071Z"),
-          orders: { payment_status: "paid", status: "completed", created_at: new Date("2026-08-10T12:29:16.071Z") },
+          orders: { status: "completed", created_at: new Date("2026-08-10T12:29:16.071Z") },
           voucher_products: { partner_id: "partner-1" },
         },
       ] as unknown as PartnerItemsResult);
@@ -105,7 +105,7 @@ describe("Report Service", () => {
       vi.mocked(reportRepo.listOrderItemsForPartner).mockResolvedValue([
         {
           order_id: "order-1", subtotal: 100000, created_at: "2026-01-15T10:00:00Z",
-          orders: { payment_status: "pending", status: "pending", created_at: "2026-01-15T10:00:00Z" },
+          orders: { status: "pending_payment", created_at: "2026-01-15T10:00:00Z" },
           voucher_products: { partner_id: "partner-1" },
         },
       ]);
@@ -124,12 +124,12 @@ describe("Report Service", () => {
       vi.mocked(reportRepo.listAllOrderItemsForPartner).mockResolvedValue([
         {
           order_id: "order-1", subtotal: 100000, created_at: "2026-01-15T10:00:00Z",
-          orders: { payment_status: "paid", status: "confirmed", created_at: "2026-01-15T10:00:00Z" },
+          orders: { status: "confirmed", created_at: "2026-01-15T10:00:00Z" },
           voucher_products: { partner_id: "partner-1" },
         },
         {
           order_id: "order-2", subtotal: 50000, created_at: "2026-01-16T10:00:00Z",
-          orders: { payment_status: "paid", status: "completed", created_at: "2026-01-16T10:00:00Z" },
+          orders: { status: "completed", created_at: "2026-01-16T10:00:00Z" },
           voucher_products: { partner_id: "partner-1" },
         },
       ]);
@@ -193,7 +193,7 @@ describe("Report Service", () => {
       vi.mocked(reportRepo.listOrderItemsForPartner).mockResolvedValue([
         {
           order_id: "order-1", subtotal: 100000, created_at: "2026-01-15T10:00:00Z",
-          orders: { payment_status: "paid", status: "confirmed", created_at: "2026-01-15T10:00:00Z" },
+          orders: { status: "confirmed", created_at: "2026-01-15T10:00:00Z" },
           voucher_products: { partner_id: "partner-1" },
         },
       ]);
