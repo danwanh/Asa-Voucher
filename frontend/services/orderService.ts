@@ -63,7 +63,7 @@ function mapOrderItem(value: BackendRecord): OrderItem {
     unitPrice: num(value.unit_price),
     subtotal: num(value.subtotal),
     voucherTitle: voucher.name,
-    partnerName: voucher.partners?.name,
+    partnerName: voucher.partners?.business_name,
     issuedVouchers: (value.issued_vouchers ?? []).map(mapIssuedVoucher),
   }
 }

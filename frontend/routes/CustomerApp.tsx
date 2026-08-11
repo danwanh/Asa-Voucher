@@ -280,7 +280,9 @@ export function CustomerApp({
     }
     if (page !== "orders") return
     setMyOrdersLoading(true)
-    void orderService.list().then(setMyOrders).catch(() => undefined).finally(() => setMyOrdersLoading(false))
+    void orderService.list().then(setMyOrders).catch(() => {
+      toast.error("Không thể tải đơn hàng. Vui lòng thử lại.")
+    }).finally(() => setMyOrdersLoading(false))
   }, [page])
 
   return (

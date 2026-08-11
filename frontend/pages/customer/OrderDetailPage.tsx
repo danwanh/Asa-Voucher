@@ -2,7 +2,7 @@ import { useState } from "react"
 import { ArrowLeft, Copy, CheckCircle2, Download, Star, MessageSquare, CreditCard } from "lucide-react"
 import { C, fmt, fmtDate } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
-import type { Order } from "@/types"
+import type { Order, OrderStatus } from "@/types"
 import { MockQR } from "@/components/MockQR"
 
 interface Props {
@@ -13,13 +13,13 @@ interface Props {
   onPayAgain?: (order: Order) => void
 }
 
-function orderStatusLabel(status: Order["status"]) {
-  if (status === "pending_payment") return "Chờ thanh toán"
-  if (status === "payment_failed") return "Thanh toán thất bại"
-  if (status === "confirmed") return "Đã xác nhận"
-  if (status === "completed") return "Hoàn thành"
-  if (status === "refunded") return "Đã hoàn tiền"
-  return "Đã hủy"
+function orderStatusLabel(status: OrderStatus) {
+  if (status === "pending_payment") return "Đã tạo đơn, đang chờ thanh toán"
+  if (status === "payment_failed") return "Thanh toán thất bại, có thể thử lại"
+  if (status === "confirmed") return "Thanh toán thành công, voucher đã phát hành"
+  if (status === "completed") return "Đơn đã hoàn tất sử dụng/xử lý"
+  if (status === "cancelled") return "Đơn bị hủy trước khi hoàn tất"
+  return "Đã hoàn tiền cho khách"
 }
 
 function issuedVoucherStatusLabel(status: string) {

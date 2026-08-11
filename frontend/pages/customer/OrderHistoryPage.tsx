@@ -2,7 +2,7 @@ import { useState } from "react"
 import { Search, Star, CreditCard, MessageSquare } from "lucide-react"
 import { C, fmt, fmtDate } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
-import type { Order } from "@/types"
+import type { Order, OrderStatus } from "@/types"
 
 interface Props {
   orders: Order[]
@@ -17,19 +17,19 @@ const ORDER_TABS: { label: string; value: Order["status"] | "all" }[] = [
   { label: "Tất cả", value: "all" },
   { label: "Chờ thanh toán", value: "pending_payment" },
   { label: "Thanh toán thất bại", value: "payment_failed" },
-  { label: "Đã xác nhận", value: "confirmed" },
-  { label: "Hoàn thành", value: "completed" },
+  { label: "Đã thanh toán", value: "confirmed" },
+  { label: "Hoàn tất", value: "completed" },
   { label: "Đã hủy", value: "cancelled" },
   { label: "Đã hoàn tiền", value: "refunded" },
 ]
 
-function orderStatusLabel(status: Order["status"]) {
-  if (status === "pending_payment") return "Chờ thanh toán"
-  if (status === "payment_failed") return "Thanh toán thất bại"
-  if (status === "confirmed") return "Đã xác nhận"
-  if (status === "completed") return "Hoàn thành"
-  if (status === "refunded") return "Đã hoàn tiền"
-  return "Đã hủy"
+function orderStatusLabel(status: OrderStatus) {
+  if (status === "pending_payment") return "Đã tạo đơn, đang chờ thanh toán"
+  if (status === "payment_failed") return "Thanh toán thất bại, có thể thử lại"
+  if (status === "confirmed") return "Thanh toán thành công, voucher đã phát hành"
+  if (status === "completed") return "Đơn đã hoàn tất sử dụng/xử lý"
+  if (status === "cancelled") return "Đơn bị hủy trước khi hoàn tất"
+  return "Đã hoàn tiền cho khách"
 }
 
 function itemSummary(order: Order) {
@@ -56,7 +56,7 @@ export function OrderHistoryPage({ orders, onDetail, onReview, onComplaint, onPa
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-black" style={{ color: C.indigo }}>Lịch sử đơn hàng</h1>
-          <p className="text-sm mt-1" style={{ color: "#8A8DA8" }}>Lịch sử đơn hàng theo trạng thái thanh toán</p>
+          <p className="text-sm mt-1" style={{ color: "#8A8DA8" }}>Lọc theo trạng thái đơn hàng</p>
         </div>
       </div>
 
