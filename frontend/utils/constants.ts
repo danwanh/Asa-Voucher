@@ -43,11 +43,12 @@ export const STATUS_LABEL: Record<string, string> = {
 
 export const STATUS_DESCRIPTION: Record<string, string> = {
   all: "Tất cả đơn hàng",
-  pending: "Đơn chờ xác nhận thanh toán",
-  confirmed: "Đơn đã xác nhận thanh toán, voucher đã phát hành",
-  completed: "Đơn đã hoàn thành, voucher đã sử dụng",
-  cancelled: "Đơn đã hủy",
-  pending_manual: "Đơn hủy nhưng voucher đã dùng, cần xử lý tay",
+  pending: "Chờ xác nhận thanh toán",
+  confirmed: "Đã xác nhận, voucher đã phát hành",
+  completed: "Hoàn thành, voucher đã sử dụng",
+  cancelled: "Đã hủy",
+  refunded: "Đã hoàn tiền (tự động hoặc từ khiếu nại)",
+  pending_manual: "Hủy nhưng voucher đã dùng, cần xử lý tay",
 }
 
 const CATEGORY_LABELS: Record<string, string> = {

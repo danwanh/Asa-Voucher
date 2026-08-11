@@ -3,22 +3,30 @@ import type { ComplaintListFilter, ComplaintRow } from "../types/complaint.types
 import type { CreateComplaintInput } from "../validations/complaint.validation.js";
 
 const INCLUDE = {
+  users: { select: { id: true, full_name: true, email: true } },
   issued_vouchers: {
     select: {
       id: true,
       voucher_product_id: true,
-      voucher_products: { select: { partner_id: true } },
+      voucher_products: { select: { id: true, name: true, partner_id: true } },
     },
   },
-  orders: { select: { id: true, user_id: true } },
+  orders: { select: { id: true, user_id: true, order_code: true, total_amount: true, status: true } },
 } as const;
 
 export async function listComplaints(
   filter: ComplaintListFilter,
 ): Promise<{ rows: ComplaintRow[]; total: number }> {
   const where: Record<string, unknown> = {};
-  if (filter.userId) where.user_id = filter.userId;
-  if (filter.status) where.status = filter.status;
+
+  if (filter.userId) {
+    where.user_id = filter.userId;
+  }
+
+  if (filter.status) {
+    where.status = filter.status;
+  }
+
   if (filter.partnerId) {
     where.issued_vouchers = { voucher_products: { partner_id: filter.partnerId } };
   }

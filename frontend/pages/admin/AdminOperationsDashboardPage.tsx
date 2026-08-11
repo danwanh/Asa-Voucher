@@ -19,7 +19,7 @@ import {
   type DashboardRecentOrder,
 } from "@/services/dashboardService"
 import { orderService } from "@/services/orderService"
-import type { OrderDetail } from "@/services/orderService"
+import type { Order } from "@/types"
 
 export function AdminOperationsDashboardPage() {
   const uid = useId().replace(/:/g, "")
@@ -39,7 +39,7 @@ export function AdminOperationsDashboardPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
 
-  const [detailOrder, setDetailOrder] = useState<OrderDetail | null>(null)
+  const [detailOrder, setDetailOrder] = useState<Order | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
 
   const loadDashboard = async () => {
@@ -73,7 +73,7 @@ export function AdminOperationsDashboardPage() {
     setDetailLoading(true)
     setDetailOrder(null)
     try {
-      const detail = await orderService.getOrder(order.id)
+      const detail = await orderService.get(order.id)
       setDetailOrder(detail)
     } catch {
       setDetailOrder(null)
@@ -388,15 +388,15 @@ export function AdminOperationsDashboardPage() {
                     Voucher trong đơn
                   </h4>
                   <div className="space-y-2">
-                    {detailOrder.items.map((item) => (
+                    {detailOrder.items?.map((item: any) => (
                       <div key={item.id} className="bg-gray-50 rounded-xl p-3.5 flex items-center justify-between">
                         <div className="min-w-0 flex-1 mr-3">
                           <p className="text-sm font-semibold truncate" style={{ color: C.indigo }}>
-                            {item.voucherProduct?.name ?? item.voucherProductId}
+                            {item.voucherTitle ?? item.voucherId}
                           </p>
                           <p className="text-xs mt-0.5" style={{ color: "#8A8DA8" }}>
-                            {item.voucherProduct?.partnerName && (
-                              <span>Đối tác: {item.voucherProduct.partnerName} &middot; </span>
+                            {item.partnerName && (
+                              <span>Đối tác: {item.partnerName} &middot; </span>
                             )}
                             x{item.quantity} &times; {fmt(item.unitPrice)}
                           </p>

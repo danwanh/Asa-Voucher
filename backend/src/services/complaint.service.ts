@@ -3,7 +3,7 @@ import { buildPaginatedResult } from "../utils/pagination.js";
 import * as complaintRepo from "../repositories/complaint.repository.js";
 import * as complaintResponseRepo from "../repositories/complaint-response.repository.js";
 import * as issuedVoucherRepo from "../repositories/issued-voucher.repository.js";
-import { isAdminRole, type AuthUser, type AppRole } from "../types/auth.types.js";
+import { isAdminRole, isPartnerStaff, type AuthUser, type AppRole } from "../types/auth.types.js";
 import type {
   AssignComplaintInput,
   CreateComplaintInput,
@@ -11,12 +11,9 @@ import type {
   ResolveComplaintInput,
   UpdateComplaintInput,
 } from "../validations/complaint.validation.js";
+import { prisma } from "../config/prisma.js";
 
 type ComplaintWithRelations = NonNullable<Awaited<ReturnType<typeof complaintRepo.findComplaintById>>>;
-
-function isPartnerStaff(role: AppRole) {
-  return role === "partner_owner" || role === "partner_voucher_staff" || role === "partner_store_staff";
-}
 
 function relatedPartnerId(complaint: ComplaintWithRelations): string | undefined {
   return complaint.issued_vouchers?.voucher_products.partner_id;
@@ -29,17 +26,16 @@ function assertCanView(user: AuthUser, complaint: ComplaintWithRelations) {
   throw new HttpError(403, "Bạn không có quyền xem khiếu nại này");
 }
 
-export async function listComplaints(user: AuthUser, query: { status?: string; page: number; limit: number }) {
-  const filter = {
-    status: query.status as ComplaintWithRelations["status"] | undefined,
-    page: query.page,
-    limit: query.limit,
-    userId: user.role === "buyer" ? user.id : undefined,
-    partnerId: isPartnerStaff(user.role) ? (user.partnerId ?? undefined) : undefined,
-  };
-
-  const { rows, total } = await complaintRepo.listComplaints(filter);
-  return buildPaginatedResult(rows, total, query);
+export async function listComplaints(user: AuthUser, query: { status?: string; page?: number; limit?: number }) {
+  const { status, page = 1, limit = 20 } = query;
+  const partnerId = isPartnerStaff(user.role) ? (user.partnerId ?? undefined) : undefined;
+  const result = await complaintRepo.listComplaints({
+    status: status as any,
+    partnerId,
+    page,
+    limit,
+  });
+  return { items: result.rows, total: result.total, page, limit };
 }
 
 export async function getComplaintById(user: AuthUser, id: string) {
@@ -113,7 +109,9 @@ export async function closeComplaint(user: AuthUser, id: string) {
 }
 
 export async function assignComplaint(user: AuthUser, id: string, input: AssignComplaintInput) {
-  if (!isAdminRole(user.role)) throw new HttpError(403, "Chỉ quản trị viên được gán xử lý");
+  if (!isAdminRole(user.role) && !isPartnerStaff(user.role)) {
+    throw new HttpError(403, "Không có quyền gán xử lý");
+  }
 
   const complaint = await complaintRepo.findComplaintById(id);
   if (!complaint) throw new HttpError(404, "Không tìm thấy khiếu nại");
@@ -125,7 +123,9 @@ export async function assignComplaint(user: AuthUser, id: string, input: AssignC
 }
 
 export async function resolveComplaint(user: AuthUser, id: string, input: ResolveComplaintInput) {
-  if (!isAdminRole(user.role)) throw new HttpError(403, "Chỉ quản trị viên được xử lý khiếu nại");
+  if (!isAdminRole(user.role) && !isPartnerStaff(user.role)) {
+    throw new HttpError(403, "Không có quyền xử lý khiếu nại");
+  }
 
   const complaint = await complaintRepo.findComplaintById(id);
   if (!complaint) throw new HttpError(404, "Không tìm thấy khiếu nại");
@@ -133,12 +133,81 @@ export async function resolveComplaint(user: AuthUser, id: string, input: Resolv
     throw new HttpError(409, "Khiếu nại đã được xử lý hoặc đóng trước đó");
   }
 
-  return complaintRepo.updateComplaint(id, {
+  const updated = await complaintRepo.updateComplaint(id, {
     status: "resolved",
     resolution_note: input.resolution_note,
     resolution_type: input.resolution_type,
     resolved_at: new Date().toISOString(),
   });
+
+  if (input.resolution_type === "refund" && complaint.order_id) {
+    await processRefundForComplaint(complaint.order_id, user.id, complaint.id, input.resolution_note);
+  }
+
+  return updated;
+}
+
+async function processRefundForComplaint(
+  orderId: string,
+  adminId: string,
+  complaintId: string,
+  note?: string
+) {
+  try {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: { payments: true },
+    });
+    if (!order) return;
+
+    const successPayment = (order.payments as Array<Record<string, unknown>> ?? []).find(
+      (p) => p.status === "success"
+    );
+    if (!successPayment) return;
+
+    await prisma.$transaction(async (tx) => {
+      await tx.payment.update({
+        where: { id: successPayment.id as string },
+        data: { status: "refunded" },
+      });
+
+      await tx.paymentLog.create({
+        data: {
+          payment_id: successPayment.id as string,
+          order_id: orderId,
+          user_id: adminId,
+          action: "REFUND",
+          status: "refunded",
+          amount: order.total_amount as never,
+        },
+      });
+
+      await tx.order.update({
+        where: { id: orderId },
+        data: { status: "refunded" },
+      });
+
+      await tx.orderLog.create({
+        data: {
+          order_id: orderId,
+          user_id: adminId,
+          action: "REFUND_ORDER",
+          description: `Hoàn tiền tự động từ khiếu nại ${complaintId}: ${note || "Không có ghi chú"}`,
+        },
+      });
+
+      await tx.adminLog.create({
+        data: {
+          admin_id: adminId,
+          target_order_id: orderId,
+          action: "complaint.refund",
+          description: `Hoàn tiền từ khiếu nại ${complaintId}`,
+        },
+      });
+    });
+  } catch (err) {
+    console.error("[ComplaintService] processRefundForComplaint error:", err);
+  }
 }
 
 export async function listComplaintResponses(user: AuthUser, id: string) {
