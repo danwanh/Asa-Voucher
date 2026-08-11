@@ -370,7 +370,6 @@ export async function updateVoucherProduct(user: CurrentUser, id: string, input:
       ? undefined
       : serializeApplicableAreas(String(input.applicable_area).split(",")),
     discount_rate: calcDiscount(originalPrice, sellingPrice),
-    updated_by: user.id,
     updated_at: new Date()
   };
   try {
