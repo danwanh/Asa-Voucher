@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { addCartItem, cancelOrder, checkout, clearCart, createOrder, createPayment, deleteCartItem, deleteOrder, getCart, getOrderController, getOrderItem, getPaymentController, listOrderItems, listOrders, listPayments, paypalCancel, paypalReturn, refundOrder, simulatePaymentFailed, simulatePaymentSuccess, updateCartItem, updateOrder, vnpayReturn } from "../controllers/commerce.controller.js";
+import { addCartItem, cancelOrder, checkout, clearCart, createOrder, createPayment, deleteCartItem, deleteOrder, getCart, getCartCount, getOrderController, getOrderItem, getPaymentController, listOrderItems, listOrders, listPayments, paypalCancel, paypalReturn, refundOrder, simulatePaymentFailed, simulatePaymentSuccess, updateCartItem, updateOrder, vnpayReturn } from "../controllers/commerce.controller.js";
 import { requireAuth } from "../middlewares/auth.js";
 import { requireRole } from "../middlewares/require-role.js";
 import { validateBody, validateParams, validateQuery } from "../middlewares/validate.js";
