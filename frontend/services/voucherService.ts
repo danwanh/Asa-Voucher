@@ -374,5 +374,27 @@ export const voucherService = {
         const itemCategory = categoryFromMap(categoryMap, item.category_id)
         return mapVoucherProduct(item, itemCategory.slug)
       })
-  }
+  },
+
+  async listPendingVouchers(): Promise<BackendVoucherProduct[]> {
+    const res = await api.get<ApiEnvelope<BackendVoucherList>>("/voucher-products", {
+      params: { page: 1, limit: 100 }
+    })
+    return extractData(res).items.filter((item) => item.workflow_status === "pending_approval")
+  },
+
+  async approveVoucher(voucherId: string) {
+    const res = await api.patch<ApiEnvelope<BackendVoucherProduct>>(`/voucher-products/${voucherId}/approval`, {
+      approval_status: "approved"
+    })
+    return extractData(res)
+  },
+
+  async rejectVoucher(voucherId: string, rejectReason: string) {
+    const res = await api.patch<ApiEnvelope<BackendVoucherProduct>>(`/voucher-products/${voucherId}/approval`, {
+      approval_status: "rejected",
+      reject_reason: rejectReason
+    })
+    return extractData(res)
+  },
 }
