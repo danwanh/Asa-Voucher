@@ -42,3 +42,8 @@ issuedVoucherRoutes.post(
   "/issued-vouchers/check", requireRole("partner_store_staff"),
   asyncHandler(issuedVoucherController.checkVoucher),
 );
+
+// Cho phần nhân viên cửa hàng xác nhận sử dụng
+issuedVoucherRoutes.post(
+  "/issued-vouchers/confirm", requireRole("partner_store_staff"),asyncHandler(issuedVoucherController.confirmVoucher),
+);
