@@ -1,5 +1,5 @@
 import { api } from "./api"
-import type { Complaint, IssuedVoucher, Order, Review } from "@/types"
+import type { CheckVoucherResult, Complaint, IssuedVoucher, Order, Review } from "@/types"
 
 type ApiData<T> = { data: T }
 
@@ -118,5 +118,18 @@ export const issuedVoucherService = {
   async redeem(id: string, branchId: string) {
     const response = await api.post(`/issued-vouchers/${id}/redeem`, { branch_id: branchId })
     return data(response)
+  },
+
+  async check(codeOrPayload: string) {
+    let payload: { voucher_code?: string; qr_code_payload?: string } = { voucher_code: codeOrPayload }
+    try {
+      const url = new URL(codeOrPayload)
+      const voucherCode = url.searchParams.get("code")
+      payload = voucherCode ? { voucher_code: voucherCode } : { qr_code_payload: codeOrPayload }
+    } catch {
+      // Manual input is a voucher code
+    }
+    const response = await api.post<ApiData<CheckVoucherResult>>("/issued-vouchers/check", payload)
+    return data<CheckVoucherResult>(response)
   },
 }
