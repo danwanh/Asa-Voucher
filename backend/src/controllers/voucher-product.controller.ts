@@ -28,15 +28,14 @@ export async function submitVoucherProduct(req: Request, res: Response) {
   ok(res, await voucherProductService.submitVoucherProduct(req.user!, req.params.id), "Voucher submitted");
 }
 
+// Sửa hàm approveVoucherProduct phù hợp với admin
 export async function approveVoucherProduct(req: Request, res: Response) {
-  const result = await voucherProductService.approveVoucherProduct(req.user!.id, req.params.id, req.body.approval_status);
-  await writeAuditLog({
-    adminId: req.user!.id,
-    action: req.body.approval_status === "approved" ? "voucher_approved" : "voucher_rejected",
-    description: `${req.body.approval_status === "approved" ? "Duyệt" : "Từ chối"} voucher`,
-    targetVoucherId: req.params.id,
-  });
-  ok(res, result, "Voucher approval updated");
+  const result = await voucherProductService.approveVoucherProduct(
+    req.user!.id,
+    req.params.id,
+    { approval_status: req.body.approval_status, reject_reason: req.body.reject_reason }
+  );
+  ok(res, result, req.body.approval_status === "approved" ? "Duyệt voucher thành công" : "Từ chối voucher thành công");
 }
 
 export async function updateVoucherStatus(req: Request, res: Response) {
