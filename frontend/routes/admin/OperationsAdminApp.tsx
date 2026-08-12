@@ -38,12 +38,21 @@ export function OperationsAdminApp({ user, onLogout, onSwitchRole, initialPage }
   const [page, setPage] = useState<Page>(() => getInitialPage(initialPage))
   const [complaintBadge, setComplaintBadge] = useState(0)
 
-  const handleNavigate = (pg: string) => {
+  const handleNavigate = useCallback((pg: string) => {
     setPage(pg as Page)
     const url = new URL(window.location.href)
     url.searchParams.set("tab", pg)
     window.history.replaceState({}, "", url.toString())
-  }
+  }, [])
+
+  useEffect(() => {
+    function onPopState() {
+      const tab = new URLSearchParams(window.location.search).get("tab") as Page | null
+      if (tab && VALID_PAGES.includes(tab)) setPage(tab)
+    }
+    window.addEventListener("popstate", onPopState)
+    return () => window.removeEventListener("popstate", onPopState)
+  }, [])
 
   const fetchComplaintBadge = useCallback(async () => {
     try {

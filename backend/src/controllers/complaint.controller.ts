@@ -3,6 +3,7 @@ import { sendCreated, sendSuccess } from "../utils/response.js";
 import { HttpError } from "../utils/http-error.js";
 import { prisma } from "../config/prisma.js";
 import * as complaintService from "../services/complaint.service.js";
+import { writeAuditLog } from "../services/audit-log.service.js";
 import {
   assignComplaintSchema,
   createComplaintResponseSchema,
@@ -48,12 +49,23 @@ export async function closeComplaint(req: Request, res: Response) {
 export async function assignComplaint(req: Request, res: Response) {
   const input = assignComplaintSchema.parse(req.body);
   const complaint = await complaintService.assignComplaint(requireUser(req), req.params.id, input);
+  await writeAuditLog({
+    adminId: req.user!.id,
+    action: "complaint_assigned",
+    description: `Gán khiếu nại cho người xử lý`,
+    targetUserId: input.assigned_to,
+  });
   sendSuccess(res, complaint, "Đã gán người xử lý");
 }
 
 export async function resolveComplaint(req: Request, res: Response) {
   const input = resolveComplaintSchema.parse(req.body);
   const complaint = await complaintService.resolveComplaint(requireUser(req), req.params.id, input);
+  await writeAuditLog({
+    adminId: req.user!.id,
+    action: "complaint_resolved",
+    description: `Giải quyết khiếu nại: ${input.resolution_type ?? ""}`,
+  });
   sendSuccess(res, complaint, "Đã hoàn tất xử lý khiếu nại");
 }
 

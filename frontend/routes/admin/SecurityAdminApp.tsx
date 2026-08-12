@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { ScrollText, Shield, ShieldCheck, User } from "lucide-react"
 import { SubAdminLayout, type SubAdminRole, type SubAdminNavItem } from "@/layouts/admin/SubAdminLayout"
 import { SystemLogsPage } from "@/pages/admin/SystemLogsPage"
@@ -8,6 +8,16 @@ import { AdminProfilePage } from "@/pages/admin/AdminProfilePage"
 import type { AppUser } from "@/types"
 
 type Page = "logs" | "security" | "rbac" | "profile"
+
+const VALID_PAGES: Page[] = ["logs", "security", "rbac", "profile"]
+
+function getInitialPage(initialPage?: "profile"): Page {
+  if (typeof window !== "undefined") {
+    const tab = new URLSearchParams(window.location.search).get("tab") as Page | null
+    if (tab && VALID_PAGES.includes(tab)) return tab
+  }
+  return initialPage ?? "logs"
+}
 
 const ROLE: SubAdminRole = {
   id: "security",
@@ -29,11 +39,27 @@ const NAV: SubAdminNavItem[] = [
 interface Props { user: AppUser; onLogout: () => void; onSwitchRole: () => void; initialPage?: "profile" }
 
 export function SecurityAdminApp({ user, onLogout, onSwitchRole, initialPage }: Props) {
-  const [page, setPage] = useState<Page>(initialPage ?? "logs")
+  const [page, setPage] = useState<Page>(() => getInitialPage(initialPage))
+
+  const handleNavigate = useCallback((pg: string) => {
+    setPage(pg as Page)
+    const url = new URL(window.location.href)
+    url.searchParams.set("tab", pg)
+    window.history.replaceState({}, "", url.toString())
+  }, [])
+
+  useEffect(() => {
+    function onPopState() {
+      const tab = new URLSearchParams(window.location.search).get("tab") as Page | null
+      if (tab && VALID_PAGES.includes(tab)) setPage(tab)
+    }
+    window.addEventListener("popstate", onPopState)
+    return () => window.removeEventListener("popstate", onPopState)
+  }, [])
 
   return (
     <SubAdminLayout user={user} role={ROLE} page={page} navItems={NAV}
-      onNavigate={(pg) => setPage(pg as Page)} onLogout={onLogout} onSwitchRole={onSwitchRole}>
+      onNavigate={handleNavigate} onLogout={onLogout} onSwitchRole={onSwitchRole}>
       {page === "logs"     && <SystemLogsPage />}
       {page === "security" && <SecurityMonitorPage />}
       {page === "rbac"     && <RBACManagementPage />}

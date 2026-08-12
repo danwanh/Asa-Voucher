@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import * as partnerService from "../services/partner.service.js";
 import { created, noContent, ok } from "../utils/response.js";
+import { writeAuditLog } from "../services/audit-log.service.js";
 
 export async function listPartners(req: Request, res: Response) {
   ok(res, await partnerService.listPartners(req.query as Record<string, string | number>));
@@ -24,11 +25,25 @@ export async function deletePartner(req: Request, res: Response) {
 }
 
 export async function updatePartnerApproval(req: Request, res: Response) {
-  ok(res, await partnerService.updatePartnerApproval(req.user!.id, req.params.id, req.body.approval_status), "Partner approval updated");
+  const result = await partnerService.updatePartnerApproval(req.user!.id, req.params.id, req.body.approval_status);
+  await writeAuditLog({
+    adminId: req.user!.id,
+    action: req.body.approval_status === "approved" ? "partner_approved" : "partner_rejected",
+    description: `${req.body.approval_status === "approved" ? "Duyệt" : "Từ chối"} đối tác`,
+    targetPartnerId: req.params.id,
+  });
+  ok(res, result, "Partner approval updated");
 }
 
 export async function updatePartnerStatus(req: Request, res: Response) {
-  ok(res, await partnerService.updatePartnerStatus(req.params.id, req.body.status), "Partner status updated");
+  const result = await partnerService.updatePartnerStatus(req.params.id, req.body.status);
+  await writeAuditLog({
+    adminId: req.user!.id,
+    action: "partner_status_changed",
+    description: `Thay đổi trạng thái đối tác thành "${req.body.status}"`,
+    targetPartnerId: req.params.id,
+  });
+  ok(res, result, "Partner status updated");
 }
 
 export async function listBranches(req: Request, res: Response) {

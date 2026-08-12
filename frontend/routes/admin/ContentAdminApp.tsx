@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { LayoutDashboard, FileText, Tag, User } from "lucide-react"
 import { SubAdminLayout, type SubAdminRole, type SubAdminNavItem } from "@/layouts/admin/SubAdminLayout"
 import { AdminContentDashboardPage } from "@/pages/admin/AdminContentDashboardPage"
@@ -9,6 +9,16 @@ import type { AppUser } from "@/types"
 import { voucherService } from "@/services/voucherService"
 
 type Page = "dashboard" | "content" | "approval" | "profile"
+
+const VALID_PAGES: Page[] = ["dashboard", "content", "approval", "profile"]
+
+function getInitialPage(initialPage?: "profile"): Page {
+  if (typeof window !== "undefined") {
+    const tab = new URLSearchParams(window.location.search).get("tab") as Page | null
+    if (tab && VALID_PAGES.includes(tab)) return tab
+  }
+  return initialPage ?? "dashboard"
+}
 
 const ROLE: SubAdminRole = {
   id: "content",
@@ -23,8 +33,24 @@ const ROLE: SubAdminRole = {
 interface Props { user: AppUser; onLogout: () => void; onSwitchRole: () => void; initialPage?: "profile" }
 
 export function ContentAdminApp({ user, onLogout, onSwitchRole, initialPage }: Props) {
-  const [page, setPage] = useState<Page>(initialPage ?? "dashboard")
+  const [page, setPage] = useState<Page>(() => getInitialPage(initialPage))
   const [pendingCount, setPendingCount] = useState(0)
+
+  const handleNavigate = useCallback((pg: string) => {
+    setPage(pg as Page)
+    const url = new URL(window.location.href)
+    url.searchParams.set("tab", pg)
+    window.history.replaceState({}, "", url.toString())
+  }, [])
+
+  useEffect(() => {
+    function onPopState() {
+      const tab = new URLSearchParams(window.location.search).get("tab") as Page | null
+      if (tab && VALID_PAGES.includes(tab)) setPage(tab)
+    }
+    window.addEventListener("popstate", onPopState)
+    return () => window.removeEventListener("popstate", onPopState)
+  }, [])
 
   useEffect(() => {
     let isMounted = true
@@ -55,7 +81,7 @@ export function ContentAdminApp({ user, onLogout, onSwitchRole, initialPage }: P
 
   return (
     <SubAdminLayout user={user} role={ROLE} page={page} navItems={NAV}
-      onNavigate={(pg) => setPage(pg as Page)} onLogout={onLogout} onSwitchRole={onSwitchRole}>
+      onNavigate={handleNavigate} onLogout={onLogout} onSwitchRole={onSwitchRole}>
       {page === "dashboard" && <AdminContentDashboardPage />}
       {page === "content"   && <ContentManagementPage />}
       {page === "approval"  && <VoucherApprovalPage />}
