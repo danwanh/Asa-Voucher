@@ -1,3 +1,4 @@
+import { date } from "zod/v4"
 import { prisma } from "../config/prisma.js"
 
 interface DashboardFilter {
@@ -136,4 +137,88 @@ export const getDashboardStats = async ({
     partnersByMonth,
     recentOrders,
   }
+}
+
+// Hàm query voucher theo stats
+export async function getContentDashboardStats(filter: {from?: Date, to?: Date} = {}) {
+  // Nếu không chọn filter thì lấy 30 ngày gần nhất
+  const now = new Date();
+  const defaultFrom = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const from = filter.from ?? defaultFrom;
+  const to = filter.to ?? now;
+
+  // Date filter chung dùng cho kết quả trả về
+  const dateFilter = {
+    created_at: {
+      gte: from,
+      lte: to,
+    },
+  };
+
+  // Query voucher stats (theo approval_status)
+  const [pending, approved, rejected] = await Promise.all([
+    prisma.voucherProduct.count({
+      where: {
+        approval_status: "pending",
+        ...dateFilter,
+      }
+    }),
+    prisma.voucherProduct.count({
+      where: {
+        approval_status: "approved",
+        ...dateFilter,
+      }
+    }),
+    prisma.voucherProduct.count ({
+      where: {
+        approval_status: "rejected",
+        ...dateFilter,
+      }
+    }),
+  ]);
+
+  // Query CMS content stats (theo content_type)
+  const [banners, articles, popups, policies, categories] = await Promise.all([
+    prisma.cmsContent.count({
+      where: {
+        content_type: "banner",
+        status: "active",
+        ...dateFilter,
+      }
+    }),
+    prisma.cmsContent.count({
+      where: {
+        content_type: "article",
+        status: "active",
+        ...dateFilter,
+      }
+    }),
+    prisma.cmsContent.count({
+      where: {
+        content_type: "popup",
+        status: "active",
+        ...dateFilter,
+      }
+    }),
+    prisma.cmsContent.count({
+      where: {
+        content_type: "policy",
+        status: "active",
+        ...dateFilter,
+      }
+    }),
+    prisma.cmsContent.count({
+      where: {
+        content_type: "category",
+        status: "active",
+        ...dateFilter,
+      }
+    }),
+  ]);
+
+  // Trả về các giá trị đã query
+  return {
+    vouchers: { pending, approved, rejected},
+    contents: {banners, articles, popups, policies, categories},
+  };
 }
