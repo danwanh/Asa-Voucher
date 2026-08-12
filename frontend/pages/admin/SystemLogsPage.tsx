@@ -36,6 +36,13 @@ const LEVEL_BG: Record<string, string> = {
 
 const ACTION_OPTIONS = [
   { value: "", label: "Tất cả hành động" },
+  { value: "LOGIN", label: "Đăng nhập" },
+  { value: "LOGOUT", label: "Đăng xuất" },
+  { value: "VERIFY_EMAIL", label: "Xác thực email" },
+  { value: "REGISTER", label: "Đăng ký" },
+  { value: "PAYMENT_CREATED", label: "Tạo thanh toán" },
+  { value: "PAYMENT_SUCCESS", label: "Thanh toán thành công" },
+  { value: "PAYMENT_FAILED", label: "Thanh toán thất bại" },
   { value: "user_created", label: "Tạo người dùng" },
   { value: "user_updated", label: "Cập nhật người dùng" },
   { value: "user_deactivated", label: "Vô hiệu hóa người dùng" },
@@ -97,7 +104,7 @@ function mapAuthLogs(raw: any[], userMap: Map<string, string>): UnifiedLog[] {
     const level: UnifiedLog["level"] =
       status === "failed" || status === "error" ? "error" :
       status === "success" || status === "authenticated" ? "success" : "info"
-    const uid = l.user_id ?? ""
+    const userName = l.users?.full_name || l.users?.email || userMap.get(l.user_id) || l.user_id || ""
     return {
       id: `auth-${l.id}`,
       rawId: l.id,
@@ -105,7 +112,7 @@ function mapAuthLogs(raw: any[], userMap: Map<string, string>): UnifiedLog[] {
       level,
       type: "Xác thực",
       message: `${l.action ?? "Đăng nhập"} — ${l.detail ?? l.status ?? ""}`,
-      actor: userMap.get(uid) || l.email || uid,
+      actor: userName,
       action: l.action,
       detail: l,
     }
@@ -132,7 +139,7 @@ function mapAdminLogs(raw: any[]): UnifiedLog[] {
 
 function mapOrderLogs(raw: any[], userMap: Map<string, string>): UnifiedLog[] {
   return (raw ?? []).map((l) => {
-    const uid = l.user_id ?? ""
+    const userName = l.users?.full_name || l.users?.email || userMap.get(l.user_id) || l.user_email || l.user_id || ""
     return {
       id: `order-${l.id}`,
       rawId: l.id,
@@ -140,7 +147,7 @@ function mapOrderLogs(raw: any[], userMap: Map<string, string>): UnifiedLog[] {
       level: "info" as const,
       type: "Đơn hàng",
       message: `${l.action ?? ""} ${l.description ?? ""}`.trim(),
-      actor: userMap.get(uid) || l.user_email || uid,
+      actor: userName,
       action: l.action,
       detail: l,
     }
@@ -153,7 +160,7 @@ function mapPaymentLogs(raw: any[], userMap: Map<string, string>): UnifiedLog[] 
     const level: UnifiedLog["level"] =
       status === "failed" ? "error" :
       status === "success" || status === "completed" ? "success" : "info"
-    const uid = l.user_id ?? ""
+    const userName = l.users?.full_name || l.users?.email || userMap.get(l.user_id) || l.user_email || l.user_id || ""
     return {
       id: `pay-${l.id}`,
       rawId: l.id,
@@ -161,7 +168,7 @@ function mapPaymentLogs(raw: any[], userMap: Map<string, string>): UnifiedLog[] 
       level,
       type: "Thanh toán",
       message: `${l.action ?? ""} ${l.status ?? ""} ${l.description ?? ""}`.trim(),
-      actor: userMap.get(uid) || l.user_email || uid,
+      actor: userName,
       action: l.action,
       detail: l,
     }
@@ -181,8 +188,15 @@ export function SystemLogsPage() {
   const [adminList, setAdminList] = useState<AdminOption[]>([])
   const [detailLog, setDetailLog] = useState<UnifiedLog | null>(null)
 
+  const dateError = dateFrom && dateTo && dateTo < dateFrom
+    ? "Khoảng thời gian không hợp lệ"
+    : ""
+
+  const hasDateFilter = dateFrom || dateTo
+  const clearDateFilter = () => { setDateFrom(""); setDateTo("") }
+
   useEffect(() => {
-    api.get("/users", { params: { limit: 100 } })
+    api.get("/users", { params: { limit: 1000 } })
       .then((r) => {
         const data = unwrap<any>(r)
         setAdminList(data.items ?? data ?? [])
@@ -191,6 +205,7 @@ export function SystemLogsPage() {
   }, [])
 
   const fetchLogs = useCallback(async () => {
+    if (dateError) { setLoading(false); return }
     setLoading(true)
     try {
       const baseParams: Record<string, any> = { limit: 100 }
@@ -202,12 +217,15 @@ export function SystemLogsPage() {
       if (actorFilter) adminParams.admin_id = actorFilter
 
       const authParams = { ...baseParams }
+      if (actionFilter) authParams.action = actionFilter
       if (actorFilter) authParams.user_id = actorFilter
 
       const orderParams = { ...baseParams }
+      if (actionFilter) orderParams.action = actionFilter
       if (actorFilter) orderParams.user_id = actorFilter
 
       const paymentParams = { ...baseParams }
+      if (actionFilter) paymentParams.action = actionFilter
       if (actorFilter) paymentParams.user_id = actorFilter
 
       const [adminResult, authResult, orderResult, paymentResult] = await Promise.allSettled([
@@ -315,7 +333,7 @@ export function SystemLogsPage() {
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
             className="px-3 py-2 rounded-xl text-xs border"
-            style={{ borderColor: "#E5E7EB", color: C.indigo }}
+            style={{ borderColor: dateError ? "#DC2626" : "#E5E7EB", color: C.indigo }}
           />
           <span className="text-xs" style={{ color: "#8A8DA8" }}>đến</span>
           <input
@@ -323,14 +341,30 @@ export function SystemLogsPage() {
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
             className="px-3 py-2 rounded-xl text-xs border"
-            style={{ borderColor: "#E5E7EB", color: C.indigo }}
+            style={{ borderColor: dateError ? "#DC2626" : "#E5E7EB", color: C.indigo }}
           />
+          {hasDateFilter && (
+            <button
+              onClick={clearDateFilter}
+              className="px-2 py-2 rounded-xl text-xs font-bold transition-all"
+              style={{ color: "#DC2626", backgroundColor: "#FEF2F2" }}
+              title="Xóa bộ lọc ngày"
+            >
+              ✕
+            </button>
+          )}
         </div>
       </div>
 
       {/* Log list */}
       <div className="bg-card rounded-2xl shadow-sm overflow-hidden">
-        {loading ? (
+        {dateError ? (
+          <div className="text-center py-20">
+            <div className="text-lg mb-2" style={{ color: "#DC2626" }}>⚠</div>
+            <div className="font-bold text-sm" style={{ color: "#DC2626" }}>{dateError}</div>
+            <div className="text-xs mt-1" style={{ color: "#8A8DA8" }}>Vui lòng chọn lại khoảng thời gian</div>
+          </div>
+        ) : loading ? (
           <div className="text-center py-20">
             <AppIcon name="clock" className="w-8 h-8 animate-spin mx-auto mb-3" style={{ color: C.indigo }} />
             <div className="font-bold text-sm" style={{ color: C.indigo }}>Đang tải nhật ký...</div>

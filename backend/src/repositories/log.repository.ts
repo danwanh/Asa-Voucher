@@ -32,7 +32,15 @@ export async function listAuthenticationLogs(
   const take = filter.limit;
 
   const [rows, total] = await Promise.all([
-    prisma.authenticationLog.findMany({ where, orderBy: { occurred_at: "desc" }, skip, take }),
+    prisma.authenticationLog.findMany({
+      where,
+      orderBy: { occurred_at: "desc" },
+      skip,
+      take,
+      include: {
+        users: { select: { id: true, email: true, full_name: true } },
+      },
+    }),
     prisma.authenticationLog.count({ where }),
   ]);
 
@@ -101,7 +109,15 @@ export async function listOrderLogs(
   const take = filter.limit;
 
   const [rows, total] = await Promise.all([
-    prisma.orderLog.findMany({ where, orderBy: { occurred_at: "desc" }, skip, take }),
+    prisma.orderLog.findMany({
+      where,
+      orderBy: { occurred_at: "desc" },
+      skip,
+      take,
+      include: {
+        users: { select: { id: true, email: true, full_name: true } },
+      },
+    }),
     prisma.orderLog.count({ where }),
   ]);
 
@@ -113,12 +129,13 @@ export async function findOrderLogById(id: string) {
 }
 
 export async function listPaymentLogs(
-  filter: DateRangeFilter & { payment_id?: string; order_id?: string; user_id?: string; status?: string },
+  filter: DateRangeFilter & { payment_id?: string; order_id?: string; user_id?: string; action?: string; status?: string },
 ): Promise<{ rows: PaymentLogRow[]; total: number }> {
   const where: Record<string, unknown> = {};
   if (filter.payment_id) where.payment_id = filter.payment_id;
   if (filter.order_id) where.order_id = filter.order_id;
   if (filter.user_id) where.user_id = filter.user_id;
+  if (filter.action) where.action = filter.action;
   if (filter.status) where.status = filter.status;
   Object.assign(where, toDateRange(filter));
 
@@ -126,7 +143,15 @@ export async function listPaymentLogs(
   const take = filter.limit;
 
   const [rows, total] = await Promise.all([
-    prisma.paymentLog.findMany({ where, orderBy: { occurred_at: "desc" }, skip, take }),
+    prisma.paymentLog.findMany({
+      where,
+      orderBy: { occurred_at: "desc" },
+      skip,
+      take,
+      include: {
+        users: { select: { id: true, email: true, full_name: true } },
+      },
+    }),
     prisma.paymentLog.count({ where }),
   ]);
 
