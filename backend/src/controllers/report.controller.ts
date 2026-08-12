@@ -32,3 +32,15 @@ export async function getPartnerReport(req: Request, res: Response) {
   const result = await reportService.getPartnerReport(requireUser(req), query);
   sendSuccess(res, result);
 }
+
+// Cho phần report theo nhân viên
+export async function getStaffVoucherReport(req: Request, res: Response) {
+  // Parse query params từ URL
+  const query = reportQuerySchema.parse(req.query);
+
+  // Gọi service để xử lý logic
+  const result = await reportService.getStaffVoucherReport(requireUser(req), query);
+
+  // Trả về kết quả sau khi thành công
+  sendSuccess(res, result);
+}

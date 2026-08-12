@@ -340,3 +340,16 @@ export function isFieldLocked(status: string, field: string): boolean {
   if (locked.includes("*")) return true
   return locked.includes(field)
 }
+
+// ── FC-PAV-REPORT: Staff voucher report type ───────────────────────
+export interface StaffVoucherReportItem {
+  voucher_product_id: string;
+  program_name: string;
+  category_name: string;
+  total_quantity: number;
+  sold_quantity: number;
+  used_quantity: number;
+  usage_rate: number;
+  revenue: number;
+  effectiveness_score: number;
+}

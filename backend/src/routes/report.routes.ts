@@ -17,3 +17,10 @@ reportRoutes.get(
   requireRole("admin_content", "admin_operations", "admin_security"),
   asyncHandler(reportController.getPartnerReport),
 );
+
+reportRoutes.get(
+  "/reports/staff-vouchers",
+  requireAuth,
+  requireRole(...reportViewerRoles),
+  asyncHandler(reportController.getStaffVoucherReport)
+);
