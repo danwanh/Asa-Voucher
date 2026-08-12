@@ -1,16 +1,19 @@
 import { useState } from "react"
-import { Search, Loader2, CheckCircle2, XCircle, QrCode, Info } from "lucide-react"
+import { Search, Loader2, CheckCircle2, XCircle, QrCode, Info, ShieldCheck } from "lucide-react"
 import { issuedVoucherService } from "@/services/issuedVoucherService"
 import type { CheckVoucherResult } from "@/types"
 import { C, fmt, STATUS_LABEL } from "@/utils/constants"
 
 type CheckState = "idle" | "loading" | "success" | "error"
+type ConfirmState = "idle" | "loading" | "success" | "error"
 
 export function StaffCheckVoucherPage() {
   const [input, setInput] = useState("")
   const [state, setState] = useState<CheckState>("idle")
   const [result, setResult] = useState<CheckVoucherResult | null>(null)
   const [errorMsg, setErrorMsg] = useState("")
+  const [confirmState, setConfirmState] = useState<ConfirmState>("idle")
+  const [confirmMsg, setConfirmMsg] = useState("")
 
   async function handleCheck() {
     const code = input.trim()
@@ -40,6 +43,23 @@ export function StaffCheckVoucherPage() {
     setState("idle")
     setResult(null)
     setErrorMsg("")
+    setConfirmState("idle")
+    setConfirmMsg("")
+  }
+
+  async function handleConfirm() {
+    if (!iv) return
+    setConfirmState("loading")
+    setConfirmMsg("")
+    try {
+      const res = await issuedVoucherService.confirm(iv.voucher_code)
+      setConfirmMsg(res.message || "Xác nhận sử dụng voucher thành công")
+      setConfirmState("success")
+    } catch (err: any) {
+      const msg = err?.response?.data?.error?.message || err?.response?.data?.message || "Xác nhận thất bại. Vui lòng thử lại."
+      setConfirmMsg(msg)
+      setConfirmState("error")
+    }
   }
 
   const iv = result?.issued_voucher
@@ -137,6 +157,50 @@ export function StaffCheckVoucherPage() {
               <Row label="Hết hạn" value={iv.expired_date} />
             </div>
           </div>
+
+          {/* CONFIRM SECTION — chỉ hiện khi voucher active */}
+          {iv.status === "active" && confirmState === "idle" && (
+            <button
+              onClick={handleConfirm}
+              disabled={confirmState === "loading"}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-white transition-all"
+              style={{ backgroundColor: C.teal }}
+            >
+              <ShieldCheck className="w-4 h-4" />
+              Xác nhận sử dụng Voucher
+            </button>
+          )}
+
+          {/* Confirm loading */}
+          {confirmState === "loading" && (
+            <div className="flex items-center justify-center gap-2 py-4">
+              <Loader2 className="w-5 h-5 animate-spin" style={{ color: C.teal }} />
+              <span className="text-sm" style={{ color: "#8A8DA8" }}>Đang xác nhận...</span>
+            </div>
+          )}
+
+          {/* Confirm success */}
+          {confirmState === "success" && (
+            <div className="flex items-start gap-3 p-4 rounded-2xl" style={{ backgroundColor: "#E8F5EE" }}>
+              <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: "#2D7A52" }} />
+              <div>
+                <p className="text-sm font-bold" style={{ color: "#2D7A52" }}>{confirmMsg}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Confirm error */}
+          {confirmState === "error" && (
+            <div className="flex items-start gap-3 p-4 rounded-2xl" style={{ backgroundColor: "#FEE2E2" }}>
+              <XCircle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: "#B91C1C" }} />
+              <div>
+                <p className="text-sm font-bold" style={{ color: "#B91C1C" }}>{confirmMsg}</p>
+                <button onClick={() => { setConfirmState("idle"); setConfirmMsg("") }} className="text-xs font-bold mt-2 underline" style={{ color: "#B91C1C" }}>
+                  Thử lại
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Reset button */}
           <button

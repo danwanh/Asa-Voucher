@@ -132,4 +132,12 @@ export const issuedVoucherService = {
     const response = await api.post<ApiData<CheckVoucherResult>>("/issued-vouchers/check", payload)
     return data<CheckVoucherResult>(response)
   },
+
+  async confirm(voucherCode: string, note?: string) {
+    const response = await api.post<ApiData<{ message: string; issued_voucher: any; usage: any }>>(
+      "/issued-vouchers/confirm",
+      { voucher_code: voucherCode, note },
+    )
+    return data(response)
+  },
 }
