@@ -154,7 +154,8 @@ async function createOrderFromItems(userId: string, items: Array<{ voucher_produ
   const subtotal = builtItems.reduce((sum, item) => sum + Number(item.orderItem.subtotal), 0);
 
   return prisma.$transaction(async (tx) => {
-    const order = await tx.order.create({ data: { order_code: orderCode(), user_id: userId, subtotal, discount_amount: 0, total_amount: subtotal, payment_method: paymentMethod, note } });
+    const orderData: any = { order_code: orderCode(), user_id: userId, subtotal, discount_amount: 0, total_amount: subtotal, payment_method: paymentMethod, note };
+    const order = await tx.order.create({ data: orderData });
     const orderItems = await Promise.all(builtItems.map((item) => tx.orderItem.create({ data: { ...item.orderItem, order_id: order.id } })));
     await tx.orderLog.create({ data: { order_id: order.id, user_id: userId, action: "CREATE_ORDER", description: "Order created" } });
     return { ...order, items: orderItems };

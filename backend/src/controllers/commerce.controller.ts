@@ -6,6 +6,10 @@ export async function getCart(req: Request, res: Response) {
   ok(res, await commerceService.getCart(req.user!.id), "Cart retrieved");
 }
 
+export async function getCartCount(req: Request, res: Response) {
+  ok(res, await commerceService.getCartCount(req.user!.id), "Cart count retrieved");
+}
+
 export async function addCartItem(req: Request, res: Response) {
   const result = await commerceService.addCartItem(req.user!.id, req.body);
   if (result.created) created(res, result.item, "Cart item added");
