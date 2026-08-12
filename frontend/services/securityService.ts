@@ -22,6 +22,26 @@ export interface SecurityAlertListResult {
   limit: number
 }
 
+export interface AdminLogItem {
+  id: string
+  adminId: string
+  adminEmail?: string
+  adminName?: string
+  targetUserId?: string
+  targetPartnerId?: string
+  targetVoucherId?: string
+  action: string
+  description: string
+  occurredAt: string
+}
+
+export interface AdminLogListResult {
+  items: AdminLogItem[]
+  total: number
+  page: number
+  limit: number
+}
+
 export const securityService = {
   async listAlerts(params?: { status?: string; alert_type?: string; page?: number; limit?: number }) {
     const response = await api.get<Envelope<SecurityAlertListResult>>("/security-alerts", { params })
@@ -74,5 +94,44 @@ export const securityService = {
 
   async detectAnomalies() {
     return unwrap(await api.post<Envelope<any>>("/security-alerts/detect"))
+  },
+
+  async listAdminLogs(params?: { admin_id?: string; action?: string; date_from?: string; date_to?: string; page?: number; limit?: number }) {
+    const response = await api.get<Envelope<AdminLogListResult>>("/admin-logs", { params })
+    const data = unwrap(response)
+    return {
+      items: (data.items ?? []).map((l: any) => ({
+        id: String(l.id),
+        adminId: String(l.admin_id),
+        adminEmail: l.admin?.email ?? "",
+        adminName: l.admin?.full_name ?? "",
+        targetUserId: l.target_user_id ? String(l.target_user_id) : undefined,
+        targetPartnerId: l.target_partner_id ? String(l.target_partner_id) : undefined,
+        targetVoucherId: l.target_voucher_id ? String(l.target_voucher_id) : undefined,
+        action: l.action,
+        description: l.description ?? "",
+        occurredAt: l.occurred_at,
+      })),
+      total: data.total,
+      page: data.page,
+      limit: data.limit,
+    }
+  },
+
+  async getAdminLog(id: string): Promise<AdminLogItem> {
+    const response = await api.get<Envelope<any>>(`/admin-logs/${id}`)
+    const l = unwrap(response)
+    return {
+      id: String(l.id),
+      adminId: String(l.admin_id),
+      adminEmail: l.admin?.email ?? "",
+      adminName: l.admin?.full_name ?? "",
+      targetUserId: l.target_user_id ? String(l.target_user_id) : undefined,
+      targetPartnerId: l.target_partner_id ? String(l.target_partner_id) : undefined,
+      targetVoucherId: l.target_voucher_id ? String(l.target_voucher_id) : undefined,
+      action: l.action,
+      description: l.description ?? "",
+      occurredAt: l.occurred_at,
+    }
   },
 }

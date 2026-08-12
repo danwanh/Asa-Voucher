@@ -64,7 +64,15 @@ export async function listAdminLogs(
   const take = filter.limit;
 
   const [rows, total] = await Promise.all([
-    prisma.adminLog.findMany({ where, orderBy: { occurred_at: "desc" }, skip, take }),
+    prisma.adminLog.findMany({
+      where,
+      orderBy: { occurred_at: "desc" },
+      skip,
+      take,
+      include: {
+        admin: { select: { id: true, email: true, full_name: true } },
+      },
+    }),
     prisma.adminLog.count({ where }),
   ]);
 
@@ -72,7 +80,12 @@ export async function listAdminLogs(
 }
 
 export async function findAdminLogById(id: string) {
-  return prisma.adminLog.findUnique({ where: { id } }) as Promise<AdminLogRow | null>;
+  return prisma.adminLog.findUnique({
+    where: { id },
+    include: {
+      admin: { select: { id: true, email: true, full_name: true } },
+    },
+  }) as Promise<AdminLogRow | null>;
 }
 
 export async function listOrderLogs(
