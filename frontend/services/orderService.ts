@@ -54,6 +54,22 @@ function mapIssuedVoucher(value: BackendRecord): IssuedVoucher {
   }
 }
 
+function mapPayment(value: BackendRecord): Payment {
+  const method: "vnpay" | "paypal" = value.method === "paypal" ? "paypal" : "vnpay"
+  const result: any = {
+    id: String(value.id),
+    orderId: String(value.order_id),
+    method,
+    amount: num(value.amount),
+    status: value.status,
+    paidAt: value.paid_at,
+    transactionRef: value.transaction_ref,
+    createdAt: value.created_at,
+  }
+
+  return result as Payment
+}
+
 function mapOrderItem(value: BackendRecord): OrderItem {
   const voucher = value.voucher_products ?? {}
   return {
@@ -72,15 +88,25 @@ export function mapOrder(value: BackendRecord): Order {
   const items: OrderItem[] = (value.order_items ?? value.items ?? []).map((item: BackendRecord) => mapOrderItem(item))
   const first = items[0]
   const issued = items.flatMap((item) => item.issuedVouchers ?? [])
+  const allPartnerNames = [...new Set(items.map((item) => item.partnerName).filter((name): name is string => Boolean(name)))]
+  const payments = Array.isArray(value.payments) ? value.payments.map(mapPayment) : []
+  const unpaidPayment = payments.find((p) => p.status === "pending")
+  const paidPayment = payments.find((p) => p.status === "success")
   return {
     id: String(value.id),
     userId: String(value.user_id),
+    userName: value.users?.full_name,
     orderCode: String(value.order_code ?? value.code ?? value.id),
     voucherId: first?.voucherId ?? "",
     voucherTitle: first?.voucherTitle ?? "Đơn hàng voucher",
-    partnerName: first?.partnerName ?? "",
+    partnerName: allPartnerNames.length === 0
+      ? ""
+      : allPartnerNames.length === 1
+        ? allPartnerNames[0]
+        : allPartnerNames.join(", "),
     amount: num(value.total_amount),
     status: value.status,
+    paymentStatus: paidPayment ? "paid" : unpaidPayment ? "pending" : value.status === "refunded" ? "refunded" : "pending",
     paymentMethod: String(value.payment_method ?? ""),
     createdAt: value.created_at,
     updatedAt: value.updated_at,
@@ -92,6 +118,8 @@ export function mapOrder(value: BackendRecord): Order {
     complaints: Array.isArray(value.complaints) ? value.complaints.map(mapComplaint) : [],
     paymentExpiresAt: value.payment_expires_at,
     items,
+    payments,
+    note: value.note ?? null,
   }
 }
 
@@ -113,9 +141,14 @@ export const orderService = {
     return mapOrder(data<BackendRecord>(response))
   },
 
-  async list() {
-    const response = await api.get("/orders")
+  async list(params?: { status?: string; search?: string }) {
+    const response = await api.get("/orders", { params })
     return data<BackendRecord[]>(response).map(mapOrder)
+  },
+
+  async listOrders(params?: { status?: string; search?: string }) {
+    const items = await this.list(params)
+    return { items, total: items.length }
   },
 
   async get(id: string) {
@@ -123,9 +156,37 @@ export const orderService = {
     return mapOrder(data<BackendRecord>(response))
   },
 
+  async getOrder(id: string) {
+    return this.get(id)
+  },
+
   async cancel(id: string) {
     const response = await api.patch(`/orders/${id}/cancel`)
     return mapOrder(data<BackendRecord>(response))
+  },
+
+  async cancelOrder(id: string) {
+    return this.cancel(id)
+  },
+
+  async refundOrder(id: string, reason?: string) {
+    const response = await api.patch(`/orders/${id}/refund`, { reason })
+    return mapOrder(data<BackendRecord>(response))
+  },
+
+  async createPayment(orderId: string, method: string) {
+    const response = await api.post(`/orders/${orderId}/payments`, { method })
+    return data<BackendRecord>(response)
+  },
+
+  async simulatePaymentSuccess(paymentId: string) {
+    const response = await api.patch(`/payments/${paymentId}/simulate-success`)
+    return data<BackendRecord>(response)
+  },
+
+  async simulatePaymentFailed(paymentId: string) {
+    const response = await api.patch(`/payments/${paymentId}/simulate-failed`)
+    return data<BackendRecord>(response)
   },
 }
 

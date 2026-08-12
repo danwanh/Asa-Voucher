@@ -3,14 +3,7 @@ import * as commerceService from "../services/commerce.service.js";
 import { created, noContent, ok } from "../utils/response.js";
 
 export async function getCart(req: Request, res: Response) {
-  const hasItemFilter = req.query.item_ids !== undefined;
-  const rawItemIds = typeof req.query.item_ids === "string" ? req.query.item_ids : "";
-  const itemIds = hasItemFilter ? rawItemIds.split(",").filter(Boolean) : undefined;
-  ok(res, await commerceService.getCart(req.user!.id, itemIds));
-}
-
-export async function getCartCount(req: Request, res: Response) {
-  ok(res, await commerceService.getCartCount(req.user!.id));
+  ok(res, await commerceService.getCart(req.user!.id), "Cart retrieved");
 }
 
 export async function addCartItem(req: Request, res: Response) {
@@ -42,51 +35,56 @@ export async function createOrder(req: Request, res: Response) {
 }
 
 export async function listOrders(req: Request, res: Response) {
-  ok(res, await commerceService.listOrders(req.user!));
+  ok(res, await commerceService.listOrders({ ...req.user!, partnerId: req.user!.partnerId ?? undefined }, req.query as { status?: string; search?: string }));
 }
 
 export async function getOrderController(req: Request, res: Response) {
-  ok(res, await commerceService.getOrderById(req.user!, req.params.id));
+  ok(res, await commerceService.getOrderById({ ...req.user!, partnerId: req.user!.partnerId ?? undefined }, req.params.id));
 }
 
 export async function updateOrder(req: Request, res: Response) {
-  ok(res, await commerceService.updateOrder(req.user!, req.params.id, req.body), "Order updated");
+  ok(res, await commerceService.updateOrder({ ...req.user!, partnerId: req.user!.partnerId ?? undefined }, req.params.id, req.body), "Order updated");
 }
 
 export async function cancelOrder(req: Request, res: Response) {
-  ok(res, await commerceService.cancelOrder(req.user!, req.params.id), "Order cancelled");
+  try {
+    ok(res, await commerceService.cancelOrder({ ...req.user!, partnerId: req.user!.partnerId ?? undefined }, req.params.id), "Order cancelled");
+  } catch (err) {
+    console.error("CANCEL ORDER ERROR:", err);
+    throw err;
+  }
 }
 
 export async function deleteOrder(req: Request, res: Response) {
-  ok(res, await commerceService.cancelOrder(req.user!, req.params.id), "Order cancelled");
+  ok(res, await commerceService.cancelOrder({ ...req.user!, partnerId: req.user!.partnerId ?? undefined }, req.params.id), "Order cancelled");
 }
 
 export async function listOrderItems(req: Request, res: Response) {
-  ok(res, await commerceService.listOrderItems(req.user!, req.params.orderId));
+  ok(res, await commerceService.listOrderItems({ ...req.user!, partnerId: req.user!.partnerId ?? undefined }, req.params.orderId));
 }
 
 export async function getOrderItem(req: Request, res: Response) {
-  ok(res, await commerceService.getOrderItem(req.user!, req.params.id));
+  ok(res, await commerceService.getOrderItem({ ...req.user!, partnerId: req.user!.partnerId ?? undefined }, req.params.id));
 }
 
 export async function listPayments(req: Request, res: Response) {
-  ok(res, await commerceService.listPayments(req.user!, req.params.orderId));
+  ok(res, await commerceService.listPayments({ ...req.user!, partnerId: req.user!.partnerId ?? undefined }, req.params.orderId));
 }
 
 export async function createPayment(req: Request, res: Response) {
-  created(res, await commerceService.createPayment(req.user!, req.params.orderId, req.body.method), "Payment created");
+  created(res, await commerceService.createPayment({ ...req.user!, partnerId: req.user!.partnerId ?? undefined }, req.params.orderId, req.body.method), "Payment created");
 }
 
 export async function getPaymentController(req: Request, res: Response) {
-  ok(res, await commerceService.getPaymentById(req.user!, req.params.id));
+  ok(res, await commerceService.getPaymentById({ ...req.user!, partnerId: req.user!.partnerId ?? undefined }, req.params.id));
 }
 
 export async function simulatePaymentSuccess(req: Request, res: Response) {
-  ok(res, await commerceService.simulatePaymentSuccess(req.user!, req.params.id), "Payment succeeded");
+  ok(res, await commerceService.simulatePaymentSuccess({ ...req.user!, partnerId: req.user!.partnerId ?? undefined }, req.params.id), "Payment succeeded");
 }
 
 export async function simulatePaymentFailed(req: Request, res: Response) {
-  ok(res, await commerceService.simulatePaymentFailed(req.user!, req.params.id), "Payment failed");
+  ok(res, await commerceService.simulatePaymentFailed({ ...req.user!, partnerId: req.user!.partnerId ?? undefined }, req.params.id), "Payment failed");
 }
 
 export async function vnpayReturn(req: Request, res: Response) {
@@ -99,4 +97,8 @@ export async function paypalReturn(req: Request, res: Response) {
 
 export async function paypalCancel(req: Request, res: Response) {
   res.redirect(await commerceService.handlePayPalCancel(req.query.token ? String(req.query.token) : undefined));
+}
+
+export async function refundOrder(req: Request, res: Response) {
+  ok(res, await commerceService.refundOrder({ ...req.user!, partnerId: req.user!.partnerId ?? undefined }, req.params.id, req.body.note ?? req.body.reason), "Order refunded");
 }
