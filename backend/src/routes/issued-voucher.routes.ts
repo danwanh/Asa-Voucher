@@ -36,3 +36,9 @@ issuedVoucherRoutes.get(
   requireRole("partner_owner", "partner_voucher_staff", "partner_store_staff", "admin_security"),
   asyncHandler(issuedVoucherController.listVoucherUsages),
 );
+
+// Cho phần kiểm tra voucher bởi nhân viên cửa hàng
+issuedVoucherRoutes.post(
+  "/issued-vouchers/check", requireRole("partner_store_staff"),
+  asyncHandler(issuedVoucherController.checkVoucher),
+);
