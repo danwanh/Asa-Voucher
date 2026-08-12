@@ -389,3 +389,18 @@ export interface CheckVoucherResult {
   }
   eligible_branch_ids: string[]
 }
+
+// ── FC-ADC-CONTENT: CMS Content type ─────────────────────────────
+export interface CmsContent {
+  id: string
+  content_type: string
+  title: string
+  content: string | null
+  image_url: string | null
+  display_time: string | null
+  status: string
+  sort_order: number
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
