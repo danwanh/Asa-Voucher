@@ -27,7 +27,7 @@ export function RBACManagementPage() {
         setAllPermissions(permsData)
         if (rolesData.length > 0) {
           setSelectedRoleId(rolesData[0].id)
-          setLocalPerms(new Set(rolesData[0].permissions.map((p) => p.id)))
+          setLocalPerms(new Set(rolesData[0].permissions.map((p: PermissionItem) => p.id)))
         }
       } catch {
         toast.error("Không thể tải dữ liệu phân quyền")
