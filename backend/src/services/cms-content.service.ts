@@ -1,6 +1,5 @@
 import { prisma } from "../config/prisma.js";
 import { HttpError } from "../utils/http-error.js";
-import { buildPaginatedResult } from "../utils/pagination.js";
 import * as cmsContentRepo from "../repositories/cms-content.repository.js"
 import { ListCmsContentQuery, CreateCmsContentInput,  UpdateCmsContentInput} from "../validations/cms-content.validation.js";
 import { AuthUser } from "../types/auth.types.js";

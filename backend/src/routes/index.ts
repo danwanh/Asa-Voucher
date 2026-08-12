@@ -14,6 +14,7 @@ import { reportRoutes } from "./report.routes.js";
 import {dashboardRoutes} from "./dashboard.routes.js"
 import { rbacRoutes } from "./rbac.routes.js";
 import { securityRoutes } from "./security.routes.js";
+import { cmsContentRoutes } from "./cms-content.routes.js";
 
 export const apiRoutes = Router();
 
@@ -32,3 +33,4 @@ apiRoutes.use(reportRoutes);
 apiRoutes.use(dashboardRoutes);
 apiRoutes.use(rbacRoutes);
 apiRoutes.use(securityRoutes);
+apiRoutes.use(cmsContentRoutes);
