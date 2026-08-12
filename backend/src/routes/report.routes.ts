@@ -17,3 +17,9 @@ reportRoutes.get(
   requireRole("admin_content", "admin_operations", "admin_security"),
   asyncHandler(reportController.getPartnerReport),
 );
+
+// Thêm route mới cho phần báo cáo của nhân viên
+reportRoutes.get(
+  "/reports/staff-vouchers",
+  asyncHandler(reportController.getStaffVoucherReport)
+);

@@ -149,7 +149,7 @@ export async function getStaffVoucherReport(user: AuthUser, query: ReportQuery,)
   const productIds =  products.map(p => p.id);
 
   // Query 2 cái còn lại
-  const [usedCounts, revenueMap] = await Promise.all([reportRepo.countUsedIssuedVouchersByProduct(productIds), reportRepo.sumRevenueProducts(productIds),]);
+  const [usedCounts, revenueMap] = await Promise.all([reportRepo.countUsedByProducts(productIds), reportRepo.sumRevenueProducts(productIds),]);
 
   // Dùng vòng lặp cho giá trị
   const reportItems: StaffVoucherReportItem[] = products.map((product) => {
