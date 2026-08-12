@@ -34,3 +34,16 @@ export const listVoucherUsagesQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20),
 });
+
+
+// Cho việc kiểm tra voucher
+export const checkVoucherSchema = z.object({
+  voucher_code: z.string().min(1, "Mã voucher không được để trống."),
+  qr_code_payload: z.string().min(1).optional(),
+}).refine(
+  (data) => Boolean(data.voucher_code || data.qr_code_payload),
+  {
+    message: "voucher_code hoặc qr_code_payload là bắt buộc",
+  }
+);
+export type CheckVoucherInput = z.infer<typeof checkVoucherSchema>;

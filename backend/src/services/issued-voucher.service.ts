@@ -12,6 +12,7 @@ import type {
   UpdateIssuedVoucherStatusInput,
   ValidateVoucherInput,
 } from "../validations/issued-voucher.validation.js";
+import type { CheckVoucherInput } from "../validations/issued-voucher.validation.js";
 
 type IssuedVoucherWithProduct = Awaited<
   ReturnType<typeof issuedVoucherRepo.findIssuedVoucherById>
@@ -173,4 +174,52 @@ export async function listUsages(
 
   const { rows, total } = await voucherUsageRepo.listUsages(filter);
   return buildPaginatedResult(rows, total, query);
+}
+
+// Hàm cho phần kiểm tra voucher
+export async function checkVoucher(user: AuthUser, input: CheckVoucherInput) {
+  // Query voucher theo mã hoặc qr_payload
+  const voucher = input.qr_code_payload ? await issuedVoucherRepo.findIssuedVoucherByQrPayload(input.qr_code_payload) : await issuedVoucherRepo.findIssuedVoucherByCode(input.voucher_code);
+
+  // Kiểm tra có tìm thấy
+  if (!voucher) {
+    throw new HttpError(404, "Mã voucher không hợp lệ.");
+  }
+
+  // Check RB-09: đối tác chỉ xác thực voucher thuộc phạm vi chi nhánh/chương trình của mình
+  if (voucher && voucher.voucher_products.partner_id !== user.partnerId) {
+    throw new HttpError(403, "Voucher không thuộc phạm vi đối tác của bạn");
+  }
+
+  // Check status của voucher
+  if (voucher.status === "used") {
+    throw new HttpError(400, "Voucher đã được sử dụng");
+  }
+
+  if (voucher.status === "refunded") {
+    throw new HttpError(400, "Voucher đã hoàn tiền");
+  }
+
+  // So sánh để đánh giá trạng thái hết hạn
+  const isExpired = voucher.status === "expired" || (voucher.expired_date && new Date (voucher.expired_date) < new Date());
+
+  if (isExpired) {
+    throw new HttpError(400, "Voucher đã hết hạn");
+  }
+
+  // Nếu ở trạng thái khác ngoài còn hạn (active) thì báo lỗi khác
+  if (voucher.status !== "active") {
+    throw new HttpError(400, "Voucher không ở trạng thái hợp lệ");
+  }
+
+  // Check branch eligibility (RB-09)
+  const eligibleBranchIds = await issuedVoucherRepo.findEligibleBranchIds(voucher.voucher_product_id);
+
+  const userBranchId = user.branchId;
+
+  if (!userBranchId || !eligibleBranchIds.includes(userBranchId)) {
+    throw new HttpError(403, "Bạn chỉ được kiểm tra voucher tại chi nhánh của mình.");
+  }
+
+  return {issued_voucher: voucher, eligible_branch_ids: eligibleBranchIds}
 }
