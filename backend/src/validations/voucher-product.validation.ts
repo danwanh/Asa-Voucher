@@ -59,7 +59,14 @@ export const updateVoucherProductSchema = voucherProductBaseSchema
     { message: "Selling price must not exceed original price (RB-02)", path: ["selling_price"] }
   );
 
-export const approvalSchema = z.object({ approval_status: z.enum(["approved", "rejected"]) });
+export const approvalSchema = z.object({
+  approval_status: z.enum(["approved", "rejected"]),
+  reject_reason: z.string().min(1, "Lý do từ chối không được để trống").optional(),
+ }).refine(
+    (data) => data.approval_status === "approved" || (data.approval_status === "rejected" && data.reject_reason),
+    {message: "Lý do từ chối là bắt buộc khi từ chối voucher", path:["reject_reason"]}
+ );
+
 export const voucherStatusSchema = z.object({ status: z.enum(["draft", "active", "paused", "sold_out", "expired"]) });
 
 export const createVoucherImageSchema = z.object({
