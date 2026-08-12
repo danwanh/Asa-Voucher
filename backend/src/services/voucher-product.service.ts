@@ -439,13 +439,74 @@ export async function submitVoucherProduct(user: CurrentUser, id: string) {
   }
 }
 
-export async function approveVoucherProduct(adminId: string, id: string, approvalStatus: string) {
-  try {
-    const updated = await prisma.voucherProduct.update({ where: { id }, data: { approval_status: approvalStatus, approved_by: adminId, approved_at: new Date(), updated_at: new Date() } });
-    return withWorkflow(updated as unknown as Record<string, unknown>);
-  } catch (error) {
-    throwDbError(error, "Voucher product not found");
+export async function approveVoucherProduct(adminId: string, id: string, input: {
+  approval_status: string;
+  reject_reason?: string
+}) {
+  // Kiểm tra voucher
+  const voucher = await getVoucher(id);
+
+  if (voucher.approval_status !== "pending") {
+    throw new HttpError(400, "Voucher không ở trạng thái chờ duyệt", "INVALID_APPROVAL_STATUS");
   }
+
+  // Nếu là reject --> kiểm tra reject_reason, nếu thiếu thì báo lỗi
+  if (input.approval_status === "rejected" && !input.reject_reason) {
+    throw new HttpError(400, "Lý do từ chối không được để trống", "MISSING_REJECT_REASON");
+  }
+
+  // Nếu là voucher được duyệt --> kiểm tra BR
+  if (input.approval_status === "approved") {
+    // Kiểm tra giá bán < original_price
+    const sellingPrice = Number(voucher.selling_price);
+    const originalPrice = Number(voucher.original_price);
+    if (isNaN(sellingPrice) || isNaN(originalPrice) || sellingPrice >= originalPrice) {
+      throw new HttpError(400, "Giá bán phải nhỏ hơn giá gốc (Vi phạm quy tắc giá RB-02)", "INVALID_PRICE_RULE");
+    }
+
+    // Kiểm tra có đầy đủ thời gian bán bắt đầu, kết thúc và số ngày sử dụng
+    const hasSaleTime = voucher.sale_start_date && voucher.sale_end_date;
+    const hasValidTime = voucher.validity_days;
+    if (!hasSaleTime || !hasValidTime) {
+      throw new HttpError(400, "Voucher thiếu thời gian bán hàng hoặc thời gian sử dụng", "MISSING_TIME_RANGE");
+    }
+
+    // Kiểm tra voucher hết số lượng phát hành hoặc hết thời gian bán
+    const saleEndDate = voucher.sale_end_date instanceof Date ? voucher.sale_end_date : new Date(String(voucher.sale_end_date));
+    const totalQuantity = Number(voucher.total_quantity);
+    const isOutOfQuantity = totalQuantity <= 0;
+    const isSaleExpired = !isNaN(saleEndDate.getTime()) && saleEndDate.getTime() <= Date.now();
+    if (isOutOfQuantity || isSaleExpired) {
+      throw new HttpError(400, "Voucher đã hết số lượng phát hành hoặc hết thời hạn bán", "VOUCHER_EXPIRED_OR_OUT_OF_STOCK");
+    }
+  }
+
+  // Transaction: cập nhật và audit log
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.voucherProduct.update({
+      where: { id },
+      data: {
+        approval_status: input.approval_status,
+        approved_by: adminId,
+        approved_at: new Date(),
+        updated_at: new Date(),
+      },
+    });
+
+    await tx.adminLog.create({
+      data: {
+        admin_id: adminId,
+        action: input.approval_status === "approved" ? "APPROVE_VOUCHER" : "REJECT_VOUCHER",
+        content_type: "voucher",
+        description: input.approval_status === "approved"
+          ? `Duyệt voucher: ${voucher.name}`
+          : `Từ chối voucher: ${voucher.name}. Lý do: ${input.reject_reason}`,
+        target_voucher_id: id,
+      },
+    });
+
+    return withWorkflow(updated as Record<string, unknown>);
+  });
 }
 
 export async function updateVoucherStatus(user: CurrentUser, id: string, status: string) {
