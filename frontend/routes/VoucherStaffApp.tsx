@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Tag, PlusCircle, BarChart3, User, LogOut, Menu, ChevronRight } from "lucide-react"
+import { Tag, PlusCircle, BarChart3, ScanCheck, User, LogOut, Menu, ChevronRight } from "lucide-react"
 import { C } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import { PartnerVouchersPage } from "@/pages/partner/PartnerVouchersPage"
@@ -11,8 +11,9 @@ import { PartnerRevenuePage } from "@/pages/partner/PartnerRevenuePage"
 import { StaffProfilePage } from "@/pages/staff/StaffProfilePage"
 import type { AppUser, Voucher } from "@/types"
 import { StaffVoucherReportPage } from "@/pages/staff/StaffVoucherReportPage"
+import { StaffCheckVoucherPage } from "@/pages/staff/StaffCheckVoucherPage"
 
-type Page = "vouchers" | "create" | "edit" | "voucher-detail" | "reports" | "staff-reports" | "profile"
+type Page = "vouchers" | "create" | "edit" | "voucher-detail" | "reports" | "staff-reports" | "check-voucher" | "profile"
 
 interface Props {
   user: AppUser
@@ -21,10 +22,11 @@ interface Props {
 }
 
 const NAV = [
-  { label: "Quản lý Voucher",  pg: "vouchers" as Page, icon: <Tag className="w-4 h-4" /> },
-  { label: "Tạo voucher mới",  pg: "create" as Page,   icon: <PlusCircle className="w-4 h-4" /> },
-  { label: "Báo cáo Voucher",   pg: "staff-reports" as Page, icon: <BarChart3 className="w-4 h-4" /> },
-  { label: "Hồ sơ cá nhân",    pg: "profile" as Page,   icon: <User className="w-4 h-4" /> },
+  { label: "Quản lý Voucher",    pg: "vouchers" as Page, icon: <Tag className="w-4 h-4" /> },
+  { label: "Tạo voucher mới",    pg: "create" as Page,   icon: <PlusCircle className="w-4 h-4" /> },
+  { label: "Kiểm tra Voucher",   pg: "check-voucher" as Page, icon: <ScanCheck className="w-4 h-4" /> },
+  { label: "Báo cáo Voucher",    pg: "staff-reports" as Page, icon: <BarChart3 className="w-4 h-4" /> },
+  { label: "Hồ sơ cá nhân",      pg: "profile" as Page,  icon: <User className="w-4 h-4" /> },
 ]
 
 const PAGE_LABELS: Record<Page, string> = {
@@ -34,6 +36,7 @@ const PAGE_LABELS: Record<Page, string> = {
   "voucher-detail": "Chi tiết Voucher",
   reports: "Hiệu suất của tôi",
   "staff-reports": "Báo cáo hiệu suất Voucher",
+  "check-voucher": "Kiểm tra Voucher",
   profile: "Hồ sơ cá nhân",
 }
 
@@ -162,6 +165,7 @@ export function VoucherStaffApp({ user, onLogout, initialPage }: Props) {
           )}
           {page === "reports" && <PartnerRevenuePage />}
           {page === "staff-reports" && <StaffVoucherReportPage/>}
+          {page === "check-voucher" && <StaffCheckVoucherPage/>}
           {page === "profile" && <StaffProfilePage user={user} onLogout={onLogout} />}
         </main>
       </div>

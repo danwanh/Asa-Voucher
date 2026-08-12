@@ -353,3 +353,39 @@ export interface StaffVoucherReportItem {
   revenue: number;
   effectiveness_score: number;
 }
+
+// ── FC-PAS-CHECK: Voucher check result type ───────────────────────
+export interface CheckVoucherResult {
+  issued_voucher: {
+    id: string
+    voucher_code: string
+    qr_code_payload: string
+    status: string
+    expired_date: string
+    issued_date: string
+    created_at: string
+    owner_id: string
+    voucher_products: {
+      id: string
+      name: string
+      partner_id: string
+      thumbnail_url: string | null
+      partners: { business_name: string }
+    }
+    order_items?: {
+      id: string
+      orders?: {
+        id: string
+        order_code: string | null
+        total_amount: number
+        payment_method: string
+        status: string
+        created_at: string
+        users: { full_name: string }
+      } | null
+    }[]
+    reviews?: { id: string; rating: number; comment: string | null; media_urls: string[]; created_at: string }[]
+    complaints?: { id: string; reason: string; status: string; created_at: string }[]
+  }
+  eligible_branch_ids: string[]
+}
