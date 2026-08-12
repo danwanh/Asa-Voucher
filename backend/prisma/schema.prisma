@@ -54,6 +54,7 @@ model User {
   voucher_usages        VoucherUsage[]      @relation("VoucherUsageRedeemer")
   security_alerts       SecurityAlert[]     @relation("SecurityAlertUser")
   reviewed_alerts       SecurityAlert[]     @relation("SecurityAlertReviewer")
+  cms_contents  CmsContent[]  @relation("CmsContentCreator")
 
   @@index([role])
   @@map("users")
@@ -114,6 +115,7 @@ model AdminLog {
   target_partner    Partner?        @relation(fields: [target_partner_id], references: [id], onUpdate: NoAction, map: "admin_logs_target_partner_fk")
   target_user       User?           @relation("AdminLogTargetUser", fields: [target_user_id], references: [id], onUpdate: NoAction)
   target_voucher    VoucherProduct? @relation(fields: [target_voucher_id], references: [id], onUpdate: NoAction, map: "admin_logs_target_voucher_fk")
+  content_type      String?         @db.VarChar(50)
 
   @@map("admin_logs")
 }
@@ -530,4 +532,25 @@ model RolePermission {
 
   @@unique([role_id, permission_id])
   @@map("role_permissions")
+}
+
+model CmsContent {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  content_type String    @db.VarChar(50)
+  title        String    @db.VarChar(255)
+  content      String?   @db.Text
+  image_url    String?   @db.VarChar(500)
+  display_time DateTime? @db.Timestamptz(6)
+  status       String    @default("active") @db.VarChar(20)
+  sort_order   Int       @default(0)
+  created_by   String?   @db.Uuid
+  created_at   DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
+
+  // Thêm dòng này để khớp relation với User:
+  creator      User?     @relation("CmsContentCreator", fields: [created_by], references: [id])
+
+  @@index([content_type])
+  @@index([status])
+  @@map("cms_contents")
 }
