@@ -8,6 +8,7 @@ import type {
   VoucherReportItem,
 } from "../types/report.types.js";
 import type { ReportQuery } from "../validations/report.validation.js";
+import type { StaffVoucherReportItem } from "../types/report.types.js";
 
 function isPartnerOwnerLike(role: AuthUser["role"]) {
   return role === "partner_owner" || role === "partner_voucher_staff";
@@ -130,4 +131,57 @@ export async function getPartnerReport(user: AuthUser, query: ReportQuery): Prom
   }
 
   return results;
+}
+
+// CHO BÁO CÁO HIỆU SUẤT VOUCHER THEO NHÂN VIÊN
+// Hàm lấy báo cáo theo nhân viên
+export async function getStaffVoucherReport(user: AuthUser, query: ReportQuery,):Promise<StaffVoucherReportItem[]> {
+  // Kiểm tra tài khoản có tồn tại
+  if (!user.partnerId) {
+    throw new HttpError(403, "Tài khoản chưa gắn với đối tác nào");
+  }
+
+  // Gọi repositories funcs
+  // Lấy danh sách voucher do user tạo
+  const products = await reportRepo.listVoucherProductsByCreator(user.id, query.category_id, query.date_from, query.date_to);
+
+  // Extract ra mảng
+  const productIds =  products.map(p => p.id);
+
+  // Query 2 cái còn lại
+  const [usedCounts, revenueMap] = await Promise.all([reportRepo.countUsedIssuedVouchersByProduct(productIds), reportRepo.sumRevenueProducts(productIds),]);
+
+  // Dùng vòng lặp cho giá trị
+  const reportItems: StaffVoucherReportItem[] = products.map((product) => {
+    // Tính số lượng bán
+    const soldQuantity = product.total_quantity - product.remaining_quantity;
+
+    // Tính số lượng đã dùng
+    const usedQuantity = usedCounts[product.id]??0;
+
+    // Tính doanh thu
+    const totalRevenue = Number(revenueMap[product.id])??0;
+
+    // Tính tỉ lệ sử dụng (%)
+    const calculatedUsageRate = soldQuantity > 0 ? Math.round((usedQuantity / soldQuantity) * 10000)/100 : 0;
+
+    // Tính điểm hiệu quả
+    const calcuatedEffectiveness = Math.round(calculatedUsageRate * totalRevenue / 10000);
+
+    // Trả về đúng cấu trúc
+    return {
+      voucher_product_id: product.id,
+      program_name: product.name,
+      category_name: (product as any).category_name?? "",
+      total_quantity: product.total_quantity,
+      sold_quantity: soldQuantity,
+      used_quantity: usedQuantity,
+      usage_rate: calculatedUsageRate,
+      revenue:totalRevenue,
+      effectiveness_score: calcuatedEffectiveness,
+    };
+  });
+
+  // Trả về kết quả cuối cùng
+  return reportItems;
 }
