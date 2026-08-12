@@ -7,7 +7,7 @@ import {
   listVoucherUsagesQuerySchema,
   redeemVoucherSchema,
   updateIssuedVoucherStatusSchema,
-  validateVoucherSchema,
+  validateVoucherSchema, checkVoucherSchema
 } from "../validations/issued-voucher.validation.js";
 
 function requireUser(req: Request) {
@@ -56,5 +56,11 @@ export async function listUsagesForVoucher(req: Request, res: Response) {
 export async function listVoucherUsages(req: Request, res: Response) {
   const query = listVoucherUsagesQuerySchema.parse(req.query);
   const result = await issuedVoucherService.listUsages(requireUser(req), query);
+  sendSuccess(res, result);
+}
+
+export async function checkVoucher(req: Request, res: Response) {
+  const input = checkVoucherSchema.parse(req.body);
+  const result = await issuedVoucherService.checkVoucher(requireUser(req), input);
   sendSuccess(res, result);
 }
