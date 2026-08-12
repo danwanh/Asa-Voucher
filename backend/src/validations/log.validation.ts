@@ -38,6 +38,7 @@ export const paymentLogQuerySchema = z.object({
   payment_id: z.string().uuid().optional(),
   order_id: z.string().uuid().optional(),
   user_id: z.string().uuid().optional(),
+  action: z.string().optional(),
   status: z.string().optional(),
 });
 export type PaymentLogQuery = z.infer<typeof paymentLogQuerySchema>;
