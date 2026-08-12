@@ -30,3 +30,13 @@ export const updateOrderSchema = z.object({
 export const createPaymentSchema = z.object({
   method: z.enum(["momo", "vnpay", "zalopay", "bank_transfer"]).optional()
 });
+
+export const listOrdersQuerySchema = z.object({
+  status: z.string().optional(),
+  search: z.string().trim().min(1).optional()
+});
+
+export const refundOrderSchema = z.object({
+  note: z.string().trim().max(500).optional(),
+  reason: z.string().trim().max(500).optional(),
+});
