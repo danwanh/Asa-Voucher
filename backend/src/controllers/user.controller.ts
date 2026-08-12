@@ -6,6 +6,7 @@ import { requireData, sanitizeUser, throwDbError } from "../utils/db.js";
 import { HttpError } from "../utils/http-error.js";
 import { created, noContent, ok } from "../utils/response.js";
 import { rangeFromPagination } from "../validations/common.validation.js";
+import { writeAuditLog } from "../services/audit-log.service.js";
 
 const PARTNER_STAFF_ROLES = ["partner_voucher_staff", "partner_store_staff"] as const;
 
@@ -154,6 +155,12 @@ export async function createUserByAdmin(req: Request, res: Response) {
   delete payload.password;
   try {
     const user = await prisma.user.create({ data: payload as never });
+    await writeAuditLog({
+      adminId: req.user!.id,
+      action: "user_created",
+      description: `Tạo người dùng ${user.email} (${user.role})`,
+      targetUserId: user.id,
+    });
     created(res, sanitizeUser(user as unknown as Record<string, unknown>), "User created");
   } catch (error) {
     throwDbError(error);
@@ -167,6 +174,26 @@ export async function getUser(req: Request, res: Response) {
 
   const user = requireData(await prisma.user.findUnique({ where: { id: req.params.id } }), "User not found");
   ok(res, sanitizeUser(user as unknown as Record<string, unknown>));
+}
+
+export async function lookupRecipient(req: Request, res: Response) {
+  const identifier = String(req.query.identifier).trim();
+  const phone = identifier.replace(/\s/g, "");
+  const normalizedPhone = phone.startsWith("+84") ? `0${phone.slice(3)}` : phone;
+  const user = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { email: { equals: identifier, mode: "insensitive" } },
+        { phone: normalizedPhone },
+        { phone }
+      ],
+      is_active: true
+    },
+    select: { id: true, full_name: true, email: true, phone: true }
+  });
+
+  if (!user) throw new HttpError(404, "Recipient account was not found", "RECIPIENT_NOT_FOUND");
+  ok(res, user);
 }
 
 export async function updateUser(req: Request, res: Response) {
@@ -194,6 +221,15 @@ export async function updateUser(req: Request, res: Response) {
 
   try {
     const user = await prisma.user.update({ where: { id: req.params.id }, data: { ...req.body, updated_at: new Date() } as never });
+    if (isAdmin && req.user!.id !== req.params.id) {
+      const changes = Object.keys(req.body).filter((k) => k !== "updated_at").join(", ");
+      await writeAuditLog({
+        adminId: req.user!.id,
+        action: req.body.is_active === false ? "user_deactivated" : "user_updated",
+        description: `Cập nhật người dùng ${user.email}: ${changes}`,
+        targetUserId: user.id,
+      });
+    }
     ok(res, sanitizeUser(user as unknown as Record<string, unknown>), "User updated");
   } catch (error) {
     throwDbError(error, "User not found");
@@ -246,6 +282,12 @@ export async function deleteUser(req: Request, res: Response) {
         is_active: false,
         updated_at: new Date(),
       },
+    });
+    await writeAuditLog({
+      adminId: req.user!.id,
+      action: "user_deactivated",
+      description: `Vô hiệu hóa tài khoản người dùng`,
+      targetUserId: req.params.id,
     });
   } catch (error) {
     throwDbError(error, "User not found");

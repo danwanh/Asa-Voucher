@@ -1,9 +1,5 @@
 import { Router } from "express";
-<<<<<<< Updated upstream
-import { addCartItem, cancelOrder, checkout, clearCart, createOrder, createPayment, deleteCartItem, deleteOrder, getCart, getOrderController, getOrderItem, getPaymentController, listOrderItems, listOrders, listPayments, simulatePaymentFailed, simulatePaymentSuccess, updateCartItem, updateOrder } from "../controllers/commerce.controller.js";
-=======
-import { addCartItem, cancelOrder, checkout, clearCart, createOrder, createPayment, deleteCartItem, deleteOrder, getCart, getCartCount, getOrderController, getOrderItem, getPaymentController, listOrderItems, listOrders, listPayments, paypalCancel, paypalReturn, refundOrder, simulatePaymentFailed, simulatePaymentSuccess, updateCartItem, updateOrder, vnpayReturn } from "../controllers/commerce.controller.js";
->>>>>>> Stashed changes
+import { addCartItem, cancelOrder, checkout, clearCart, createOrder, createPayment, deleteCartItem, deleteOrder, getCart, getOrderController, getOrderItem, getPaymentController, listOrderItems, listOrders, listPayments, paypalCancel, paypalReturn, refundOrder, simulatePaymentFailed, simulatePaymentSuccess, updateCartItem, updateOrder, vnpayReturn } from "../controllers/commerce.controller.js";
 import { requireAuth } from "../middlewares/auth.js";
 import { requireRole } from "../middlewares/require-role.js";
 import { validateBody, validateParams, validateQuery } from "../middlewares/validate.js";
@@ -13,12 +9,12 @@ import { idParamSchema, orderIdParamSchema } from "../validations/common.validat
 
 export const commerceRoutes = Router();
 
-commerceRoutes.get("/cart", requireAuth, requireRole(["buyer"]), asyncHandler(getCart));
-commerceRoutes.post("/cart/items", requireAuth, requireRole(["buyer"]), validateBody(cartItemSchema), asyncHandler(addCartItem));
-commerceRoutes.patch("/cart/items/:id", requireAuth, requireRole(["buyer"]), validateParams(idParamSchema), validateBody(updateCartItemSchema), asyncHandler(updateCartItem));
-commerceRoutes.delete("/cart/items/:id", requireAuth, requireRole(["buyer"]), validateParams(idParamSchema), asyncHandler(deleteCartItem));
-commerceRoutes.delete("/cart/items", requireAuth, requireRole(["buyer"]), asyncHandler(clearCart));
-commerceRoutes.post("/cart/checkout", requireAuth, requireRole(["buyer"]), validateBody(checkoutSchema), asyncHandler(checkout));
+commerceRoutes.get("/cart", requireAuth, requireRole("buyer"), asyncHandler(getCart));
+commerceRoutes.post("/cart/items", requireAuth, requireRole("buyer"), validateBody(cartItemSchema), asyncHandler(addCartItem));
+commerceRoutes.patch("/cart/items/:id", requireAuth, requireRole("buyer"), validateParams(idParamSchema), validateBody(updateCartItemSchema), asyncHandler(updateCartItem));
+commerceRoutes.delete("/cart/items/:id", requireAuth, requireRole("buyer"), validateParams(idParamSchema), asyncHandler(deleteCartItem));
+commerceRoutes.delete("/cart/items", requireAuth, requireRole("buyer"), asyncHandler(clearCart));
+commerceRoutes.post("/cart/checkout", requireAuth, requireRole("buyer"), validateBody(checkoutSchema), asyncHandler(checkout));
 
 commerceRoutes.get("/orders", requireAuth, validateQuery(listOrdersQuerySchema), asyncHandler(listOrders));
 commerceRoutes.post("/orders", requireAuth, requireRole("buyer"), validateBody(createOrderSchema), asyncHandler(createOrder));

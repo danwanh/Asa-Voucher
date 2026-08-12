@@ -241,16 +241,24 @@ Tài liệu này liệt kê các API CRUD cơ bản cần viết cho backend d�
 | `DELETE` | `/cart/items` | `buyer` | Xóa toàn bộ item trong giỏ hàng hiện tại |
 | `POST` | `/cart/checkout` | `buyer` | Tạo đơn hàng từ các item trong giỏ hàng |
 
+Payload checkout cần có `recipient_identifier` (email hoặc số điện thoại), `is_gift`, `payment_method` (`vnpay` hoặc `paypal`) và có thể có `expected_prices` để phát hiện giá voucher đã thay đổi.
+
 ### Orders
 
 | Method | Endpoint | Quyền | Mục đích |
 | --- | --- | --- | --- |
-| `GET` | `/orders` | Buyer owner, partner liên quan, admin | Danh sách đơn hàng theo quyền |
-| `POST` | `/orders` | `buyer` | Tạo đơn hàng trực tiếp từ danh sách voucher hoặc từ `cart_item_ids` |
-| `GET` | `/orders/{id}` | Owner, partner liên quan, admin | Chi tiết đơn hàng |
+| `GET` | `/orders` | Buyer tạo/nhận, partner liên quan, admin | Danh sách đơn hàng theo quyền |
+| `POST` | `/orders` | `buyer` | Tạo đơn hàng từ `cart_item_ids`, tìm người nhận bằng `recipient_identifier` |
+| `GET` | `/orders/{id}` | Buyer tạo/nhận, partner liên quan, admin | Chi tiết đơn hàng |
 | `PATCH` | `/orders/{id}` | Owner hoặc admin | Cập nhật ghi chú/trạng thái phù hợp |
 | `DELETE` | `/orders/{id}` | Owner hoặc admin | Hủy đơn nếu chưa thanh toán |
 | `PATCH` | `/orders/{id}/cancel` | Owner hoặc admin | Hủy đơn hàng |
+
+### Recipient lookup
+
+| Method | Endpoint | Quyền | Mục đích |
+| --- | --- | --- | --- |
+| `GET` | `/users/recipient-lookup?identifier=` | `buyer` | Tìm người nhận theo email hoặc số điện thoại, chỉ trả về thông tin định danh an toàn |
 
 ### Order items
 
@@ -266,10 +274,19 @@ Không khuyến nghị viết API sửa/xóa `order_items` sau khi đơn đã t�
 | Method | Endpoint | Quyền | Mục đích |
 | --- | --- | --- | --- |
 | `GET` | `/orders/{orderId}/payments` | Owner hoặc admin | Lịch sử thanh toán của đơn |
-| `POST` | `/orders/{orderId}/payments` | Owner | Tạo thanh toán mô phỏng |
+| `POST` | `/orders/{orderId}/payments` | Buyer tạo/nhận | Tạo thanh toán mô phỏng VNPay hoặc PayPal |
 | `PATCH` | `/payments/{id}/simulate-success` | Owner hoặc admin | Mô phỏng thanh toán thành công |
 | `PATCH` | `/payments/{id}/simulate-failed` | Owner hoặc admin | Mô phỏng thanh toán thất bại |
 | `GET` | `/payments/{id}` | Owner hoặc admin | Chi tiết thanh toán |
+
+### Voucher validation and redemption
+
+| Method | Endpoint | Quyền | Mục đích |
+| --- | --- | --- | --- |
+| `POST` | `/issued-vouchers/validate` | Partner staff hoặc admin | Kiểm tra voucher bằng code hoặc `qr_code_payload` |
+| `POST` | `/issued-vouchers/{id}/redeem` | `partner_store_staff` | Xác nhận sử dụng voucher tại đúng chi nhánh |
+
+QR payload được phát hành dưới dạng URL `FRONTEND_URL/voucher/verify?code={voucher_code}` để mở trực tiếp trang xác nhận staff.
 
 ### Nghiệp vụ chính
 
@@ -280,11 +297,16 @@ Không khuyến nghị viết API sửa/xóa `order_items` sau khi đơn đã t�
 - `cart_items.quantity` phải là số nguyên dương và không vượt `voucher_products.remaining_quantity` tại thời điểm thêm/cập nhật/checkout.
 - Khi checkout thành công từ giỏ hàng, backend tạo `orders` và `order_items`, sau đó xóa các `cart_items` đã checkout.
 - Khi tạo đơn phải snapshot giá vào `order_items`.
+- `orders.user_id` là người tạo đơn; `orders.recipient_id` là người sở hữu voucher sau thanh toán.
+- `recipient_identifier` phải khớp email hoặc số điện thoại của tài khoản tồn tại trong `users`; nếu không, trả `RECIPIENT_NOT_FOUND`.
+- Mua cho bản thân dùng `recipient_id = user_id`; mua tặng dùng `is_gift = true`.
+- Đơn pending có thời hạn thanh toán 15 phút qua `payment_expires_at`.
 - Tổng tiền đơn hàng tính từ `order_items`, không tin dữ liệu giá từ client.
 - Chỉ cho mua voucher đang bán hợp lệ.
 - Số lượng mua không vượt `remaining_quantity`.
-- Khi thanh toán thành công: cập nhật `payment_status = paid`, `status = confirmed/completed`, giảm tồn kho và phát hành voucher điện tử.
+- Khi thanh toán thành công: cập nhật `payments.status = success`, `orders.status = confirmed`, giảm tồn kho và phát hành voucher điện tử.
 - Thanh toán thật nằm ngoài phạm vi, chỉ cần mô phỏng.
+- Provider mô phỏng được giới hạn ở `vnpay` và `paypal`; không dùng secret khi các biến môi trường để trống.
 
 ### Test và điều kiện đạt
 
@@ -301,6 +323,8 @@ Không khuyến nghị viết API sửa/xóa `order_items` sau khi đơn đã t�
 | Mua voucher chưa duyệt | Tạo order với voucher `pending` | Trả `422` |
 | Hủy đơn chưa thanh toán | `PATCH /orders/{id}/cancel` | Trạng thái `cancelled` |
 | Thanh toán thành công | `PATCH /payments/{id}/simulate-success` | Payment `success`, order `paid`, phát hành đủ voucher code |
+| Người nhận không tồn tại | `POST /orders` với email không có trong `users` | Trả `422 RECIPIENT_NOT_FOUND` |
+| Hết hạn thanh toán | Tạo payment sau 15 phút | Order `cancelled`, trả `409 ORDER_PAYMENT_EXPIRED` |
 | Thanh toán lại đơn đã paid | Gọi simulate-success lần 2 | Trả `409` hoặc idempotent không phát hành trùng |
 
 ## 7. Issued Voucher và Redemption APIs

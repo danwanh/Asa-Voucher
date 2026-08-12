@@ -12,7 +12,6 @@ import {
   YAxis,
 } from "recharts"
 import { C, fmt } from "@/utils/constants"
-import { PartnerDashboardPage } from "@/pages/partner/PartnerDashboardPage"
 import { partnerService, type PartnerBranch } from "@/services/partnerService"
 import { reportService, type RevenuePoint, type VoucherReportItem } from "@/services/reportService"
 
@@ -36,14 +35,22 @@ function fmtDate(date: string) {
   return value.toLocaleDateString("vi-VN")
 }
 
-function buildUsageSummary(rows: VoucherReportItem[]) {
-  const revenue = rows.reduce((sum, item) => sum + item.revenue, 0)
-  const issued = rows.reduce((sum, item) => sum + item.issued_quantity, 0)
-  const sold = rows.reduce((sum, item) => sum + item.sold_quantity, 0)
-  const used = rows.reduce((sum, item) => sum + item.used_quantity, 0)
-  const expired = rows.reduce((sum, item) => sum + item.expired_quantity, 0)
+function voucherUsageRate(item: VoucherReportItem) {
+  if (item.sold_quantity === 0) return 0
+  return Number(((item.used_quantity / item.sold_quantity) * 100).toFixed(2))
+}
+
+function buildUsageSummary(revenueRows: RevenuePoint[], voucherRows: VoucherReportItem[]) {
+  const revenue = revenueRows.reduce((sum, item) => sum + item.revenue, 0)
+  const issued = voucherRows.reduce((sum, item) => sum + item.total_quantity, 0)
+  const remaining = voucherRows.reduce((sum, item) => sum + item.remaining_quantity, 0)
+  const sold = voucherRows.reduce((sum, item) => sum + item.sold_quantity, 0)
+  const used = voucherRows.reduce((sum, item) => sum + item.used_quantity, 0)
   const usageRate = sold === 0 ? 0 : Number(((used / sold) * 100).toFixed(2))
-  return { revenue, issued, sold, used, expired, usageRate }
+  const activeVouchers = voucherRows.filter((item) => item.remaining_quantity > 0).length
+  const totalVouchers = voucherRows.length
+
+  return { revenue, issued, remaining, sold, used, usageRate, activeVouchers, totalVouchers }
 }
 
 export function PartnerRevenuePage({ partnerId, partnerName }: Props) {
@@ -153,7 +160,7 @@ export function PartnerRevenuePage({ partnerId, partnerName }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [partnerId, fromMonth, toMonth, branchId, voucherId])
 
-  const usageSummary = useMemo(() => buildUsageSummary(voucherStats), [voucherStats])
+  const usageSummary = useMemo(() => buildUsageSummary(revenue, voucherStats), [revenue, voucherStats])
 
   const hasReportData = revenue.length > 0 || voucherStats.length > 0
 
@@ -164,11 +171,6 @@ export function PartnerRevenuePage({ partnerId, partnerName }: Props) {
         <div className="text-xs font-semibold px-3 py-1.5 rounded-xl" style={{ backgroundColor: C.indigo + "12", color: C.indigo }}>
           {partnerName || "Đối tác hiện tại"}
         </div>
-      </div>
-
-      {/* Merge toàn bộ phần dashboard hiện có vào trang Báo cáo. */}
-      <div className="bg-white rounded-2xl shadow-sm">
-        <PartnerDashboardPage partnerId={partnerId} />
       </div>
 
       <div className="bg-white rounded-2xl p-4 border shadow-sm" style={{ borderColor: "#E2DFC8" }}>
@@ -252,10 +254,18 @@ export function PartnerRevenuePage({ partnerId, partnerName }: Props) {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-7 gap-4">
             <div className="bg-card rounded-2xl p-4 shadow-sm">
               <div className="text-xs font-semibold" style={{ color: "#8A8DA8" }}>Doanh thu</div>
               <div className="text-lg font-black mt-1" style={{ color: C.peach }}>{fmt(usageSummary.revenue)}</div>
+            </div>
+            <div className="bg-card rounded-2xl p-4 shadow-sm">
+              <div className="text-xs font-semibold" style={{ color: "#8A8DA8" }}>Voucher đang bán</div>
+              <div className="text-lg font-black mt-1" style={{ color: C.teal }}>{usageSummary.activeVouchers}</div>
+            </div>
+            <div className="bg-card rounded-2xl p-4 shadow-sm">
+              <div className="text-xs font-semibold" style={{ color: "#8A8DA8" }}>Tổng voucher</div>
+              <div className="text-lg font-black mt-1" style={{ color: C.indigo }}>{usageSummary.totalVouchers}</div>
             </div>
             <div className="bg-card rounded-2xl p-4 shadow-sm">
               <div className="text-xs font-semibold" style={{ color: "#8A8DA8" }}>Phát hành</div>
@@ -270,8 +280,8 @@ export function PartnerRevenuePage({ partnerId, partnerName }: Props) {
               <div className="text-lg font-black mt-1" style={{ color: C.teal }}>{usageSummary.used}</div>
             </div>
             <div className="bg-card rounded-2xl p-4 shadow-sm">
-              <div className="text-xs font-semibold" style={{ color: "#8A8DA8" }}>Hết hạn</div>
-              <div className="text-lg font-black mt-1" style={{ color: "#B45309" }}>{usageSummary.expired}</div>
+              <div className="text-xs font-semibold" style={{ color: "#8A8DA8" }}>Còn lại</div>
+              <div className="text-lg font-black mt-1" style={{ color: "#B45309" }}>{usageSummary.remaining}</div>
             </div>
             <div className="bg-card rounded-2xl p-4 shadow-sm">
               <div className="text-xs font-semibold" style={{ color: "#8A8DA8" }}>Tỷ lệ sử dụng</div>
@@ -319,12 +329,10 @@ export function PartnerRevenuePage({ partnerId, partnerName }: Props) {
                     {[
                       "Voucher",
                       "Phát hành",
+                        "Còn lại",
                       "Đã bán",
                       "Đã dùng",
-                      "Hết hạn",
                       "Tỷ lệ sử dụng",
-                      "Doanh thu",
-                      "Kết thúc bán",
                     ].map((header) => (
                       <th key={header} className="px-4 py-3 text-left text-xs font-bold" style={{ color: C.indigo }}>{header}</th>
                     ))}
@@ -334,13 +342,11 @@ export function PartnerRevenuePage({ partnerId, partnerName }: Props) {
                   {voucherStats.map((item) => (
                     <tr key={item.voucher_product_id} className="border-t" style={{ borderColor: "#F0EDD8" }}>
                       <td className="px-4 py-3 font-semibold" style={{ color: C.indigo }}>{item.name}</td>
-                      <td className="px-4 py-3">{item.issued_quantity}</td>
+                      <td className="px-4 py-3">{item.total_quantity}</td>
+                      <td className="px-4 py-3">{item.remaining_quantity}</td>
                       <td className="px-4 py-3">{item.sold_quantity}</td>
                       <td className="px-4 py-3">{item.used_quantity}</td>
-                      <td className="px-4 py-3">{item.expired_quantity}</td>
-                      <td className="px-4 py-3">{item.usage_rate}%</td>
-                      <td className="px-4 py-3">{fmt(item.revenue)}</td>
-                      <td className="px-4 py-3">{fmtDate(item.sale_end_date)}</td>
+                      <td className="px-4 py-3">{voucherUsageRate(item)}%</td>
                     </tr>
                   ))}
                 </tbody>

@@ -8,6 +8,7 @@ import type {
   VoucherReportItem,
 } from "../types/report.types.js";
 import type { ReportQuery } from "../validations/report.validation.js";
+import type { StaffVoucherReportItem } from "../types/report.types.js";
 
 function isPartnerOwnerLike(role: AuthUser["role"]) {
   return role === "partner_owner" || role === "partner_voucher_staff";
@@ -23,8 +24,13 @@ function resolvePartnerScope(user: AuthUser, query: ReportQuery): string | undef
   throw new HttpError(403, "Bạn không có quyền xem báo cáo");
 }
 
-function toDateKey(isoTimestamp: string): string {
-  return isoTimestamp.slice(0, 10);
+function toDateKey(value: Date | string): string {
+  if (value instanceof Date) {
+    // Keep UTC day stable regardless of local server timezone.
+    return value.toISOString().slice(0, 10);
+  }
+
+  return value.slice(0, 10);
 }
 
 export async function getRevenueReport(user: AuthUser, query: ReportQuery): Promise<RevenuePoint[]> {
@@ -34,7 +40,7 @@ export async function getRevenueReport(user: AuthUser, query: ReportQuery): Prom
   if (partnerId) {
     const items = await reportRepo.listOrderItemsForPartner(partnerId, query.date_from, query.date_to);
     for (const item of items) {
-      if (item.orders?.payment_status !== "paid") continue;
+      if (!item.orders || !["confirmed", "completed"].includes(item.orders.status)) continue;
       const key = toDateKey(item.orders.created_at);
       const bucket = buckets.get(key) ?? { revenue: 0, orderIds: new Set<string>() };
       bucket.revenue += Number(item.subtotal);
@@ -110,7 +116,7 @@ export async function getPartnerReport(user: AuthUser, query: ReportQuery): Prom
     let revenue = 0;
     const paidOrderIds = new Set<string>();
     for (const item of items) {
-      if (item.orders?.payment_status !== "paid") continue;
+      if (!item.orders || !["confirmed", "completed"].includes(item.orders.status)) continue;
       revenue += Number(item.subtotal);
       paidOrderIds.add(item.order_id);
     }
@@ -125,4 +131,57 @@ export async function getPartnerReport(user: AuthUser, query: ReportQuery): Prom
   }
 
   return results;
+}
+
+// CHO BÁO CÁO HIỆU SUẤT VOUCHER THEO NHÂN VIÊN
+// Hàm lấy báo cáo theo nhân viên
+export async function getStaffVoucherReport(user: AuthUser, query: ReportQuery,):Promise<StaffVoucherReportItem[]> {
+  // Kiểm tra tài khoản có tồn tại
+  if (!user.partnerId) {
+    throw new HttpError(403, "Tài khoản chưa gắn với đối tác nào");
+  }
+
+  // Gọi repositories funcs
+  // Lấy danh sách voucher do user tạo
+  const products = await reportRepo.listVoucherProductsByCreator(user.id, query.category_id, query.date_from, query.date_to);
+
+  // Extract ra mảng
+  const productIds =  products.map(p => p.id);
+
+  // Query 2 cái còn lại
+  const [usedCounts, revenueMap] = await Promise.all([reportRepo.countUsedByProducts(productIds), reportRepo.sumRevenueProducts(productIds),]);
+
+  // Dùng vòng lặp cho giá trị
+  const reportItems: StaffVoucherReportItem[] = products.map((product) => {
+    // Tính số lượng bán
+    const soldQuantity = product.total_quantity - product.remaining_quantity;
+
+    // Tính số lượng đã dùng
+    const usedQuantity = usedCounts[product.id]??0;
+
+    // Tính doanh thu
+    const totalRevenue = Number(revenueMap[product.id])??0;
+
+    // Tính tỉ lệ sử dụng (%)
+    const calculatedUsageRate = soldQuantity > 0 ? Math.round((usedQuantity / soldQuantity) * 10000)/100 : 0;
+
+    // Tính điểm hiệu quả
+    const calcuatedEffectiveness = Math.round(calculatedUsageRate * totalRevenue / 10000);
+
+    // Trả về đúng cấu trúc
+    return {
+      voucher_product_id: product.id,
+      program_name: product.name,
+      category_name: (product as any).category_name?? "",
+      total_quantity: product.total_quantity,
+      sold_quantity: soldQuantity,
+      used_quantity: usedQuantity,
+      usage_rate: calculatedUsageRate,
+      revenue:totalRevenue,
+      effectiveness_score: calcuatedEffectiveness,
+    };
+  });
+
+  // Trả về kết quả cuối cùng
+  return reportItems;
 }

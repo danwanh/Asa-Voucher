@@ -23,7 +23,7 @@ issuedVoucherRoutes.post(
 );
 issuedVoucherRoutes.post(
   "/issued-vouchers/:id/redeem",
-  requireRole("partner_owner", "partner_voucher_staff", "partner_store_staff"),
+  requireRole("partner_store_staff"),
   asyncHandler(issuedVoucherController.redeemVoucher),
 );
 
@@ -35,4 +35,15 @@ issuedVoucherRoutes.get(
   "/voucher-usages",
   requireRole("partner_owner", "partner_voucher_staff", "partner_store_staff", "admin_security"),
   asyncHandler(issuedVoucherController.listVoucherUsages),
+);
+
+// Cho phần kiểm tra voucher bởi nhân viên cửa hàng
+issuedVoucherRoutes.post(
+  "/issued-vouchers/check", requireRole("partner_store_staff"),
+  asyncHandler(issuedVoucherController.checkVoucher),
+);
+
+// Cho phần nhân viên cửa hàng xác nhận sử dụng
+issuedVoucherRoutes.post(
+  "/issued-vouchers/confirm", requireRole("partner_store_staff"),asyncHandler(issuedVoucherController.confirmVoucher),
 );

@@ -11,14 +11,11 @@ interface Props {
   onBack: () => void
 }
 
-type PaymentMethod = "vnpay" | "momo" | "zalopay" | "bank" | "qr"
+type PaymentMethod = "vnpay" | "paypal"
 
 const PAYMENT_METHODS = [
   { id: "vnpay" as PaymentMethod, label: "VNPay", icon: "creditCard", desc: "Thẻ ATM / Internet Banking" },
-  { id: "momo" as PaymentMethod, label: "MoMo", icon: "wallet", desc: "Ví điện tử MoMo" },
-  { id: "zalopay" as PaymentMethod, label: "ZaloPay", icon: "wallet", desc: "Ví điện tử ZaloPay" },
-  { id: "bank" as PaymentMethod, label: "Thẻ ngân hàng", icon: "building", desc: "Visa / Mastercard / JCB" },
-  { id: "qr" as PaymentMethod, label: "QR Banking", icon: "smartphone", desc: "Quét mã QR ngân hàng" },
+  { id: "paypal" as PaymentMethod, label: "PayPal", icon: "wallet", desc: "Thanh toán mô phỏng qua PayPal" },
 ]
 
 export function CheckoutPage({ cart, total, onSuccess, onBack }: Props) {

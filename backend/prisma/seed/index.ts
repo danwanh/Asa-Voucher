@@ -4,6 +4,7 @@ import { seedUsers } from "./01-users.js";
 import { seedCatalog } from "./02-catalog.js";
 import { seedCommerce } from "./03-commerce.js";
 import { seedEngagement } from "./04-engagement.js";
+import { seedRbac } from "../../src/seed/rbac-seed.js";
 import { TEST_PASSWORD } from "./shared.js";
 
 const prisma = new PrismaClient();
@@ -32,6 +33,10 @@ async function clearSeedDomain() {
   await prisma.partnerBranch.deleteMany();
   await prisma.partner.deleteMany();
 
+  await prisma.rolePermission.deleteMany();
+  await prisma.permission.deleteMany();
+  await prisma.role.deleteMany();
+
   await prisma.refreshToken.deleteMany();
   await prisma.authenticationLog.deleteMany();
   await prisma.adminLog.deleteMany();
@@ -48,6 +53,7 @@ async function main() {
   await seedCatalog({ prisma, passwordHash });
   await seedCommerce({ prisma, passwordHash });
   await seedEngagement({ prisma, passwordHash });
+  await seedRbac({ prisma });
 
   console.log("Seed dữ liệu hoàn tất.");
   console.log(`Mật khẩu test dùng chung: ${TEST_PASSWORD}`);

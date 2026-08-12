@@ -26,6 +26,9 @@ type BackendVoucherProduct = {
   terms_and_conditions: unknown
   usage_instructions: unknown
   status: string
+  workflow_status?: string
+  workflow_label?: string
+  submitted_at?: string | null
   partners?: {
     business_name: string
   } | null
@@ -47,6 +50,10 @@ type BackendVoucherList = {
 type BackendReview = {
   id: string
   user_id: string
+  users?: {
+    full_name?: string | null
+    avatar_url?: string | null
+  } | null
   rating: number
   comment: string | null
   created_at: string
@@ -54,6 +61,8 @@ type BackendReview = {
 
 type BackendReviewList = {
   items: BackendReview[]
+  pagination?: { total: number }
+  average_rating?: number
 }
 
 type BackendVoucherBranch = {
@@ -66,6 +75,25 @@ type BackendVoucherBranch = {
     city: string
     district: string | null
   }
+}
+
+export type VoucherCreateInput = {
+  category_id: string
+  name: string
+  description: string
+  original_price: number
+  selling_price: number
+  applicable_area?: string
+  total_quantity: number
+  terms_and_conditions: string[]
+  usage_instructions?: string[]
+  sale_start_date: string
+  sale_end_date: string
+  validity_days: number
+}
+
+export type VoucherUpdateInput = Partial<VoucherCreateInput> & {
+  thumbnail_url?: string
 }
 
 export type VoucherPublicReview = {
@@ -97,10 +125,22 @@ function toNumber(value: string | number): number {
   return typeof value === "number" ? value : Number(value)
 }
 
-function mapStatus(status: string, remaining: number, validTo: string): Voucher["status"] {
+function mapStatus(product: BackendVoucherProduct): Voucher["status"] {
+  if (product.workflow_status === "draft") return "draft"
+  if (product.workflow_status === "pending_approval") return "pending"
+  if (product.workflow_status === "approved") return "approved"
+  if (product.workflow_status === "rejected") return "rejected"
+  if (product.workflow_status === "paused") return "locked"
+  if (product.workflow_status === "sold_out") return "sold_out"
+  if (product.workflow_status === "expired") return "expired"
+  if (product.workflow_status === "active") return "active"
+
+  const remaining = product.remaining_quantity
+  const validTo = product.sale_end_date
   if (remaining <= 0) return "sold_out"
   if (new Date(validTo) < new Date()) return "expired"
-  if (status === "active") return "active"
+  if (product.status === "active") return "active"
+  if (product.status === "draft") return "draft"
   return "pending"
 }
 
@@ -134,7 +174,7 @@ function mapVoucherProduct(product: BackendVoucherProduct, categorySlug: string)
     validTo: product.sale_end_date,
     quantity: product.total_quantity,
     sold,
-    status: mapStatus(product.status, product.remaining_quantity, product.sale_end_date),
+    status: mapStatus(product),
     rating: 0,
     reviews: 0,
     description: product.description ?? "",
@@ -145,9 +185,16 @@ function mapVoucherProduct(product: BackendVoucherProduct, categorySlug: string)
 }
 
 function mapReview(review: BackendReview): VoucherPublicReview {
+  const fullName = review.users?.full_name?.trim() || "Khách hàng"
+  const nameParts = fullName.split(/\s+/).filter(Boolean)
+  const lastName = nameParts.pop() ?? "K"
+  const maskedName = nameParts.length > 0
+    ? `${nameParts.join(" ")} ${lastName.charAt(0)}***`
+    : `${lastName.charAt(0)}***`
+
   return {
     id: review.id,
-    name: "Khách hàng",
+    name: maskedName,
     rating: review.rating,
     text: review.comment?.trim() || "",
     date: review.created_at
@@ -192,7 +239,7 @@ function categoryFromMap(categoryMap: Map<string, BackendCategory>, categoryId: 
 }
 
 export const voucherService = {
-  async listPublicVouchers(params?: { page?: number; limit?: number; search?: string; categoryId?: string; partnerId?: string }): Promise<Voucher[]> {
+  async listPublicVouchers(params?: { page?: number; limit?: number; search?: string; categoryId?: string; partnerId?: string; area?: string }): Promise<Voucher[]> {
     const [categoryMap, listRes] = await Promise.all([
       getCategoryMap(),
       api.get<ApiEnvelope<BackendVoucherList>>("/voucher-products", {
@@ -201,7 +248,8 @@ export const voucherService = {
           limit: params?.limit ?? 100,
           search: params?.search,
           category_id: params?.categoryId,
-          partner_id: params?.partnerId
+          partner_id: params?.partnerId,
+          area: params?.area
         }
       })
     ])
@@ -211,6 +259,65 @@ export const voucherService = {
       const category = categoryFromMap(categoryMap, item.category_id)
       return mapVoucherProduct(item, category.slug)
     })
+  },
+
+  async listMyVouchers(params?: { page?: number; limit?: number; search?: string; categoryId?: string }): Promise<Voucher[]> {
+    const [categoryMap, listRes] = await Promise.all([
+      getCategoryMap(),
+      api.get<ApiEnvelope<BackendVoucherList>>("/voucher-products", {
+        params: {
+          scope: "mine",
+          page: params?.page ?? 1,
+          limit: params?.limit ?? 100,
+          search: params?.search,
+          category_id: params?.categoryId
+        }
+      })
+    ])
+
+    return extractData(listRes).items.map((item) => {
+      const category = categoryFromMap(categoryMap, item.category_id)
+      return mapVoucherProduct(item, category.slug)
+    })
+  },
+
+  async listCategories(): Promise<BackendCategory[]> {
+    const categoryMap = await getCategoryMap()
+    return Array.from(categoryMap.values())
+  },
+
+  async createVoucher(input: VoucherCreateInput): Promise<Voucher> {
+    const [categoryMap, createRes] = await Promise.all([
+      getCategoryMap(),
+      api.post<ApiEnvelope<BackendVoucherProduct>>("/voucher-products", input)
+    ])
+    const item = extractData(createRes)
+    const category = categoryFromMap(categoryMap, item.category_id)
+    return mapVoucherProduct(item, category.slug)
+  },
+
+  async updateVoucher(voucherId: string, input: VoucherUpdateInput): Promise<Voucher> {
+    const [categoryMap, updateRes] = await Promise.all([
+      getCategoryMap(),
+      api.patch<ApiEnvelope<BackendVoucherProduct>>(`/voucher-products/${voucherId}`, input)
+    ])
+    const item = extractData(updateRes)
+    const category = categoryFromMap(categoryMap, item.category_id)
+    return mapVoucherProduct(item, category.slug)
+  },
+
+  async assignBranch(voucherId: string, branchId: string): Promise<void> {
+    await api.post(`/voucher-products/${voucherId}/branches`, { branch_id: branchId })
+  },
+
+  async submitVoucher(voucherId: string): Promise<Voucher> {
+    const [categoryMap, submitRes] = await Promise.all([
+      getCategoryMap(),
+      api.patch<ApiEnvelope<BackendVoucherProduct>>(`/voucher-products/${voucherId}/submit`)
+    ])
+    const item = extractData(submitRes)
+    const category = categoryFromMap(categoryMap, item.category_id)
+    return mapVoucherProduct(item, category.slug)
   },
 
   async getDetail(id: string): Promise<VoucherDetailData> {
@@ -225,7 +332,8 @@ export const voucherService = {
     const category = categoryFromMap(categoryMap, voucherProduct.category_id)
 
     const current = mapVoucherProduct(voucherProduct, category.slug)
-    const reviews = extractData(reviewsRes).items.map(mapReview).filter((item) => item.text)
+    const reviewList = extractData(reviewsRes)
+    const reviews = reviewList.items.map(mapReview).filter((item) => item.text)
     const branches = extractData(branchesRes).map(mapBranch)
 
     const conditions = parseStringArray(voucherProduct.terms_and_conditions)
@@ -234,8 +342,8 @@ export const voucherService = {
     return {
       voucher: {
         ...current,
-        reviews: reviews.length,
-        rating: reviews.length === 0 ? 0 : Number((reviews.reduce((sum, item) => sum + item.rating, 0) / reviews.length).toFixed(1))
+        reviews: reviewList.pagination?.total ?? reviews.length,
+        rating: reviewList.average_rating ?? 0
       },
       reviews,
       branches,

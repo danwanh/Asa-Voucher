@@ -8,6 +8,8 @@ export const complaintRoutes = Router();
 
 complaintRoutes.use(requireAuth);
 
+complaintRoutes.get("/complaints/admins/search", asyncHandler(complaintController.searchAdmins));
+
 complaintRoutes.get("/complaints", asyncHandler(complaintController.listComplaints));
 complaintRoutes.post(
   "/complaints",
@@ -20,12 +22,12 @@ complaintRoutes.delete("/complaints/:id", asyncHandler(complaintController.close
 
 complaintRoutes.patch(
   "/complaints/:id/assign",
-  requireRole("admin_content", "admin_operations"),
+  requireRole("admin_content", "admin_operations", "partner_owner", "partner_voucher_staff"),
   asyncHandler(complaintController.assignComplaint),
 );
 complaintRoutes.patch(
   "/complaints/:id/resolve",
-  requireRole("admin_content", "admin_operations"),
+  requireRole("admin_content", "admin_operations", "partner_owner", "partner_voucher_staff"),
   asyncHandler(complaintController.resolveComplaint),
 );
 

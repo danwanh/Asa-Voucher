@@ -3,7 +3,7 @@ import * as commerceService from "../services/commerce.service.js";
 import { created, noContent, ok } from "../utils/response.js";
 
 export async function getCart(req: Request, res: Response) {
-  ok(res, await commerceService.getCart(req.user!.id));
+  ok(res, await commerceService.getCart(req.user!.id), "Cart retrieved");
 }
 
 export async function addCartItem(req: Request, res: Response) {
@@ -86,8 +86,6 @@ export async function simulatePaymentSuccess(req: Request, res: Response) {
 export async function simulatePaymentFailed(req: Request, res: Response) {
   ok(res, await commerceService.simulatePaymentFailed({ ...req.user!, partnerId: req.user!.partnerId ?? undefined }, req.params.id), "Payment failed");
 }
-<<<<<<< Updated upstream
-=======
 
 export async function vnpayReturn(req: Request, res: Response) {
   res.redirect(await commerceService.handleVnpayReturn(req.query as Record<string, unknown>));
@@ -104,4 +102,3 @@ export async function paypalCancel(req: Request, res: Response) {
 export async function refundOrder(req: Request, res: Response) {
   ok(res, await commerceService.refundOrder({ ...req.user!, partnerId: req.user!.partnerId ?? undefined }, req.params.id, req.body.note ?? req.body.reason), "Order refunded");
 }
->>>>>>> Stashed changes

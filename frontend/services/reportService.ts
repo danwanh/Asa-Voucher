@@ -1,4 +1,5 @@
 import { api } from "./api"
+import type { StaffVoucherReportItem } from "@/types"
 
 type ApiEnvelope<T> = {
   success: boolean
@@ -59,4 +60,9 @@ export const reportService = {
     const res = await api.get<ApiEnvelope<VoucherReportItem[]>>("/reports/vouchers", { params: filters })
     return extractData(res)
   },
+
+  async getStaffVoucherReport(filters: ReportFilters): Promise<StaffVoucherReportItem[]> {
+    const res = await api.get<ApiEnvelope<StaffVoucherReportItem[]>>("/reports/staff-vouchers", {params: filters})
+    return extractData(res)
+  }
 }

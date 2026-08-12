@@ -1,9 +1,10 @@
 import type { Request, Response } from "express";
 import * as voucherProductService from "../services/voucher-product.service.js";
 import { created, noContent, ok } from "../utils/response.js";
+import { writeAuditLog } from "../services/audit-log.service.js";
 
 export async function listVoucherProducts(req: Request, res: Response) {
-  ok(res, await voucherProductService.listVoucherProducts(req.query as Record<string, string | number>));
+  ok(res, await voucherProductService.listVoucherProducts(req.user, req.query as Record<string, string | number>));
 }
 
 export async function createVoucherProduct(req: Request, res: Response) {
@@ -28,11 +29,25 @@ export async function submitVoucherProduct(req: Request, res: Response) {
 }
 
 export async function approveVoucherProduct(req: Request, res: Response) {
-  ok(res, await voucherProductService.approveVoucherProduct(req.user!.id, req.params.id, req.body.approval_status), "Voucher approval updated");
+  const result = await voucherProductService.approveVoucherProduct(req.user!.id, req.params.id, req.body.approval_status);
+  await writeAuditLog({
+    adminId: req.user!.id,
+    action: req.body.approval_status === "approved" ? "voucher_approved" : "voucher_rejected",
+    description: `${req.body.approval_status === "approved" ? "Duyệt" : "Từ chối"} voucher`,
+    targetVoucherId: req.params.id,
+  });
+  ok(res, result, "Voucher approval updated");
 }
 
 export async function updateVoucherStatus(req: Request, res: Response) {
-  ok(res, await voucherProductService.updateVoucherStatus(req.user!, req.params.id, req.body.status), "Voucher status updated");
+  const result = await voucherProductService.updateVoucherStatus(req.user!, req.params.id, req.body.status);
+  await writeAuditLog({
+    adminId: req.user!.id,
+    action: "voucher_status_changed",
+    description: `Thay đổi trạng thái voucher thành "${req.body.status}"`,
+    targetVoucherId: req.params.id,
+  });
+  ok(res, result, "Voucher status updated");
 }
 
 export async function listVoucherImages(req: Request, res: Response) {

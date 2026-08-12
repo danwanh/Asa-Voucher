@@ -19,7 +19,7 @@ export type VoucherStatus =
   | "locked"
   | "cancelled"
   | "used"
-export type OrderStatus = "pending" | "completed" | "cancelled" | "used"
+export type OrderStatus = "pending_payment" | "payment_failed" | "confirmed" | "completed" | "cancelled" | "pending_manual" | "used" | "refunded"
 
 // Kept for pages that still reference the old admin sub-role concept;
 // no longer used on AppUser (admin_content/admin_operations/admin_security are
@@ -143,19 +143,89 @@ export interface StaffMember {
 export interface Order {
   id: string
   userId: string
+  userName?: string
+  orderCode?: string
   voucherId: string
   voucherTitle: string
+  partnerId?: string
   partnerName: string
   amount: number
   status: OrderStatus
+  paymentStatus: string
   paymentMethod: string
   createdAt: string
+  updatedAt?: string
   code: string
+  qrPayload?: string
+  recipientId?: string
+  isGift?: boolean
+  giverName?: string
+  complaints?: Complaint[]
+  paymentExpiresAt?: string
+  items?: OrderItem[]
+  payments?: Payment[]
+  note?: string
+}
+
+export interface OrderItem {
+  id: string
+  voucherId: string
+  quantity: number
+  unitPrice: number
+  subtotal: number
+  voucherTitle?: string
+  partnerName?: string
+  issuedVouchers?: IssuedVoucher[]
+}
+
+export interface IssuedVoucher {
+  id: string
+  code: string
+  qrPayload: string
+  status: "active" | "used" | "expired" | "refunded"
+  expiredDate?: string
+  review?: Review
+  complaint?: Complaint
+}
+
+export interface Review {
+  id: string
+  issuedVoucherId?: string
+  rating: number
+  comment: string | null
+  mediaUrls: string[]
+  createdAt: string
+}
+
+export type ComplaintStatus = "open" | "under_review" | "resolved" | "closed"
+
+export interface Complaint {
+  id: string
+  issuedVoucherId?: string
+  reason: string
+  description: string
+  evidenceUrls: string[]
+  status: ComplaintStatus
+  resolutionNote?: string | null
+  resolutionType?: string | null
+  createdAt: string
+  resolvedAt?: string | null
+}
+
+export interface Payment {
+  id: string
+  orderId: string
+  method: "vnpay" | "paypal"
+  amount: number
+  status: "pending" | "success" | "failed" | "refunded"
+  transactionRef?: string
+  checkout_url?: string
 }
 
 export interface CartItem {
   voucher: Voucher
   qty: number
+  cartItemId?: string
 }
 
 export interface User {
@@ -197,4 +267,125 @@ export interface VerificationRecord {
   staffName: string
   verifiedAt: string
   status: "valid" | "invalid" | "used"
+}
+
+// ── FC-PAV-MANAGE: VoucherProduct types (match backend Prisma) ──────
+export interface VoucherProduct {
+  id: string
+  partner_id: string
+  category_id: string
+  name: string
+  description: string | null
+  thumbnail_url: string | null
+  original_price: number
+  selling_price: number
+  discount_rate: number
+  applicable_area: string | null
+  total_quantity: number
+  remaining_quantity: number
+  terms_and_conditions: unknown | null
+  usage_instructions: unknown | null
+  sale_start_date: string
+  sale_end_date: string
+  validity_days: number
+  status: VoucherProductStatus
+  approval_status: ApprovalStatus
+  approved_by: string | null
+  approved_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type VoucherProductStatus = "draft" | "active" | "paused" | "sold_out" | "expired"
+export type ApprovalStatus = "pending" | "approved" | "rejected"
+
+export interface VoucherProductImage {
+  id: string
+  voucher_product_id: string
+  image_url: string
+  is_primary: boolean
+  sort_order: number
+}
+
+export interface VoucherProductBranch {
+  id: string
+  voucher_product_id: string
+  branch_id: string
+  partner_branches?: {
+    id: string
+    branch_name: string
+    address: string
+    city: string
+    district: string | null
+    phone: string | null
+  }
+}
+
+// ── FC-PAV-MANAGE: Field locking rules ─────────────────────────────
+export const LOCKED_FIELDS_BY_STATUS: Record<string, string[]> = {
+  draft: [],
+  pending: [],
+  approved: ["total_quantity", "remaining_quantity"],
+  active: ["total_quantity", "remaining_quantity", "original_price", "selling_price"],
+  sold_out: ["total_quantity", "remaining_quantity", "original_price", "selling_price", "name", "category_id"],
+  expired: ["*"],
+}
+
+export function getLockedFields(status: string): string[] {
+  return LOCKED_FIELDS_BY_STATUS[status] ?? ["*"]
+}
+
+export function isFieldLocked(status: string, field: string): boolean {
+  const locked = getLockedFields(status)
+  if (locked.includes("*")) return true
+  return locked.includes(field)
+}
+
+// ── FC-PAV-REPORT: Staff voucher report type ───────────────────────
+export interface StaffVoucherReportItem {
+  voucher_product_id: string;
+  program_name: string;
+  category_name: string;
+  total_quantity: number;
+  sold_quantity: number;
+  used_quantity: number;
+  usage_rate: number;
+  revenue: number;
+  effectiveness_score: number;
+}
+
+// ── FC-PAS-CHECK: Voucher check result type ───────────────────────
+export interface CheckVoucherResult {
+  issued_voucher: {
+    id: string
+    voucher_code: string
+    qr_code_payload: string
+    status: string
+    expired_date: string
+    issued_date: string
+    created_at: string
+    owner_id: string
+    voucher_products: {
+      id: string
+      name: string
+      partner_id: string
+      thumbnail_url: string | null
+      partners: { business_name: string }
+    }
+    order_items?: {
+      id: string
+      orders?: {
+        id: string
+        order_code: string | null
+        total_amount: number
+        payment_method: string
+        status: string
+        created_at: string
+        users: { full_name: string }
+      } | null
+    }[]
+    reviews?: { id: string; rating: number; comment: string | null; media_urls: string[]; created_at: string }[]
+    complaints?: { id: string; reason: string; status: string; created_at: string }[]
+  }
+  eligible_branch_ids: string[]
 }
