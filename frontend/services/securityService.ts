@@ -30,8 +30,8 @@ export const securityService = {
       items: (data.items ?? []).map((a: any) => ({
         id: String(a.id),
         userId: String(a.user_id),
-        userName: a.users?.full_name ?? "N/A",
-        email: a.users?.email ?? "",
+        userName: a.user?.full_name ?? "N/A",
+        email: a.user?.email ?? "",
         alertType: a.alert_type,
         detail: a.detail ?? "",
         ipAddress: a.ip_address ?? "",
@@ -41,6 +41,22 @@ export const securityService = {
       total: data.total,
       page: data.page,
       limit: data.limit,
+    }
+  },
+
+  async getAlert(id: string): Promise<SecurityAlertItem> {
+    const response = await api.get<Envelope<any>>(`/security-alerts/${id}`)
+    const a = unwrap(response)
+    return {
+      id: String(a.id),
+      userId: String(a.user_id),
+      userName: a.users?.full_name ?? a.user?.full_name ?? "N/A",
+      email: a.users?.email ?? a.user?.email ?? "",
+      alertType: a.alert_type,
+      detail: a.detail ?? "",
+      ipAddress: a.ip_address ?? "",
+      status: a.status,
+      createdAt: a.created_at,
     }
   },
 

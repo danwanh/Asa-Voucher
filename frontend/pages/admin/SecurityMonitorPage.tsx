@@ -25,6 +25,9 @@ export function SecurityMonitorPage() {
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
 
+  const [detailAlert, setDetailAlert] = useState<SecurityAlertItem | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+
   useEffect(() => {
     let mounted = true
     async function load() {
@@ -85,6 +88,18 @@ export function SecurityMonitorPage() {
     }
   }
 
+  const handleViewDetail = async (id: string) => {
+    setDetailLoading(true)
+    try {
+      const full = await securityService.getAlert(id)
+      setDetailAlert(full)
+    } catch {
+      toast.error("Không thể tải chi tiết cảnh báo")
+    } finally {
+      setDetailLoading(false)
+    }
+  }
+
   return (
     <div className="p-6">
       <div className="mb-6">
@@ -121,7 +136,7 @@ export function SecurityMonitorPage() {
               border: `1px solid ${filter === f ? C.indigo : "#E5E7EB"}`,
             }}
           >
-            {{ all: "Tất cả", open: "Chưa xử lý", reviewed: "Đã xem", locked: "Đã khóa" }[f]}
+            {{ all: "Tất cả", open: "Chưa xử lý", reviewed: "Đã xem xét", locked: "Đã khóa" }[f]}
           </button>
         ))}
       </div>
@@ -191,9 +206,9 @@ export function SecurityMonitorPage() {
                             <Unlock className="w-4 h-4" style={{ color: "#0891B2" }} />
                           </button>
                         )}
-                        <button className="p-1.5 rounded-lg hover:bg-muted/30 transition-colors" title="Xem chi tiết">
-                          <Eye className="w-4 h-4" style={{ color: "#8A8DA8" }} />
-                        </button>
+                          <button onClick={() => handleViewDetail(a.id)} disabled={detailLoading} className="p-1.5 rounded-lg hover:bg-muted/30 transition-colors disabled:opacity-50" title="Xem chi tiết">
+                            <Eye className="w-4 h-4" style={{ color: "#8A8DA8" }} />
+                          </button>
                       </div>
                     </td>
                   </tr>
@@ -226,6 +241,61 @@ export function SecurityMonitorPage() {
                 {actionLoading && <AppIcon name="clock" className="w-4 h-4 animate-spin" />}
                 {actionLoading ? "Đang xử lý..." : "Khóa tài khoản"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Detail dialog */}
+      {detailAlert && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+            <div className="flex items-start justify-between mb-4">
+              <h3 className="text-lg font-black" style={{ color: C.indigo }}>Chi tiết cảnh báo</h3>
+              <button onClick={() => setDetailAlert(null)} className="p-1 rounded-lg hover:bg-muted/30">
+                <XCircle className="w-5 h-5" style={{ color: "#8A8DA8" }} />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-sm">
+              <div>
+                <div className="text-xs font-semibold" style={{ color: "#8A8DA8" }}>Người dùng</div>
+                <div className="font-bold" style={{ color: C.indigo }}>{detailAlert.userName}</div>
+                <div style={{ color: "#6B7280" }}>{detailAlert.email}</div>
+              </div>
+
+              <div>
+                <div className="text-xs font-semibold" style={{ color: "#8A8DA8" }}>Loại cảnh báo</div>
+                <div style={{ color: C.indigo }}>{TYPE_LABELS[detailAlert.alertType]?.label ?? detailAlert.alertType}</div>
+              </div>
+
+              <div>
+                <div className="text-xs font-semibold" style={{ color: "#8A8DA8" }}>Chi tiết</div>
+                <div style={{ color: "#6B7280" }}>{detailAlert.detail || "Không có mô tả"}</div>
+              </div>
+
+              <div>
+                <div className="text-xs font-semibold" style={{ color: "#8A8DA8" }}>Địa chỉ IP</div>
+                <code style={{ color: "#6B7280" }}>{detailAlert.ipAddress || "—"}</code>
+              </div>
+
+              <div>
+                <div className="text-xs font-semibold" style={{ color: "#8A8DA8" }}>Thời gian</div>
+                <div style={{ color: "#6B7280" }}>{new Date(detailAlert.createdAt).toLocaleString("vi-VN")}</div>
+              </div>
+
+              <div>
+                <div className="text-xs font-semibold" style={{ color: "#8A8DA8" }}>Trạng thái</div>
+                <span
+                  className="inline-block px-2.5 py-1 rounded-full text-xs font-bold mt-1"
+                  style={{
+                    backgroundColor: STATUS_CONFIG[detailAlert.status]?.bg,
+                    color: STATUS_CONFIG[detailAlert.status]?.color,
+                  }}
+                >
+                  {STATUS_CONFIG[detailAlert.status]?.label ?? detailAlert.status}
+                </span>
+              </div>
             </div>
           </div>
         </div>
