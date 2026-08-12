@@ -1,84 +1,651 @@
-import { useState } from "react"
-import { C, fmt, fmtDate } from "@/utils/constants"
+import { useState, useEffect, useCallback, useRef } from "react"
+import { C, fmt, fmtDate, STATUS_DESCRIPTION } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import { StatusBadge } from "@/components/StatusBadge"
-import { ORDERS, USERS } from "@/data/mock"
+import { orderService } from "@/services/orderService"
+import type { Order } from "@/types"
+
+type Action = "confirm_payment" | "cancel" | "cancel_refund_prompt" | "refund"
+
+const ACTION_CONFIG: Record<Action, { label: string; icon: string; color: string }> = {
+  confirm_payment: { label: "Xác nhận thanh toán", icon: "check", color: C.teal },
+  cancel: { label: "Hủy đơn", icon: "trash", color: "#C0392B" },
+  cancel_refund_prompt: { label: "Hủy đơn", icon: "trash", color: "#C0392B" },
+  refund: { label: "Hoàn tiền", icon: "wallet", color: C.peach },
+}
+
+function getActionsForStatus(status: string, paymentStatus: string): Action[] {
+  if (status === "pending") return ["confirm_payment", "cancel"]
+  if (status === "confirmed" || status === "pending_manual") return ["cancel_refund_prompt"]
+  if (status === "completed" && paymentStatus === "paid") return ["refund"]
+  if (status === "cancelled" && paymentStatus !== "refunded") return ["refund"]
+  return []
+}
 
 export function AdminOrdersPage() {
   const [filter, setFilter] = useState("all")
+  const [search, setSearch] = useState("")
+  const [orders, setOrders] = useState<Order[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const filtered = filter === "all" ? ORDERS : ORDERS.filter((o) => o.status === filter)
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [showPanel, setShowPanel] = useState(false)
+
+  const [dialogType, setDialogType] = useState<"confirm" | "refund_prompt" | null>(null)
+  const [dialogAction, setDialogAction] = useState<Action | null>(null)
+  const [dialogOrder, setDialogOrder] = useState<Order | null>(null)
+  const [refundNote, setRefundNote] = useState("")
+  const [actionLoading, setActionLoading] = useState(false)
+
+  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null)
+
+  const toastTimer = useRef<ReturnType<typeof setTimeout>>()
+  const panelRef = useRef<HTMLDivElement>(null)
+
+  const showToast = useCallback((type: "success" | "error", message: string) => {
+    setToast({ type, message })
+    clearTimeout(toastTimer.current)
+    toastTimer.current = setTimeout(() => setToast(null), 4000)
+  }, [])
+
+  const fetchOrders = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const params: { status?: string; search?: string } = {}
+      if (filter !== "all") params.status = filter
+      if (search.trim()) params.search = search.trim()
+      const result = await orderService.listOrders(params)
+      setOrders(result.items)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Không thể tải danh sách đơn hàng"
+      setError(message)
+    } finally {
+      setLoading(false)
+    }
+  }, [filter, search])
+
+  const isFirstRender = useRef(true)
+
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false
+      fetchOrders()
+      return
+    }
+    const debounce = setTimeout(fetchOrders, 300)
+    return () => clearTimeout(debounce)
+  }, [fetchOrders])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (dialogType) closeDialog()
+        else setShowPanel(false)
+      }
+    }
+    document.addEventListener("keydown", onKey)
+    return () => document.removeEventListener("keydown", onKey)
+  }, [dialogType, actionLoading])
+
+  const handleSelectOrder = async (order: Order) => {
+    setDetailLoading(true)
+    setShowPanel(true)
+    try {
+      const detail = await orderService.getOrder(order.id)
+      setSelectedOrder(detail)
+    } catch {
+      showToast("error", "Không thể tải chi tiết đơn hàng")
+      setShowPanel(false)
+    } finally {
+      setDetailLoading(false)
+    }
+  }
+
+  const handleAction = (action: Action, order: Order) => {
+    if (action === "cancel_refund_prompt") {
+      setDialogType("refund_prompt")
+    } else {
+      setDialogType("confirm")
+    }
+    setDialogAction(action)
+    setDialogOrder(order)
+  }
+
+  const closeDialog = () => {
+    if (actionLoading) return
+    setDialogType(null)
+    setDialogAction(null)
+    setDialogOrder(null)
+    setRefundNote("")
+  }
+
+  const executeAction = async (withRefund?: boolean) => {
+    if (!dialogAction || !dialogOrder) return
+    const action = dialogAction
+    const order = dialogOrder
+    setActionLoading(true)
+    try {
+      if (action === "confirm_payment") {
+        const unpaidPayment = order.payments?.find((p) => p.status === "pending")
+        if (unpaidPayment) {
+          await orderService.simulatePaymentSuccess(unpaidPayment.id)
+        } else {
+          const payment = await orderService.createPayment(order.id, order.paymentMethod)
+          await orderService.simulatePaymentSuccess(payment.id)
+        }
+        showToast("success", "Xác nhận thanh toán thành công")
+      } else if (action === "cancel") {
+        await orderService.cancelOrder(order.id)
+        showToast("success", "Hủy đơn hàng thành công")
+      } else if (action === "cancel_refund_prompt") {
+        await orderService.cancelOrder(order.id)
+        if (withRefund) {
+          try {
+            await orderService.refundOrder(order.id, "Hoàn tiền khi hủy đơn")
+            showToast("success", "Hủy đơn + hoàn tiền thành công")
+          } catch {
+            showToast("success", "Hủy đơn thành công (hoàn tiền không thực hiện được)")
+          }
+        } else {
+          showToast("success", "Hủy đơn hàng thành công")
+        }
+      } else if (action === "refund") {
+        await orderService.refundOrder(order.id, refundNote || undefined)
+        showToast("success", "Hoàn tiền thành công")
+        setRefundNote("")
+      }
+
+      closeDialog()
+      setShowPanel(false)
+      setSelectedOrder(null)
+      fetchOrders()
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Thao tác thất bại"
+      showToast("error", message)
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const filterTabs = [
+    { v: "all", l: "Tất cả", desc: "Tất cả đơn hàng" },
+    { v: "pending", l: "Chờ xử lý", desc: "Chờ xác nhận thanh toán" },
+    { v: "pending_payment", l: "Chờ thanh toán", desc: "Đơn tạo xong, chờ khách thanh toán" },
+    { v: "payment_failed", l: "Thanh toán thất bại", desc: "Giao dịch thanh toán lỗi" },
+    { v: "confirmed", l: "Đã xác nhận", desc: "Đã xác nhận, voucher đã phát hành" },
+    { v: "completed", l: "Hoàn thành", desc: "Đơn đã hoàn thành, voucher đã sử dụng" },
+    { v: "cancelled", l: "Đã hủy", desc: "Đơn đã hủy" },
+    { v: "refunded", l: "Đã hoàn tiền", desc: "Hoàn tiền từ khiếu nại hoặc tự động" },
+    { v: "pending_manual", l: "Chờ xử lý thủ công", desc: "Voucher đã dùng, cần xử lý tay" },
+  ]
+
+  const availableActions = selectedOrder ? getActionsForStatus(selectedOrder.status, selectedOrder.paymentStatus) : []
 
   return (
-    <div className="p-6">
-      <h2 className="font-black text-lg mb-5" style={{ color: C.indigo }}>
-        Quản lý đơn hàng ({ORDERS.length})
-      </h2>
-
-      <div className="flex flex-wrap gap-2 mb-5">
-        {[
-          { v: "all", l: "Tất cả" },
-          { v: "pending", l: "Chờ xử lý" },
-          { v: "completed", l: "Hoàn thành" },
-          { v: "used", l: "Đã dùng" },
-          { v: "cancelled", l: "Đã hủy" },
-        ].map(({ v, l }) => (
-          <button
-            key={v}
-            onClick={() => setFilter(v)}
-            className="px-4 py-2 rounded-2xl text-sm font-bold transition-all border"
-            style={{
-              backgroundColor: filter === v ? C.indigo : "white",
-              color: filter === v ? "white" : C.indigo,
-              borderColor: filter === v ? C.indigo : "#E2DFC8",
-            }}
+    <div className="min-h-screen p-6" style={{ backgroundColor: C.content }}>
+      <div className="max-w-7xl mx-auto">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-xl font-black" style={{ color: C.indigo }}>
+            Quản lý đơn hàng
+          </h1>
+          <span
+            className="text-sm font-semibold px-3 py-1 rounded-full"
+            style={{ backgroundColor: C.eggshell, color: C.indigo }}
           >
-            {l}
-          </button>
-        ))}
-      </div>
+            {loading ? "Đang tải..." : `${orders.length} đơn`}
+          </span>
+        </div>
 
-      <div className="bg-card rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-sm p-4 mb-5">
+          <div className="flex flex-wrap gap-2 mb-4">
+            {filterTabs.map(({ v, l, desc }) => (
+              <div key={v} className="relative group">
+                <button
+                  onClick={() => setFilter(v)}
+                  className="px-4 py-2 rounded-full text-sm font-semibold transition-all"
+                  style={{
+                    backgroundColor: filter === v ? C.indigo : "transparent",
+                    color: filter === v ? "white" : C.indigo,
+                    border: `1.5px solid ${filter === v ? C.indigo : "#E2DFC8"}`,
+                  }}
+                >
+                  {l}
+                </button>
+                {desc && (
+                  <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 px-3 py-1.5 rounded-lg text-xs whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-10 shadow-lg" style={{ backgroundColor: "#333", color: "white" }}>
+                    {desc}
+                    <div className="absolute left-1/2 -translate-x-1/2 -top-1 w-2 h-2 rotate-45" style={{ backgroundColor: "#333" }} />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="relative">
+            <AppIcon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "#8A8DA8" }} />
+            <input
+              type="text"
+              placeholder="Tìm mã đơn, tên khách hàng, email..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full md:w-96 pl-10 pr-4 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
+              style={{ borderColor: "#E2DFC8", color: C.indigo }}
+            />
+          </div>
+        </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-4 text-sm flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={fetchOrders} className="underline font-bold ml-2">Thử lại</button>
+        </div>
+      )}
+
+      <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr style={{ backgroundColor: C.eggshell }}>
-                {["Mã đơn", "Voucher", "Đối tác", "Khách hàng", "Số tiền", "Phương thức", "Ngày", "Trạng thái"].map((h) => (
-                  <th key={h} className="px-4 py-3 text-left font-bold text-xs" style={{ color: C.indigo }}>{h}</th>
+                {["Mã đơn", "Người mua", "Trạng thái", "Số tiền", "Phương thức", "Ngày tạo"].map((h, i) => (
+                  <th
+                    key={h}
+                    className="px-5 py-3.5 text-left font-bold text-xs uppercase tracking-wider"
+                    style={{
+                      color: C.indigo,
+                      textAlign: i === 3 ? "right" : "left",
+                    }}
+                  >
+                    {h}
+                  </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {filtered.map((o) => {
-                const u = USERS.find((u) => u.id === o.userId)
-                return (
-                  <tr key={o.id} className="border-t hover:bg-muted/30 transition-colors" style={{ borderColor: "#F0EDD8" }}>
-                    <td className="px-4 py-3">
-                      <code className="text-xs" style={{ color: C.indigoLight, fontFamily: "'Inter', monospace" }}>{o.id}</code>
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="px-5 py-20 text-center" style={{ color: "#8A8DA8" }}>
+                    <AppIcon name="clock" className="w-8 h-8 mx-auto mb-3 animate-spin" style={{ color: C.indigo }} />
+                    <div className="font-semibold text-sm">Đang tải dữ liệu...</div>
+                  </td>
+                </tr>
+              ) : orders.length === 0 ? (
+                <tr>
+                  <td colSpan={6}>
+                    <div className="text-center py-20">
+                      <AppIcon name="search" className="w-12 h-12 mb-4 mx-auto" style={{ color: "#D1D5DB" }} />
+                      <div className="font-bold text-sm" style={{ color: C.indigo }}>Không tìm thấy đơn hàng</div>
+                      <p className="text-xs mt-1" style={{ color: "#8A8DA8" }}>Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                orders.map((o) => (
+                  <tr
+                    key={o.id}
+                    onClick={() => handleSelectOrder(o)}
+                    className="border-t hover:bg-gray-50/80 cursor-pointer transition-colors group"
+                    style={{ borderColor: "#F0EDD8" }}
+                  >
+                    <td className="px-5 py-3.5">
+                      <code
+                        className="text-xs font-semibold px-2 py-1 rounded-md"
+                        style={{
+                          color: C.indigo,
+                          backgroundColor: C.eggshell,
+                          fontFamily: "'Inter', monospace",
+                        }}
+                      >
+                        {o.code}
+                      </code>
                     </td>
-                    <td className="px-4 py-3 text-xs font-semibold max-w-36">
-                      <span className="line-clamp-2" style={{ color: C.indigo }}>{o.voucherTitle}</span>
+                    <td className="px-5 py-3.5">
+                      <span className="text-xs font-semibold" style={{ color: C.indigo }}>
+                        {o.userName ?? o.userId}
+                      </span>
                     </td>
-                    <td className="px-4 py-3 text-xs" style={{ color: "#8A8DA8" }}>{o.partnerName}</td>
-                    <td className="px-4 py-3 text-xs font-semibold" style={{ color: C.indigo }}>{u?.name ?? "—"}</td>
-                    <td className="px-4 py-3 font-bold text-xs" style={{ color: C.peach }}>{fmt(o.amount)}</td>
-                    <td className="px-4 py-3 text-xs" style={{ color: "#8A8DA8" }}>{o.paymentMethod}</td>
-                    <td className="px-4 py-3 text-xs" style={{ color: "#8A8DA8" }}>{fmtDate(o.createdAt)}</td>
-                    <td className="px-4 py-3"><StatusBadge status={o.status} /></td>
+                    <td className="px-5 py-3.5">
+                      <StatusBadge status={o.status} />
+                    </td>
+                    <td className="px-5 py-3.5 text-right">
+                      <span className="text-xs font-bold" style={{ color: C.peach }}>
+                        {fmt(o.amount)}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <span className="text-xs" style={{ color: "#8A8DA8" }}>{o.paymentMethod}</span>
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <span className="text-xs" style={{ color: "#8A8DA8" }}>{fmtDate(o.createdAt)}</span>
+                    </td>
                   </tr>
-                )
-              })}
+                ))
+              )}
             </tbody>
           </table>
         </div>
-
-        {filtered.length === 0 && (
-          <div className="text-center py-16">
-            <AppIcon name="package" className="w-10 h-10 mb-3 mx-auto" />
-            <div className="font-bold" style={{ color: C.indigo }}>Không có đơn hàng</div>
-          </div>
-        )}
       </div>
+
+      {showPanel && (
+        <div className="fixed inset-0 z-50 flex justify-end" onClick={() => setShowPanel(false)}>
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
+          <div
+            ref={panelRef}
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-lg bg-white shadow-2xl overflow-y-auto animate-slide-in"
+          >
+            {detailLoading ? (
+              <div className="flex items-center justify-center h-full">
+                <AppIcon name="clock" className="w-8 h-8 animate-spin" style={{ color: C.indigo }} />
+              </div>
+            ) : selectedOrder ? (
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6 pb-4 border-b" style={{ borderColor: "#F0EDD8" }}>
+                  <div>
+                    <h3 className="text-lg font-black" style={{ color: C.indigo }}>Chi tiết đơn hàng</h3>
+                    <code
+                      className="text-xs font-semibold px-2 py-0.5 rounded-md mt-1 inline-block"
+                      style={{ color: C.indigo, backgroundColor: C.eggshell, fontFamily: "'Inter', monospace" }}
+                    >
+                      {selectedOrder.code}
+                    </code>
+                  </div>
+                  <button
+                    onClick={() => setShowPanel(false)}
+                    className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+                    style={{ color: "#8A8DA8" }}
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 mb-6">
+                  <div className="bg-gray-50 rounded-xl p-3.5">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider mb-1" style={{ color: "#8A8DA8" }}>Trạng thái</p>
+                    <StatusBadge status={selectedOrder.status} />
+                  </div>
+                  <div className="bg-gray-50 rounded-xl p-3.5">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider mb-1" style={{ color: "#8A8DA8" }}>Ngày tạo</p>
+                    <p className="text-sm font-semibold" style={{ color: C.indigo }}>{fmtDate(selectedOrder.createdAt)}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-xl p-3.5">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider mb-1" style={{ color: "#8A8DA8" }}>Người mua</p>
+                    <p className="text-sm font-semibold" style={{ color: C.indigo }}>{selectedOrder.userName ?? "N/A"}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-xl p-3.5">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider mb-1" style={{ color: "#8A8DA8" }}>Thanh toán</p>
+                    <p className="text-sm font-semibold" style={{ color: C.indigo }}>{selectedOrder.paymentMethod}</p>
+                  </div>
+                </div>
+
+                {selectedOrder.note && (
+                  <div className="bg-yellow-50 border border-yellow-100 rounded-xl p-3.5 mb-6">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider mb-1" style={{ color: "#856404" }}>Ghi chú</p>
+                    <p className="text-sm" style={{ color: "#856404" }}>{selectedOrder.note}</p>
+                  </div>
+                )}
+
+                <div className="mb-6">
+                  <h4 className="text-[11px] font-semibold uppercase tracking-wider mb-3" style={{ color: "#8A8DA8" }}>Voucher trong đơn</h4>
+                  <div className="space-y-2">
+                    {selectedOrder.items?.map((item) => (
+                      <div key={item.id} className="bg-gray-50 rounded-xl p-3.5 flex items-center justify-between">
+                        <div className="min-w-0 flex-1 mr-3">
+                          <p className="text-sm font-semibold truncate" style={{ color: C.indigo }}>
+                            {item.voucherTitle ?? item.voucherId}
+                          </p>
+                          <p className="text-xs mt-0.5" style={{ color: "#8A8DA8" }}>
+                            {item.partnerName && (
+                              <span>Đối tác: {item.partnerName} &middot; </span>
+                            )}
+                            x{item.quantity} &times; {fmt(item.unitPrice)}
+                          </p>
+                        </div>
+                        <p className="text-sm font-bold whitespace-nowrap" style={{ color: C.peach }}>{fmt(item.subtotal)}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 rounded-xl p-4 mb-6">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-bold" style={{ color: C.indigo }}>Tổng cộng</span>
+                    <span className="text-lg font-black" style={{ color: C.peach }}>{fmt(selectedOrder.amount)}</span>
+                  </div>
+                </div>
+
+                {(selectedOrder.status === "cancelled" || selectedOrder.status === "completed") && (
+                  <div
+                    className="rounded-xl p-3.5 mb-6 flex items-center gap-2"
+                    style={{
+                      backgroundColor: selectedOrder.paymentStatus === "refunded" ? "#E8F5EE" : "#FEF3C7",
+                      border: `1px solid ${selectedOrder.paymentStatus === "refunded" ? "#D1FAE5" : "#FDE68A"}`,
+                    }}
+                  >
+                    <AppIcon
+                      name={selectedOrder.paymentStatus === "refunded" ? "check" : "alert"}
+                      className="w-4 h-4 shrink-0"
+                      style={{ color: selectedOrder.paymentStatus === "refunded" ? "#2D7A52" : "#856404" }}
+                    />
+                    <span className="text-sm font-bold" style={{ color: selectedOrder.paymentStatus === "refunded" ? "#2D7A52" : "#856404" }}>
+                      {selectedOrder.paymentStatus === "refunded" ? "Đã hoàn tiền" : "Chưa hoàn tiền"}
+                    </span>
+                  </div>
+                )}
+
+                {selectedOrder.status === "pending_manual" && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6">
+                    <div className="flex items-start gap-2">
+                      <AppIcon name="alert" className="w-5 h-5 mt-0.5 shrink-0" style={{ color: "#856404" }} />
+                      <div>
+                        <p className="text-sm font-bold" style={{ color: "#856404" }}>Cần xử lý thủ công</p>
+                        <p className="text-xs mt-1" style={{ color: "#856404" }}>
+                          Đơn hàng này đã bị hủy nhưng voucher đã được sử dụng. Vui lòng xử lý thủ công.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {availableActions.length > 0 && (
+                  <div className="flex flex-wrap gap-2.5 pt-4 border-t" style={{ borderColor: "#F0EDD8" }}>
+                    {availableActions.map((action) => {
+                      const config = ACTION_CONFIG[action]
+                      return (
+                        <button
+                          key={action}
+                          onClick={() => handleAction(action, selectedOrder)}
+                          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:shadow-md active:scale-[0.98]"
+                          style={{ backgroundColor: config.color }}
+                        >
+                          <AppIcon name={config.icon} className="w-4 h-4" />
+                          {config.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
+
+      {dialogType === "confirm" && dialogAction && dialogOrder && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center" onClick={closeDialog}>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div
+                className="w-11 h-11 rounded-full flex items-center justify-center shrink-0"
+                style={{ backgroundColor: ACTION_CONFIG[dialogAction].color + "15" }}
+              >
+                <AppIcon name={ACTION_CONFIG[dialogAction].icon} className="w-5 h-5" style={{ color: ACTION_CONFIG[dialogAction].color }} />
+              </div>
+              <h3 className="text-lg font-black" style={{ color: C.indigo }}>
+                {ACTION_CONFIG[dialogAction].label}
+              </h3>
+            </div>
+
+            <p className="text-sm mb-5 leading-relaxed" style={{ color: "#8A8DA8" }}>
+              {dialogAction === "confirm_payment"
+                ? "Xác nhận đã thanh toán cho đơn hàng này?"
+                : "Ghi nhận hoàn tiền cho đơn hàng này?"}
+            </p>
+
+            <div className="bg-gray-50 rounded-xl p-4 mb-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "#8A8DA8" }}>Đơn hàng</p>
+                  <code
+                    className="text-sm font-bold mt-0.5 inline-block px-2 py-0.5 rounded"
+                    style={{ color: C.indigo, backgroundColor: C.eggshell, fontFamily: "'Inter', monospace" }}
+                  >
+                    {dialogOrder.code}
+                  </code>
+                </div>
+                <div className="text-right">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "#8A8DA8" }}>Tổng tiền</p>
+                  <p className="text-base font-black mt-0.5" style={{ color: C.peach }}>{fmt(dialogOrder.amount)}</p>
+                </div>
+              </div>
+            </div>
+
+            {dialogAction === "refund" && (
+              <div className="mb-5">
+                <label className="text-xs font-bold block mb-1.5" style={{ color: C.indigo }}>Ghi chú hoàn tiền (tùy chọn)</label>
+                <textarea
+                  value={refundNote}
+                  onChange={(e) => setRefundNote(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 resize-none"
+                  style={{ borderColor: "#E2DFC8", color: C.indigo }}
+                  rows={2}
+                  placeholder="Lý do hoàn tiền..."
+                />
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={closeDialog}
+                disabled={actionLoading}
+                className="px-5 py-2.5 rounded-xl text-sm font-bold border transition-colors hover:bg-gray-50 disabled:opacity-50"
+                style={{ borderColor: "#E2DFC8", color: C.indigo }}
+              >
+                Đóng
+              </button>
+              <button
+                onClick={() => executeAction()}
+                disabled={actionLoading}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:shadow-md active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ backgroundColor: ACTION_CONFIG[dialogAction].color }}
+              >
+                {actionLoading && <AppIcon name="clock" className="w-4 h-4 animate-spin" />}
+                {actionLoading ? "Đang xử lý..." : "Xác nhận"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {dialogType === "refund_prompt" && dialogOrder && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center" onClick={closeDialog}>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div
+                className="w-11 h-11 rounded-full flex items-center justify-center shrink-0"
+                style={{ backgroundColor: C.peach + "15" }}
+              >
+                <AppIcon name="wallet" className="w-5 h-5" style={{ color: C.peach }} />
+              </div>
+              <h3 className="text-lg font-black" style={{ color: C.indigo }}>Hủy đơn hàng</h3>
+            </div>
+
+            <p className="text-sm mb-5 leading-relaxed" style={{ color: "#8A8DA8" }}>
+              Bạn có muốn hoàn tiền cho đơn hàng này không?
+            </p>
+
+            <div className="bg-gray-50 rounded-xl p-4 mb-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "#8A8DA8" }}>Đơn hàng</p>
+                  <code
+                    className="text-sm font-bold mt-0.5 inline-block px-2 py-0.5 rounded"
+                    style={{ color: C.indigo, backgroundColor: C.eggshell, fontFamily: "'Inter', monospace" }}
+                  >
+                    {dialogOrder.code}
+                  </code>
+                </div>
+                <div className="text-right">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "#8A8DA8" }}>Tổng tiền</p>
+                  <p className="text-base font-black mt-0.5" style={{ color: C.peach }}>{fmt(dialogOrder.amount)}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={closeDialog}
+                disabled={actionLoading}
+                className="px-5 py-2.5 rounded-xl text-sm font-bold border transition-colors hover:bg-gray-50 disabled:opacity-50"
+                style={{ borderColor: "#E2DFC8", color: C.indigo }}
+              >
+                Đóng
+              </button>
+              <button
+                onClick={() => executeAction(false)}
+                disabled={actionLoading}
+                className="px-5 py-2.5 rounded-xl text-sm font-bold border transition-colors hover:bg-gray-50 disabled:opacity-50"
+                style={{ borderColor: "#E2DFC8", color: C.indigo }}
+              >
+                {actionLoading ? "Đang xử lý..." : "Không"}
+              </button>
+              <button
+                onClick={() => executeAction(true)}
+                disabled={actionLoading}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:shadow-md active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ backgroundColor: C.peach }}
+              >
+                {actionLoading && <AppIcon name="clock" className="w-4 h-4 animate-spin" />}
+                {actionLoading ? "Đang xử lý..." : "Có, hoàn tiền"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {toast && (
+        <div
+          className={`fixed bottom-6 right-6 z-[70] px-5 py-3.5 rounded-xl shadow-lg text-sm font-bold text-white flex items-center gap-2.5 ${
+            toast.type === "success" ? "bg-emerald-500" : "bg-red-500"
+          }`}
+        >
+          <AppIcon name={toast.type === "success" ? "check" : "alert"} className="w-4 h-4" />
+          {toast.message}
+        </div>
+      )}
+
+      <style>{`
+        @keyframes slide-in {
+          from { transform: translateX(100%); opacity: 0.8; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+        .animate-slide-in {
+          animation: slide-in 0.2s ease-out;
+        }
+      `}</style>
+    </div>
     </div>
   )
 }
