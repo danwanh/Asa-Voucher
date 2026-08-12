@@ -263,3 +263,15 @@ export interface VerificationRecord {
   verifiedAt: string
   status: "valid" | "invalid" | "used"
 }
+
+export interface StaffVoucherReportItem {
+  voucher_product_id: string;
+  program_name: string;
+  category_name: string;
+  total_quantity: number;
+  sold_quantity: number;
+  used_quantity: number;
+  usage_rate: number;
+  revenue: number;
+  effectiveness_score: number;
+}

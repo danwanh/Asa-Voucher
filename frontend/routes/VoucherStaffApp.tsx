@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Tag, PlusCircle, User, LogOut, Menu, ChevronRight } from "lucide-react"
+import { Tag, PlusCircle, BarChart3, User, LogOut, Menu, ChevronRight } from "lucide-react"
 import { C } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import { PartnerVouchersPage } from "@/pages/partner/PartnerVouchersPage"
@@ -10,8 +10,9 @@ import { PartnerVoucherDetailPage } from "@/pages/partner/PartnerVoucherDetailPa
 import { PartnerRevenuePage } from "@/pages/partner/PartnerRevenuePage"
 import { StaffProfilePage } from "@/pages/staff/StaffProfilePage"
 import type { AppUser, Voucher } from "@/types"
+import { StaffVoucherReportPage } from "@/pages/staff/StaffVoucherReportPage"
 
-type Page = "vouchers" | "create" | "edit" | "voucher-detail" | "reports" | "profile"
+type Page = "vouchers" | "create" | "edit" | "voucher-detail" | "reports" | "staff-reports" | "profile"
 
 interface Props {
   user: AppUser
@@ -22,6 +23,7 @@ interface Props {
 const NAV = [
   { label: "Quản lý Voucher",  pg: "vouchers" as Page, icon: <Tag className="w-4 h-4" /> },
   { label: "Tạo voucher mới",  pg: "create" as Page,   icon: <PlusCircle className="w-4 h-4" /> },
+  { label: "Báo cáo Voucher",   pg: "staff-reports" as Page, icon: <BarChart3 className="w-4 h-4" /> },
   { label: "Hồ sơ cá nhân",    pg: "profile" as Page,   icon: <User className="w-4 h-4" /> },
 ]
 
@@ -31,6 +33,7 @@ const PAGE_LABELS: Record<Page, string> = {
   edit: "Chỉnh sửa Voucher",
   "voucher-detail": "Chi tiết Voucher",
   reports: "Hiệu suất của tôi",
+  "staff-reports": "Báo cáo hiệu suất Voucher",
   profile: "Hồ sơ cá nhân",
 }
 
@@ -158,6 +161,7 @@ export function VoucherStaffApp({ user, onLogout, initialPage }: Props) {
             <PartnerVoucherDetailPage voucher={selectedVoucher} onBack={() => setPage("vouchers")} onEdit={goEdit} />
           )}
           {page === "reports" && <PartnerRevenuePage />}
+          {page === "staff-reports" && <StaffVoucherReportPage/>}
           {page === "profile" && <StaffProfilePage user={user} onLogout={onLogout} />}
         </main>
       </div>
