@@ -9,6 +9,7 @@ import {
   updateIssuedVoucherStatusSchema,
   validateVoucherSchema, checkVoucherSchema
 } from "../validations/issued-voucher.validation.js";
+import { confirmVoucherSchema } from "../validations/issued-voucher.validation.js";
 
 function requireUser(req: Request) {
   if (!req.user) throw new HttpError(401, "Authentication required");
@@ -63,4 +64,11 @@ export async function checkVoucher(req: Request, res: Response) {
   const input = checkVoucherSchema.parse(req.body);
   const result = await issuedVoucherService.checkVoucher(requireUser(req), input);
   sendSuccess(res, result);
+}
+
+// Hàm cho xác nhận sử dụng voucher
+export async function confirmVoucher(req: Request, res: Response) {
+  const input = confirmVoucherSchema.parse(req.body);
+  const result = await issuedVoucherService.confirmVoucher(requireUser(req), input);
+  sendSuccess(res, result, result.message);
 }
