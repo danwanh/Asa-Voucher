@@ -34,6 +34,22 @@ const INCLUDE = {
   complaints: { select: { id: true, reason: true, description: true, evidence_urls: true, status: true, resolution_note: true, resolution_type: true, created_at: true, resolved_at: true } },
 } as const;
 
+const LIST_INCLUDE = {
+  voucher_products: { select: { id: true, name: true, partner_id: true, partners: { select: { business_name: true } } } },
+  order_items: {
+    select: {
+      id: true,
+      order_id: true,
+      quantity: true,
+      unit_price: true,
+      subtotal: true,
+      orders: { select: { id: true, user_id: true, recipient_id: true, total_amount: true, payment_method: true, status: true, is_gift: true, created_at: true, users: { select: { full_name: true } } } },
+    },
+  },
+  reviews: { select: { id: true, rating: true, comment: true, media_urls: true, created_at: true } },
+  complaints: { select: { id: true, reason: true, description: true, evidence_urls: true, status: true, resolution_note: true, resolution_type: true, created_at: true, resolved_at: true } },
+} as const;
+
 type IssuedVoucherWithRelations = IssuedVoucherRow & {
   voucher_products: { partner_id: string };
   order_items?: { order_id: string; orders?: { status: string } | null };
@@ -51,7 +67,7 @@ export async function listIssuedVouchers(
   const take = filter.limit;
 
   const [rows, total] = await Promise.all([
-    prisma.issuedVoucher.findMany({ where, include: INCLUDE, orderBy: { created_at: "desc" }, skip, take }),
+    prisma.issuedVoucher.findMany({ where, include: LIST_INCLUDE, orderBy: { created_at: "desc" }, skip, take }),
     prisma.issuedVoucher.count({ where }),
   ]);
 

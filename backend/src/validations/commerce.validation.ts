@@ -39,7 +39,9 @@ export const createPaymentSchema = z.object({
 
 export const listOrdersQuerySchema = z.object({
   status: z.string().optional(),
-  search: z.string().trim().min(1).optional()
+  search: z.string().trim().min(1).optional(),
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(20)
 });
 
 export const refundOrderSchema = z.object({

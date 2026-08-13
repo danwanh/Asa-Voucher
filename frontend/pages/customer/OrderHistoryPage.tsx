@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Search, Star, CreditCard, MessageSquare } from "lucide-react"
+import { Search, Star, CreditCard, MessageSquare, ChevronLeft, ChevronRight } from "lucide-react"
 import { C, fmt, fmtDate } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import type { Order, OrderStatus } from "@/types"
@@ -11,6 +11,10 @@ interface Props {
   onReview?: (o: Order, existing?: { rating: number; content: string }) => void
   onComplaint?: (o: Order) => void
   onPayAgain?: (o: Order) => void
+  page?: number
+  totalPages?: number
+  onPageChange?: (page: number) => void
+  onFilterChange?: (status?: string, search?: string) => void
 }
 
 const ORDER_TABS: { label: string; value: Order["status"] | "all" }[] = [
@@ -38,7 +42,7 @@ function itemSummary(order: Order) {
   return items.map((item) => `${item.voucherTitle ?? order.voucherTitle} ×${item.quantity}`).join(" · ")
 }
 
-export function OrderHistoryPage({ orders, onDetail, onReview, onComplaint, onPayAgain }: Props) {
+export function OrderHistoryPage({ orders, onDetail, onReview, onComplaint, onPayAgain, page = 1, totalPages = 1, onPageChange, onFilterChange }: Props) {
   const [tab, setTab] = useState<Order["status"] | "all">("all")
   const [search, setSearch] = useState("")
 
@@ -69,7 +73,11 @@ export function OrderHistoryPage({ orders, onDetail, onReview, onComplaint, onPa
           return (
             <button
               key={tabItem.value}
-              onClick={() => setTab(tabItem.value)}
+               onClick={() => {
+                 setTab(tabItem.value)
+                 onFilterChange?.(tabItem.value === "all" ? undefined : tabItem.value, search.trim() || undefined)
+                 onPageChange?.(1)
+               }}
               className="flex-shrink-0 px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-1.5 transition-colors"
               style={{
                 backgroundColor: tab === tabItem.value ? C.peach : "white",
@@ -95,7 +103,12 @@ export function OrderHistoryPage({ orders, onDetail, onReview, onComplaint, onPa
           style={{ borderColor: "#E2DFC8", backgroundColor: "white", fontFamily: "'Inter', sans-serif" }}
           placeholder="Tìm theo mã đơn, tên voucher..."
           value={search}
-          onChange={(event) => setSearch(event.target.value)}
+           onChange={(event) => {
+             const value = event.target.value
+             setSearch(value)
+             onFilterChange?.(tab === "all" ? undefined : tab, value.trim() || undefined)
+             onPageChange?.(1)
+           }}
         />
       </div>
 
@@ -200,6 +213,13 @@ export function OrderHistoryPage({ orders, onDetail, onReview, onComplaint, onPa
           </div>
         )}
       </div>
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-3 mt-6">
+          <button disabled={page <= 1} onClick={() => onPageChange?.(page - 1)} className="p-2 rounded-lg border disabled:opacity-40" aria-label="Trang trước"><ChevronLeft className="w-4 h-4" /></button>
+          <span className="text-sm font-semibold">Trang {page} / {totalPages}</span>
+          <button disabled={page >= totalPages} onClick={() => onPageChange?.(page + 1)} className="p-2 rounded-lg border disabled:opacity-40" aria-label="Trang sau"><ChevronRight className="w-4 h-4" /></button>
+        </div>
+      )}
     </div>
   )
 }

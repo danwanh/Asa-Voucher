@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
-import { SlidersHorizontal, X, ChevronDown } from "lucide-react"
+import { SlidersHorizontal, X, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react"
 import { C, formatCategoryLabel } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import { VoucherCard } from "@/components/VoucherCard"
@@ -91,7 +91,8 @@ export function VoucherListPage({ onBuy, onDetail, searchQuery, filters, onFilte
   const [sort, setSort] = useState("popular")
   const [showFilters, setShowFilters] = useState(false)
   const [source, setSource] = useState<Voucher[]>([])
-  const [catalog, setCatalog] = useState<Voucher[]>([])
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
 
@@ -102,33 +103,13 @@ export function VoucherListPage({ onBuy, onDetail, searchQuery, filters, onFilte
   useEffect(() => {
     let isMounted = true
 
-    async function loadCatalog() {
-      try {
-        const items = await voucherService.listPublicVouchers({ limit: 100 })
-        if (!isMounted) return
-        setCatalog(items)
-      } catch {
-        if (!isMounted) return
-        setCatalog([])
-      }
-    }
-
-    loadCatalog()
-
-    return () => {
-      isMounted = false
-    }
-  }, [])
-
-  useEffect(() => {
-    let isMounted = true
-
     async function loadVouchers() {
       setIsLoading(true)
       setLoadError(null)
       try {
-        const items = await voucherService.listPublicVouchers({
-          limit: 100,
+         const result = await voucherService.listPublicVouchersPage({
+           page,
+           limit: 20,
           search: searchQuery.trim() || undefined,
           categoryId: filters.categoryId !== "all" ? filters.categoryId : undefined,
           partnerId: filters.partnerId !== "all" ? filters.partnerId : undefined,
@@ -138,7 +119,8 @@ export function VoucherListPage({ onBuy, onDetail, searchQuery, filters, onFilte
         // TODO(backend): add server-side filters for price/discount/effective_status
         // in GET /voucher-products to avoid client-side filtering for large datasets.
         if (!isMounted) return
-        setSource(items)
+         setSource(result.items)
+         setTotalPages(result.totalPages)
       } catch {
         if (!isMounted) return
         setLoadError("Không thể tải danh sách voucher")
@@ -152,12 +134,16 @@ export function VoucherListPage({ onBuy, onDetail, searchQuery, filters, onFilte
     return () => {
       isMounted = false
     }
+  }, [searchQuery, filters.categoryId, filters.partnerId, filters.area, page])
+
+  useEffect(() => {
+    setPage(1)
   }, [searchQuery, filters.categoryId, filters.partnerId, filters.area])
 
   const categoryOptions = useMemo(() => {
     const map = new Map<string, { id: string; label: string }>()
 
-    for (const voucher of catalog) {
+    for (const voucher of source) {
       const categoryId = voucher.categoryId ?? voucher.category
       if (map.has(categoryId)) continue
       const label = formatCategoryLabel(voucher.category)
@@ -165,27 +151,27 @@ export function VoucherListPage({ onBuy, onDetail, searchQuery, filters, onFilte
     }
 
     return [{ id: "all", label: "Tất cả" }, ...Array.from(map.values())]
-  }, [catalog])
+  }, [source])
 
   const partnerOptions = useMemo(() => {
     const map = new Map<string, { id: string; label: string }>()
-    for (const voucher of catalog) {
+    for (const voucher of source) {
       if (!map.has(voucher.partnerId)) {
         map.set(voucher.partnerId, { id: voucher.partnerId, label: voucher.partnerName || voucher.partnerId })
       }
     }
     return [{ id: "all", label: "Tất cả đối tác" }, ...Array.from(map.values())]
-  }, [catalog])
+  }, [source])
 
   const areaOptions = useMemo(() => {
     const values = new Set<string>()
-    for (const voucher of catalog) {
+    for (const voucher of source) {
       for (const area of parseApplicableAreas(voucher.applicableArea)) {
         values.add(area)
       }
     }
     return ["all", ...Array.from(values).sort((a, b) => a.localeCompare(b, "vi"))]
-  }, [catalog])
+  }, [source])
 
   const hasActiveFilters =
     filters.categoryId !== "all" ||
@@ -366,7 +352,7 @@ export function VoucherListPage({ onBuy, onDetail, searchQuery, filters, onFilte
       ) : (
         <>
           <div className="text-sm mb-4 font-semibold" style={{ color: "#8A8DA8" }}>
-            Tìm thấy <strong style={{ color: C.indigo }}>{filtered.length}</strong> voucher
+             Tìm thấy <strong style={{ color: C.indigo }}>{filtered.length}</strong> voucher
             {hasActiveFilters && (
               <span className="ml-2 text-xs px-2 py-0.5 rounded-full font-bold" style={{ backgroundColor: C.peach + "15", color: C.peach }}>Đang lọc</span>
             )}
@@ -376,6 +362,13 @@ export function VoucherListPage({ onBuy, onDetail, searchQuery, filters, onFilte
               <VoucherCard key={v.id} voucher={v} onBuy={() => onBuy(v)} onClick={() => onDetail(v)} />
             ))}
           </div>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-3 mt-6">
+              <button disabled={page <= 1} onClick={() => setPage((value) => value - 1)} className="p-2 rounded-lg border disabled:opacity-40" aria-label="Trang trước"><ChevronLeft className="w-4 h-4" /></button>
+              <span className="text-sm font-semibold">Trang {page} / {totalPages}</span>
+              <button disabled={page >= totalPages} onClick={() => setPage((value) => value + 1)} className="p-2 rounded-lg border disabled:opacity-40" aria-label="Trang sau"><ChevronRight className="w-4 h-4" /></button>
+            </div>
+          )}
         </>
       )}
     </div>
