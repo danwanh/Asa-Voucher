@@ -1,10 +1,11 @@
 import { PrismaClient } from "@prisma/client";
 import { hashPassword } from "../../src/utils/auth.js";
+import { seedPartners } from "./00-partners.js";
 import { seedUsers } from "./01-users.js";
 import { seedCatalog } from "./02-catalog.js";
 import { seedCommerce } from "./03-commerce.js";
 import { seedEngagement } from "./04-engagement.js";
-import { seedRbac } from "../../src/seed/rbac-seed.js";
+import { seedRbac } from "../../src/seed/rbac.seed.js";
 import { TEST_PASSWORD } from "./shared.js";
 
 const prisma = new PrismaClient();
@@ -50,6 +51,7 @@ async function main() {
   await clearSeedDomain();
 
   await seedUsers({ prisma, passwordHash });
+  await seedPartners({ prisma, passwordHash });
   await seedCatalog({ prisma, passwordHash });
   await seedCommerce({ prisma, passwordHash });
   await seedEngagement({ prisma, passwordHash });

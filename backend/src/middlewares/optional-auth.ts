@@ -5,6 +5,7 @@ import type { AuthUser } from "../types/auth.types.js";
 
 interface AccessTokenPayload {
   sub: string;
+  email: string;
   role: AuthUser["role"];
   partnerId?: string | null;
   branchId?: string | null;
@@ -30,6 +31,7 @@ export function optionalAuth(req: Request, _res: Response, next: NextFunction) {
     const payload = jwt.verify(token, secret) as unknown as AccessTokenPayload;
     req.user = {
       id: payload.sub,
+      email: payload.email,
       role: payload.role,
       partnerId: payload.partnerId ?? null,
       branchId: payload.branchId ?? null,

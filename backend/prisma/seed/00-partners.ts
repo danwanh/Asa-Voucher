@@ -1,0 +1,145 @@
+import type { SeedContext } from "./shared.js";
+import { ids, now, daysFrom } from "./shared.js";
+
+const partnerData = [
+  {
+    id: ids.partners.highlands,
+    representative_user_id: ids.users.ownerHighlands,
+    business_name: "Highlands Coffee Việt Nam",
+    business_code: "ASA-HIGHLANDS-001",
+    business_type: "restaurant",
+    tax_number: "0312345601",
+    logo_url: "https://cdn.asa.test/logo/highlands.png",
+    website_url: "https://www.highlandscoffee.com.vn",
+    description: "Chuỗi cà phê phong cách Việt Nam với nhiều chi nhánh trung tâm.",
+    approval_status: "approved",
+    status: "active",
+    approved_by: ids.users.adminOperations,
+    approved_at: daysFrom(now, -120),
+  },
+  {
+    id: ids.partners.phucLong,
+    representative_user_id: ids.users.ownerPhucLong,
+    business_name: "Phúc Long Heritage",
+    business_code: "ASA-PHUCLONG-001",
+    business_type: "restaurant",
+    tax_number: "0312345602",
+    logo_url: "https://cdn.asa.test/logo/phuclong.png",
+    website_url: "https://phuclong.com.vn",
+    description: "Thương hiệu trà và cà phê nổi tiếng tại Việt Nam.",
+    approval_status: "approved",
+    status: "active",
+    approved_by: ids.users.adminOperations,
+    approved_at: daysFrom(now, -110),
+  },
+  {
+    id: ids.partners.pizzaHut,
+    representative_user_id: ids.users.ownerPizzaHut,
+    business_name: "Pizza Hut Việt Nam",
+    business_code: "ASA-PIZZAHUT-001",
+    business_type: "restaurant",
+    tax_number: "0312345603",
+    logo_url: "https://cdn.asa.test/logo/pizzahut.png",
+    website_url: "https://www.pizzahut.vn",
+    description: "Chuỗi nhà hàng pizza quốc tế với dịch vụ giao hàng nhanh.",
+    approval_status: "approved",
+    status: "active",
+    approved_by: ids.users.adminOperations,
+    approved_at: daysFrom(now, -100),
+  },
+  {
+    id: ids.partners.cgv,
+    representative_user_id: ids.users.ownerCGV,
+    business_name: "CGV Cinemas Vietnam",
+    business_code: "ASA-CGV-001",
+    business_type: "entertainment",
+    tax_number: "0312345604",
+    logo_url: "https://cdn.asa.test/logo/cgv.png",
+    website_url: "https://www.cgv.vn",
+    description: "Hệ thống rạp chiếu phim cao cấp hàng đầu Việt Nam.",
+    approval_status: "approved",
+    status: "active",
+    approved_by: ids.users.adminOperations,
+    approved_at: daysFrom(now, -90),
+  },
+  {
+    id: ids.partners.gogi,
+    representative_user_id: ids.users.ownerGogi,
+    business_name: "GoGi House Vietnam",
+    business_code: "ASA-GOGI-001",
+    business_type: "restaurant",
+    tax_number: "0312345605",
+    logo_url: "https://cdn.asa.test/logo/gogi.png",
+    website_url: "https://gogihouse.vn",
+    description: "Nhà hàng BBQ Hàn Quốc nổi tiếng với thịt nướng thượng hạng.",
+    approval_status: "approved",
+    status: "active",
+    approved_by: ids.users.adminOperations,
+    approved_at: daysFrom(now, -80),
+  },
+  {
+    id: ids.partners.vinpearl,
+    representative_user_id: ids.users.ownerVinpearl,
+    business_name: "Vinpearl Resort & Spa",
+    business_code: "ASA-VINPEARL-001",
+    business_type: "hotel",
+    tax_number: "0312345606",
+    logo_url: "https://cdn.asa.test/logo/vinpearl.png",
+    website_url: "https://vinpearl.com",
+    description: "Hệ thống resort và spa cao cấp của Vingroup.",
+    approval_status: "approved",
+    status: "active",
+    approved_by: ids.users.adminOperations,
+    approved_at: daysFrom(now, -70),
+  },
+];
+
+export async function seedPartners({ prisma }: SeedContext) {
+  for (const partner of partnerData) {
+    await prisma.partner.upsert({
+      where: { id: partner.id },
+      create: {
+        ...partner,
+        created_at: daysFrom(now, -140),
+        updated_at: daysFrom(now, -2),
+      },
+      update: {
+        representative_user_id: partner.representative_user_id,
+        business_name: partner.business_name,
+        business_code: partner.business_code,
+        business_type: partner.business_type,
+        tax_number: partner.tax_number,
+        logo_url: partner.logo_url,
+        website_url: partner.website_url,
+        description: partner.description,
+        approval_status: partner.approval_status,
+        status: partner.status,
+        approved_by: partner.approved_by ?? null,
+        approved_at: partner.approved_at ?? null,
+        updated_at: daysFrom(now, -2),
+      },
+    });
+  }
+
+  const partnerUserMap: Array<{ userId: string; partnerId: string }> = [
+    { userId: ids.users.ownerHighlands, partnerId: ids.partners.highlands },
+    { userId: ids.users.ownerPhucLong, partnerId: ids.partners.phucLong },
+    { userId: ids.users.ownerPizzaHut, partnerId: ids.partners.pizzaHut },
+    { userId: ids.users.ownerCGV, partnerId: ids.partners.cgv },
+    { userId: ids.users.ownerGogi, partnerId: ids.partners.gogi },
+    { userId: ids.users.ownerVinpearl, partnerId: ids.partners.vinpearl },
+    { userId: ids.users.voucherStaffHighlands, partnerId: ids.partners.highlands },
+    { userId: ids.users.voucherStaffPhucLong, partnerId: ids.partners.phucLong },
+    { userId: ids.users.voucherStaffPizzaHut, partnerId: ids.partners.pizzaHut },
+    { userId: ids.users.voucherStaffCGV, partnerId: ids.partners.cgv },
+    { userId: ids.users.voucherStaffGogi, partnerId: ids.partners.gogi },
+    { userId: ids.users.voucherStaffVinpearl, partnerId: ids.partners.vinpearl },
+  ];
+
+  for (const mapping of partnerUserMap) {
+    await prisma.user.update({
+      where: { id: mapping.userId },
+      data: { partner_id: mapping.partnerId },
+    });
+  }
+}

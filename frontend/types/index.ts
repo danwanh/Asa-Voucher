@@ -153,6 +153,8 @@ export interface Order {
   status: OrderStatus
   paymentStatus: string
   paymentMethod: string
+  refundRef?: string
+  refundedAt?: string
   createdAt: string
   updatedAt?: string
   code: string
@@ -208,6 +210,7 @@ export interface Complaint {
   status: ComplaintStatus
   resolutionNote?: string | null
   resolutionType?: string | null
+  resolutionTypes?: string[]
   createdAt: string
   resolvedAt?: string | null
 }
@@ -219,6 +222,9 @@ export interface Payment {
   amount: number
   status: "pending" | "success" | "failed" | "refunded"
   transactionRef?: string
+  refundRef?: string
+  refundedAt?: string
+  gatewayResponse?: string
   checkout_url?: string
 }
 

@@ -46,7 +46,7 @@ export type AssignComplaintInput = z.infer<typeof assignComplaintSchema>;
 
 export const resolveComplaintSchema = z.object({
   resolution_note: z.string().min(1).max(2000),
-  resolution_type: resolutionTypeEnum,
+  resolution_types: z.array(resolutionTypeEnum).min(1).max(3),
 });
 export type ResolveComplaintInput = z.infer<typeof resolveComplaintSchema>;
 

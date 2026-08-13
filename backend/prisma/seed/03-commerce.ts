@@ -175,6 +175,78 @@ const orders: OrderSeed[] = [
     status: "completed",
     note: "Combo điện ảnh cho nhóm bạn",
     created_at: daysFrom(now, -6)
+  },
+  {
+    id: ids.orders.cancelled01,
+    order_code: "DH-20260801-0008",
+    user_id: ids.users.buyerNgocLinh,
+    subtotal: 160000,
+    discount_amount: 0,
+    total_amount: 160000,
+    payment_method: "paypal",
+    status: "cancelled",
+    note: "Hủy đơn chưa thanh toán - không cần hoàn tiền",
+    created_at: daysFrom(now, -3)
+  },
+  {
+    id: ids.orders.cancelled02,
+    order_code: "DH-20260801-0009",
+    user_id: ids.users.buyerQuocBao,
+    subtotal: 429000,
+    discount_amount: 30000,
+    total_amount: 399000,
+    payment_method: "vnpay",
+    status: "cancelled",
+    note: "Hủy đơn đã thanh toán - yêu cầu hoàn tiền",
+    created_at: daysFrom(now, -5)
+  },
+  {
+    id: ids.orders.cancelled03,
+    order_code: "DH-20260801-0010",
+    user_id: ids.users.buyerMinhAnh,
+    subtotal: 229000,
+    discount_amount: 20000,
+    total_amount: 209000,
+    payment_method: "paypal",
+    status: "cancelled",
+    note: "Hủy đơn đã thanh toán PayPal - chờ hoàn tiền",
+    created_at: daysFrom(now, -4)
+  },
+  {
+    id: ids.orders.cancelled04,
+    order_code: "DH-20260801-0011",
+    user_id: ids.users.buyerDucManh,
+    subtotal: 319000,
+    discount_amount: 0,
+    total_amount: 319000,
+    payment_method: "vnpay",
+    status: "cancelled",
+    note: "Hủy đơn chưa thanh toán",
+    created_at: daysFrom(now, -2)
+  },
+  {
+    id: ids.orders.cancelled05,
+    order_code: "DH-20260801-0012",
+    user_id: ids.users.buyerThuTrang,
+    subtotal: 448000,
+    discount_amount: 50000,
+    total_amount: 398000,
+    payment_method: "vnpay",
+    status: "cancelled",
+    note: "Hủy đơn đã thanh toán - hoàn tiền VNPay",
+    created_at: daysFrom(now, -6)
+  },
+  {
+    id: ids.orders.cancelled06,
+    order_code: "DH-20260801-0013",
+    user_id: ids.users.buyerHoangNam,
+    subtotal: 160000,
+    discount_amount: 0,
+    total_amount: 160000,
+    payment_method: "paypal",
+    status: "cancelled",
+    note: "Hủy đơn chưa thanh toán",
+    created_at: daysFrom(now, -1)
   }
 ];
 
@@ -298,6 +370,90 @@ const orderItems: OrderItemSeed[] = [
     snapped_discount_rate: 30.61,
     subtotal: 229000,
     created_at: daysFrom(now, -6)
+  },
+  {
+    id: ids.orderItems.oi11,
+    order_id: ids.orders.cancelled01,
+    voucher_product_id: ids.vouchers.pizzaHutHalf,
+    quantity: 1,
+    unit_price: 160000,
+    snapped_original_price: 320000,
+    snapped_selling_price: 160000,
+    snapped_discount_rate: 50,
+    subtotal: 160000,
+    created_at: daysFrom(now, -3)
+  },
+  {
+    id: ids.orderItems.oi12,
+    order_id: ids.orders.cancelled02,
+    voucher_product_id: ids.vouchers.gogiBuffet,
+    quantity: 1,
+    unit_price: 319000,
+    snapped_original_price: 429000,
+    snapped_selling_price: 319000,
+    snapped_discount_rate: 25.64,
+    subtotal: 319000,
+    created_at: daysFrom(now, -5)
+  },
+  {
+    id: ids.orderItems.oi13,
+    order_id: ids.orders.cancelled03,
+    voucher_product_id: ids.vouchers.lotteCinema,
+    quantity: 1,
+    unit_price: 229000,
+    snapped_original_price: 330000,
+    snapped_selling_price: 229000,
+    snapped_discount_rate: 30.61,
+    subtotal: 229000,
+    created_at: daysFrom(now, -4)
+  },
+  {
+    id: ids.orderItems.oi14,
+    order_id: ids.orders.cancelled04,
+    voucher_product_id: ids.vouchers.gogiSet2Nguoi,
+    quantity: 1,
+    unit_price: 319000,
+    snapped_original_price: 429000,
+    snapped_selling_price: 319000,
+    snapped_discount_rate: 25.64,
+    subtotal: 319000,
+    created_at: daysFrom(now, -2)
+  },
+  {
+    id: ids.orderItems.oi15,
+    order_id: ids.orders.cancelled05,
+    voucher_product_id: ids.vouchers.cgvCouple,
+    quantity: 1,
+    unit_price: 249000,
+    snapped_original_price: 360000,
+    snapped_selling_price: 249000,
+    snapped_discount_rate: 30.83,
+    subtotal: 249000,
+    created_at: daysFrom(now, -6)
+  },
+  {
+    id: ids.orderItems.oi16,
+    order_id: ids.orders.cancelled05,
+    voucher_product_id: ids.vouchers.highlandsCombo,
+    quantity: 1,
+    unit_price: 99000,
+    snapped_original_price: 138000,
+    snapped_selling_price: 99000,
+    snapped_discount_rate: 28.26,
+    subtotal: 99000,
+    created_at: daysFrom(now, -6)
+  },
+  {
+    id: ids.orderItems.oi17,
+    order_id: ids.orders.cancelled06,
+    voucher_product_id: ids.vouchers.pizzaHutFamily,
+    quantity: 1,
+    unit_price: 160000,
+    snapped_original_price: 228000,
+    snapped_selling_price: 160000,
+    snapped_discount_rate: 29.82,
+    subtotal: 160000,
+    created_at: daysFrom(now, -1)
   }
 ];
 
@@ -373,6 +529,39 @@ const payments: PaymentSeed[] = [
     amount: 448000,
     status: "success",
     transaction_ref: "MOMO-DH0007",
+    gateway_response: "Thanh toán thành công",
+    paid_at: daysFrom(now, -6),
+    created_at: daysFrom(now, -6)
+  },
+  {
+    id: ids.payments.cancelled02,
+    order_id: ids.orders.cancelled02,
+    method: "vnpay",
+    amount: 399000,
+    status: "success",
+    transaction_ref: "VNPAY-DH0008",
+    gateway_response: "Thanh toán thành công",
+    paid_at: daysFrom(now, -5),
+    created_at: daysFrom(now, -5)
+  },
+  {
+    id: ids.payments.cancelled03,
+    order_id: ids.orders.cancelled03,
+    method: "paypal",
+    amount: 209000,
+    status: "success",
+    transaction_ref: "PP-DH0009",
+    gateway_response: "Thanh toán thành công",
+    paid_at: daysFrom(now, -4),
+    created_at: daysFrom(now, -4)
+  },
+  {
+    id: ids.payments.cancelled05,
+    order_id: ids.orders.cancelled05,
+    method: "vnpay",
+    amount: 398000,
+    status: "success",
+    transaction_ref: "VNPAY-DH0010",
     gateway_response: "Thanh toán thành công",
     paid_at: daysFrom(now, -6),
     created_at: daysFrom(now, -6)
@@ -482,6 +671,58 @@ const issuedVouchers: IssuedVoucherSeed[] = [
     issued_date: daysFrom(now, -6),
     expired_date: daysFrom(now, 19),
     status: "active",
+    created_at: daysFrom(now, -6)
+  },
+  {
+    id: ids.issuedVouchers.iv09,
+    voucher_code: "ASA-GOG-000009",
+    qr_code_payload: "qr://asa/GOG/000009",
+    qr_code_image_url: "https://cdn.asa.test/qr/asa-gog-000009.png",
+    order_item_id: ids.orderItems.oi12,
+    voucher_product_id: ids.vouchers.gogiBuffet,
+    owner_id: ids.users.buyerQuocBao,
+    issued_date: daysFrom(now, -5),
+    expired_date: daysFrom(now, 25),
+    status: "refunded",
+    created_at: daysFrom(now, -5)
+  },
+  {
+    id: ids.issuedVouchers.iv10,
+    voucher_code: "ASA-CIN-000010",
+    qr_code_payload: "qr://asa/CIN/000010",
+    qr_code_image_url: "https://cdn.asa.test/qr/asa-cin-000010.png",
+    order_item_id: ids.orderItems.oi13,
+    voucher_product_id: ids.vouchers.lotteCinema,
+    owner_id: ids.users.buyerMinhAnh,
+    issued_date: daysFrom(now, -4),
+    expired_date: daysFrom(now, 26),
+    status: "refunded",
+    created_at: daysFrom(now, -4)
+  },
+  {
+    id: ids.issuedVouchers.iv11,
+    voucher_code: "ASA-CGV-000011",
+    qr_code_payload: "qr://asa/CGV/000011",
+    qr_code_image_url: "https://cdn.asa.test/qr/asa-cgv-000011.png",
+    order_item_id: ids.orderItems.oi15,
+    voucher_product_id: ids.vouchers.cgvCouple,
+    owner_id: ids.users.buyerThuTrang,
+    issued_date: daysFrom(now, -6),
+    expired_date: daysFrom(now, 24),
+    status: "refunded",
+    created_at: daysFrom(now, -6)
+  },
+  {
+    id: ids.issuedVouchers.iv12,
+    voucher_code: "ASA-HLC-000012",
+    qr_code_payload: "qr://asa/HLC/000012",
+    qr_code_image_url: "https://cdn.asa.test/qr/asa-hlc-000012.png",
+    order_item_id: ids.orderItems.oi16,
+    voucher_product_id: ids.vouchers.highlandsCombo,
+    owner_id: ids.users.buyerThuTrang,
+    issued_date: daysFrom(now, -6),
+    expired_date: daysFrom(now, 24),
+    status: "refunded",
     created_at: daysFrom(now, -6)
   }
 ];

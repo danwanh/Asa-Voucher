@@ -23,6 +23,15 @@ export type ComplaintDetail = ComplaintListItem & {
   evidenceUrls: string[]
   customerName?: string
   customerEmail?: string
+  payments?: {
+    id: string
+    method: string
+    amount: number
+    status: string
+    transactionRef?: string
+    refundRef?: string
+    refundedAt?: string
+  }[]
 }
 
 export type ComplaintResponse = {
@@ -99,7 +108,7 @@ export const feedbackService = {
         status: c.status,
         assignedTo: c.assigned_to ? String(c.assigned_to) : undefined,
         resolutionNote: c.resolution_note,
-        resolutionType: c.resolution_type,
+        resolutionTypes: Array.isArray(c.resolution_types) ? c.resolution_types : c.resolution_type ? [c.resolution_type] : [],
         createdAt: c.created_at,
         resolvedAt: c.resolved_at,
       })) as ComplaintListItem[],
@@ -121,6 +130,17 @@ export const feedbackService = {
       content: r.content,
       createdAt: r.created_at,
     })) : []
+
+    const payments = Array.isArray(c.orders?.payments) ? c.orders.payments.map((p: any) => ({
+      id: String(p.id),
+      method: p.method,
+      amount: Number(p.amount),
+      status: p.status,
+      transactionRef: p.transaction_ref,
+      refundRef: p.refund_ref,
+      refundedAt: p.refunded_at,
+    })) : []
+
     return {
       id: String(c.id),
       userId: String(c.user_id),
@@ -136,10 +156,11 @@ export const feedbackService = {
       status: c.status,
       assignedTo: c.assigned_to ? String(c.assigned_to) : undefined,
       resolutionNote: c.resolution_note,
-      resolutionType: c.resolution_type,
+      resolutionTypes: Array.isArray(c.resolution_types) ? c.resolution_types : c.resolution_type ? [c.resolution_type] : [],
       createdAt: c.created_at,
       resolvedAt: c.resolved_at,
       responses,
+      payments,
     } as ComplaintDetail
   },
 
@@ -148,10 +169,10 @@ export const feedbackService = {
     return unwrap(response)
   },
 
-  async resolveComplaint(id: string, input: { resolutionNote: string; resolutionType: string }) {
+  async resolveComplaint(id: string, input: { resolutionNote: string; resolutionTypes: string[] }) {
     const response = await api.patch<Envelope<any>>(`/complaints/${id}/resolve`, {
       resolution_note: input.resolutionNote,
-      resolution_type: input.resolutionType,
+      resolution_types: input.resolutionTypes,
     })
     return unwrap(response)
   },
