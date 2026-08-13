@@ -5,11 +5,10 @@ import * as issuedVoucherService from "../services/issued-voucher.service.js";
 import {
   listIssuedVouchersQuerySchema,
   listVoucherUsagesQuerySchema,
-  redeemVoucherSchema,
   updateIssuedVoucherStatusSchema,
-  validateVoucherSchema, checkVoucherSchema
+  checkVoucherSchema,
+  confirmVoucherSchema,
 } from "../validations/issued-voucher.validation.js";
-import { confirmVoucherSchema } from "../validations/issued-voucher.validation.js";
 
 function requireUser(req: Request) {
   if (!req.user) throw new HttpError(401, "Authentication required");
@@ -37,18 +36,6 @@ export async function updateIssuedVoucherStatus(req: Request, res: Response) {
   sendSuccess(res, voucher, "Cập nhật trạng thái voucher thành công");
 }
 
-export async function validateVoucher(req: Request, res: Response) {
-  const input = validateVoucherSchema.parse(req.body);
-  const result = await issuedVoucherService.validateVoucher(requireUser(req), input);
-  sendSuccess(res, result);
-}
-
-export async function redeemVoucher(req: Request, res: Response) {
-  const input = redeemVoucherSchema.parse(req.body);
-  const result = await issuedVoucherService.redeemVoucher(requireUser(req), req.params.id, input);
-  sendCreated(res, result, "Xác nhận sử dụng voucher thành công");
-}
-
 export async function listUsagesForVoucher(req: Request, res: Response) {
   const usages = await issuedVoucherService.listUsagesForVoucher(requireUser(req), req.params.id);
   sendSuccess(res, usages);
@@ -66,7 +53,6 @@ export async function checkVoucher(req: Request, res: Response) {
   sendSuccess(res, result);
 }
 
-// Hàm cho xác nhận sử dụng voucher
 export async function confirmVoucher(req: Request, res: Response) {
   const input = confirmVoucherSchema.parse(req.body);
   const result = await issuedVoucherService.confirmVoucher(requireUser(req), input);

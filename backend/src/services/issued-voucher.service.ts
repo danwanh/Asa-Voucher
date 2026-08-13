@@ -3,16 +3,12 @@ import { HttpError } from "../utils/http-error.js";
 import { buildPaginatedResult } from "../utils/pagination.js";
 import * as issuedVoucherRepo from "../repositories/issued-voucher.repository.js";
 import * as voucherUsageRepo from "../repositories/voucher-usage.repository.js";
-import { isAdminRole, type AuthUser } from "../types/auth.types.js";
-import type {
-  IssuedVoucherStatus,
-  ListIssuedVouchersQuery,
-} from "../types/issued-voucher.types.js";
+import { isAdminRole, isPartnerStaff, type AuthUser } from "../types/auth.types.js";
+import type { IssuedVoucherStatus } from "../types/issued-voucher.types.js";
+import type { ListIssuedVouchersQuery } from "../validations/issued-voucher.validation.js";
 import type {
   ConfirmVoucherInput,
-  RedeemVoucherInput,
   UpdateIssuedVoucherStatusInput,
-  ValidateVoucherInput,
 } from "../validations/issued-voucher.validation.js";
 import type { CheckVoucherInput } from "../validations/issued-voucher.validation.js";
 
@@ -20,19 +16,35 @@ type IssuedVoucherWithProduct = Awaited<
   ReturnType<typeof issuedVoucherRepo.findIssuedVoucherById>
 >;
 
-function isPartnerStaff(user: AuthUser) {
-  return (
-    user.role === "partner_owner" ||
-    user.role === "partner_voucher_staff" ||
-    user.role === "partner_store_staff"
-  );
-}
-
 function assertCanViewIssuedVoucher(user: AuthUser, voucher: NonNullable<IssuedVoucherWithProduct>) {
   if (isAdminRole(user.role)) return;
   if (voucher.owner_id === user.id) return;
-  if (isPartnerStaff(user) && voucher.voucher_products.partner_id === user.partnerId) return;
+  if (isPartnerStaff(user.role) && voucher.voucher_products.partner_id === user.partnerId) return;
   throw new HttpError(403, "Bạn không có quyền xem voucher này");
+}
+
+function assertPartnerScope(user: AuthUser, voucher: NonNullable<IssuedVoucherWithProduct>) {
+  if (isAdminRole(user.role)) return;
+  if (!isPartnerStaff(user.role)) {
+    throw new HttpError(403, "Bạn không có quyền truy cập voucher này");
+  }
+  if (user.partnerId && voucher.voucher_products.partner_id !== user.partnerId) {
+    throw new HttpError(403, "Voucher không thuộc phạm vi đối tác của bạn");
+  }
+}
+
+function resolveRedeemableState(voucher: NonNullable<IssuedVoucherWithProduct>) {
+  const today = new Date().toISOString().slice(0, 10);
+
+  if (voucher.status === "used") return { redeemable: false, reason: "Voucher đã được sử dụng" };
+  if (voucher.status === "refunded") return { redeemable: false, reason: "Voucher đã hoàn tiền" };
+  if (voucher.status === "expired" || voucher.expired_date < today) {
+    return { redeemable: false, reason: "Voucher đã hết hạn" };
+  }
+  if (voucher.status !== "active") {
+    return { redeemable: false, reason: "Voucher không ở trạng thái hợp lệ" };
+  }
+  return { redeemable: true, reason: null as string | null };
 }
 
 export async function listIssuedVouchers(user: AuthUser, query: ListIssuedVouchersQuery) {
@@ -41,7 +53,7 @@ export async function listIssuedVouchers(user: AuthUser, query: ListIssuedVouche
     page: query.page,
     limit: query.limit,
     ownerId: user.role === "buyer" ? user.id : undefined,
-    partnerId: isPartnerStaff(user) ? (user.partnerId ?? undefined) : undefined,
+    partnerId: isPartnerStaff(user.role) ? (user.partnerId ?? undefined) : undefined,
   };
 
   const { rows, total } = await issuedVoucherRepo.listIssuedVouchers(filter);
@@ -70,90 +82,6 @@ export async function updateIssuedVoucherStatus(
   return issuedVoucherRepo.updateIssuedVoucherStatus(id, input.status as IssuedVoucherStatus);
 }
 
-function resolveRedeemableState(voucher: NonNullable<IssuedVoucherWithProduct>) {
-  const today = new Date().toISOString().slice(0, 10);
-
-  if (voucher.status === "used") return { redeemable: false, reason: "Voucher đã được sử dụng" };
-  if (voucher.status === "refunded") return { redeemable: false, reason: "Voucher đã hoàn tiền" };
-  if (voucher.status === "expired" || voucher.expired_date < today) {
-    return { redeemable: false, reason: "Voucher đã hết hạn" };
-  }
-  if (voucher.status !== "active") {
-    return { redeemable: false, reason: "Voucher không ở trạng thái hợp lệ" };
-  }
-  return { redeemable: true, reason: null as string | null };
-}
-
-export async function validateVoucher(user: AuthUser, input: ValidateVoucherInput) {
-  if (!isPartnerStaff(user) && !isAdminRole(user.role)) {
-    throw new HttpError(403, "Bạn không có quyền kiểm tra voucher");
-  }
-
-  const voucher = input.voucher_code
-    ? await issuedVoucherRepo.findIssuedVoucherByCode(input.voucher_code)
-    : await issuedVoucherRepo.findIssuedVoucherByQrPayload(input.qr_code_payload as string);
-
-  if (!voucher) throw new HttpError(404, "Không tìm thấy voucher với mã đã cung cấp");
-
-  // RB-09: đối tác chỉ được xác thực voucher thuộc phạm vi của mình
-  if (isPartnerStaff(user) && voucher.voucher_products.partner_id !== user.partnerId) {
-    throw new HttpError(403, "Voucher không thuộc phạm vi đối tác của bạn");
-  }
-
-  const state = resolveRedeemableState(voucher);
-  const eligibleBranchIds = await issuedVoucherRepo.findEligibleBranchIds(voucher.voucher_product_id);
-
-  return {
-    issued_voucher: voucher,
-    redeemable: state.redeemable,
-    reason: state.reason,
-    eligible_branch_ids: eligibleBranchIds,
-  };
-}
-
-export async function redeemVoucher(user: AuthUser, issuedVoucherId: string, input: RedeemVoucherInput) {
-  if (user.role !== "partner_store_staff") {
-    throw new HttpError(403, "Chỉ nhân viên cửa hàng được xác nhận sử dụng voucher");
-  }
-
-  const voucher = await issuedVoucherRepo.findIssuedVoucherById(issuedVoucherId);
-  if (!voucher) throw new HttpError(404, "Không tìm thấy voucher đã phát hành");
-
-  // RB-09: đối tác chỉ xác thực voucher thuộc phạm vi chi nhánh/chương trình của mình
-  if (voucher.voucher_products.partner_id !== user.partnerId) {
-    throw new HttpError(403, "Voucher không thuộc phạm vi đối tác của bạn");
-  }
-
-  // store_staff chỉ redeem tại đúng chi nhánh được phân công
-  if (user.role === "partner_store_staff" && user.branchId !== input.branch_id) {
-    throw new HttpError(403, "Bạn chỉ được xác nhận voucher tại chi nhánh của mình");
-  }
-
-  const eligibleBranchIds = await issuedVoucherRepo.findEligibleBranchIds(voucher.voucher_product_id);
-  if (!eligibleBranchIds.includes(input.branch_id)) {
-    throw new HttpError(403, "Chi nhánh này không nằm trong phạm vi áp dụng của voucher");
-  }
-
-  const state = resolveRedeemableState(voucher);
-  if (!state.redeemable) {
-    // RB-07 / RB-08: đã dùng, hết hạn, bị hủy/khóa thì không được redeem
-    const status = voucher.status === "used" ? 409 : 422;
-    throw new HttpError(status, state.reason ?? "Voucher không hợp lệ để sử dụng");
-  }
-
-  const usage = await voucherUsageRepo.createVoucherUsage({
-    issued_voucher_id: voucher.id,
-    branch_id: input.branch_id,
-    redeemed_by: user.id,
-    redemption_code: input.redemption_code,
-    note: input.note,
-  });
-
-  const updatedVoucher = await issuedVoucherRepo.updateIssuedVoucherStatus(voucher.id, "used");
-
-  return { issued_voucher: updatedVoucher, usage };
-}
-
 export async function listUsagesForVoucher(user: AuthUser, issuedVoucherId: string) {
   const voucher = await getIssuedVoucherById(user, issuedVoucherId);
   return voucherUsageRepo.listUsagesByIssuedVoucher(voucher.id);
@@ -163,14 +91,14 @@ export async function listUsages(
   user: AuthUser,
   query: { page: number; limit: number },
 ) {
-  if (!isPartnerStaff(user) && user.role !== "admin_security") {
+  if (!isPartnerStaff(user.role) && user.role !== "admin_security") {
     throw new HttpError(403, "Bạn không có quyền xem log xác thực");
   }
 
   const filter = {
     page: query.page,
     limit: query.limit,
-    partnerId: isPartnerStaff(user) ? (user.partnerId ?? undefined) : undefined,
+    partnerId: isPartnerStaff(user.role) ? (user.partnerId ?? undefined) : undefined,
     branchId: user.role === "partner_store_staff" ? (user.branchId ?? undefined) : undefined,
   };
 
@@ -178,105 +106,83 @@ export async function listUsages(
   return buildPaginatedResult(rows, total, query);
 }
 
-// Hàm cho phần kiểm tra voucher
 export async function checkVoucher(user: AuthUser, input: CheckVoucherInput) {
-  // Query voucher theo mã hoặc qr_payload
-  const voucher = input.qr_code_payload ? await issuedVoucherRepo.findIssuedVoucherByQrPayload(input.qr_code_payload) : await issuedVoucherRepo.findIssuedVoucherByCode(input.voucher_code);
+  if (!isPartnerStaff(user.role) && !isAdminRole(user.role)) {
+    throw new HttpError(403, "Bạn không có quyền kiểm tra voucher");
+  }
 
-  // Kiểm tra có tìm thấy
+  const voucher = input.qr_code_payload
+    ? await issuedVoucherRepo.findIssuedVoucherByQrPayload(input.qr_code_payload)
+    : input.voucher_code
+      ? await issuedVoucherRepo.findIssuedVoucherByCode(input.voucher_code)
+      : null;
+
   if (!voucher) {
     throw new HttpError(404, "Mã voucher không hợp lệ");
   }
 
-  // Check RB-09: đối tác chỉ xác thực voucher thuộc phạm vi chi nhánh/chương trình của mình
-  if (voucher && voucher.voucher_products.partner_id !== user.partnerId) {
-    throw new HttpError(403, "Voucher không thuộc phạm vi đối tác của bạn");
+  assertPartnerScope(user, voucher);
+
+  const state = resolveRedeemableState(voucher);
+  if (!state.redeemable) {
+    throw new HttpError(400, state.reason!);
   }
 
-  // Check status của voucher
-  if (voucher.status === "used") {
-    throw new HttpError(400, "Voucher đã được sử dụng");
+  if (user.role === "partner_store_staff") {
+    const eligibleBranchIds = await issuedVoucherRepo.findEligibleBranchIds(voucher.voucher_product_id);
+    const userBranchId = user.branchId;
+
+    if (!userBranchId || !eligibleBranchIds.includes(userBranchId)) {
+      throw new HttpError(403, "Bạn chỉ được kiểm tra voucher tại chi nhánh của mình");
+    }
   }
 
-  if (voucher.status === "refunded") {
-    throw new HttpError(400, "Voucher đã hoàn tiền");
-  }
-
-  // So sánh để đánh giá trạng thái hết hạn
-  const isExpired = voucher.status === "expired" || (voucher.expired_date && new Date (voucher.expired_date) < new Date());
-
-  if (isExpired) {
-    throw new HttpError(400, "Voucher đã hết hạn");
-  }
-
-  // Nếu ở trạng thái khác ngoài còn hạn (active) thì báo lỗi khác
-  if (voucher.status !== "active") {
-    throw new HttpError(400, "Voucher không ở trạng thái hợp lệ");
-  }
-
-  // Check branch eligibility (RB-09)
   const eligibleBranchIds = await issuedVoucherRepo.findEligibleBranchIds(voucher.voucher_product_id);
 
+  return { issued_voucher: voucher, eligible_branch_ids: eligibleBranchIds };
+}
+
+export async function confirmVoucher(user: AuthUser, input: ConfirmVoucherInput) {
+  if (user.role !== "partner_store_staff") {
+    throw new HttpError(403, "Chỉ nhân viên cửa hàng được xác nhận sử dụng voucher");
+  }
+
+  const voucher = await issuedVoucherRepo.findIssuedVoucherByCode(input.voucher_code);
+
+  if (!voucher) {
+    throw new HttpError(404, "Mã voucher không hợp lệ");
+  }
+
+  assertPartnerScope(user, voucher);
+
+  const eligibleBranchIds = await issuedVoucherRepo.findEligibleBranchIds(voucher.voucher_product_id);
   const userBranchId = user.branchId;
 
   if (!userBranchId || !eligibleBranchIds.includes(userBranchId)) {
-    throw new HttpError(403, "Bạn chỉ được kiểm tra voucher tại chi nhánh của mình");
-  }
-
-  return {issued_voucher: voucher, eligible_branch_ids: eligibleBranchIds}
-}
-
-// Hàm để xác nhận sử dụng voucher với giao dịch
-export async function confirmVoucher(user: AuthUser, input: ConfirmVoucherInput) {
-  // Tìm voucher theo code
-  const voucher = await issuedVoucherRepo.findIssuedVoucherByCode(input.voucher_code);
-
-  // Kiểm tra nếu không tìm thấy voucher
-  if (!voucher) {
-    throw new HttpError(404, "Mã voucher không hợp lệ");
-  }
-
-  // Kiểm tra RB-09 partner scope check
-  if (voucher && voucher.voucher_products.partner_id !== user.partnerId) {
-    throw new HttpError(403, "Voucher không thuộc phạm vi đối tác của bạn");
-  }
-
-  // Kiểm tra nhánh (check branch eligibility)
-  const eligibleBranchIds = await issuedVoucherRepo.findEligibleBranchIds(voucher.voucher_product_id);
-  const userBranchId = user.branchId;
-
-  // Kiểm tra trong danh sách có chi nhánh thuộc
-  if (! userBranchId || !eligibleBranchIds.includes(userBranchId)) {
     throw new HttpError(403, "Bạn chỉ được xác nhận sử dụng voucher tại chi nhánh của mình");
   }
 
-  // Tạo transaction
   return prisma.$transaction(async (tx) => {
-    const re_voucher = await tx.issuedVoucher.findUnique({
-      where: {
-        id: voucher?.id
-      }
-    })
+    const reVoucher = await tx.issuedVoucher.findUnique({
+      where: { id: voucher.id },
+    });
 
-    // Kiểm tra trạng thái: nếu đã bị dùng/request khác chạy song song
-    if (!re_voucher || re_voucher.status !== "active") {
+    if (!reVoucher || reVoucher.status !== "active") {
       throw new HttpError(400, "Voucher đã được sử dụng hoặc không còn hợp lệ");
     }
 
-    // Update trạng thái sang "used"
     const updatedVoucher = await tx.issuedVoucher.update({
       where: { id: voucher.id },
       data: { status: "used", updated_at: new Date() },
     });
 
-    // Thêm vào voucher_usage log
     const usage = await tx.voucherUsage.create({
       data: {
         issued_voucher_id: voucher.id,
         branch_id: userBranchId,
         redeemed_by: user.id,
         used_at: new Date(),
-      }
+      },
     });
 
     return { message: "Xác nhận sử dụng voucher thành công", issued_voucher: updatedVoucher, usage };
