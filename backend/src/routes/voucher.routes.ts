@@ -1,6 +1,6 @@
 import { Router } from "express";
 import type { NextFunction, Request, Response } from "express";
-import { approveVoucherProduct, createVoucherBranch, createVoucherImage, createVoucherProduct, deleteVoucherBranch, deleteVoucherImage, deleteVoucherProduct, getVoucherProduct, listVoucherBranches, listVoucherImages, listVoucherProducts, submitVoucherProduct, updateVoucherImage, updateVoucherProduct, updateVoucherStatus } from "../controllers/voucher-product.controller.js";
+import { approveVoucherProduct, createVoucherBranch, createVoucherImage, createVoucherProduct, deleteVoucherBranch, deleteVoucherImage, deleteVoucherProduct, getPublicVoucherDetail, getVoucherProduct, listVoucherBranches, listVoucherImages, listVoucherProducts, submitVoucherProduct, updateVoucherImage, updateVoucherProduct, updateVoucherStatus } from "../controllers/voucher-product.controller.js";
 import { optionalAuth, requireAuth } from "../middlewares/auth.js";
 import { requireRole } from "../middlewares/require-role.js";
 import { validateBody, validateParams, validateQuery } from "../middlewares/validate.js";
@@ -21,6 +21,7 @@ function requireAuthForMineScope(req: Request, res: Response, next: NextFunction
 
 voucherRoutes.get("/voucher-products", validateQuery(voucherProductQuerySchema), requireAuthForMineScope, asyncHandler(listVoucherProducts));
 voucherRoutes.post("/voucher-products", requireAuth, requireRole("partner_owner", "partner_voucher_staff"), validateBody(createVoucherProductSchema), asyncHandler(createVoucherProduct));
+voucherRoutes.get("/voucher-products/:id/detail", validateParams(idParamSchema), asyncHandler(getPublicVoucherDetail));
 voucherRoutes.get("/voucher-products/:id", optionalAuth, validateParams(idParamSchema), asyncHandler(getVoucherProduct));
 voucherRoutes.patch("/voucher-products/:id", requireAuth, validateParams(idParamSchema), validateBody(updateVoucherProductSchema), asyncHandler(updateVoucherProduct));
 voucherRoutes.delete("/voucher-products/:id", requireAuth, validateParams(idParamSchema), asyncHandler(deleteVoucherProduct));

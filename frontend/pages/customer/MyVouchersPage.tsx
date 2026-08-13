@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Search, QrCode, Gift, Star, MessageSquare } from "lucide-react"
+import { Search, QrCode, Gift, Star, MessageSquare, ChevronLeft, ChevronRight } from "lucide-react"
 import { C, fmt, fmtDate } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import { StatusBadge } from "@/components/StatusBadge"
@@ -12,6 +12,10 @@ interface Props {
   loading?: boolean
   onReview?: (order: Order, issuedVoucher: IssuedVoucher) => void
   onComplaint?: (order: Order, issuedVoucher: IssuedVoucher) => void
+  page?: number
+  totalPages?: number
+  onPageChange?: (page: number) => void
+  onFilterChange?: (status?: string) => void
 }
 
 interface VoucherEntry {
@@ -41,7 +45,7 @@ function buildEntries(orders: Order[]): VoucherEntry[] {
   })
 }
 
-export function MyVouchersPage({ orders, ownerId, loading = false, onReview, onComplaint }: Props) {
+export function MyVouchersPage({ orders, ownerId, loading = false, onReview, onComplaint, page = 1, totalPages = 1, onPageChange, onFilterChange }: Props) {
   const ownedOrders = ownerId ? orders.filter((order) => order.recipientId === ownerId) : orders
   const entries = buildEntries(ownedOrders)
   const [tab, setTab] = useState("active")
@@ -70,7 +74,11 @@ export function MyVouchersPage({ orders, ownerId, loading = false, onReview, onC
           return (
             <button
               key={t.value}
-              onClick={() => setTab(t.value)}
+               onClick={() => {
+                 setTab(t.value)
+                 onFilterChange?.(t.value)
+                 onPageChange?.(1)
+               }}
               className="flex-shrink-0 px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 transition-colors"
               style={{ backgroundColor: tab === t.value ? C.indigo : "white", color: tab === t.value ? "white" : C.indigo, border: `1px solid ${tab === t.value ? C.indigo : "#E2DFC8"}` }}
             >
@@ -130,6 +138,14 @@ export function MyVouchersPage({ orders, ownerId, loading = false, onReview, onC
               </div>
             )
           })}
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-3 mt-6">
+          <button disabled={page <= 1} onClick={() => onPageChange?.(page - 1)} className="p-2 rounded-lg border disabled:opacity-40" aria-label="Trang trước"><ChevronLeft className="w-4 h-4" /></button>
+          <span className="text-sm font-semibold">Trang {page} / {totalPages}</span>
+          <button disabled={page >= totalPages} onClick={() => onPageChange?.(page + 1)} className="p-2 rounded-lg border disabled:opacity-40" aria-label="Trang sau"><ChevronRight className="w-4 h-4" /></button>
         </div>
       )}
 

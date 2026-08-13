@@ -7,6 +7,7 @@ import { voucherService, type VoucherApplicableBranch, type VoucherDetailData, t
 
 interface Props {
   voucher: Voucher
+  detail: VoucherDetailData
   onBack: () => void
   onLogin: () => void
   onDetail: (v: Voucher) => void
@@ -14,7 +15,7 @@ interface Props {
   onBuyNow: (v: Voucher) => void
 }
 
-export function GuestVoucherDetailPage({ voucher: v, onBack, onLogin, onDetail, onAddToCart, onBuyNow }: Props) {
+export function GuestVoucherDetailPage({ voucher: v, detail, onBack, onLogin, onDetail, onAddToCart, onBuyNow }: Props) {
   const [liked, setLiked] = useState(false)
   const [detailVoucher, setDetailVoucher] = useState<Voucher>(v)
   const [reviews, setReviews] = useState<VoucherPublicReview[]>([])
@@ -31,57 +32,21 @@ export function GuestVoucherDetailPage({ voucher: v, onBack, onLogin, onDetail, 
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!v.id) {
-      setError("Voucher không hợp lệ.")
-      setIsLoading(false)
-      return
-    }
+    setDetailVoucher(detail.voucher)
+    setReviews(detail.reviews)
+    setBranches(detail.branches)
+    setDetailMeta({ conditions: detail.conditions, usageInstructions: detail.usageInstructions, applicableArea: detail.applicableArea, partnerId: detail.partnerId, categoryName: detail.categoryName })
+    setIsLoading(false)
+  }, [detail])
 
+  useEffect(() => {
     let cancelled = false
-
-    async function loadDetail() {
-      setIsLoading(true)
-      setError(null)
-      try {
-        const detail = await voucherService.getDetail(v.id)
-        if (cancelled) return
-        setDetailVoucher(detail.voucher)
-        setReviews(detail.reviews)
-        setBranches(detail.branches)
-        setRelated([])
-        setDetailMeta({
-          conditions: detail.conditions,
-          usageInstructions: detail.usageInstructions,
-          applicableArea: detail.applicableArea,
-          partnerId: detail.partnerId,
-          categoryName: detail.categoryName
-        })
-
-        voucherService
-          .listRelatedVouchers({
-            partnerId: detail.partnerId,
-            excludeId: detail.voucher.id,
-            limit: 4
-          })
-          .then((items) => {
-            if (!cancelled) setRelated(items)
-          })
-          .catch(() => {
-            if (!cancelled) setRelated([])
-          })
-      } catch {
-        if (cancelled) return
-        setError("Không thể tải chi tiết voucher từ hệ thống. Vui lòng thử lại.")
-      } finally {
-        if (!cancelled) setIsLoading(false)
-      }
-    }
-
-    loadDetail()
-    return () => {
-      cancelled = true
-    }
-  }, [v.id])
+    setRelated([])
+    void voucherService.listRelatedVouchers({ partnerId: detail.partnerId, excludeId: detail.voucher.id, limit: 4 })
+      .then((items) => { if (!cancelled) setRelated(items) })
+      .catch(() => { if (!cancelled) setRelated([]) })
+    return () => { cancelled = true }
+  }, [detail])
 
   const pct = useMemo(() => {
     if (detailVoucher.originalPrice <= 0) return 0

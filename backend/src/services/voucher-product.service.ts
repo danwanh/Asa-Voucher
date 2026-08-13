@@ -4,6 +4,7 @@ import { requireData, throwDbError } from "../utils/db.js";
 import { HttpError } from "../utils/http-error.js";
 import { getAreaMatchCandidates, serializeApplicableAreas } from "../utils/applicable-area.js";
 import { rangeFromPagination } from "../validations/common.validation.js";
+import { notifyVoucherApproved, notifyVoucherRejected } from "./notification.service.js";
 
 type CurrentUser = { id: string; role: UserRole; partnerId?: string | null; branchId?: string | null };
 type WorkflowStatus = "draft" | "pending_approval" | "rejected" | "approved" | "active" | "paused" | "sold_out" | "expired";
@@ -280,7 +281,31 @@ export async function listVoucherProducts(user: CurrentUser | undefined, queryIn
   }
 
   const [items, count] = await prisma.$transaction([
-    prisma.voucherProduct.findMany({ where, include: PARTNER_NAME_INCLUDE, skip: from, take: to - from + 1, orderBy: { created_at: "desc" } }),
+    prisma.voucherProduct.findMany({
+      where,
+      select: {
+        id: true,
+        partner_id: true,
+        category_id: true,
+        name: true,
+        description: true,
+        thumbnail_url: true,
+        original_price: true,
+        selling_price: true,
+        discount_rate: true,
+        applicable_area: true,
+        total_quantity: true,
+        remaining_quantity: true,
+        sale_start_date: true,
+        sale_end_date: true,
+        status: true,
+        approval_status: true,
+        partners: { select: { business_name: true } },
+      },
+      skip: from,
+      take: to - from + 1,
+      orderBy: { created_at: "desc" },
+    }),
     prisma.voucherProduct.count({ where })
   ]);
   return { items: (items as unknown as Record<string, unknown>[]).map(withWorkflow), count, page, limit };
@@ -332,6 +357,78 @@ export async function getVoucherProduct(user: CurrentUser | undefined, id: strin
   if (!isPublicVisible && user) await assertVoucherOwnerOrAdmin(user, voucher);
   if (!isPublicVisible && !user) throw new HttpError(404, "Voucher product not found", "NOT_FOUND");
   return withWorkflow(voucher);
+}
+
+export async function getPublicVoucherDetail(id: string) {
+  const [voucher, branches, reviews] = await Promise.all([
+    prisma.voucherProduct.findFirst({
+      where: { id, approval_status: "approved", status: "active" },
+      select: {
+        id: true,
+        partner_id: true,
+        category_id: true,
+        name: true,
+        description: true,
+        thumbnail_url: true,
+        original_price: true,
+        selling_price: true,
+        discount_rate: true,
+        applicable_area: true,
+        total_quantity: true,
+        remaining_quantity: true,
+        sale_start_date: true,
+        sale_end_date: true,
+        validity_days: true,
+        terms_and_conditions: true,
+        usage_instructions: true,
+        status: true,
+        approval_status: true,
+        partners: { select: { business_name: true } },
+        categories: { select: { name: true, slug: true } }
+      }
+    }),
+    prisma.voucherProductBranch.findMany({
+      where: { voucher_product_id: id },
+      select: {
+        id: true,
+        branch_id: true,
+        partner_branches: {
+          select: { id: true, branch_name: true, address: true, city: true, district: true }
+        }
+      }
+    }),
+    Promise.all([
+      prisma.review.findMany({
+        where: { voucher_product_id: id, is_published: true },
+        orderBy: { created_at: "desc" },
+        take: 6,
+        select: {
+          id: true,
+          rating: true,
+          comment: true,
+          created_at: true,
+          users: { select: { full_name: true } }
+        }
+      }),
+      prisma.review.aggregate({
+        where: { voucher_product_id: id, is_published: true },
+        _avg: { rating: true },
+        _count: { _all: true }
+      })
+    ])
+  ]);
+
+  const current = requireData(voucher, "Voucher product not found") as Record<string, unknown>;
+  const [reviewItems, reviewStats] = reviews;
+  return {
+    voucher: withWorkflow(current),
+    branches,
+    reviews: {
+      items: reviewItems,
+      pagination: { total: reviewStats._count._all },
+      average_rating: Number((reviewStats._avg.rating ?? 0).toFixed(1))
+    }
+  };
 }
 
 export async function updateVoucherProduct(user: CurrentUser, id: string, input: Record<string, unknown>) {
@@ -439,13 +536,111 @@ export async function submitVoucherProduct(user: CurrentUser, id: string) {
   }
 }
 
-export async function approveVoucherProduct(adminId: string, id: string, approvalStatus: string) {
-  try {
-    const updated = await prisma.voucherProduct.update({ where: { id }, data: { approval_status: approvalStatus, approved_by: adminId, approved_at: new Date(), updated_at: new Date() } });
-    return withWorkflow(updated as unknown as Record<string, unknown>);
-  } catch (error) {
-    throwDbError(error, "Voucher product not found");
+export async function approveVoucherProduct(adminId: string, id: string, input: {
+  approval_status: string;
+  reject_reason?: string
+}) {
+  // Kiểm tra voucher (include partner info + representative email)
+  const voucher = await requireData<Record<string, unknown>>(
+    await prisma.voucherProduct.findUnique({
+      where: { id },
+      include: {
+        partners: {
+          select: {
+            business_name: true,
+            representative_user: {
+              select: { email: true, full_name: true },
+            },
+          },
+        },
+      },
+    }) as unknown as Record<string, unknown> | null,
+    "Voucher product not found"
+  );
+
+  if (voucher.approval_status !== "pending") {
+    throw new HttpError(400, "Voucher không ở trạng thái chờ duyệt", "INVALID_APPROVAL_STATUS");
   }
+
+  // Nếu là reject --> kiểm tra reject_reason, nếu thiếu thì báo lỗi
+  if (input.approval_status === "rejected" && !input.reject_reason) {
+    throw new HttpError(400, "Lý do từ chối không được để trống", "MISSING_REJECT_REASON");
+  }
+
+  // Nếu là voucher được duyệt --> kiểm tra BR
+  if (input.approval_status === "approved") {
+    // RB-02: Kiểm tra giá bán < original_price
+    const sellingPrice = Number(voucher.selling_price);
+    const originalPrice = Number(voucher.original_price);
+    if (isNaN(sellingPrice) || isNaN(originalPrice) || sellingPrice >= originalPrice) {
+      throw new HttpError(400, "Giá bán phải nhỏ hơn giá gốc (Vi phạm quy tắc giá RB-02)", "INVALID_PRICE_RULE");
+    }
+
+    // RB-03: Kiểm tra có đầy đủ thời gian bán bắt đầu, kết thúc và số ngày sử dụng
+    const hasSaleTime = voucher.sale_start_date && voucher.sale_end_date;
+    const hasValidTime = voucher.validity_days;
+    if (!hasSaleTime || !hasValidTime) {
+      throw new HttpError(400, "Voucher thiếu thời gian bán hàng hoặc thời gian sử dụng", "MISSING_TIME_RANGE");
+    }
+
+    // RB-04: Kiểm tra voucher hết số lượng phát hành hoặc hết thời gian bán
+    const saleEndDate = voucher.sale_end_date instanceof Date ? voucher.sale_end_date : new Date(String(voucher.sale_end_date));
+    const remainingQuantity = Number(voucher.remaining_quantity);
+    const isOutOfQuantity = remainingQuantity <= 0;
+    const isSaleExpired = !isNaN(saleEndDate.getTime()) && saleEndDate.getTime() <= Date.now();
+    if (isOutOfQuantity || isSaleExpired) {
+      throw new HttpError(400, "Voucher đã hết số lượng phát hành hoặc hết thời hạn bán", "VOUCHER_EXPIRED_OR_OUT_OF_STOCK");
+    }
+  }
+
+  // Transaction: cập nhật và audit log
+  const result = await prisma.$transaction(async (tx) => {
+    const updated = await tx.voucherProduct.update({
+      where: { id },
+      data: {
+        approval_status: input.approval_status,
+        approved_by: adminId,
+        approved_at: new Date(),
+        updated_at: new Date(),
+      },
+    });
+
+    await tx.adminLog.create({
+      data: {
+        admin_id: adminId,
+        action: input.approval_status === "approved" ? "APPROVE_VOUCHER" : "REJECT_VOUCHER",
+        content_type: "voucher",
+        description: input.approval_status === "approved"
+          ? `Duyệt voucher: ${voucher.name}`
+          : `Từ chối voucher: ${voucher.name}. Lý do: ${input.reject_reason}`,
+        target_voucher_id: id,
+      },
+    });
+
+    return withWorkflow(updated as Record<string, unknown>);
+  });
+
+  // Gửi email notification cho partner (fire-and-forget)
+  const partner = voucher.partners as { business_name: string; representative_user: { email: string; full_name: string } } | null;
+  if (partner?.representative_user?.email) {
+    const emailParams = {
+      partnerEmail: partner.representative_user.email,
+      partnerName: partner.representative_user.full_name || partner.business_name,
+      voucherName: voucher.name as string,
+    };
+
+    if (input.approval_status === "approved") {
+      notifyVoucherApproved(emailParams).catch((err) =>
+        console.error("[Notification] Failed to send approval email:", err)
+      );
+    } else {
+      notifyVoucherRejected({ ...emailParams, rejectReason: input.reject_reason! }).catch((err) =>
+        console.error("[Notification] Failed to send rejection email:", err)
+      );
+    }
+  }
+
+  return result;
 }
 
 export async function updateVoucherStatus(user: CurrentUser, id: string, status: string) {

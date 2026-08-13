@@ -129,6 +129,14 @@ export function mapOrder(value: BackendRecord): Order {
   }
 }
 
+export type OrderListPage = {
+  items: Order[]
+  page: number
+  limit: number
+  total: number
+  totalPages: number
+}
+
 export const orderService = {
   async lookupRecipient(identifier: string) {
     const response = await api.get("/users/recipient-lookup", { params: { identifier } })
@@ -147,14 +155,20 @@ export const orderService = {
     return mapOrder(data<BackendRecord>(response))
   },
 
-  async list(params?: { status?: string; search?: string }) {
-    const response = await api.get("/orders", { params })
-    return data<BackendRecord[]>(response).map(mapOrder)
+  async list(params?: { status?: string; search?: string; page?: number; limit?: number }): Promise<OrderListPage> {
+    const response = await api.get("/orders", { params: { ...params, page: params?.page ?? 1, limit: params?.limit ?? 20 } })
+    const result = data<{ items: BackendRecord[]; pagination: { page: number; limit: number; total: number; total_pages: number } }>(response)
+    return {
+      items: result.items.map(mapOrder),
+      page: result.pagination.page,
+      limit: result.pagination.limit,
+      total: result.pagination.total,
+      totalPages: result.pagination.total_pages,
+    }
   },
 
   async listOrders(params?: { status?: string; search?: string }) {
-    const items = await this.list(params)
-    return { items, total: items.length }
+    return this.list(params)
   },
 
   async get(id: string) {

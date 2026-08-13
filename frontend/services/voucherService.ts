@@ -32,6 +32,10 @@ type BackendVoucherProduct = {
   partners?: {
     business_name: string
   } | null
+  categories?: {
+    name: string
+    slug: string
+  } | null
 }
 
 type BackendCategory = {
@@ -45,6 +49,14 @@ type BackendVoucherList = {
   count: number
   page: number
   limit: number
+}
+
+export type VoucherListPage = {
+  items: Voucher[]
+  page: number
+  limit: number
+  total: number
+  totalPages: number
 }
 
 type BackendReview = {
@@ -216,6 +228,7 @@ function extractData<T>(response: { data: ApiEnvelope<T> }): T {
 }
 
 let categoryMapPromise: Promise<Map<string, BackendCategory>> | null = null
+const voucherDetailPromises = new Map<string, Promise<VoucherDetailData>>()
 
 async function getCategoryMap() {
   if (!categoryMapPromise) {
@@ -239,13 +252,37 @@ function categoryFromMap(categoryMap: Map<string, BackendCategory>, categoryId: 
 }
 
 export const voucherService = {
+  async listPublicVouchersPage(params?: { page?: number; limit?: number; search?: string; categoryId?: string; partnerId?: string; area?: string }): Promise<VoucherListPage> {
+    const [categoryMap, listRes] = await Promise.all([
+      getCategoryMap(),
+      api.get<ApiEnvelope<BackendVoucherList>>("/voucher-products", {
+        params: {
+          page: params?.page ?? 1,
+          limit: params?.limit ?? 20,
+          search: params?.search,
+          category_id: params?.categoryId,
+          partner_id: params?.partnerId,
+          area: params?.area,
+        },
+      }),
+    ])
+    const list = extractData(listRes)
+    return {
+      items: list.items.map((item) => mapVoucherProduct(item, categoryFromMap(categoryMap, item.category_id).slug)),
+      page: list.page,
+      limit: list.limit,
+      total: list.count,
+      totalPages: Math.max(1, Math.ceil(list.count / list.limit)),
+    }
+  },
+
   async listPublicVouchers(params?: { page?: number; limit?: number; search?: string; categoryId?: string; partnerId?: string; area?: string }): Promise<Voucher[]> {
     const [categoryMap, listRes] = await Promise.all([
       getCategoryMap(),
       api.get<ApiEnvelope<BackendVoucherList>>("/voucher-products", {
         params: {
           page: params?.page ?? 1,
-          limit: params?.limit ?? 100,
+          limit: params?.limit ?? 30,
           search: params?.search,
           category_id: params?.categoryId,
           partner_id: params?.partnerId,
@@ -268,7 +305,7 @@ export const voucherService = {
         params: {
           scope: "mine",
           page: params?.page ?? 1,
-          limit: params?.limit ?? 100,
+          limit: params?.limit ?? 30,
           search: params?.search,
           category_id: params?.categoryId
         }
@@ -321,37 +358,49 @@ export const voucherService = {
   },
 
   async getDetail(id: string): Promise<VoucherDetailData> {
-    const [categoryMap, voucherRes, branchesRes, reviewsRes] = await Promise.all([
-      getCategoryMap(),
-      api.get<ApiEnvelope<BackendVoucherProduct>>(`/voucher-products/${id}`),
-      api.get<ApiEnvelope<BackendVoucherBranch[]>>(`/voucher-products/${id}/branches`),
-      api.get<ApiEnvelope<BackendReviewList>>(`/voucher-products/${id}/reviews`, { params: { page: 1, limit: 6 } })
-    ])
+    const existing = voucherDetailPromises.get(id)
+    if (existing) return existing
 
-    const voucherProduct = extractData(voucherRes)
-    const category = categoryFromMap(categoryMap, voucherProduct.category_id)
+    const request = (async () => {
+      const detailRes = await api.get<ApiEnvelope<{
+        voucher: BackendVoucherProduct
+        branches: BackendVoucherBranch[]
+        reviews: BackendReviewList
+      }>>(`/voucher-products/${id}/detail`)
+      const detail = extractData(detailRes)
+      const voucherProduct = detail.voucher
+      const category = voucherProduct.categories ?? { name: voucherProduct.category_id, slug: voucherProduct.category_id }
 
-    const current = mapVoucherProduct(voucherProduct, category.slug)
-    const reviewList = extractData(reviewsRes)
-    const reviews = reviewList.items.map(mapReview).filter((item) => item.text)
-    const branches = extractData(branchesRes).map(mapBranch)
+      const current = mapVoucherProduct(voucherProduct, category.slug)
+      const reviewList = detail.reviews
+      const reviews = reviewList.items.map(mapReview).filter((item) => item.text)
+      const branches = detail.branches.map(mapBranch)
 
-    const conditions = parseStringArray(voucherProduct.terms_and_conditions)
-    const usageInstructions = parseStringArray(voucherProduct.usage_instructions)
+      const conditions = parseStringArray(voucherProduct.terms_and_conditions)
+      const usageInstructions = parseStringArray(voucherProduct.usage_instructions)
 
-    return {
-      voucher: {
-        ...current,
-        reviews: reviewList.pagination?.total ?? reviews.length,
-        rating: reviewList.average_rating ?? 0
-      },
-      reviews,
-      branches,
-      conditions,
-      usageInstructions,
-      applicableArea: voucherProduct.applicable_area,
-      partnerId: voucherProduct.partner_id,
-      categoryName: category.name
+      return {
+        voucher: {
+          ...current,
+          reviews: reviewList.pagination?.total ?? reviews.length,
+          rating: reviewList.average_rating ?? 0
+        },
+        reviews,
+        branches,
+        conditions,
+        usageInstructions,
+        applicableArea: voucherProduct.applicable_area,
+        partnerId: voucherProduct.partner_id,
+        categoryName: category.name
+      }
+    })()
+
+    voucherDetailPromises.set(id, request)
+    try {
+      return await request
+    } catch (error) {
+      voucherDetailPromises.delete(id)
+      throw error
     }
   },
 
@@ -374,5 +423,27 @@ export const voucherService = {
         const itemCategory = categoryFromMap(categoryMap, item.category_id)
         return mapVoucherProduct(item, itemCategory.slug)
       })
-  }
+  },
+
+  async listPendingVouchers(): Promise<BackendVoucherProduct[]> {
+    const res = await api.get<ApiEnvelope<BackendVoucherList>>("/voucher-products", {
+      params: { page: 1, limit: 30 }
+    })
+    return extractData(res).items.filter((item) => item.workflow_status === "pending_approval")
+  },
+
+  async approveVoucher(voucherId: string) {
+    const res = await api.patch<ApiEnvelope<BackendVoucherProduct>>(`/voucher-products/${voucherId}/approval`, {
+      approval_status: "approved"
+    })
+    return extractData(res)
+  },
+
+  async rejectVoucher(voucherId: string, rejectReason: string) {
+    const res = await api.patch<ApiEnvelope<BackendVoucherProduct>>(`/voucher-products/${voucherId}/approval`, {
+      approval_status: "rejected",
+      reject_reason: rejectReason
+    })
+    return extractData(res)
+  },
 }

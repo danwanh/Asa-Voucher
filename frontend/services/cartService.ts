@@ -87,11 +87,6 @@ function mapCartItem(item: BackendCartItem): CartItem | null {
 }
 
 export const cartService = {
-  async getCount(): Promise<number> {
-    const response = await api.get<{ data: number }>("/cart/count")
-    return extractData<number>(response)
-  },
-
   async get(cartItemIds?: string[]): Promise<CartItem[]> {
     const response = await api.get<{ data: BackendCart }>("/cart", {
       params: cartItemIds === undefined ? undefined : { item_ids: cartItemIds.join(",") },

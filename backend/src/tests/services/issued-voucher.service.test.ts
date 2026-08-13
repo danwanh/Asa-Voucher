@@ -17,6 +17,15 @@ vi.mock("../../repositories/voucher-usage.repository.js", () => ({
   listUsages: vi.fn(),
 }));
 
+vi.mock("../../config/prisma.js", () => ({
+  prisma: {
+    $transaction: vi.fn((fn: unknown) => {
+      if (typeof fn === "function") return fn({});
+      return fn;
+    }),
+  },
+}));
+
 import * as issuedVoucherRepo from "../../repositories/issued-voucher.repository.js";
 import * as voucherUsageRepo from "../../repositories/voucher-usage.repository.js";
 import * as issuedVoucherService from "../../services/issued-voucher.service.js";
@@ -115,111 +124,91 @@ describe("Issued Voucher Service", () => {
     });
   });
 
-  describe("validateVoucher", () => {
+  describe("checkVoucher", () => {
     it("returns voucher info for valid code", async () => {
       const voucher = makeIssuedVoucher();
       vi.mocked(issuedVoucherRepo.findIssuedVoucherByCode).mockResolvedValue(voucher);
       vi.mocked(issuedVoucherRepo.findEligibleBranchIds).mockResolvedValue(["branch-1"]);
 
-      const result = await issuedVoucherService.validateVoucher(STORE_STAFF, { voucher_code: "VC-001" });
-      expect(result.redeemable).toBe(true);
+      const result = await issuedVoucherService.checkVoucher(STORE_STAFF, { voucher_code: "VC-001" });
+      expect(result.issued_voucher).toBeDefined();
       expect(result.eligible_branch_ids).toEqual(["branch-1"]);
     });
 
     it("rejects if not partner staff or admin", async () => {
       await expect(
-        issuedVoucherService.validateVoucher(BUYER, { voucher_code: "VC-001" })
+        issuedVoucherService.checkVoucher(BUYER, { voucher_code: "VC-001" })
       ).rejects.toThrow(HttpError);
     });
 
-    it("returns redeemable=false for used voucher", async () => {
+    it("throws 400 for used voucher", async () => {
       const voucher = makeIssuedVoucher({ status: "used" });
       vi.mocked(issuedVoucherRepo.findIssuedVoucherByCode).mockResolvedValue(voucher);
-      vi.mocked(issuedVoucherRepo.findEligibleBranchIds).mockResolvedValue([]);
 
-      const result = await issuedVoucherService.validateVoucher(PARTNER_OWNER, { voucher_code: "VC-001" });
-      expect(result.redeemable).toBe(false);
+      await expect(
+        issuedVoucherService.checkVoucher(PARTNER_OWNER, { voucher_code: "VC-001" })
+      ).rejects.toThrow(HttpError);
     });
 
-    it("returns redeemable=false for expired voucher", async () => {
+    it("throws 400 for expired voucher", async () => {
       const voucher = makeIssuedVoucher({ expired_date: "2020-01-01" });
       vi.mocked(issuedVoucherRepo.findIssuedVoucherByCode).mockResolvedValue(voucher);
-      vi.mocked(issuedVoucherRepo.findEligibleBranchIds).mockResolvedValue([]);
 
-      const result = await issuedVoucherService.validateVoucher(PARTNER_OWNER, { voucher_code: "VC-001" });
-      expect(result.redeemable).toBe(false);
+      await expect(
+        issuedVoucherService.checkVoucher(PARTNER_OWNER, { voucher_code: "VC-001" })
+      ).rejects.toThrow(HttpError);
     });
 
-    it("rejects partner validating voucher from another partner", async () => {
+    it("rejects partner checking voucher from another partner", async () => {
       const otherPartner: AuthUser = { id: "u-other", email: "o@test.com", role: "partner_owner", partnerId: "partner-2" };
       const voucher = makeIssuedVoucher();
       vi.mocked(issuedVoucherRepo.findIssuedVoucherByCode).mockResolvedValue(voucher);
 
       await expect(
-        issuedVoucherService.validateVoucher(otherPartner, { voucher_code: "VC-001" })
+        issuedVoucherService.checkVoucher(otherPartner, { voucher_code: "VC-001" })
       ).rejects.toThrow(HttpError);
     });
   });
 
-  describe("redeemVoucher", () => {
-    it("redeems active voucher successfully", async () => {
+  describe("confirmVoucher", () => {
+    it("confirms active voucher successfully", async () => {
       const voucher = makeIssuedVoucher();
-      vi.mocked(issuedVoucherRepo.findIssuedVoucherById).mockResolvedValue(voucher);
+      vi.mocked(issuedVoucherRepo.findIssuedVoucherByCode).mockResolvedValue(voucher);
       vi.mocked(issuedVoucherRepo.findEligibleBranchIds).mockResolvedValue(["branch-1"]);
-      vi.mocked(voucherUsageRepo.createVoucherUsage).mockResolvedValue({
-        id: "usage-1", issued_voucher_id: "iv-1", branch_id: "branch-1",
-        redeemed_by: "u-staff", redemption_code: "RED-001", used_at: new Date().toISOString(), note: null,
+
+      const { prisma } = await import("../../config/prisma.js");
+      vi.mocked(prisma.$transaction).mockImplementation(async (fn: (tx: never) => Promise<unknown>) => {
+        return fn({
+          issuedVoucher: {
+            findUnique: vi.fn().mockResolvedValue(voucher),
+            update: vi.fn().mockResolvedValue({ ...voucher, status: "used" }),
+          },
+          voucherUsage: {
+            create: vi.fn().mockResolvedValue({
+              id: "usage-1", issued_voucher_id: "iv-1", branch_id: "branch-1",
+              redeemed_by: "u-staff", used_at: new Date(),
+            }),
+          },
+        } as never);
       });
-      vi.mocked(issuedVoucherRepo.updateIssuedVoucherStatus).mockResolvedValue({ ...voucher, status: "used" });
 
-      const result = await issuedVoucherService.redeemVoucher(STORE_STAFF, "iv-1", { branch_id: "branch-1" });
-      expect(result.issued_voucher.status).toBe("used");
-      expect(result.usage).toBeDefined();
+      const result = await issuedVoucherService.confirmVoucher(STORE_STAFF, { voucher_code: "VC-001" });
+      expect(result.message).toContain("thành công");
     });
 
-    it("rejects if already used (409)", async () => {
-      const voucher = makeIssuedVoucher({ status: "used" });
-      vi.mocked(issuedVoucherRepo.findIssuedVoucherById).mockResolvedValue(voucher);
-      vi.mocked(issuedVoucherRepo.findEligibleBranchIds).mockResolvedValue(["branch-1"]);
-
+    it("rejects non-store-staff user", async () => {
       await expect(
-        issuedVoucherService.redeemVoucher(STORE_STAFF, "iv-1", { branch_id: "branch-1" })
+        issuedVoucherService.confirmVoucher(ADMIN, { voucher_code: "VC-001" })
       ).rejects.toThrow(HttpError);
     });
 
-    it("rejects if expired (422)", async () => {
-      const voucher = makeIssuedVoucher({ expired_date: "2020-01-01" });
-      vi.mocked(issuedVoucherRepo.findIssuedVoucherById).mockResolvedValue(voucher);
-      vi.mocked(issuedVoucherRepo.findEligibleBranchIds).mockResolvedValue(["branch-1"]);
-
-      await expect(
-        issuedVoucherService.redeemVoucher(STORE_STAFF, "iv-1", { branch_id: "branch-1" })
-      ).rejects.toThrow(HttpError);
-    });
-
-    it("rejects store_staff at wrong branch", async () => {
+    it("rejects if voucher from another partner", async () => {
+      const otherPartner: AuthUser = { id: "u-other", email: "o@test.com", role: "partner_store_staff", partnerId: "partner-2", branchId: "branch-1" };
       const voucher = makeIssuedVoucher();
-      vi.mocked(issuedVoucherRepo.findIssuedVoucherById).mockResolvedValue(voucher);
-      vi.mocked(issuedVoucherRepo.findEligibleBranchIds).mockResolvedValue(["branch-1", "branch-2"]);
+      vi.mocked(issuedVoucherRepo.findIssuedVoucherByCode).mockResolvedValue(voucher);
 
       await expect(
-        issuedVoucherService.redeemVoucher(STORE_STAFF, "iv-1", { branch_id: "branch-2" })
-      ).rejects.toThrow(HttpError);
-    });
-
-    it("rejects if branch not in eligible list", async () => {
-      const voucher = makeIssuedVoucher();
-      vi.mocked(issuedVoucherRepo.findIssuedVoucherById).mockResolvedValue(voucher);
-      vi.mocked(issuedVoucherRepo.findEligibleBranchIds).mockResolvedValue(["branch-1"]);
-
-      await expect(
-        issuedVoucherService.redeemVoucher(PARTNER_OWNER, "iv-1", { branch_id: "branch-99" })
-      ).rejects.toThrow(HttpError);
-    });
-
-    it("rejects non-partner-staff user", async () => {
-      await expect(
-        issuedVoucherService.redeemVoucher(ADMIN, "iv-1", { branch_id: "branch-1" })
+        issuedVoucherService.confirmVoucher(otherPartner, { voucher_code: "VC-001" })
       ).rejects.toThrow(HttpError);
     });
   });

@@ -78,15 +78,10 @@ export const useAuthStore = create<AuthState>()(
           setAccessToken(token)
           try {
             const user = await authService.getMe()
-            set({ user, accessToken: token, isInitialized: true })
+            set({ user, accessToken: getAccessToken() ?? token, isInitialized: true })
           } catch {
-            try {
-              const result = await authService.refresh()
-              set({ user: result.user, accessToken: result.accessToken, isInitialized: true })
-            } catch {
-              set({ user: null, accessToken: null, isInitialized: true })
-              setAccessToken(null)
-            }
+            set({ user: null, accessToken: null, isInitialized: true })
+            setAccessToken(null)
           }
         })()
 

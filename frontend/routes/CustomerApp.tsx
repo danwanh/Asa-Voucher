@@ -23,7 +23,7 @@ import { customerPagePath } from "@/utils/customerRoutes"
 import type { AppUser, CartItem, IssuedVoucher, Voucher, Order } from "@/types"
 import { orderService, paymentService } from "@/services/orderService"
 import { issuedVoucherService } from "@/services/issuedVoucherService"
-import { voucherService } from "@/services/voucherService"
+import { voucherService, type VoucherDetailData } from "@/services/voucherService"
 
 interface Props {
   user: AppUser
@@ -87,6 +87,7 @@ export function CustomerApp({
   const router = useRouter()
   const [page, setPage] = useState<CustomerPage>(initialPage ?? "home")
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null)
+  const [selectedVoucherDetail, setSelectedVoucherDetail] = useState<VoucherDetailData | null>(null)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [reviewOrder, setReviewOrder] = useState<Order | null>(null)
   const [reviewIssuedVoucher, setReviewIssuedVoucher] = useState<IssuedVoucher | null>(null)
@@ -101,8 +102,16 @@ export function CustomerApp({
   const [voucherSearch, setVoucherSearch] = useState("")
   const [voucherFilters, setVoucherFilters] = useState<VoucherListFilters>(DEFAULT_VOUCHER_FILTERS)
   const [myOrders, setMyOrders] = useState<Order[]>([])
+  const [ordersPage, setOrdersPage] = useState(1)
+  const [ordersTotalPages, setOrdersTotalPages] = useState(1)
+  const [orderStatusFilter, setOrderStatusFilter] = useState<string | undefined>()
+  const [orderSearch, setOrderSearch] = useState("")
   const [myOrdersLoading, setMyOrdersLoading] = useState(initialPage === "orders" || initialPage === "my-vouchers")
   const [myIssuedVouchers, setMyIssuedVouchers] = useState<Order[]>([])
+  const [issuedPage, setIssuedPage] = useState(1)
+  const [issuedTotalPages, setIssuedTotalPages] = useState(1)
+  const [issuedStatus, setIssuedStatus] = useState<string | undefined>()
+  const [issuedSearch, setIssuedSearch] = useState("")
   const [myIssuedVouchersLoading, setMyIssuedVouchersLoading] = useState(initialPage === "my-vouchers")
 
   useEffect(() => {
@@ -131,6 +140,7 @@ export function CustomerApp({
     if (!initialVoucherId) return
     void voucherService.getDetail(initialVoucherId).then((detail) => {
       setSelectedVoucher(detail.voucher)
+      setSelectedVoucherDetail(detail)
       setPage("detail")
     }).catch(() => {
       toast.error("Không thể tải chi tiết voucher.")
@@ -258,12 +268,18 @@ export function CustomerApp({
   }
 
   const reloadOrders = () => {
-    void orderService.list().then(setMyOrders).catch(() => undefined)
+    void orderService.list({ page: ordersPage, limit: 20, status: orderStatusFilter, search: orderSearch || undefined }).then((result) => {
+      setMyOrders(result.items)
+      setOrdersTotalPages(result.totalPages)
+    }).catch(() => undefined)
   }
 
   const reloadIssuedVouchers = () => {
     setMyIssuedVouchersLoading(true)
-    void issuedVoucherService.listMine().then(setMyIssuedVouchers).catch(() => undefined).finally(() => setMyIssuedVouchersLoading(false))
+    void issuedVoucherService.listMine({ page: issuedPage, limit: 20, status: issuedStatus }).then((result) => {
+      setMyIssuedVouchers(result.items)
+      setIssuedTotalPages(result.totalPages)
+    }).catch(() => undefined).finally(() => setMyIssuedVouchersLoading(false))
   }
 
   const returnFromFeedback = () => {
@@ -280,10 +296,13 @@ export function CustomerApp({
     }
     if (page !== "orders") return
     setMyOrdersLoading(true)
-    void orderService.list().then(setMyOrders).catch(() => {
+    void orderService.list({ page: ordersPage, limit: 20, status: orderStatusFilter, search: orderSearch || undefined }).then((result) => {
+      setMyOrders(result.items)
+      setOrdersTotalPages(result.totalPages)
+    }).catch(() => {
       toast.error("Không thể tải đơn hàng. Vui lòng thử lại.")
     }).finally(() => setMyOrdersLoading(false))
-  }, [page])
+  }, [page, ordersPage, issuedPage, orderStatusFilter, orderSearch, issuedStatus, issuedSearch])
 
   return (
     <CustomerLayout
@@ -310,6 +329,7 @@ export function CustomerApp({
       {page === "detail" && selectedVoucher && (
         <VoucherDetailPage
           voucher={selectedVoucher}
+          detail={selectedVoucherDetail!}
           onBuy={() => {
             add(selectedVoucher)
             toast.success(`Đã thêm "${selectedVoucher.title.slice(0, 30)}..." vào giỏ hàng`)
@@ -371,7 +391,14 @@ export function CustomerApp({
        {page === "success" && <CheckoutSuccessPage code={lastCode} qrPayload={lastQrPayload} onDone={() => router.push("/my-vouchers")} />}
        {page === "my-vouchers" && (
          <MyVouchersPage
-             orders={myIssuedVouchers}
+              orders={myIssuedVouchers}
+              page={issuedPage}
+              totalPages={issuedTotalPages}
+              onPageChange={setIssuedPage}
+              onFilterChange={(status) => {
+                setIssuedPage(1)
+                setIssuedStatus(status)
+              }}
              ownerId={user.id}
              loading={myIssuedVouchersLoading}
            onReview={(order, issuedVoucher) => goReview(order, issuedVoucher, "my-vouchers")}
@@ -379,8 +406,16 @@ export function CustomerApp({
          />
        )}
       {page === "orders" && (
-        <OrderHistoryPage
-          orders={myOrders}
+         <OrderHistoryPage
+           orders={myOrders}
+           page={ordersPage}
+           totalPages={ordersTotalPages}
+           onPageChange={setOrdersPage}
+           onFilterChange={(status, search) => {
+             setOrdersPage(1)
+             setOrderStatusFilter(status)
+             setOrderSearch(search ?? "")
+           }}
           pendingOrderId={pendingOrder?.id}
           onDetail={goOrderDetail}
            onReview={(o) => goReview(o)}

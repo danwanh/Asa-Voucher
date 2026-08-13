@@ -17,6 +17,7 @@ import {
   type PaymentProvider,
 } from "./payment-provider.service.js";
 import { env } from "../config/env.js";
+import { buildPaginatedResult } from "../utils/pagination.js";
 
 type CurrentUser = { id: string; role: UserRole; partnerId?: string };
 type Voucher = Record<string, unknown> & {
@@ -233,7 +234,7 @@ function assertOrderAccess(user: CurrentUser, order: Record<string, unknown>) {
 
 export async function listOrders(
   user: CurrentUser,
-  query?: { status?: string; search?: string }
+  query?: { status?: string; search?: string; page?: number; limit?: number }
 ) {
   const where: Record<string, unknown> = user.role === "buyer"
     ? { OR: [{ user_id: user.id }, { recipient_id: user.id }] }
@@ -256,23 +257,44 @@ export async function listOrders(
     }
   }
 
-  const data = await prisma.order.findMany({
+  const page = query?.page ?? 1;
+  const limit = query?.limit ?? 20;
+  const skip = (page - 1) * limit;
+  const [data, total] = await prisma.$transaction([
+    prisma.order.findMany({
     where,
-    include: {
+    select: {
+      id: true,
+      user_id: true,
+      order_code: true,
+      recipient_id: true,
+      total_amount: true,
+      status: true,
+      payment_method: true,
+      payment_expires_at: true,
+      is_gift: true,
+      created_at: true,
+      updated_at: true,
       users: { select: { full_name: true } },
-      complaints: true,
       order_items: {
-        include: {
-          voucher_products: { include: { partners: true } },
-          issued_vouchers: { include: { reviews: true, complaints: true } },
+        select: {
+          id: true,
+          voucher_product_id: true,
+          quantity: true,
+          unit_price: true,
+          subtotal: true,
+          voucher_products: { select: { id: true, name: true, partner_id: true, partners: { select: { business_name: true } } } },
+          issued_vouchers: { select: { id: true, voucher_code: true, qr_code_payload: true, status: true, expired_date: true } },
         },
       },
-      payments: true
+      payments: { select: { status: true } },
     },
     orderBy: { created_at: "desc" }
-  });
+    , skip, take: limit }),
+    prisma.order.count({ where }),
+  ]);
 
-  return data
+  const items = data
     .filter((order: Record<string, unknown> & { payments?: PaymentRecord[] }) => {
       try {
         assertOrderAccess(user, order as unknown as Record<string, unknown>);
@@ -285,6 +307,8 @@ export async function listOrders(
       ...order,
       payment_status: derivePaymentStatus(order.payments as PaymentRecord[])
     }));
+
+  return buildPaginatedResult(items, total, { page, limit });
 }
 
 export async function getOrderById(user: CurrentUser, id: string) {
