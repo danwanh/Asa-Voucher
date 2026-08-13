@@ -495,10 +495,10 @@ export async function approveVoucherProduct(adminId: string, id: string, input: 
       throw new HttpError(400, "Voucher thiếu thời gian bán hàng hoặc thời gian sử dụng", "MISSING_TIME_RANGE");
     }
 
-    // Kiểm tra voucher hết số lượng phát hành hoặc hết thời gian bán
+    // RB-04: Kiểm tra voucher hết số lượng phát hành hoặc hết thời gian bán
     const saleEndDate = voucher.sale_end_date instanceof Date ? voucher.sale_end_date : new Date(String(voucher.sale_end_date));
-    const totalQuantity = Number(voucher.total_quantity);
-    const isOutOfQuantity = totalQuantity <= 0;
+    const remainingQuantity = Number(voucher.remaining_quantity);
+    const isOutOfQuantity = remainingQuantity <= 0;
     const isSaleExpired = !isNaN(saleEndDate.getTime()) && saleEndDate.getTime() <= Date.now();
     if (isOutOfQuantity || isSaleExpired) {
       throw new HttpError(400, "Voucher đã hết số lượng phát hành hoặc hết thời hạn bán", "VOUCHER_EXPIRED_OR_OUT_OF_STOCK");
