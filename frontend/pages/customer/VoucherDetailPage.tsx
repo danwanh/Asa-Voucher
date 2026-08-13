@@ -4,12 +4,13 @@ import { C, fmt, fmtDate } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import { StatusBadge } from "@/components/StatusBadge"
 import type { Voucher } from "@/types"
-import { voucherService, type VoucherApplicableBranch, type VoucherDetailData, type VoucherPublicReview } from "@/services/voucherService"
+import { type VoucherApplicableBranch, type VoucherDetailData, type VoucherPublicReview } from "@/services/voucherService"
 
 const FALLBACK = "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=600&h=400&fit=crop"
 
 interface Props {
   voucher: Voucher
+  detail: VoucherDetailData
   onBuy: () => void
   onBuyNow?: () => void
   onBack: () => void
@@ -19,7 +20,7 @@ interface Props {
   onEditReview?: () => void
 }
 
-export function VoucherDetailPage({ voucher: v, onBuy, onBuyNow, onBack, onWriteReview, hasReviewed, onEditReview }: Props) {
+export function VoucherDetailPage({ voucher: v, detail, onBuy, onBuyNow, onBack, onWriteReview, hasReviewed, onEditReview }: Props) {
   const [detailVoucher, setDetailVoucher] = useState<Voucher>(v)
   const [reviews, setReviews] = useState<VoucherPublicReview[]>([])
   const [branches, setBranches] = useState<VoucherApplicableBranch[]>([])
@@ -34,37 +35,12 @@ export function VoucherDetailPage({ voucher: v, onBuy, onBuyNow, onBack, onWrite
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    let isMounted = true
-
-    async function loadDetail() {
-      setIsLoading(true)
-      setError(null)
-      try {
-        const detail = await voucherService.getDetail(v.id)
-        if (!isMounted) return
-        setDetailVoucher(detail.voucher)
-        setReviews(detail.reviews)
-        setBranches(detail.branches)
-        setDetailMeta({
-          conditions: detail.conditions,
-          usageInstructions: detail.usageInstructions,
-          applicableArea: detail.applicableArea,
-          partnerId: detail.partnerId,
-          categoryName: detail.categoryName
-        })
-      } catch {
-        if (!isMounted) return
-        setError("Không thể tải chi tiết voucher từ hệ thống. Vui lòng thử lại.")
-      } finally {
-        if (isMounted) setIsLoading(false)
-      }
-    }
-
-    loadDetail()
-    return () => {
-      isMounted = false
-    }
-  }, [v])
+    setDetailVoucher(detail.voucher)
+    setReviews(detail.reviews)
+    setBranches(detail.branches)
+    setDetailMeta({ conditions: detail.conditions, usageInstructions: detail.usageInstructions, applicableArea: detail.applicableArea, partnerId: detail.partnerId, categoryName: detail.categoryName })
+    setIsLoading(false)
+  }, [detail])
 
   const pct = useMemo(() => {
     if (detailVoucher.quantity <= 0) return 0

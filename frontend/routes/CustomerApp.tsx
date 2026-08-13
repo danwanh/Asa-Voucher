@@ -23,7 +23,7 @@ import { customerPagePath } from "@/utils/customerRoutes"
 import type { AppUser, CartItem, IssuedVoucher, Voucher, Order } from "@/types"
 import { orderService, paymentService } from "@/services/orderService"
 import { issuedVoucherService } from "@/services/issuedVoucherService"
-import { voucherService } from "@/services/voucherService"
+import { voucherService, type VoucherDetailData } from "@/services/voucherService"
 
 interface Props {
   user: AppUser
@@ -87,6 +87,7 @@ export function CustomerApp({
   const router = useRouter()
   const [page, setPage] = useState<CustomerPage>(initialPage ?? "home")
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null)
+  const [selectedVoucherDetail, setSelectedVoucherDetail] = useState<VoucherDetailData | null>(null)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [reviewOrder, setReviewOrder] = useState<Order | null>(null)
   const [reviewIssuedVoucher, setReviewIssuedVoucher] = useState<IssuedVoucher | null>(null)
@@ -139,6 +140,7 @@ export function CustomerApp({
     if (!initialVoucherId) return
     void voucherService.getDetail(initialVoucherId).then((detail) => {
       setSelectedVoucher(detail.voucher)
+      setSelectedVoucherDetail(detail)
       setPage("detail")
     }).catch(() => {
       toast.error("Không thể tải chi tiết voucher.")
@@ -327,6 +329,7 @@ export function CustomerApp({
       {page === "detail" && selectedVoucher && (
         <VoucherDetailPage
           voucher={selectedVoucher}
+          detail={selectedVoucherDetail!}
           onBuy={() => {
             add(selectedVoucher)
             toast.success(`Đã thêm "${selectedVoucher.title.slice(0, 30)}..." vào giỏ hàng`)

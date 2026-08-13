@@ -8,7 +8,7 @@ import { GuestVoucherListPage } from "@/pages/guest/GuestVoucherListPage"
 import { GuestVoucherDetailPage } from "@/pages/guest/GuestVoucherDetailPage"
 import { CartPage } from "@/pages/customer/CartPage"
 import type { Voucher, CartItem } from "@/types"
-import { voucherService } from "@/services/voucherService"
+import { voucherService, type VoucherDetailData } from "@/services/voucherService"
 
 interface Props {
   onLogin: () => void
@@ -50,10 +50,14 @@ export function GuestApp({ onLogin, onRegister, onCheckout, cartAdd, cartCount, 
   const router = useRouter()
   const [page, setPage] = useState<GuestPage>(initialPage ?? "home")
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null)
+  const [selectedVoucherDetail, setSelectedVoucherDetail] = useState<VoucherDetailData | null>(null)
 
   useEffect(() => {
     if (!initialVoucherId) return
-    void voucherService.getDetail(initialVoucherId).then((detail) => setSelectedVoucher(detail.voucher)).catch(() => {
+    void voucherService.getDetail(initialVoucherId).then((detail) => {
+      setSelectedVoucher(detail.voucher)
+      setSelectedVoucherDetail(detail)
+    }).catch(() => {
       toast.error("Không thể tải chi tiết voucher.")
       router.push("/vouchers")
     })
@@ -108,6 +112,7 @@ export function GuestApp({ onLogin, onRegister, onCheckout, cartAdd, cartCount, 
       {page === "detail" && selectedVoucher && (
         <GuestVoucherDetailPage
           voucher={selectedVoucher}
+          detail={selectedVoucherDetail!}
           onBack={() => router.push("/vouchers")}
           onLogin={onLogin}
           onDetail={goDetail}

@@ -15,6 +15,10 @@ export async function getVoucherProduct(req: Request, res: Response) {
   ok(res, await voucherProductService.getVoucherProduct(req.user, req.params.id));
 }
 
+export async function getPublicVoucherDetail(req: Request, res: Response) {
+  ok(res, await voucherProductService.getPublicVoucherDetail(req.params.id));
+}
+
 export async function updateVoucherProduct(req: Request, res: Response) {
   ok(res, await voucherProductService.updateVoucherProduct(req.user!, req.params.id, req.body), "Voucher product updated");
 }

@@ -32,6 +32,10 @@ type BackendVoucherProduct = {
   partners?: {
     business_name: string
   } | null
+  categories?: {
+    name: string
+    slug: string
+  } | null
 }
 
 type BackendCategory = {
@@ -224,6 +228,7 @@ function extractData<T>(response: { data: ApiEnvelope<T> }): T {
 }
 
 let categoryMapPromise: Promise<Map<string, BackendCategory>> | null = null
+const voucherDetailPromises = new Map<string, Promise<VoucherDetailData>>()
 
 async function getCategoryMap() {
   if (!categoryMapPromise) {
@@ -353,37 +358,49 @@ export const voucherService = {
   },
 
   async getDetail(id: string): Promise<VoucherDetailData> {
-    const [categoryMap, voucherRes, branchesRes, reviewsRes] = await Promise.all([
-      getCategoryMap(),
-      api.get<ApiEnvelope<BackendVoucherProduct>>(`/voucher-products/${id}`),
-      api.get<ApiEnvelope<BackendVoucherBranch[]>>(`/voucher-products/${id}/branches`),
-      api.get<ApiEnvelope<BackendReviewList>>(`/voucher-products/${id}/reviews`, { params: { page: 1, limit: 6 } })
-    ])
+    const existing = voucherDetailPromises.get(id)
+    if (existing) return existing
 
-    const voucherProduct = extractData(voucherRes)
-    const category = categoryFromMap(categoryMap, voucherProduct.category_id)
+    const request = (async () => {
+      const detailRes = await api.get<ApiEnvelope<{
+        voucher: BackendVoucherProduct
+        branches: BackendVoucherBranch[]
+        reviews: BackendReviewList
+      }>>(`/voucher-products/${id}/detail`)
+      const detail = extractData(detailRes)
+      const voucherProduct = detail.voucher
+      const category = voucherProduct.categories ?? { name: voucherProduct.category_id, slug: voucherProduct.category_id }
 
-    const current = mapVoucherProduct(voucherProduct, category.slug)
-    const reviewList = extractData(reviewsRes)
-    const reviews = reviewList.items.map(mapReview).filter((item) => item.text)
-    const branches = extractData(branchesRes).map(mapBranch)
+      const current = mapVoucherProduct(voucherProduct, category.slug)
+      const reviewList = detail.reviews
+      const reviews = reviewList.items.map(mapReview).filter((item) => item.text)
+      const branches = detail.branches.map(mapBranch)
 
-    const conditions = parseStringArray(voucherProduct.terms_and_conditions)
-    const usageInstructions = parseStringArray(voucherProduct.usage_instructions)
+      const conditions = parseStringArray(voucherProduct.terms_and_conditions)
+      const usageInstructions = parseStringArray(voucherProduct.usage_instructions)
 
-    return {
-      voucher: {
-        ...current,
-        reviews: reviewList.pagination?.total ?? reviews.length,
-        rating: reviewList.average_rating ?? 0
-      },
-      reviews,
-      branches,
-      conditions,
-      usageInstructions,
-      applicableArea: voucherProduct.applicable_area,
-      partnerId: voucherProduct.partner_id,
-      categoryName: category.name
+      return {
+        voucher: {
+          ...current,
+          reviews: reviewList.pagination?.total ?? reviews.length,
+          rating: reviewList.average_rating ?? 0
+        },
+        reviews,
+        branches,
+        conditions,
+        usageInstructions,
+        applicableArea: voucherProduct.applicable_area,
+        partnerId: voucherProduct.partner_id,
+        categoryName: category.name
+      }
+    })()
+
+    voucherDetailPromises.set(id, request)
+    try {
+      return await request
+    } catch (error) {
+      voucherDetailPromises.delete(id)
+      throw error
     }
   },
 

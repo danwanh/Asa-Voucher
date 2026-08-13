@@ -358,6 +358,78 @@ export async function getVoucherProduct(user: CurrentUser | undefined, id: strin
   return withWorkflow(voucher);
 }
 
+export async function getPublicVoucherDetail(id: string) {
+  const [voucher, branches, reviews] = await Promise.all([
+    prisma.voucherProduct.findFirst({
+      where: { id, approval_status: "approved", status: "active" },
+      select: {
+        id: true,
+        partner_id: true,
+        category_id: true,
+        name: true,
+        description: true,
+        thumbnail_url: true,
+        original_price: true,
+        selling_price: true,
+        discount_rate: true,
+        applicable_area: true,
+        total_quantity: true,
+        remaining_quantity: true,
+        sale_start_date: true,
+        sale_end_date: true,
+        validity_days: true,
+        terms_and_conditions: true,
+        usage_instructions: true,
+        status: true,
+        approval_status: true,
+        partners: { select: { business_name: true } },
+        categories: { select: { name: true, slug: true } }
+      }
+    }),
+    prisma.voucherProductBranch.findMany({
+      where: { voucher_product_id: id },
+      select: {
+        id: true,
+        branch_id: true,
+        partner_branches: {
+          select: { id: true, branch_name: true, address: true, city: true, district: true }
+        }
+      }
+    }),
+    Promise.all([
+      prisma.review.findMany({
+        where: { voucher_product_id: id, is_published: true },
+        orderBy: { created_at: "desc" },
+        take: 6,
+        select: {
+          id: true,
+          rating: true,
+          comment: true,
+          created_at: true,
+          users: { select: { full_name: true } }
+        }
+      }),
+      prisma.review.aggregate({
+        where: { voucher_product_id: id, is_published: true },
+        _avg: { rating: true },
+        _count: { _all: true }
+      })
+    ])
+  ]);
+
+  const current = requireData(voucher, "Voucher product not found") as Record<string, unknown>;
+  const [reviewItems, reviewStats] = reviews;
+  return {
+    voucher: withWorkflow(current),
+    branches,
+    reviews: {
+      items: reviewItems,
+      pagination: { total: reviewStats._count._all },
+      average_rating: Number((reviewStats._avg.rating ?? 0).toFixed(1))
+    }
+  };
+}
+
 export async function updateVoucherProduct(user: CurrentUser, id: string, input: Record<string, unknown>) {
   const voucher = await getVoucher(id);
   await assertVoucherOwnerOrAdmin(user, voucher, false);
