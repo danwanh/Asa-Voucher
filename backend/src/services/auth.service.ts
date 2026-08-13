@@ -106,13 +106,13 @@ async function persistRefreshToken(userId: string, refreshToken: string) {
   }
 }
 
-export async function issueTokens(user: UserRow) {
-  const partnerId = await getPartnerId(user.id, user.partner_branches_id ?? null);
+export async function issueTokens(user: UserRow, partnerId?: string) {
+  const resolvedPartnerId = partnerId ?? await getPartnerId(user.id, user.partner_branches_id ?? null);
   const accessToken = signAccessToken({
     user_id: user.id,
     email: user.email,
     role: user.role,
-    partner_id: partnerId,
+    partner_id: resolvedPartnerId,
     branch_id: user.partner_branches_id ?? undefined,
     auth_version: user.auth_version ?? 0
   });
@@ -121,9 +121,9 @@ export async function issueTokens(user: UserRow) {
   return { accessToken, refreshToken };
 }
 
-async function publicUser(user: UserRow) {
-  const partnerId = await getPartnerId(user.id, user.partner_branches_id ?? null);
-  return { ...sanitizeUser(user), partnerId, branchId: user.partner_branches_id ?? undefined };
+async function publicUser(user: UserRow, partnerId?: string) {
+  const resolvedPartnerId = partnerId ?? await getPartnerId(user.id, user.partner_branches_id ?? null);
+  return { ...sanitizeUser(user), partnerId: resolvedPartnerId, branchId: user.partner_branches_id ?? undefined };
 }
 
 export async function login(identifier: string, password: string, metadata: { ip?: string; userAgent?: string }) {
@@ -297,12 +297,31 @@ export async function resetPassword(token: string, newPassword: string) {
 
 export async function refresh(refreshToken: string | undefined) {
   if (!refreshToken) throw new HttpError(401, "Refresh token required", "REFRESH_TOKEN_REQUIRED");
-  const token = await prisma.refreshToken.findFirst({ where: { token_hash: hashRefreshToken(refreshToken), revoked_at: null, expires_at: { gt: new Date() } }, include: { users: true } });
+  const token = await prisma.refreshToken.findFirst({
+    where: { token_hash: hashRefreshToken(refreshToken), revoked_at: null, expires_at: { gt: new Date() } },
+    select: {
+      id: true,
+      users: {
+        select: {
+          id: true,
+          email: true,
+          full_name: true,
+          role: true,
+          is_active: true,
+          is_verified: true,
+          auth_version: true,
+          partner_branches_id: true
+        }
+      }
+    }
+  });
   if (!token?.users) throw new HttpError(401, "Invalid refresh token", "INVALID_REFRESH_TOKEN");
   if (!token.users.is_active || !token.users.is_verified) throw new HttpError(403, "Account is not active", "ACCOUNT_NOT_ACTIVE");
   await prisma.refreshToken.update({ where: { id: token.id }, data: { revoked_at: new Date() } });
-  const tokens = await issueTokens(token.users as unknown as UserRow);
-  return { ...tokens, user: await publicUser(token.users as unknown as UserRow) };
+  const user = token.users as unknown as UserRow;
+  const partnerId = await getPartnerId(user.id, user.partner_branches_id ?? null);
+  const tokens = await issueTokens(user, partnerId);
+  return { ...tokens, user: await publicUser(user, partnerId) };
 }
 
 export async function logout(refreshToken: string | undefined, userId?: string) {

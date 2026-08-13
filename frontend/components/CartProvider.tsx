@@ -49,33 +49,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     isCreateOrderRoute && checkoutSelectionIds !== null,
     checkoutSelectionIds ?? undefined,
   )
-  const [serverCartCount, setServerCartCount] = useState<number | null>(null)
-  const [cartCountRequestLoading, setCartCountRequestLoading] = useState(false)
-
-  const refreshCartCount = useCallback(async () => {
-    if (!userId) {
-      setServerCartCount(null)
-      setCartCountRequestLoading(false)
-      return
-    }
-    setCartCountRequestLoading(true)
-    try {
-      setServerCartCount(await cartService.getCount())
-    } catch {
-      setServerCartCount(null)
-    } finally {
-      setCartCountRequestLoading(false)
-    }
-  }, [userId])
-
-  useEffect(() => {
-    void refreshCartCount()
-  }, [refreshCartCount])
-
-  useEffect(() => {
-    if (cartState.hasLoaded) setServerCartCount(cartState.cart.length)
-  }, [cartState.hasLoaded, cartState.cart.length])
-
   const add = useCallback(async (voucher: Voucher) => {
     const item = await cartState.add(voucher)
     return item
@@ -91,13 +64,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const clear = useCallback(async () => {
     await cartState.clear()
-    setServerCartCount(0)
   }, [cartState.clear])
 
   const removeMany = useCallback((cartItemIds: string[]) => {
     cartState.removeMany(cartItemIds)
-    const removedCount = new Set(cartItemIds).size
-    setServerCartCount((current) => current === null ? current : Math.max(0, current - removedCount))
   }, [cartState.removeMany])
 
   const setCheckoutSelection = useCallback((cartItemIds: string[]) => {
@@ -114,8 +84,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     ? []
     : checkoutState.cart.filter((item) => item.cartItemId && checkoutSelectionIds.includes(item.cartItemId))
 
-  const cartCount = userId ? serverCartCount : cartState.cart.length
-  const cartCountLoading = Boolean(userId && (cartCountRequestLoading || serverCartCount === null))
+  const cartCount = cartState.count
+  const cartCountLoading = Boolean(userId && !cartState.hasLoaded)
 
   return (
     <CartContext.Provider value={{

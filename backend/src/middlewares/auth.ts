@@ -17,7 +17,18 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
     const user = requireData(
       await prisma.user.findUnique({
         where: { id: payload.user_id },
-        select: { id: true, email: true, full_name: true, role: true, is_active: true, is_verified: true, auth_version: true, partner_branches_id: true }
+        select: {
+          id: true,
+          email: true,
+          full_name: true,
+          role: true,
+          is_active: true,
+          is_verified: true,
+          auth_version: true,
+          partner_branches_id: true,
+          represented_partners: { select: { id: true }, take: 1 },
+          partner_branches: { select: { partner_id: true } }
+        }
       }),
       "User not found"
     );
@@ -37,26 +48,7 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
       return;
     }
 
-    let partnerId: string | undefined;
-    const partner = await prisma.partner.findFirst({
-      where: { representative_user_id: user.id },
-      select: { id: true }
-    });
-
-    if (partner?.id) {
-      partnerId = partner.id;
-    }
-
-    if (!partnerId && user.partner_branches_id) {
-      const branch = await prisma.partnerBranch.findUnique({
-        where: { id: user.partner_branches_id },
-        select: { partner_id: true }
-      });
-
-      if (branch?.partner_id) {
-        partnerId = branch.partner_id;
-      }
-    }
+    const partnerId = user.represented_partners[0]?.id ?? user.partner_branches?.partner_id;
 
     req.user = {
       id: user.id,
