@@ -47,6 +47,14 @@ type BackendVoucherList = {
   limit: number
 }
 
+export type VoucherListPage = {
+  items: Voucher[]
+  page: number
+  limit: number
+  total: number
+  totalPages: number
+}
+
 type BackendReview = {
   id: string
   user_id: string
@@ -239,13 +247,37 @@ function categoryFromMap(categoryMap: Map<string, BackendCategory>, categoryId: 
 }
 
 export const voucherService = {
+  async listPublicVouchersPage(params?: { page?: number; limit?: number; search?: string; categoryId?: string; partnerId?: string; area?: string }): Promise<VoucherListPage> {
+    const [categoryMap, listRes] = await Promise.all([
+      getCategoryMap(),
+      api.get<ApiEnvelope<BackendVoucherList>>("/voucher-products", {
+        params: {
+          page: params?.page ?? 1,
+          limit: params?.limit ?? 20,
+          search: params?.search,
+          category_id: params?.categoryId,
+          partner_id: params?.partnerId,
+          area: params?.area,
+        },
+      }),
+    ])
+    const list = extractData(listRes)
+    return {
+      items: list.items.map((item) => mapVoucherProduct(item, categoryFromMap(categoryMap, item.category_id).slug)),
+      page: list.page,
+      limit: list.limit,
+      total: list.count,
+      totalPages: Math.max(1, Math.ceil(list.count / list.limit)),
+    }
+  },
+
   async listPublicVouchers(params?: { page?: number; limit?: number; search?: string; categoryId?: string; partnerId?: string; area?: string }): Promise<Voucher[]> {
     const [categoryMap, listRes] = await Promise.all([
       getCategoryMap(),
       api.get<ApiEnvelope<BackendVoucherList>>("/voucher-products", {
         params: {
           page: params?.page ?? 1,
-          limit: params?.limit ?? 100,
+          limit: params?.limit ?? 30,
           search: params?.search,
           category_id: params?.categoryId,
           partner_id: params?.partnerId,
@@ -268,7 +300,7 @@ export const voucherService = {
         params: {
           scope: "mine",
           page: params?.page ?? 1,
-          limit: params?.limit ?? 100,
+          limit: params?.limit ?? 30,
           search: params?.search,
           category_id: params?.categoryId
         }
@@ -378,7 +410,7 @@ export const voucherService = {
 
   async listPendingVouchers(): Promise<BackendVoucherProduct[]> {
     const res = await api.get<ApiEnvelope<BackendVoucherList>>("/voucher-products", {
-      params: { page: 1, limit: 100 }
+      params: { page: 1, limit: 30 }
     })
     return extractData(res).items.filter((item) => item.workflow_status === "pending_approval")
   },

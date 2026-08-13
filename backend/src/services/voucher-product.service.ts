@@ -280,7 +280,31 @@ export async function listVoucherProducts(user: CurrentUser | undefined, queryIn
   }
 
   const [items, count] = await prisma.$transaction([
-    prisma.voucherProduct.findMany({ where, include: PARTNER_NAME_INCLUDE, skip: from, take: to - from + 1, orderBy: { created_at: "desc" } }),
+    prisma.voucherProduct.findMany({
+      where,
+      select: {
+        id: true,
+        partner_id: true,
+        category_id: true,
+        name: true,
+        description: true,
+        thumbnail_url: true,
+        original_price: true,
+        selling_price: true,
+        discount_rate: true,
+        applicable_area: true,
+        total_quantity: true,
+        remaining_quantity: true,
+        sale_start_date: true,
+        sale_end_date: true,
+        status: true,
+        approval_status: true,
+        partners: { select: { business_name: true } },
+      },
+      skip: from,
+      take: to - from + 1,
+      orderBy: { created_at: "desc" },
+    }),
     prisma.voucherProduct.count({ where })
   ]);
   return { items: (items as unknown as Record<string, unknown>[]).map(withWorkflow), count, page, limit };
