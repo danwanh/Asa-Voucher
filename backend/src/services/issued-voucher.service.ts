@@ -57,7 +57,7 @@ export async function listIssuedVouchers(user: AuthUser, query: ListIssuedVouche
   };
 
   const { rows, total } = await issuedVoucherRepo.listIssuedVouchers(filter);
-  return buildPaginatedResult(rows, total, query);
+  return buildPaginatedResult(rows, total, { page: query.page, limit: query.limit });
 }
 
 export async function getIssuedVoucherById(user: AuthUser, id: string) {
