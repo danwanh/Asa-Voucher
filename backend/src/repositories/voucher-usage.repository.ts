@@ -10,14 +10,14 @@ export async function createVoucherUsage(input: {
 }): Promise<VoucherUsageRow> {
   return prisma.voucherUsage.create({
     data: { ...input, used_at: new Date() },
-  }) as Promise<VoucherUsageRow>;
+  }) as unknown as Promise<VoucherUsageRow>;
 }
 
 export async function listUsagesByIssuedVoucher(issuedVoucherId: string): Promise<VoucherUsageRow[]> {
   return prisma.voucherUsage.findMany({
     where: { issued_voucher_id: issuedVoucherId },
     orderBy: { used_at: "desc" },
-  }) as Promise<VoucherUsageRow[]>;
+  }) as unknown as Promise<VoucherUsageRow[]>;
 }
 
 export async function listUsages(

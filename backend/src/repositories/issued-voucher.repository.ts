@@ -59,22 +59,22 @@ export async function listIssuedVouchers(
 }
 
 export async function findIssuedVoucherById(id: string) {
-  return prisma.issuedVoucher.findUnique({ where: { id }, include: INCLUDE }) as Promise<IssuedVoucherWithRelations | null>;
+  return prisma.issuedVoucher.findUnique({ where: { id }, include: INCLUDE }) as unknown as Promise<IssuedVoucherWithRelations | null>;
 }
 
 export async function findIssuedVoucherByCode(voucherCode: string) {
-  return prisma.issuedVoucher.findUnique({ where: { voucher_code: voucherCode }, include: INCLUDE }) as Promise<(IssuedVoucherRow & { voucher_products: { partner_id: string } }) | null>;
+  return prisma.issuedVoucher.findUnique({ where: { voucher_code: voucherCode }, include: INCLUDE }) as unknown as Promise<(IssuedVoucherRow & { voucher_products: { partner_id: string } }) | null>;
 }
 
 export async function findIssuedVoucherByQrPayload(qrCodePayload: string) {
-  return prisma.issuedVoucher.findUnique({ where: { qr_code_payload: qrCodePayload }, include: INCLUDE }) as Promise<(IssuedVoucherRow & { voucher_products: { partner_id: string } }) | null>;
+  return prisma.issuedVoucher.findUnique({ where: { qr_code_payload: qrCodePayload }, include: INCLUDE }) as unknown as Promise<(IssuedVoucherRow & { voucher_products: { partner_id: string } }) | null>;
 }
 
 export async function updateIssuedVoucherStatus(id: string, status: IssuedVoucherStatus) {
   return prisma.issuedVoucher.update({
     where: { id },
     data: { status, updated_at: new Date() },
-  }) as Promise<IssuedVoucherRow>;
+  }) as unknown as Promise<IssuedVoucherRow>;
 }
 
 export async function findEligibleBranchIds(voucherProductId: string): Promise<string[]> {
