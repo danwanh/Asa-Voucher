@@ -8,8 +8,8 @@ import nodemailer from "nodemailer";
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || "smtp.gmail.com",
-  port: Number(process.env.SMTP_PORT) || 465,
-  secure: true,
+  port: Number(process.env.SMTP_PORT) || 587,
+  secure: false, // port 587 dùng TLS, secure=true cho port 465
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
@@ -29,7 +29,7 @@ async function sendEmail({ to, subject, html }: SendEmailParams): Promise<void> 
   }
 
   await transporter.sendMail({
-    from: process.env.SMTP_FROM || process.env.SMTP_USER,
+    from: process.env.EMAIL_FROM || process.env.SMTP_USER,
     to,
     subject,
     html,
