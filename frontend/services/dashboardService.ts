@@ -26,9 +26,31 @@ export type DashboardStats = {
   recentOrders: DashboardRecentOrder[]
 }
 
+/** FC-ADC-DASHBOARD: Thống kê voucher + nội dung cho admin_content */
+export type ContentDashboardStats = {
+  vouchers: {
+    pending: number
+    approved: number
+    rejected: number
+  }
+  contents: {
+    banners: number
+    articles: number
+    popups: number
+    policies: number
+    categories: number
+  }
+}
+
 export type DashboardFilters = {
   from?: string
   to?: string
+}
+
+/** FC-ADC-DASHBOARD: Filter cho content dashboard */
+export type ContentDashboardFilters = {
+  from_date?: string
+  to_date?: string
 }
 
 function extractData<T>(response: { data: ApiEnvelope<T> }): T {
@@ -45,10 +67,22 @@ async function fetchDashboard(filters?: DashboardFilters): Promise<DashboardStat
   return extractData(res)
 }
 
+/** FC-ADC-DASHBOARD: GET /dashboard/content */
+async function fetchContentDashboard(filters?: ContentDashboardFilters): Promise<ContentDashboardStats> {
+  const res = await api.get<ApiEnvelope<ContentDashboardStats>>("/dashboard/content", {
+    params: {
+      from_date: filters?.from_date,
+      to_date: filters?.to_date,
+    },
+  })
+  return extractData(res)
+}
+
 export async function getDashboardStats(filters?: DashboardFilters): Promise<DashboardStats> {
   return fetchDashboard(filters)
 }
 
 export const dashboardService = {
   getStats: fetchDashboard,
+  getContentStats: fetchContentDashboard,
 }
