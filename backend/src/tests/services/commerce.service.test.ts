@@ -36,6 +36,8 @@ const { mockPrisma, mockTx } = vi.hoisted(() => {
       order: {
         findUnique: vi.fn(),
         findMany: vi.fn(),
+        count: vi.fn(),
+        groupBy: vi.fn(),
         update: vi.fn(),
       },
       orderItem: {
@@ -44,7 +46,7 @@ const { mockPrisma, mockTx } = vi.hoisted(() => {
       payment: {
         findUnique: vi.fn(),
       },
-      $transaction: vi.fn((fn: Function) => fn(tx)),
+      $transaction: vi.fn((input: unknown) => Array.isArray(input) ? Promise.all(input) : (input as Function)(tx)),
     },
     mockTx: tx,
   };
@@ -255,11 +257,17 @@ describe("Commerce Service", () => {
       vi.mocked(prisma.order.findMany).mockResolvedValue([
         { id: "o1", user_id: "u-buyer", order_items: [] },
       ] as any);
+      vi.mocked(prisma.order.count).mockResolvedValue(1 as any);
+      vi.mocked(prisma.order.groupBy).mockResolvedValue([
+        { status: "payment_failed", _count: { _all: 1 } },
+      ] as any);
 
       const result = await commerceService.listOrders(BUYER);
-      expect(result).toHaveLength(1);
+      expect(result.items).toHaveLength(1);
+      expect(result.countsByStatus.all).toBe(1);
+      expect(result.countsByStatus.payment_failed).toBe(1);
       expect(prisma.order.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { OR: [{ user_id: "u-buyer" }, { recipient_id: "u-buyer" }] } })
+        expect.objectContaining({ where: { AND: [{ OR: [{ user_id: "u-buyer" }, { recipient_id: "u-buyer" }] }] } })
       );
     });
 
@@ -268,9 +276,38 @@ describe("Commerce Service", () => {
         { id: "o1", user_id: "u-buyer", order_items: [] },
         { id: "o2", user_id: "u-other", order_items: [] },
       ] as any);
+      vi.mocked(prisma.order.count).mockResolvedValue(2 as any);
+      vi.mocked(prisma.order.groupBy).mockResolvedValue([
+        { status: "cancelled", _count: { _all: 2 } },
+      ] as any);
 
       const result = await commerceService.listOrders(ADMIN);
-      expect(result).toHaveLength(2);
+      expect(result.items).toHaveLength(2);
+      expect(result.countsByStatus.cancelled).toBe(2);
+    });
+
+    it("does not apply status filter to badge counts", async () => {
+      vi.mocked(prisma.order.findMany).mockResolvedValue([
+        { id: "o1", user_id: "u-buyer", status: "cancelled", order_items: [] },
+      ] as any);
+      vi.mocked(prisma.order.count).mockResolvedValue(1 as any);
+      vi.mocked(prisma.order.groupBy).mockResolvedValue([
+        { status: "payment_failed", _count: { _all: 1 } },
+        { status: "cancelled", _count: { _all: 1 } },
+      ] as any);
+
+      const result = await commerceService.listOrders(BUYER, { status: "cancelled" });
+
+      expect(result.items).toHaveLength(1);
+      expect(result.countsByStatus.all).toBe(2);
+      expect(result.countsByStatus.payment_failed).toBe(1);
+      expect(result.countsByStatus.cancelled).toBe(1);
+      expect(prisma.order.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ status: "cancelled" }) })
+      );
+      expect(prisma.order.groupBy).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { AND: [{ OR: [{ user_id: "u-buyer" }, { recipient_id: "u-buyer" }] }] } })
+      );
     });
   });
 

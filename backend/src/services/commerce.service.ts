@@ -47,6 +47,8 @@ function isAdmin(user: CurrentUser) {
 
 type PaymentRecord = { status: string };
 
+const ORDER_STATUS_VALUES = ["pending_payment", "payment_failed", "confirmed", "completed", "cancelled", "refunded"] as const;
+
 function derivePaymentStatus(payments: PaymentRecord[] | undefined): "pending" | "paid" | "failed" | "refunded" {
   const list = payments ?? [];
   if (list.some((p) => p.status === "refunded")) return "refunded";
@@ -232,35 +234,53 @@ function assertOrderAccess(user: CurrentUser, order: Record<string, unknown>) {
   throw new HttpError(403, "Insufficient permissions", "FORBIDDEN");
 }
 
+function buildOrderListWhere(user: CurrentUser, query?: { status?: string; search?: string }) {
+  const and: Record<string, unknown>[] = [];
+
+  if (user.role === "buyer") {
+    and.push({ OR: [{ user_id: user.id }, { recipient_id: user.id }] });
+  } else if (isPartnerStaff(user.role)) {
+    and.push(user.partnerId
+      ? { order_items: { some: { voucher_products: { partner_id: user.partnerId } } } }
+      : { id: "__no_access__" });
+  }
+
+  if (query?.search) {
+    and.push({
+      OR: [
+        { order_code: { contains: query.search, mode: "insensitive" } },
+        { users: { full_name: { contains: query.search, mode: "insensitive" } } },
+        { users: { email: { contains: query.search, mode: "insensitive" } } },
+      ],
+    });
+  }
+
+  const where: Record<string, unknown> = and.length > 0 ? { AND: and } : {};
+  if (query?.status) where.status = query.status;
+  return where;
+}
+
+function buildCountsByStatus(grouped: Array<{ status: string; _count: { _all: number } }>) {
+  const counts: Record<string, number> = { all: 0 };
+  for (const status of ORDER_STATUS_VALUES) counts[status] = 0;
+  for (const row of grouped) {
+    counts[row.status] = row._count._all;
+    counts.all += row._count._all;
+  }
+  return counts;
+}
+
 export async function listOrders(
   user: CurrentUser,
   query?: { status?: string; search?: string; page?: number; limit?: number }
 ) {
-  const where: Record<string, unknown> = user.role === "buyer"
-    ? { OR: [{ user_id: user.id }, { recipient_id: user.id }] }
-    : {};
-
-  if (query?.status) where.status = query.status;
-
-  if (query?.search) {
-    const searchOr = [
-      { order_code: { contains: query.search, mode: "insensitive" } },
-      { users: { full_name: { contains: query.search, mode: "insensitive" } } },
-      { users: { email: { contains: query.search, mode: "insensitive" } } }
-    ];
-    // Nếu buyer đã có where.OR cho user_id/recipient_id, gộp bằng AND thay vì ghi đè
-    if (where.OR) {
-      where.AND = [{ OR: where.OR }, { OR: searchOr }];
-      delete where.OR;
-    } else {
-      where.OR = searchOr;
-    }
-  }
+  const where = buildOrderListWhere(user, query);
+  const countsWhere = buildOrderListWhere(user, { search: query?.search });
 
   const page = query?.page ?? 1;
   const limit = query?.limit ?? 20;
   const skip = (page - 1) * limit;
-  const [data, total] = await prisma.$transaction([
+  const [data, total, groupedCounts] = await prisma.$transaction([
     prisma.order.findMany({
     where,
     select: {
@@ -292,6 +312,7 @@ export async function listOrders(
     orderBy: { created_at: "desc" }
     , skip, take: limit }),
     prisma.order.count({ where }),
+    prisma.order.groupBy({ by: ["status"], where: countsWhere, orderBy: { status: "asc" }, _count: { _all: true } }),
   ]);
 
   const items = data
@@ -308,7 +329,10 @@ export async function listOrders(
       payment_status: derivePaymentStatus(order.payments as PaymentRecord[])
     }));
 
-  return buildPaginatedResult(items, total, { page, limit });
+  return {
+    ...buildPaginatedResult(items, total, { page, limit }),
+    countsByStatus: buildCountsByStatus(groupedCounts as Array<{ status: string; _count: { _all: number } }>),
+  };
 }
 
 export async function getOrderById(user: CurrentUser, id: string) {
