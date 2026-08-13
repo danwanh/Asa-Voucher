@@ -12,6 +12,8 @@ import type {
   UpdateComplaintInput,
 } from "../validations/complaint.validation.js";
 import { prisma } from "../config/prisma.js";
+import { refundVnpayPayment, refundPayPalPayment, formatVnpayDate, safeParseJson, extractPaypalCaptureId } from "./payment-provider.service.js";
+import { createComplaintNotifications, createAssignmentNotification, createRequestInfoNotification } from "./notification.service.js";
 
 type ComplaintWithRelations = NonNullable<Awaited<ReturnType<typeof complaintRepo.findComplaintById>>>;
 
@@ -116,10 +118,14 @@ export async function assignComplaint(user: AuthUser, id: string, input: AssignC
   const complaint = await complaintRepo.findComplaintById(id);
   if (!complaint) throw new HttpError(404, "Không tìm thấy khiếu nại");
 
-  return complaintRepo.updateComplaint(id, {
+  const updated = await complaintRepo.updateComplaint(id, {
     assigned_to: input.assigned_to,
     status: complaint.status === "open" ? "under_review" : complaint.status,
   });
+
+  await createAssignmentNotification(id, input.assigned_to, user.id);
+
+  return updated;
 }
 
 export async function resolveComplaint(user: AuthUser, id: string, input: ResolveComplaintInput) {
@@ -136,13 +142,23 @@ export async function resolveComplaint(user: AuthUser, id: string, input: Resolv
   const updated = await complaintRepo.updateComplaint(id, {
     status: "resolved",
     resolution_note: input.resolution_note,
-    resolution_type: input.resolution_type,
+    resolution_types: input.resolution_types,
     resolved_at: new Date().toISOString(),
   });
 
-  if (input.resolution_type === "refund" && complaint.order_id) {
+  if (input.resolution_types.includes("refund") && complaint.order_id) {
     await processRefundForComplaint(complaint.order_id, user.id, complaint.id, input.resolution_note);
   }
+
+  const partnerId = complaint.issued_vouchers?.voucher_products?.partner_id ?? null;
+  await createComplaintNotifications(
+    id,
+    complaint.user_id,
+    partnerId,
+    complaint.assigned_to,
+    input.resolution_types,
+    input.resolution_note
+  );
 
   return updated;
 }
@@ -153,61 +169,104 @@ async function processRefundForComplaint(
   complaintId: string,
   note?: string
 ) {
-  try {
-    const order = await prisma.order.findUnique({
-      where: { id: orderId },
-      include: { payments: true },
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { payments: true },
+  });
+  if (!order) throw new HttpError(404, "Không tìm thấy đơn hàng để hoàn tiền");
+
+  const successPayment = (order.payments as Array<Record<string, unknown>> ?? []).find(
+    (p) => p.status === "success"
+  );
+  if (!successPayment) throw new HttpError(409, "Đơn hàng chưa thanh toán, không thể hoàn tiền");
+
+  const provider = String(successPayment.method);
+  const transactionRef = String(successPayment.transaction_ref || "");
+
+  let refundResult: { refundId: string; gatewayResponse: unknown };
+
+  // Simulated payment → simulate refund
+  if (transactionRef.startsWith("SIM-")) {
+    refundResult = {
+      refundId: `SIM-REFUND-${Date.now()}`,
+      gatewayResponse: { provider, mode: "simulated-refund", transactionRef },
+    };
+  } else if (provider === "paypal" && transactionRef) {
+    const gatewayData = safeParseJson(successPayment.gateway_response);
+    const realCaptureId = extractPaypalCaptureId(gatewayData) ?? transactionRef;
+    refundResult = await refundPayPalPayment({
+      captureId: realCaptureId,
+      amountVnd: Number(order.total_amount),
+      orderCode: String(order.order_code),
+      note: note || `Refund for complaint ${complaintId}`,
     });
-    if (!order) return;
-
-    const successPayment = (order.payments as Array<Record<string, unknown>> ?? []).find(
-      (p) => p.status === "success"
-    );
-    if (!successPayment) return;
-
-    await prisma.$transaction(async (tx) => {
-      await tx.payment.update({
-        where: { id: successPayment.id as string },
-        data: { status: "refunded" },
-      });
-
-      await tx.paymentLog.create({
-        data: {
-          payment_id: successPayment.id as string,
-          order_id: orderId,
-          user_id: adminId,
-          action: "REFUND",
-          status: "refunded",
-          amount: order.total_amount as never,
-        },
-      });
-
-      await tx.order.update({
-        where: { id: orderId },
-        data: { status: "refunded" },
-      });
-
-      await tx.orderLog.create({
-        data: {
-          order_id: orderId,
-          user_id: adminId,
-          action: "REFUND_ORDER",
-          description: `Hoàn tiền tự động từ khiếu nại ${complaintId}: ${note || "Không có ghi chú"}`,
-        },
-      });
-
-      await tx.adminLog.create({
-        data: {
-          admin_id: adminId,
-          target_order_id: orderId,
-          action: "complaint.refund",
-          description: `Hoàn tiền từ khiếu nại ${complaintId}`,
-        },
-      });
+  } else if (provider === "vnpay" && transactionRef) {
+    const gatewayData = safeParseJson(successPayment.gateway_response);
+    const transactionNo = String(gatewayData.vnp_TransactionNo || "");
+    if (!transactionNo) {
+      throw new HttpError(422, "Thiếu vnp_TransactionNo của giao dịch gốc, không thể hoàn tiền", "VNPAY_TRANSACTION_NO_MISSING");
+    }
+    const transactionDate = successPayment.paid_at
+      ? formatVnpayDate(new Date(successPayment.paid_at as string | Date))
+      : "";
+    refundResult = await refundVnpayPayment({
+      transactionRef,
+      transactionNo,
+      transactionDate,
+      amountVnd: Number(order.total_amount),
+      orderCode: String(order.order_code),
+      createdBy: adminId,
+      reason: note || `Refund từ khiếu nại ${complaintId}`,
     });
-  } catch (err) {
-    console.error("[ComplaintService] processRefundForComplaint error:", err);
+  } else {
+    throw new HttpError(422, `Không hỗ trợ hoàn tiền cho phương thức ${provider}`, "UNSUPPORTED_REFUND_PROVIDER");
   }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.payment.update({
+      where: { id: successPayment.id as string },
+      data: {
+        status: "refunded",
+        refund_ref: refundResult.refundId,
+        refunded_at: new Date(),
+        gateway_response: JSON.stringify(refundResult.gatewayResponse),
+      },
+    });
+
+    await tx.paymentLog.create({
+      data: {
+        payment_id: successPayment.id as string,
+        order_id: orderId,
+        user_id: adminId,
+        action: "REFUND",
+        status: "refunded",
+        amount: order.total_amount as never,
+      },
+    });
+
+    await tx.order.update({
+      where: { id: orderId },
+      data: { status: "refunded" },
+    });
+
+    await tx.orderLog.create({
+      data: {
+        order_id: orderId,
+        user_id: adminId,
+        action: "REFUND_ORDER",
+        description: `Hoàn tiền từ khiếu nại ${complaintId} (gateway ref: ${refundResult.refundId}): ${note || "Không có ghi chú"}`,
+      },
+    });
+
+    await tx.adminLog.create({
+      data: {
+        admin_id: adminId,
+        target_order_id: orderId,
+        action: "complaint.refund",
+        description: `Hoàn tiền từ khiếu nại ${complaintId} (${refundResult.refundId})`,
+      },
+    });
+  });
 }
 
 export async function listComplaintResponses(user: AuthUser, id: string) {

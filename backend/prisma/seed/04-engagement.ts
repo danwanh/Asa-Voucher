@@ -31,10 +31,10 @@ type ComplaintSeed = {
   reason: "not_as_described" | "cannot_redeem" | "expired_early" | "wrong_value" | "other";
   description: string;
   evidence_urls?: Prisma.InputJsonValue;
-  status: "open" | "under_review" | "resolved" | "closed";
+  status: "open" | "under_review" | "resolved";
   assigned_to?: string;
   resolution_note?: string;
-  resolution_type?: "refund" | "reissue" | "no_action" | "partner_penalized";
+  resolution_types?: ("refund" | "reissue" | "no_action" | "partner_penalized")[];
   created_at: Date;
   resolved_at?: Date;
 };
@@ -107,9 +107,8 @@ const complaints: ComplaintSeed[] = [
     user_id: ids.users.buyerNgocLinh,
     reason: "wrong_value",
     description: "Hệ thống trừ tiền ví nhưng đơn lại báo thất bại.",
-    status: "under_review",
-    assigned_to: ids.users.adminSecurity,
-    created_at: daysFrom(now, -7)
+    status: "open",
+    created_at: daysFrom(now, -2)
   },
   {
     id: "76000000-0000-0000-0000-000000000003",
@@ -121,7 +120,7 @@ const complaints: ComplaintSeed[] = [
     status: "resolved",
     assigned_to: ids.users.adminOperations,
     resolution_note: "Đã xác minh với đối tác và hoàn tiền 100% cho khách hàng.",
-    resolution_type: "refund",
+    resolution_types: ["refund"],
     created_at: daysFrom(now, -22),
     resolved_at: daysFrom(now, -20)
   },
@@ -132,12 +131,90 @@ const complaints: ComplaintSeed[] = [
     user_id: ids.users.buyerHoangNam,
     reason: "expired_early",
     description: "Voucher báo hết hạn sớm hơn thông tin trong ứng dụng.",
-    status: "closed",
-    assigned_to: ids.users.adminContent,
+    status: "resolved",
+    assigned_to: ids.users.adminOperations,
     resolution_note: "Đối chiếu dữ liệu cho thấy voucher đã hết hạn đúng theo điều khoản.",
-    resolution_type: "no_action",
-    created_at: daysFrom(now, -5),
-    resolved_at: daysFrom(now, -3)
+    resolution_types: ["no_action"],
+    created_at: daysFrom(now, -8),
+    resolved_at: daysFrom(now, -6)
+  },
+  {
+    id: "76000000-0000-0000-0000-000000000005",
+    order_id: ids.orders.paid03,
+    user_id: ids.users.buyerGiaHan,
+    reason: "not_as_described",
+    description: "Voucher buffet nhưng thực tế chỉ áp dụng cho suất tối đa 2 người, không đúng mô tả.",
+    evidence_urls: ["https://cdn.asa.test/complaint/buffet-menu.jpg", "https://cdn.asa.test/complaint/bill.jpg"],
+    status: "open",
+    created_at: daysFrom(now, -1)
+  },
+  {
+    id: "76000000-0000-0000-0000-000000000006",
+    order_id: ids.orders.paid04,
+    user_id: ids.users.buyerBaoVy,
+    reason: "cannot_redeem",
+    description: "Mã voucher không quét được tại quầy, hệ thống báo mã không tồn tại.",
+    evidence_urls: ["https://cdn.asa.test/complaint/qr-error.jpg"],
+    status: "open",
+    created_at: daysFrom(now, -1)
+  },
+  {
+    id: "76000000-0000-0000-0000-000000000007",
+    order_id: ids.orders.paid01,
+    user_id: ids.users.buyerMinhAnh,
+    reason: "wrong_value",
+    description: "Giá voucher hiển thị 120.000đ nhưng khi thanh toán bị tính 150.000đ.",
+    status: "under_review",
+    assigned_to: ids.users.adminOperations,
+    created_at: daysFrom(now, -3)
+  },
+  {
+    id: "76000000-0000-0000-0000-000000000008",
+    issued_voucher_id: ids.issuedVouchers.iv07,
+    user_id: ids.users.buyerBaoVy,
+    reason: "other",
+    description: "Thanh toán PayPal bị trừ 2 lần cho cùng 1 đơn hàng.",
+    evidence_urls: ["https://cdn.asa.test/complaint/paypal-double-charge.jpg"],
+    status: "open",
+    created_at: daysFrom(now, -2)
+  },
+  {
+    id: "76000000-0000-0000-0000-000000000009",
+    issued_voucher_id: ids.issuedVouchers.iv03,
+    user_id: ids.users.buyerHoangNam,
+    reason: "not_as_described",
+    description: "Ly size L nhưng khi nhận chỉ có size M, không đúng với mô tả trên voucher.",
+    status: "open",
+    created_at: daysFrom(now, -1)
+  },
+  {
+    id: "76000000-0000-0000-0000-000000000010",
+    issued_voucher_id: ids.issuedVouchers.iv05,
+    user_id: ids.users.buyerGiaHan,
+    reason: "expired_early",
+    description: "Voucher hết hạn ngày 01/08 nhưng hệ thống hiển thị hết hạn ngày 15/08.",
+    status: "under_review",
+    assigned_to: ids.users.adminSecurity,
+    created_at: daysFrom(now, -5)
+  },
+  {
+    id: "76000000-0000-0000-0000-000000000011",
+    order_id: ids.orders.cancelled02,
+    user_id: ids.users.buyerQuocBao,
+    reason: "cannot_redeem",
+    description: "Đã đặt lịch trước nhưng đến nơi đối tác từ chối nhận voucher.",
+    status: "open",
+    created_at: daysFrom(now, -1)
+  },
+  {
+    id: "76000000-0000-0000-0000-000000000012",
+    order_id: ids.orders.cancelled03,
+    user_id: ids.users.buyerMinhAnh,
+    reason: "other",
+    description: "Muốn đổi voucher CGV sang voucher khác nhưng hệ thống không cho.",
+    status: "under_review",
+    assigned_to: ids.users.adminContent,
+    created_at: daysFrom(now, -4)
   }
 ];
 
@@ -151,28 +228,28 @@ const complaintResponses: ComplaintResponseSeed[] = [
     created_at: daysFrom(now, -4)
   },
   {
-    id: "76100000-0000-0000-0000-000000000002",
-    complaint_id: "76000000-0000-0000-0000-000000000002",
+    id: "76100000-0000-0000-0000-000000000007",
+    complaint_id: "76000000-0000-0000-0000-000000000007",
+    responded_by: ids.users.adminOperations,
+    responder_role: "admin",
+    content: "Chúng tôi đang kiểm tra lại giá hiển thị trên hệ thống.",
+    created_at: daysFrom(now, -3)
+  },
+  {
+    id: "76100000-0000-0000-0000-000000000010",
+    complaint_id: "76000000-0000-0000-0000-000000000010",
     responded_by: ids.users.adminSecurity,
     responder_role: "admin",
-    content: "Đội ngũ kỹ thuật đang đối soát giao dịch ví điện tử.",
-    created_at: daysFrom(now, -6)
+    content: "Đội ngũ đang xác minh thông tin ngày hết hạn với đối tác.",
+    created_at: daysFrom(now, -4)
   },
   {
-    id: "76100000-0000-0000-0000-000000000003",
-    complaint_id: "76000000-0000-0000-0000-000000000003",
-    responded_by: ids.users.ownerVinpearl,
-    responder_role: "partner",
-    content: "Đối tác xác nhận tạm ngưng dịch vụ trong thời gian bảo trì.",
-    created_at: daysFrom(now, -21)
-  },
-  {
-    id: "76100000-0000-0000-0000-000000000004",
-    complaint_id: "76000000-0000-0000-0000-000000000003",
-    responded_by: ids.users.buyerThuTrang,
-    responder_role: "user",
-    content: "Tôi đồng ý phương án hoàn tiền.",
-    created_at: daysFrom(now, -20)
+    id: "76100000-0000-0000-0000-000000000012",
+    complaint_id: "76000000-0000-0000-0000-000000000012",
+    responded_by: ids.users.adminContent,
+    responder_role: "admin",
+    content: "Voucher CGV không hỗ trợ đổi, vui lòng liên hệ bộ phận CSKH để được hỗ trợ thêm.",
+    created_at: daysFrom(now, -3)
   }
 ];
 
@@ -220,7 +297,7 @@ export async function seedEngagement({ prisma }: SeedContext) {
         status: complaint.status,
         assigned_to: complaint.assigned_to ?? null,
         resolution_note: complaint.resolution_note ?? null,
-        resolution_type: complaint.resolution_type ?? null,
+        resolution_types: complaint.resolution_types ?? null,
         created_at: complaint.created_at,
         resolved_at: complaint.resolved_at ?? null
       }

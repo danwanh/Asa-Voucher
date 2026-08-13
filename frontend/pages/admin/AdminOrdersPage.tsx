@@ -5,25 +5,27 @@ import { StatusBadge } from "@/components/StatusBadge"
 import { orderService } from "@/services/orderService"
 import type { Order } from "@/types"
 
-type Action = "confirm_payment" | "cancel" | "cancel_refund_prompt" | "refund"
+type Action = "cancel" | "cancel_refund_prompt" | "refund" | "reject"
 
-const ACTION_CONFIG: Record<Action, { label: string; icon: string; color: string }> = {
-  confirm_payment: { label: "Xác nhận thanh toán", icon: "check", color: C.teal },
-  cancel: { label: "Hủy đơn", icon: "trash", color: "#C0392B" },
-  cancel_refund_prompt: { label: "Hủy đơn", icon: "trash", color: "#C0392B" },
-  refund: { label: "Hoàn tiền", icon: "wallet", color: C.peach },
+const ACTION_CONFIG: Record<Action, { label: string; icon: string; color: string; confirmLabel: string; description: string }> = {
+  cancel: { label: "Hủy đơn", icon: "trash", color: "#C0392B", confirmLabel: "Hủy đơn", description: "Bạn có chắc chắn muốn hủy đơn hàng này không? Thao tác này không thể hoàn tác." },
+  cancel_refund_prompt: { label: "Hủy đơn", icon: "trash", color: "#C0392B", confirmLabel: "", description: "" },
+  refund: { label: "Hoàn tiền", icon: "wallet", color: C.peach, confirmLabel: "Xác nhận hoàn tiền", description: "Gọi VNPay/PayPal để hoàn tiền cho đơn hàng này?" },
+  reject: { label: "Từ chối", icon: "x", color: "#856404", confirmLabel: "Từ chối", description: "Từ chối xử lý thủ công, đơn sẽ trở về trạng thái trước đó?" },
 }
 
 function getActionsForStatus(status: string, paymentStatus: string): Action[] {
-  if (status === "pending") return ["confirm_payment", "cancel"]
-  if (status === "confirmed" || status === "pending_manual") return ["cancel_refund_prompt"]
-  if (status === "completed" && paymentStatus === "paid") return ["refund"]
-  if (status === "cancelled" && paymentStatus !== "refunded") return ["refund"]
+  if (status === "pending_payment" || status === "payment_failed") return ["cancel"]
+  if (status === "confirmed") return ["cancel_refund_prompt"]
+  if (status === "completed") return []
+  if (status === "cancelled" && paymentStatus === "paid") return ["refund"]
+  if (status === "pending_manual") return ["cancel_refund_prompt", "reject"]
   return []
 }
 
 export function AdminOrdersPage() {
   const [filter, setFilter] = useState("all")
+  const [cancelledSubFilter, setCancelledSubFilter] = useState<"all" | "no_refund" | "pending_refund">("all")
   const [search, setSearch] = useState("")
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
@@ -90,6 +92,14 @@ export function AdminOrdersPage() {
     return () => document.removeEventListener("keydown", onKey)
   }, [dialogType, actionLoading])
 
+  const filteredOrders = filter === "cancelled" && cancelledSubFilter !== "all"
+    ? orders.filter(o => {
+        if (cancelledSubFilter === "no_refund") return o.paymentStatus !== "paid"
+        if (cancelledSubFilter === "pending_refund") return o.paymentStatus === "paid"
+        return true
+      })
+    : orders
+
   const handleSelectOrder = async (order: Order) => {
     setDetailLoading(true)
     setShowPanel(true)
@@ -128,34 +138,34 @@ export function AdminOrdersPage() {
     const order = dialogOrder
     setActionLoading(true)
     try {
-      if (action === "confirm_payment") {
-        const unpaidPayment = order.payments?.find((p) => p.status === "pending")
-        if (unpaidPayment) {
-          await orderService.simulatePaymentSuccess(unpaidPayment.id)
-        } else {
-          const payment = await orderService.createPayment(order.id, order.paymentMethod)
-          await orderService.simulatePaymentSuccess(payment.id)
-        }
-        showToast("success", "Xác nhận thanh toán thành công")
-      } else if (action === "cancel") {
+      if (action === "cancel") {
         await orderService.cancelOrder(order.id)
         showToast("success", "Hủy đơn hàng thành công")
       } else if (action === "cancel_refund_prompt") {
         await orderService.cancelOrder(order.id)
         if (withRefund) {
           try {
-            await orderService.refundOrder(order.id, "Hoàn tiền khi hủy đơn")
-            showToast("success", "Hủy đơn + hoàn tiền thành công")
+            const refundResult = await orderService.refundOrder(order.id, "Hoàn tiền khi hủy đơn")
+            const refundRef = (refundResult as any)?.refundRef
+            showToast("success", refundRef
+              ? `Hủy đơn + hoàn tiền thành công (Ref: ${refundRef})`
+              : "Hủy đơn + hoàn tiền thành công")
           } catch {
-            showToast("success", "Hủy đơn thành công (hoàn tiền không thực hiện được)")
+            showToast("error", "Hủy đơn thành công nhưng hoàn tiền thất bại")
           }
         } else {
           showToast("success", "Hủy đơn hàng thành công")
         }
       } else if (action === "refund") {
-        await orderService.refundOrder(order.id, refundNote || undefined)
-        showToast("success", "Hoàn tiền thành công")
+        const refundResult = await orderService.refundOrder(order.id, refundNote || undefined)
+        const refundRef = (refundResult as any)?.refundRef
+        showToast("success", refundRef
+          ? `Hoàn tiền thành công (Ref: ${refundRef})`
+          : "Hoàn tiền thành công")
         setRefundNote("")
+      } else if (action === "reject") {
+        await orderService.updateOrder(order.id, { status: "confirmed" })
+        showToast("success", "Đã từ chối xử lý thủ công")
       }
 
       closeDialog()
@@ -172,7 +182,6 @@ export function AdminOrdersPage() {
 
   const filterTabs = [
     { v: "all", l: "Tất cả", desc: "Tất cả đơn hàng" },
-    { v: "pending", l: "Chờ xử lý", desc: "Chờ xác nhận thanh toán" },
     { v: "pending_payment", l: "Chờ thanh toán", desc: "Đơn tạo xong, chờ khách thanh toán" },
     { v: "payment_failed", l: "Thanh toán thất bại", desc: "Giao dịch thanh toán lỗi" },
     { v: "confirmed", l: "Đã xác nhận", desc: "Đã xác nhận, voucher đã phát hành" },
@@ -195,7 +204,7 @@ export function AdminOrdersPage() {
             className="text-sm font-semibold px-3 py-1 rounded-full"
             style={{ backgroundColor: C.eggshell, color: C.indigo }}
           >
-            {loading ? "Đang tải..." : `${orders.length} đơn`}
+            {loading ? "Đang tải..." : `${filteredOrders.length} đơn`}
           </span>
         </div>
 
@@ -204,7 +213,7 @@ export function AdminOrdersPage() {
             {filterTabs.map(({ v, l, desc }) => (
               <div key={v} className="relative group">
                 <button
-                  onClick={() => setFilter(v)}
+                  onClick={() => { setFilter(v); setCancelledSubFilter("all") }}
                   className="px-4 py-2 rounded-full text-sm font-semibold transition-all"
                   style={{
                     backgroundColor: filter === v ? C.indigo : "transparent",
@@ -236,6 +245,29 @@ export function AdminOrdersPage() {
             />
           </div>
         </div>
+
+      {filter === "cancelled" && (
+        <div className="flex gap-2 mb-4">
+          {[
+            { v: "all" as const, l: "Tất cả" },
+            { v: "no_refund" as const, l: "Không hoàn tiền" },
+            { v: "pending_refund" as const, l: "Chờ hoàn tiền" },
+          ].map(({ v, l }) => (
+            <button
+              key={v}
+              onClick={() => setCancelledSubFilter(v)}
+              className="px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
+              style={{
+                backgroundColor: cancelledSubFilter === v ? "#6366F1" : "transparent",
+                color: cancelledSubFilter === v ? "white" : C.indigo,
+                border: `1.5px solid ${cancelledSubFilter === v ? "#6366F1" : "#E2DFC8"}`,
+              }}
+            >
+              {l}
+            </button>
+          ))}
+        </div>
+      )}
 
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-4 text-sm flex items-center justify-between">
@@ -271,7 +303,7 @@ export function AdminOrdersPage() {
                     <div className="font-semibold text-sm">Đang tải dữ liệu...</div>
                   </td>
                 </tr>
-              ) : orders.length === 0 ? (
+              ) : filteredOrders.length === 0 ? (
                 <tr>
                   <td colSpan={6}>
                     <div className="text-center py-20">
@@ -282,7 +314,7 @@ export function AdminOrdersPage() {
                   </td>
                 </tr>
               ) : (
-                orders.map((o) => (
+                filteredOrders.map((o) => (
                   <tr
                     key={o.id}
                     onClick={() => handleSelectOrder(o)}
@@ -418,22 +450,51 @@ export function AdminOrdersPage() {
                   </div>
                 </div>
 
-                {(selectedOrder.status === "cancelled" || selectedOrder.status === "completed") && (
+                {((selectedOrder.status === "cancelled" && selectedOrder.paymentStatus === "paid") || selectedOrder.status === "refunded") && (
                   <div
-                    className="rounded-xl p-3.5 mb-6 flex items-center gap-2"
+                    className="rounded-xl p-3.5 mb-6"
                     style={{
                       backgroundColor: selectedOrder.paymentStatus === "refunded" ? "#E8F5EE" : "#FEF3C7",
                       border: `1px solid ${selectedOrder.paymentStatus === "refunded" ? "#D1FAE5" : "#FDE68A"}`,
                     }}
                   >
-                    <AppIcon
-                      name={selectedOrder.paymentStatus === "refunded" ? "check" : "alert"}
-                      className="w-4 h-4 shrink-0"
-                      style={{ color: selectedOrder.paymentStatus === "refunded" ? "#2D7A52" : "#856404" }}
-                    />
-                    <span className="text-sm font-bold" style={{ color: selectedOrder.paymentStatus === "refunded" ? "#2D7A52" : "#856404" }}>
-                      {selectedOrder.paymentStatus === "refunded" ? "Đã hoàn tiền" : "Chưa hoàn tiền"}
-                    </span>
+                    <div className="flex items-center gap-2 mb-1">
+                      <AppIcon
+                        name={selectedOrder.paymentStatus === "refunded" ? "check" : "alert"}
+                        className="w-4 h-4 shrink-0"
+                        style={{ color: selectedOrder.paymentStatus === "refunded" ? "#2D7A52" : "#856404" }}
+                      />
+                      <span className="text-sm font-bold" style={{ color: selectedOrder.paymentStatus === "refunded" ? "#2D7A52" : "#856404" }}>
+                        {selectedOrder.paymentStatus === "refunded" ? "Đã hoàn tiền" : "Chưa hoàn tiền"}
+                      </span>
+                    </div>
+                    {selectedOrder.paymentStatus === "refunded" && selectedOrder.payments?.filter(p => p.status === "refunded").map((rp) => (
+                      <div key={rp.id} className="mt-2 text-xs space-y-1" style={{ color: "#2D7A52" }}>
+                        {rp.refundRef && (
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-semibold">Gateway Ref:</span>
+                            <code
+                              className="px-1.5 py-0.5 rounded"
+                              style={{ backgroundColor: "#D1FAE5", fontFamily: "'Inter', monospace" }}
+                            >
+                              {rp.refundRef}
+                            </code>
+                          </div>
+                        )}
+                        {rp.refundedAt && (
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-semibold">Thời gian:</span>
+                            <span>{fmtDate(rp.refundedAt)}</span>
+                          </div>
+                        )}
+                        {rp.method && (
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-semibold">Phương thức:</span>
+                            <span className="uppercase">{rp.method}</span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )}
 
@@ -495,9 +556,7 @@ export function AdminOrdersPage() {
             </div>
 
             <p className="text-sm mb-5 leading-relaxed" style={{ color: "#8A8DA8" }}>
-              {dialogAction === "confirm_payment"
-                ? "Xác nhận đã thanh toán cho đơn hàng này?"
-                : "Ghi nhận hoàn tiền cho đơn hàng này?"}
+              {ACTION_CONFIG[dialogAction].description}
             </p>
 
             <div className="bg-gray-50 rounded-xl p-4 mb-5">
@@ -520,6 +579,17 @@ export function AdminOrdersPage() {
 
             {dialogAction === "refund" && (
               <div className="mb-5">
+                <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 mb-4 flex items-start gap-2">
+                  <AppIcon name="info" className="w-4 h-4 mt-0.5 shrink-0" style={{ color: "#1A5FAD" }} />
+                  <div className="text-xs" style={{ color: "#1A5FAD" }}>
+                    <p className="font-bold">Phương thức thanh toán</p>
+                    <p className="mt-0.5">
+                      {dialogOrder.paymentMethod === "vnpay"
+                        ? "Hoàn tiền sẽ được gửi đến VNPay Sandbox. Nếu gateway lỗi, giao dịch sẽ thất bại."
+                        : "Hoàn tiền sẽ được gửi đến PayPal Sandbox. Nếu gateway lỗi, giao dịch sẽ thất bại."}
+                    </p>
+                  </div>
+                </div>
                 <label className="text-xs font-bold block mb-1.5" style={{ color: C.indigo }}>Ghi chú hoàn tiền (tùy chọn)</label>
                 <textarea
                   value={refundNote}
@@ -548,7 +618,7 @@ export function AdminOrdersPage() {
                 style={{ backgroundColor: ACTION_CONFIG[dialogAction].color }}
               >
                 {actionLoading && <AppIcon name="clock" className="w-4 h-4 animate-spin" />}
-                {actionLoading ? "Đang xử lý..." : "Xác nhận"}
+                {actionLoading ? "Đang xử lý..." : ACTION_CONFIG[dialogAction].confirmLabel || "Xác nhận"}
               </button>
             </div>
           </div>

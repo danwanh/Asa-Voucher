@@ -127,7 +127,7 @@ export function AdminComplaintManagementPage() {
       if (filter === "resolved" && resolvedSubFilter !== "all") {
         const typeLabels: Record<string, string> = { refund: "Hoàn tiền", reissue: "Cấp lại voucher", partner_penalized: "Phạt đối tác", no_action: "Từ chối" }
         const label = typeLabels[resolvedSubFilter] ?? ""
-        filtered = filtered.filter((c) => c.resolutionType === resolvedSubFilter || (label && (c.resolutionNote ?? "").includes(label)))
+        filtered = filtered.filter((c) => (c.resolutionTypes ?? []).includes(resolvedSubFilter) || (label && (c.resolutionNote ?? "").includes(label)))
       }
       if (dateFrom) {
         filtered = filtered.filter((c) => c.createdAt >= dateFrom)
@@ -230,7 +230,7 @@ export function AdminComplaintManagementPage() {
         const note = `[${labels.join(", ")}] ${resolveNote.trim()}`
         await feedbackService.resolveComplaint(selectedComplaint.id, {
           resolutionNote: note,
-          resolutionType: acceptTypes[0],
+          resolutionTypes: acceptTypes,
         })
         showToast("success", `Đã chấp nhận - ${labels.join(", ")}`)
       } else if (dialogAction === "reject") {
@@ -241,7 +241,7 @@ export function AdminComplaintManagementPage() {
         }
         await feedbackService.resolveComplaint(selectedComplaint.id, {
           resolutionNote: resolveNote.trim(),
-          resolutionType: "no_action",
+          resolutionTypes: ["no_action"],
         })
         showToast("success", "Đã từ chối khiếu nại")
       } else if (dialogAction === "transfer") {
@@ -308,7 +308,7 @@ export function AdminComplaintManagementPage() {
     if (selectedComplaint.status === "open") {
       availableActions.push("accept", "reject", "request_info", "transfer")
     } else if (selectedComplaint.status === "under_review") {
-      availableActions.push("accept", "reject")
+      availableActions.push("accept", "reject", "request_info")
     }
   }
 
@@ -643,9 +643,50 @@ export function AdminComplaintManagementPage() {
                       <h4 className="text-[11px] font-semibold uppercase tracking-wider mb-2" style={{ color: "#8A8DA8" }}>Kết quả xử lý</h4>
                       <div className="bg-green-50 border border-green-100 rounded-xl p-4">
                         <p className="text-xs font-bold mb-1" style={{ color: "#2D7A52" }}>
-                          {RESOLUTION_TYPE_LABEL[selectedComplaint.resolutionType ?? ""] ?? selectedComplaint.resolutionType}
+                          {(selectedComplaint.resolutionTypes ?? []).map((rt) => RESOLUTION_TYPE_LABEL[rt] ?? rt).join(", ")}
                         </p>
                         <p className="text-sm" style={{ color: "#2D7A52" }}>{selectedComplaint.resolutionNote}</p>
+
+                        {(selectedComplaint.resolutionTypes ?? []).includes("refund") && selectedComplaint.payments && selectedComplaint.payments.length > 0 && (
+                          <div className="mt-3 pt-3 border-t border-green-200">
+                            {selectedComplaint.payments.filter(p => p.status === "refunded").map((rp) => (
+                              <div key={rp.id} className="text-xs space-y-1" style={{ color: "#2D7A52" }}>
+                                {rp.refundRef && (
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-semibold">Gateway Ref:</span>
+                                    <code
+                                      className="px-1.5 py-0.5 rounded"
+                                      style={{ backgroundColor: "#D1FAE5", fontFamily: "'Inter', monospace" }}
+                                    >
+                                      {rp.refundRef}
+                                    </code>
+                                  </div>
+                                )}
+                                {rp.refundedAt && (
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-semibold">Thời gian hoàn tiền:</span>
+                                    <span>{fmtDate(rp.refundedAt)}</span>
+                                  </div>
+                                )}
+                                {rp.method && (
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-semibold">Phương thức thanh toán:</span>
+                                    <span className="uppercase">{rp.method}</span>
+                                  </div>
+                                )}
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-semibold">Số tiền hoàn:</span>
+                                  <span>{new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(rp.amount)}</span>
+                                </div>
+                              </div>
+                            ))}
+                            {selectedComplaint.payments.filter(p => p.status === "refunded").length === 0 && (
+                              <div className="text-xs" style={{ color: "#856404" }}>
+                                <span className="font-semibold">Chưa có giao dịch hoàn tiền trên gateway</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -758,13 +799,21 @@ export function AdminComplaintManagementPage() {
                             color: selected ? "#2D7A52" : C.indigo,
                           }}
                         >
-                          {selected && <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-green-500 text-white text-[10px] flex items-center justify-center">✓</span>}
+                          {selected && <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-green-500 text-white text-[10px] flex items-center justify-center">&#10003;</span>}
                           <AppIcon name={opt.icon} className="w-5 h-5" />
                           {opt.l}
                         </button>
                       )
                     })}
                   </div>
+                  {acceptTypes.includes("refund") && (
+                    <div className="mt-2 bg-blue-50 border border-blue-100 rounded-lg p-2.5 flex items-start gap-2">
+                      <AppIcon name="info" className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: "#1A5FAD" }} />
+                      <p className="text-[11px] leading-relaxed" style={{ color: "#1A5FAD" }}>
+                        Hoàn tiền sẽ được thực hiện qua Sandbox API của VNPay/PayPal. Nếu gateway lỗi, giao dịch sẽ thất bại.
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 

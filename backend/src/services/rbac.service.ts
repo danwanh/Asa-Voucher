@@ -3,6 +3,7 @@ import * as rbacRepo from "../repositories/rbac.repository.js";
 import { isAdminRole, type AuthUser } from "../types/auth.types.js";
 import type { CreateRoleInput, UpdatePermissionsInput } from "../validations/rbac.validation.js";
 import { prisma } from "../config/prisma.js";
+import { writeAuditLog } from "./audit-log.service.js";
 
 function assertAdminSecurity(user: AuthUser) {
   if (user.role !== "admin_security") {
@@ -30,7 +31,15 @@ export async function createRole(user: AuthUser, input: CreateRoleInput) {
     throw new HttpError(409, "Mã vai trò đã tồn tại");
   }
 
-  return rbacRepo.createRole(input);
+  const role = await rbacRepo.createRole(input);
+
+  await writeAuditLog({
+    adminId: user.id,
+    action: "role_assigned",
+    description: `Tạo vai trò mới "${input.name}"`,
+  });
+
+  return role;
 }
 
 export async function updateRole(user: AuthUser, id: string, input: Record<string, unknown>) {
@@ -57,6 +66,13 @@ export async function deleteRole(user: AuthUser, id: string) {
   }
 
   await rbacRepo.deleteRole(id);
+
+  await writeAuditLog({
+    adminId: user.id,
+    action: "role_revoked",
+    description: `Xóa vai trò "${role.name}"`,
+  });
+
   return { success: true };
 }
 
@@ -100,5 +116,13 @@ export async function updateRolePermissions(
   }
 
   await rbacRepo.setRolePermissions(roleId, input.permissionIds);
+
+  await writeAuditLog({
+    adminId: user.id,
+    action: "role_assigned",
+    description: `Cập nhật quyền cho vai trò "${role.name}" (${input.permissionIds.length} quyền)`,
+    targetUserId: user.id,
+  });
+
   return rbacRepo.findRoleById(roleId);
 }

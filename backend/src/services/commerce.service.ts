@@ -8,7 +8,12 @@ import {
   createPayPalPayment,
   createVnpayPayment,
   createSimulatedPayment,
+  refundVnpayPayment,
+  refundPayPalPayment,
   verifyVnpayReturn,
+  formatVnpayDate,
+  safeParseJson,
+  extractPaypalCaptureId,
   type PaymentProvider,
 } from "./payment-provider.service.js";
 import { env } from "../config/env.js";
@@ -316,6 +321,17 @@ export async function updateOrder(user: CurrentUser, id: string, input: Record<s
   const order = await getOrder(id);
   assertOrderAccess(user, order);
   if (!isAdmin(user) && input.status) throw new HttpError(403, "Only admin can update order status", "FORBIDDEN");
+
+  if (input.status) {
+    const allowedStatuses = ["confirmed", "completed", "cancelled"];
+    if (!allowedStatuses.includes(String(input.status))) {
+      throw new HttpError(400, "Trạng thái không hợp lệ", "INVALID_STATUS");
+    }
+    if (order.status !== "pending_manual") {
+      throw new HttpError(409, "Chỉ có thể thay đổi trạng thái từ chờ xử lý thủ công", "INVALID_STATUS_TRANSITION");
+    }
+  }
+
   return prisma.order.update({ where: { id }, data: { ...input, updated_at: new Date() } as never });
 }
 
@@ -330,10 +346,12 @@ export async function cancelOrder(user: CurrentUser, id: string, reason?: string
     "Order not found"
   );
   assertOrderAccess(user, order);
-  if (["completed", "refunded"].includes(String(order.status))) throw new HttpError(409, "Completed order cannot be cancelled", "ORDER_ALREADY_COMPLETED");
+  if (["completed", "refunded"].includes(String(order.status))) {
+    throw new HttpError(409, "Đơn hàng đã hoàn thành không thể hủy trực tiếp. Vui lòng chuyển sang chờ xử lý thủ công.", "ORDER_CANNOT_CANCEL");
+  }
 
-  if (order.status === "cancelled" || order.status === "pending_manual") {
-    throw new HttpError(409, "Order already cancelled", "ORDER_ALREADY_CANCELLED");
+  if (order.status === "cancelled") {
+    throw new HttpError(409, "Đơn hàng đã bị hủy", "ORDER_ALREADY_CANCELLED");
   }
 
   const orderItems = (order.order_items as Array<Record<string, unknown>>) ?? [];
@@ -343,7 +361,9 @@ export async function cancelOrder(user: CurrentUser, id: string, reason?: string
     )
   );
 
-  const nextStatus = hasUsedVoucher ? "pending_manual" : "cancelled";
+  // pending_manual: always cancel (already in manual review)
+  // other statuses: pending_manual if vouchers used, cancelled otherwise
+  const nextStatus = order.status === "pending_manual" ? "cancelled" : (hasUsedVoucher ? "pending_manual" : "cancelled");
 
   return prisma.$transaction(async (tx) => {
     const data = await tx.order.update({
@@ -351,7 +371,9 @@ export async function cancelOrder(user: CurrentUser, id: string, reason?: string
       data: { status: nextStatus, updated_at: new Date() }
     });
 
-    if (!hasUsedVoucher) {
+    // Restore vouchers when: no used vouchers OR cancelling from pending_manual
+    const shouldRestore = !hasUsedVoucher || order.status === "pending_manual";
+    if (shouldRestore) {
       for (const item of orderItems) {
         await tx.issuedVoucher.updateMany({
           where: { order_item_id: item.id as string, status: "active" },
@@ -368,10 +390,10 @@ export async function cancelOrder(user: CurrentUser, id: string, reason?: string
       data: {
         order_id: id,
         user_id: user.id,
-        action: hasUsedVoucher ? "CANCEL_BLOCKED_MANUAL_REVIEW" : "CANCEL_ORDER",
-        description: hasUsedVoucher
-          ? "Voucher đã được sử dụng, chuyển sang chờ xử lý thủ công"
-          : (reason ?? "Order cancelled")
+        action: order.status === "pending_manual" ? "CANCEL_ORDER" : (hasUsedVoucher ? "CANCEL_BLOCKED_MANUAL_REVIEW" : "CANCEL_ORDER"),
+        description: order.status === "pending_manual"
+          ? "Hủy đơn từ chờ xử lý thủ công"
+          : (hasUsedVoucher ? "Voucher đã được sử dụng, chuyển sang chờ xử lý thủ công" : (reason ?? "Order cancelled"))
       }
     });
 
@@ -380,8 +402,10 @@ export async function cancelOrder(user: CurrentUser, id: string, reason?: string
         data: {
           admin_id: user.id,
           target_order_id: id,
-          action: hasUsedVoucher ? "order.cancel_blocked" : "order.cancel",
-          description: `${hasUsedVoucher ? "Chờ xử lý thủ công" : "Hủy"} đơn ${order.order_code}`
+          action: order.status === "pending_manual" ? "order.cancel" : (hasUsedVoucher ? "order.cancel_blocked" : "order.cancel"),
+          description: order.status === "pending_manual"
+            ? `Hủy đơn từ chờ xử lý thủ công ${order.order_code}`
+            : `${hasUsedVoucher ? "Chờ xử lý thủ công" : "Hủy"} đơn ${order.order_code}`
         }
       });
     }
@@ -396,16 +420,78 @@ export async function refundOrder(user: CurrentUser, id: string, note?: string) 
   }
 
   const order = await getOrder(id);
+  const orderStatus = String(order.status);
+
+  if (orderStatus !== "cancelled") {
+    throw new HttpError(409, "Chỉ hoàn tiền cho đơn hàng đã hủy", "ORDER_NOT_CANCELLED");
+  }
+
   const successPayment = (order.payments as Array<Record<string, unknown>> ?? []).find((p) => p.status === "success");
 
   if (!successPayment) {
     throw new HttpError(409, "Chỉ hoàn tiền cho đơn đã thanh toán", "ORDER_NOT_PAID");
   }
 
+  if (successPayment.status === "refunded") {
+    throw new HttpError(409, "Đơn hàng đã được hoàn tiền", "ORDER_ALREADY_REFUNDED");
+  }
+
+  const provider = String(successPayment.method);
+  const transactionRef = String(successPayment.transaction_ref || "");
+
+  let refundResult: { refundId: string; gatewayResponse: unknown };
+
+  // Simulated payment → simulate refund (don't call real gateway)
+  if (transactionRef.startsWith("SIM-")) {
+    refundResult = {
+      refundId: `SIM-REFUND-${Date.now()}`,
+      gatewayResponse: { provider, mode: "simulated-refund", transactionRef },
+    };
+  } else if (provider === "paypal" && transactionRef) {
+    const gatewayData = safeParseJson(successPayment.gateway_response);
+    const realCaptureId = extractPaypalCaptureId(gatewayData) ?? transactionRef;
+    refundResult = await refundPayPalPayment({
+      captureId: realCaptureId,
+      amountVnd: Number(order.total_amount),
+      orderCode: String(order.order_code),
+      note,
+    });
+  } else if (provider === "vnpay" && transactionRef) {
+    const gatewayData = safeParseJson(successPayment.gateway_response);
+    const transactionNo = String(gatewayData.vnp_TransactionNo || "");
+    if (!transactionNo) {
+      throw new HttpError(422, "Thiếu vnp_TransactionNo của giao dịch gốc, không thể hoàn tiền", "VNPAY_TRANSACTION_NO_MISSING");
+    }
+    const transactionDate = successPayment.paid_at
+      ? formatVnpayDate(new Date(successPayment.paid_at as string | Date))
+      : "";
+    refundResult = await refundVnpayPayment({
+      transactionRef,
+      transactionNo,
+      transactionDate,
+      amountVnd: Number(order.total_amount),
+      orderCode: String(order.order_code),
+      createdBy: user.id,
+      reason: note,
+    });
+  } else {
+    throw new HttpError(422, `Không hỗ trợ hoàn tiền cho phương thức ${provider}`, "UNSUPPORTED_REFUND_PROVIDER");
+  }
+
   return prisma.$transaction(async (tx) => {
     await tx.payment.update({
       where: { id: successPayment.id as string },
-      data: { status: "refunded" }
+      data: {
+        status: "refunded",
+        refund_ref: refundResult.refundId,
+        refunded_at: new Date(),
+        gateway_response: JSON.stringify(refundResult.gatewayResponse),
+      }
+    });
+
+    await tx.order.update({
+      where: { id },
+      data: { status: "refunded", updated_at: new Date() }
     });
 
     await tx.paymentLog.create({
@@ -424,7 +510,7 @@ export async function refundOrder(user: CurrentUser, id: string, note?: string) 
         order_id: id,
         user_id: user.id,
         action: "REFUND_ORDER",
-        description: note ?? "Admin ghi nhận hoàn tiền (mô phỏng)"
+        description: `Hoàn tiền (gateway ref: ${refundResult.refundId}): ${note || "Admin ghi nhận hoàn tiền"}`
       }
     });
 
@@ -433,11 +519,16 @@ export async function refundOrder(user: CurrentUser, id: string, note?: string) 
         admin_id: user.id,
         target_order_id: id,
         action: "order.refund",
-        description: `Hoàn tiền đơn ${order.order_code}`
+        description: `Hoàn tiền đơn ${order.order_code} (${refundResult.refundId})`
       }
     });
 
-    return { ...order, payment_status: "refunded" as const };
+    return {
+      ...order,
+      payment_status: "refunded" as const,
+      refund_ref: refundResult.refundId,
+      refunded_at: new Date(),
+    };
   });
 }
 
@@ -833,6 +924,11 @@ export async function handleVnpayReturn(query: Record<string, unknown>) {
   }
   if (successfulReturn) {
     try {
+      const existing = (() => { try { return JSON.parse(String(payment.gateway_response ?? "{}")); } catch { return {}; } })();
+      await prisma.payment.update({
+        where: { id: payment.id as string },
+        data: { gateway_response: JSON.stringify({ ...existing, vnp_TransactionNo: result.transactionNo, vnp_ResponseCode: result.responseCode }) }
+      });
       await completePayment(payment.id as string, order.user_id as string, payment, order, order.order_items as Array<Record<string, unknown>>);
       return redirectResult(order.id as string, "success");
     } catch (error) {
