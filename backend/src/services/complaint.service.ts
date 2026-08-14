@@ -54,8 +54,11 @@ export async function createComplaint(user: AuthUser, input: CreateComplaintInpu
   if (input.order_id) {
     const order = await complaintRepo.findOrderOwner(input.order_id);
     if (!order) throw new HttpError(404, "Không tìm thấy đơn hàng");
-    if (!input.issued_voucher_id && order.user_id !== user.id && order.recipient_id !== user.id) {
+    if (!input.issued_voucher_id && order.user_id !== user.id) {
       throw new HttpError(403, "Bạn chỉ được khiếu nại đơn hàng của mình");
+    }
+    if (!input.issued_voucher_id && order.status !== "confirmed" && order.status !== "completed") {
+      throw new HttpError(422, "Chỉ được khiếu nại đơn hàng đã thanh toán hoặc hoàn tất");
     }
     if (!input.issued_voucher_id && await complaintRepo.findOrderLevelComplaint(user.id, input.order_id)) {
       throw new HttpError(409, "Đơn hàng này đã có khiếu nại");

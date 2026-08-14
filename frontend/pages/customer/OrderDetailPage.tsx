@@ -40,7 +40,8 @@ export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAga
   const voucherReceiveDone = issuedVouchers.length > 0 && !isRefunded
   const displayedVouchers = order.status === "cancelled" ? [] : issuedVouchers
   const successfulPayment = order.payments?.find((payment) => payment.status === "success" || payment.status === "refunded")
-  const canGiveFeedback = (!order.isGift || order.recipientId === currentUserId) && order.recipientId === currentUserId
+  const isCreator = order.userId === currentUserId
+  const ownsVoucher = order.recipientId === currentUserId
   const canCreateFeedback = order.status === "confirmed" || order.status === "completed"
   const isGiftSender = Boolean(order.isGift && order.recipientId !== currentUserId)
 
@@ -143,7 +144,7 @@ export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAga
                             Trạng thái: {issuedVoucherStatusLabel(voucher.status)}
                            {voucher.expiredDate ? ` • Hết hạn: ${fmtDate(voucher.expiredDate)}` : ""}
                           </div>
-                          {canGiveFeedback && (canCreateFeedback || voucher.status === "used") && (
+                          {ownsVoucher && (canCreateFeedback || voucher.status === "used") && (
                             <div className="mt-3 flex flex-wrap gap-2">
                               <button onClick={() => onReview(order, voucher)} className="rounded-lg border px-3 py-1.5 text-xs font-bold" style={{ borderColor: C.apricot, color: "#D97706" }}>
                                 <Star className="mr-1 inline h-3 w-3" /> {voucher.review ? "Xem đánh giá" : "Đánh giá"}
@@ -172,7 +173,7 @@ export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAga
         </div>
       </div>
 
-      {displayedVouchers.length > 0 && (
+      {/* {displayedVouchers.length > 0 && (
         <div className="bg-white rounded-2xl p-6 border border-black/5 mb-4 text-center">
           <h3 className="font-bold text-sm mb-4" style={{ color: C.indigo }}>Mã voucher</h3>
           <div className="flex items-center justify-center gap-2 mb-4">
@@ -197,7 +198,7 @@ export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAga
             </button>
           )}
         </div>
-      )}
+      )} */}
 
       <div className="bg-white rounded-2xl p-6 border border-black/5 mb-4">
         <h3 className="font-bold text-sm mb-3" style={{ color: C.indigo }}>Thông tin thanh toán</h3>
@@ -218,7 +219,12 @@ export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAga
             <CreditCard className="w-4 h-4" /> Thanh toán lại
           </button>
         )}
-        {onComplaint && canGiveFeedback && (order.complaints?.[0] || canCreateFeedback) && (
+        {isGiftSender && isCreator && canCreateFeedback && (
+          <button onClick={() => onReview(order)} className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm border-2" style={{ borderColor: C.apricot, color: "#D97706" }}>
+            <Star className="w-4 h-4" /> Đánh giá
+          </button>
+        )}
+        {onComplaint && isCreator && (order.complaints?.[0] || canCreateFeedback) && (
           <button onClick={() => onComplaint(order)} className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm border-2" style={{ borderColor: "#93C5FD", color: "#2563EB" }}>
             <MessageSquare className="w-4 h-4" /> {order.complaints?.[0] ? "Xem khiếu nại đơn hàng" : "Khiếu nại đơn hàng"}
           </button>

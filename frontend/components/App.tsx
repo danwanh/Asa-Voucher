@@ -2,18 +2,22 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { GuestApp } from "@/routes/GuestApp"
-import { LoginPage } from "@/pages/LoginPage"
-import { CustomerApp } from "@/routes/CustomerApp"
-import { PartnerApp } from "@/routes/PartnerApp"
-import { VoucherStaffApp } from "@/routes/VoucherStaffApp"
-import { StaffApp } from "@/routes/StaffApp"
-import { AdminApp } from "@/routes/AdminApp"
+import dynamic from "next/dynamic"
 import { useCartContext } from "@/components/CartProvider"
 import { useAuthStore } from "@/stores/authStore"
 import type { AppUser, CartItem } from "@/types"
 import type { CustomerPage } from "@/layouts/CustomerLayout"
 import { toast } from "sonner"
+import { LoadingState } from "@/components/LoadingState"
+
+const loading = () => <LoadingState label="Đang tải ứng dụng..." variant="page" />
+const GuestApp = dynamic(() => import("@/routes/GuestApp").then((module) => module.GuestApp), { loading })
+const LoginPage = dynamic(() => import("@/pages/LoginPage").then((module) => module.LoginPage), { loading })
+const CustomerApp = dynamic(() => import("@/routes/CustomerApp").then((module) => module.CustomerApp), { loading })
+const PartnerApp = dynamic(() => import("@/routes/PartnerApp").then((module) => module.PartnerApp), { loading })
+const VoucherStaffApp = dynamic(() => import("@/routes/VoucherStaffApp").then((module) => module.VoucherStaffApp), { loading })
+const StaffApp = dynamic(() => import("@/routes/StaffApp").then((module) => module.StaffApp), { loading })
+const AdminApp = dynamic(() => import("@/routes/AdminApp").then((module) => module.AdminApp), { loading })
 
 function LogoutConfirmDialog({ onCancel, onConfirm }: { onCancel: () => void; onConfirm: () => void }) {
   return (
@@ -33,6 +37,7 @@ function LogoutConfirmDialog({ onCancel, onConfirm }: { onCancel: () => void; on
 export default function App({ initialPage, initialOrderId, initialVoucherId, initialStaffCode, initialPaymentStatus }: { initialPage?: CustomerPage | "profile" | "cart"; initialOrderId?: string; initialVoucherId?: string; initialStaffCode?: string; initialPaymentStatus?: string } = {}) {
   const user = useAuthStore((s) => s.user)
   const isInitialized = useAuthStore((s) => s.isInitialized)
+  const initializationError = useAuthStore((s) => s.initializationError)
   const initialize = useAuthStore((s) => s.initialize)
   const logout = useAuthStore((s) => s.logout)
   const router = useRouter()
@@ -113,6 +118,15 @@ export default function App({ initialPage, initialOrderId, initialVoucherId, ini
   const guestInitialPage = initialPage === "cart" || initialPage === "vouchers" || initialPage === "detail" || initialPage === "categories"
     ? initialPage
     : undefined
+
+  if (!isInitialized) return <LoadingState label="Đang khôi phục phiên đăng nhập..." variant="page" />
+  if (initializationError) return (
+    <div className="mx-auto max-w-md px-4 py-20 text-center">
+      <h1 className="text-xl font-black text-[#3D405B]">Không thể khôi phục phiên đăng nhập</h1>
+      <p className="mt-2 text-sm text-[#8A8DA8]">Vui lòng kiểm tra kết nối và thử lại.</p>
+      <button onClick={() => void initialize()} className="mt-6 rounded-2xl bg-[#E07A5F] px-6 py-3 font-bold text-white">Thử lại</button>
+    </div>
+  )
 
   if (!user && !showLogin && (!initialPage || guestInitialPage)) return (
     <GuestApp

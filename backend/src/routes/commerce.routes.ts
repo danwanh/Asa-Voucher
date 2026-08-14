@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { addCartItem, cancelOrder, checkout, clearCart, createOrder, createPayment, deleteCartItem, deleteOrder, getCart, getOrderController, getOrderItem, getPaymentController, listOrderItems, listOrders, listPayments, paypalCancel, paypalReturn, refundOrder, simulatePaymentFailed, simulatePaymentSuccess, updateCartItem, updateOrder, vnpayReturn } from "../controllers/commerce.controller.js";
+import { addCartItem, cancelOrder, checkout, clearCart, createOrder, createPayment, deleteCartItem, deleteOrder, getCart, getOrderController, getOrderItem, getOrderReviewTargets, getPaymentController, listOrderItems, listOrders, listPayments, paypalCancel, paypalReturn, refundOrder, simulatePaymentFailed, simulatePaymentSuccess, updateCartItem, updateOrder, vnpayReturn } from "../controllers/commerce.controller.js";
 import { requireAuth } from "../middlewares/auth.js";
 import { requireRole } from "../middlewares/require-role.js";
 import { validateBody, validateParams, validateQuery } from "../middlewares/validate.js";
@@ -23,6 +23,7 @@ commerceRoutes.patch("/orders/:id", requireAuth, validateParams(idParamSchema), 
 commerceRoutes.delete("/orders/:id", requireAuth, validateParams(idParamSchema), asyncHandler(deleteOrder));
 commerceRoutes.patch("/orders/:id/cancel", requireAuth, validateParams(idParamSchema), asyncHandler(cancelOrder));
 commerceRoutes.patch("/orders/:id/refund", requireAuth, requireRole("admin_operations"), validateParams(idParamSchema), validateBody(refundOrderSchema), asyncHandler(refundOrder));
+commerceRoutes.get("/orders/:orderId/review-targets", requireAuth, validateParams(orderIdParamSchema), asyncHandler(getOrderReviewTargets));
 
 commerceRoutes.get("/orders/:orderId/items", requireAuth, validateParams(orderIdParamSchema), asyncHandler(listOrderItems));
 commerceRoutes.get("/order-items/:id", requireAuth, validateParams(idParamSchema), asyncHandler(getOrderItem));

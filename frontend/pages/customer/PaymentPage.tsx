@@ -4,6 +4,7 @@ import { C, fmt } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import type { Order } from "@/types"
 import { toast } from "sonner"
+import { CheckoutProductList } from "@/components/CheckoutProductList"
 
 type PaymentMethod = "vnpay" | "paypal"
 
@@ -20,8 +21,6 @@ interface Props {
   onBack: () => void
   canPay?: boolean
 }
-
-const FALLBACK = "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=200&h=150&fit=crop"
 
 export function PaymentPage({ total, order, orderId, onPay, onBack, canPay = true }: Props) {
   const [payment, setPayment] = useState<PaymentMethod>("vnpay")
@@ -67,7 +66,7 @@ export function PaymentPage({ total, order, orderId, onPay, onBack, canPay = tru
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
+    <div className="max-w-5xl mx-auto px-4 py-8">
       <button
         onClick={onBack}
         className="flex items-center gap-2 mb-6 text-sm font-semibold hover:underline"
@@ -106,10 +105,22 @@ export function PaymentPage({ total, order, orderId, onPay, onBack, canPay = tru
         </div>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-6">
+      <div className="space-y-6">
+        <CheckoutProductList
+          products={(order?.items ?? []).map((item) => ({
+            id: item.id,
+            title: item.voucherTitle ?? "Voucher",
+            partner: item.partnerName,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            subtotal: item.subtotal,
+            image: item.image,
+          }))}
+          title="Sản phẩm trong đơn hàng"
+        />
+
         {/* Payment methods */}
-        <div className="md:col-span-2">
-          <div className="bg-white rounded-2xl p-6 border border-black/5 shadow-sm">
+        <div className="bg-white rounded-2xl p-6 border border-black/5 shadow-sm">
             <h2
               className="font-black text-lg mb-4"
               style={{ color: C.indigo, fontFamily: "'Nunito', sans-serif" }}
@@ -136,46 +147,16 @@ export function PaymentPage({ total, order, orderId, onPay, onBack, canPay = tru
                 </button>
               ))}
             </div>
-          </div>
         </div>
 
-        {/* Summary */}
-        <div>
-          <div className="bg-white rounded-2xl p-5 border border-black/5 shadow-sm sticky top-20">
-            <h2 className="font-black text-base mb-4" style={{ color: C.indigo, fontFamily: "'Nunito', sans-serif" }}>
-              Tóm tắt
-            </h2>
-            <div className="space-y-3 mb-4">
-              {(order?.items ?? []).map((item) => (
-                <div key={item.id} className="flex items-start gap-3">
-                  <div className="w-12 h-10 rounded-lg overflow-hidden flex-shrink-0">
-                    <img
-                      src={FALLBACK}
-                      alt=""
-                      className="w-full h-full object-cover"
-                      onError={(e) => { (e.target as HTMLImageElement).src = FALLBACK }}
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs font-semibold line-clamp-2 leading-tight" style={{ color: C.indigo }}>
-                      {item.voucherTitle ?? "Voucher"}
-                    </div>
-                    <div className="text-xs" style={{ color: "#6B7280" }}>x{item.quantity}</div>
-                  </div>
-                  <div className="text-xs font-bold whitespace-nowrap" style={{ color: C.peach }}>
-                    {fmt(item.subtotal)}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="border-t pt-3 mb-4" style={{ borderColor: "#E5E7EB" }}>
+        {/* Total and payment action */}
+        <div className="bg-white rounded-2xl p-5 sm:p-6 border border-black/5 shadow-sm">
+            <div className="mb-4">
               <div className="flex justify-between font-black text-base" style={{ color: C.indigo }}>
                 <span>Tổng cộng</span>
                 <span style={{ color: C.peach }}>{fmt(total)}</span>
               </div>
             </div>
-
             <button
               onClick={handlePay}
               disabled={!canPay || !payableStatus || expired}
@@ -186,7 +167,6 @@ export function PaymentPage({ total, order, orderId, onPay, onBack, canPay = tru
             </button>
             <p className="text-xs text-center mt-2" style={{ color: "#9CA3AF" }}>Bảo mật SSL 256-bit</p>
           </div>
-        </div>
       </div>
     </div>
   )

@@ -29,8 +29,11 @@ export async function findReviewById(id: string) {
   return prisma.review.findUnique({ where: { id }, include: INCLUDE }) as Promise<(ReviewRow & { voucher_products: { partner_id: string } }) | null>;
 }
 
-export async function findReviewByIssuedVoucherId(issuedVoucherId: string) {
-  return prisma.review.findUnique({ where: { issued_voucher_id: issuedVoucherId }, select: { id: true } });
+export async function findReviewByUserAndIssuedVoucherId(userId: string, issuedVoucherId: string) {
+  return prisma.review.findUnique({
+    where: { user_id_issued_voucher_id: { user_id: userId, issued_voucher_id: issuedVoucherId } },
+    select: { id: true },
+  });
 }
 
 export async function getReviewStats(voucherProductId: string) {

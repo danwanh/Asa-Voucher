@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ShoppingCart, Search, Menu, Home, Tag, Package, User, Bell, Grid3x3, Gift, LogOut } from "lucide-react"
 import { C } from "@/utils/constants"
@@ -55,6 +55,16 @@ export function CustomerLayout({
 }: Props) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const router = useRouter()
+
+  useEffect(() => {
+    const likelyRoutes = page === "payment" || page === "success"
+      ? ["/orders", "/my-vouchers"]
+      : page === "home" || page === "vouchers"
+        ? ["/cart", "/orders"]
+        : ["/vouchers"]
+    const timer = window.setTimeout(() => likelyRoutes.forEach((path) => router.prefetch(path)), 1000)
+    return () => window.clearTimeout(timer)
+  }, [page, router])
 
   return (
     <div className="min-h-screen pb-16 md:pb-0" style={{ backgroundColor: C.content, fontFamily: "'Nunito', sans-serif" }}>

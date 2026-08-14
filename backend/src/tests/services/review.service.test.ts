@@ -6,7 +6,7 @@ vi.mock("../../repositories/review.repository.js", () => ({
   listReviews: vi.fn(),
   getReviewStats: vi.fn(),
   findReviewById: vi.fn(),
-  findReviewByIssuedVoucherId: vi.fn(),
+  findReviewByUserAndIssuedVoucherId: vi.fn(),
   createReview: vi.fn(),
   updateReview: vi.fn(),
   setReviewPublished: vi.fn(),
@@ -93,7 +93,7 @@ describe("Review Service", () => {
         order_item_id: "oi-1", voucher_product_id: "vp-1", issued_date: "2026-01-01",
         expired_date: "2026-12-31", created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z",
       } as any);
-      vi.mocked(reviewRepo.findReviewByIssuedVoucherId).mockResolvedValue(null);
+      vi.mocked(reviewRepo.findReviewByUserAndIssuedVoucherId).mockResolvedValue(null);
       vi.mocked(reviewRepo.createReview).mockResolvedValue(makeReview());
 
       const result = await reviewService.createReview(BUYER, { issued_voucher_id: "iv-1", rating: 5 });
@@ -120,11 +120,12 @@ describe("Review Service", () => {
         order_item_id: "oi-1", voucher_product_id: "vp-1", issued_date: "2026-01-01",
         expired_date: "2026-12-31", created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z",
       } as any);
-      vi.mocked(reviewRepo.findReviewByIssuedVoucherId).mockResolvedValue({ id: "existing-review" });
+      vi.mocked(reviewRepo.findReviewByUserAndIssuedVoucherId).mockResolvedValue({ id: "existing-review" });
 
       await expect(
         reviewService.createReview(BUYER, { issued_voucher_id: "iv-1", rating: 5 })
       ).rejects.toThrow(HttpError);
+      expect(reviewRepo.findReviewByUserAndIssuedVoucherId).toHaveBeenCalledWith("u-buyer", "iv-1");
     });
 
     it("rejects if voucher belongs to another user", async () => {
@@ -144,6 +145,32 @@ describe("Review Service", () => {
       await expect(
         reviewService.createReview(PARTNER_OWNER, { issued_voucher_id: "iv-1", rating: 5 })
       ).rejects.toThrow(HttpError);
+    });
+
+    it("allows the order creator to review a voucher issued to a gift recipient", async () => {
+      vi.mocked(issuedVoucherRepo.findIssuedVoucherById).mockResolvedValue({
+        id: "iv-1", owner_id: "u-other", status: "active", voucher_product_id: "vp-1",
+        order_items: { orders: { user_id: "u-buyer", status: "confirmed" } },
+      } as any);
+      vi.mocked(reviewRepo.findReviewByUserAndIssuedVoucherId).mockResolvedValue(null);
+      vi.mocked(reviewRepo.createReview).mockResolvedValue(makeReview());
+
+      await reviewService.createReview(BUYER, { issued_voucher_id: "iv-1", rating: 5 });
+
+      expect(reviewRepo.createReview).toHaveBeenCalledWith("u-buyer", "vp-1", expect.any(Object));
+    });
+
+    it("allows the gift recipient to create a separate review", async () => {
+      vi.mocked(issuedVoucherRepo.findIssuedVoucherById).mockResolvedValue({
+        id: "iv-1", owner_id: "u-other", status: "active", voucher_product_id: "vp-1",
+        order_items: { orders: { user_id: "u-buyer", status: "confirmed" } },
+      } as any);
+      vi.mocked(reviewRepo.findReviewByUserAndIssuedVoucherId).mockResolvedValue(null);
+      vi.mocked(reviewRepo.createReview).mockResolvedValue(makeReview({ user_id: "u-other" }));
+
+      await reviewService.createReview(OTHER_BUYER, { issued_voucher_id: "iv-1", rating: 4 });
+
+      expect(reviewRepo.findReviewByUserAndIssuedVoucherId).toHaveBeenCalledWith("u-other", "iv-1");
     });
   });
 

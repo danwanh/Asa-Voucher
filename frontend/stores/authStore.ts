@@ -1,16 +1,26 @@
 import { create } from "zustand"
-import { persist } from "zustand/middleware"
 import type { AppUser } from "@/types"
 import { authService } from "@/services/authService"
-import { getAccessToken, onAccessTokenRefreshed, setAccessToken } from "@/services/api"
+import { onAccessTokenRefreshed, setAccessToken } from "@/services/api"
 
 let initializePromise: Promise<void> | null = null
+
+function clearLegacyAuthStorage() {
+  try {
+    if (typeof window !== "undefined") window.localStorage.removeItem("asa-auth")
+  } catch {
+    // Storage may be disabled; authentication no longer depends on it.
+  }
+}
+
+clearLegacyAuthStorage()
 
 interface AuthState {
   user: AppUser | null
   accessToken: string | null
   isLoading: boolean
   isInitialized: boolean
+  initializationError: boolean
 
   login: (email: string, password: string) => Promise<void>
   register: (body: { email: string; password: string; confirm_password: string; full_name: string; phone?: string }) => Promise<AppUser>
@@ -21,21 +31,23 @@ interface AuthState {
 }
 
 export const useAuthStore = create<AuthState>()(
-  persist(
     (set, get) => ({
       user: null,
       accessToken: null,
       isLoading: false,
       isInitialized: false,
+      initializationError: false,
 
       login: async (email, password) => {
         set({ isLoading: true })
         try {
           const result = await authService.login(email, password)
           set({
-            user: result.user,
-            accessToken: result.accessToken,
-            isLoading: false
+           user: result.user,
+           accessToken: result.accessToken,
+            isLoading: false,
+            isInitialized: true,
+            initializationError: false,
           })
         } catch (error) {
           set({ isLoading: false })
@@ -57,31 +69,32 @@ export const useAuthStore = create<AuthState>()(
 
       logout: async () => {
         await authService.logout()
-        set({ user: null, accessToken: null })
+        set({ user: null, accessToken: null, isInitialized: true, initializationError: false })
       },
 
       clearSession: () => {
         setAccessToken(null)
-        set({ user: null, accessToken: null })
+        set({ user: null, accessToken: null, isInitialized: true, initializationError: false })
       },
 
       initialize: async () => {
-        if (get().isInitialized) return
+        clearLegacyAuthStorage()
+        if (get().isInitialized && !get().initializationError) return
         if (initializePromise) return initializePromise
+        if (get().initializationError) set({ isInitialized: false, initializationError: false })
 
         initializePromise = (async () => {
-          const token = getAccessToken() ?? get().accessToken
-          if (!token) {
-            set({ isInitialized: true })
-            return
-          }
-          setAccessToken(token)
           try {
-            const user = await authService.getMe()
-            set({ user, accessToken: getAccessToken() ?? token, isInitialized: true })
-          } catch {
-            set({ user: null, accessToken: null, isInitialized: true })
-            setAccessToken(null)
+            const session = await authService.refresh()
+            set({ user: session.user, accessToken: session.accessToken, isInitialized: true, initializationError: false })
+          } catch (error) {
+            const status = (error as { response?: { status?: number } }).response?.status
+            if (status === 401 || status === 403) {
+              set({ user: null, accessToken: null, isInitialized: true, initializationError: false })
+              setAccessToken(null)
+            } else {
+              set({ isInitialized: true, initializationError: true })
+            }
           }
         })()
 
@@ -93,14 +106,9 @@ export const useAuthStore = create<AuthState>()(
       },
 
       setUser: (user) => set({ user })
-    }),
-    {
-      name: "asa-auth",
-      partialize: (state) => ({ accessToken: state.accessToken })
-    }
-  )
+    })
 )
 
 onAccessTokenRefreshed((token) => {
-  useAuthStore.setState({ accessToken: token })
+  useAuthStore.setState(token ? { accessToken: token } : { accessToken: null, user: null })
 })

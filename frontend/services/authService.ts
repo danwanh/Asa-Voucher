@@ -1,6 +1,5 @@
 import type { AppUser } from "@/types"
-import { api, setAccessToken, BASE_URL } from "./api"
-import axios from "axios"
+import { api, refreshSession, runSessionMutation, setAccessToken } from "./api"
 
 type BackendUser = Record<string, unknown> & {
   id: string
@@ -34,10 +33,12 @@ function extractData<T>(response: { data: { success: boolean; data: T } }): T {
 
 export const authService = {
   async login(identifier: string, password: string) {
-    const res = await api.post("/auth/login", { identifier, password })
-    const data = extractData<{ access_token: string; user: BackendUser }>(res)
-    setAccessToken(data.access_token)
-    return { accessToken: data.access_token, user: mapUser(data.user) }
+    return runSessionMutation(async () => {
+      const res = await api.post("/auth/login", { identifier, password }, { timeout: 15_000 })
+      const data = extractData<{ access_token: string; user: BackendUser }>(res)
+      setAccessToken(data.access_token)
+      return { accessToken: data.access_token, user: mapUser(data.user) }
+    })
   },
 
   async register(body: { email: string; password: string; confirm_password: string; full_name: string; phone?: string }) {
@@ -96,22 +97,18 @@ export const authService = {
   },
 
   async logout() {
-    try {
-      await api.post("/auth/logout")
-    } finally {
-      setAccessToken(null)
-    }
+    return runSessionMutation(async () => {
+      try {
+        await api.post("/auth/logout", {}, { timeout: 15_000 })
+      } finally {
+        setAccessToken(null)
+      }
+    })
   },
 
   async refresh() {
-    const res = await axios.post(
-      `${BASE_URL}/auth/refresh`,
-      {},
-      { withCredentials: true }
-    )
-    const data = extractData<{ access_token: string; user: BackendUser }>(res)
-    setAccessToken(data.access_token)
-    return { accessToken: data.access_token, user: mapUser(data.user) }
+    const session = await refreshSession()
+    return { accessToken: session.accessToken, user: mapUser(session.user as BackendUser) }
   },
 
   async getMe() {

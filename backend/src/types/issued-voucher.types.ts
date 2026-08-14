@@ -27,6 +27,7 @@ export interface VoucherUsageRow {
 
 export interface IssuedVoucherListFilter {
   ownerId?: string;
+  feedbackUserId?: string;
   partnerId?: string;
   status?: IssuedVoucherStatus;
   page: number;

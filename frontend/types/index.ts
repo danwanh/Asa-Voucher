@@ -208,6 +208,7 @@ export interface OrderItem {
   subtotal: number
   voucherTitle?: string
   partnerName?: string
+  image?: string
   issuedVouchers?: IssuedVoucher[]
 }
 
@@ -228,6 +229,18 @@ export interface Review {
   comment: string | null
   mediaUrls: string[]
   createdAt: string
+}
+
+export interface ReviewTarget {
+  id: string
+  voucherId: string
+  voucherTitle: string
+  partnerName: string
+  image?: string
+  code?: string
+  amount?: number
+  reviewable: boolean
+  review?: Review
 }
 
 export type ComplaintStatus = "open" | "under_review" | "resolved" | "closed"

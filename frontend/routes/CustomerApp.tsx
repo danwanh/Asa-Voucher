@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { startTransition, useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { AppIcon } from "@/components/AppIcon"
 import { toast } from "sonner"
@@ -20,7 +20,7 @@ import { NotificationsPage } from "@/pages/customer/NotificationsPage"
 import { CustomerSettingsPage } from "@/pages/customer/CustomerSettingsPage"
 import { C } from "@/utils/constants"
 import { customerPagePath } from "@/utils/customerRoutes"
-import type { AppUser, CartItem, CheckoutDraft, IssuedVoucher, Voucher, Order, OrderListItem } from "@/types"
+import type { AppUser, CartItem, CheckoutDraft, IssuedVoucher, Voucher, Order, OrderListItem, ReviewTarget } from "@/types"
 import { orderService, paymentService, type OrderStatusCounts } from "@/services/orderService"
 import { issuedVoucherService } from "@/services/issuedVoucherService"
 import { voucherService, type VoucherDetailData } from "@/services/voucherService"
@@ -94,7 +94,10 @@ export function CustomerApp({
   const [selectedVoucherDetail, setSelectedVoucherDetail] = useState<VoucherDetailData | null>(null)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [reviewOrder, setReviewOrder] = useState<Order | null>(null)
-  const [reviewIssuedVoucher, setReviewIssuedVoucher] = useState<IssuedVoucher | null>(null)
+  const [reviewTarget, setReviewTarget] = useState<ReviewTarget | null>(null)
+  const [reviewTargetOptions, setReviewTargetOptions] = useState<ReviewTarget[]>([])
+  const [reviewTargetOrder, setReviewTargetOrder] = useState<Order | null>(null)
+  const [reviewTargetReturnPage, setReviewTargetReturnPage] = useState<CustomerPage>("orders")
   const [complaintOrder, setComplaintOrder] = useState<Order | null>(null)
   const [complaintIssuedVoucher, setComplaintIssuedVoucher] = useState<IssuedVoucher | null>(null)
   const [reviewReturnPage, setReviewReturnPage] = useState<CustomerPage>("orders")
@@ -139,14 +142,22 @@ export function CustomerApp({
             ? "Đơn hàng đã bị hủy. Nếu giao dịch đã thu tiền, yêu cầu hoàn tiền sẽ được xử lý."
             : "Thanh toán chưa thành công. Bạn có thể thử lại khi đơn hàng còn hạn.")
         }
-      }).catch(() => undefined)
+      }).catch((error) => {
+        const status = (error as { response?: { status?: number } }).response?.status
+        toast.error(status === 403
+          ? "Bạn không có quyền truy cập đơn hàng này."
+          : status === 404
+            ? "Không tìm thấy đơn hàng."
+            : "Không thể tải chi tiết đơn hàng. Vui lòng thử lại.")
+        router.replace("/orders")
+      })
       return
     }
     void orderService.get(initialOrderId).then((order) => {
       setPendingOrder({ id: initialOrderId, order, recipient: { name: "", identifier: "", note: "", forSelf: true } })
     }).catch(() => setPendingOrder({ id: initialOrderId, recipient: { name: "", identifier: "", note: "", forSelf: false } }))
       .finally(() => setPendingOrderLoading(false))
-  }, [initialOrderId, initialPage, initialPaymentStatus])
+  }, [initialOrderId, initialPage, initialPaymentStatus, router])
 
   useEffect(() => {
     if (!initialVoucherId) return
@@ -164,7 +175,7 @@ export function CustomerApp({
     const path = customerPagePath(p, user.role)
     if (path) {
       onInitialPageConsumed?.()
-      router.push(path)
+      startTransition(() => router.push(path))
       return
     }
     setPage(p)
@@ -175,37 +186,67 @@ export function CustomerApp({
     setVoucherSearch(value)
   }
 
-  const goDetail = (v: Voucher) => router.push(`/vouchers/${v.id}`)
+  const goDetail = (v: Voucher) => startTransition(() => router.push(`/vouchers/${v.id}`))
   const goOrderDetail = (o: OrderListItem) => {
-    router.push(`/orders/${o.id}`)
+    startTransition(() => router.push(`/orders/${o.id}`))
+  }
+
+  const openReview = (order: Order, target: ReviewTarget, returnPage: CustomerPage) => {
+    setReviewOrder(order)
+    setReviewTarget(target)
+    setReviewReturnPage(returnPage)
+    setReviewTargetOptions([])
+    setReviewTargetOrder(null)
+    navigate("review")
   }
 
   const goReview = async (o: Order | OrderListItem, issuedVoucher?: IssuedVoucher, returnPage: CustomerPage = "orders") => {
-    const detail = issuedVoucher ? o as Order : await orderService.get(o.id).catch(() => null)
+    if (issuedVoucher) {
+      const order = o as Order
+      const item = order.items?.find((candidate) => candidate.issuedVouchers?.some((voucher) => voucher.id === issuedVoucher.id))
+      openReview(order, {
+        id: issuedVoucher.id,
+        voucherId: item?.voucherId ?? order.voucherId,
+        voucherTitle: item?.voucherTitle ?? order.voucherTitle,
+        partnerName: item?.partnerName ?? order.partnerName,
+        code: issuedVoucher.code,
+        amount: item?.unitPrice,
+        reviewable: !issuedVoucher.review,
+        review: issuedVoucher.review,
+      }, returnPage)
+      return
+    }
+
+    if (o.userId !== user.id) {
+      toast.error("Chỉ người mua đơn hàng mới có thể đánh giá từ lịch sử.")
+      return
+    }
+    const [detailResult, targetResult] = await Promise.allSettled([
+      orderService.get(o.id),
+      orderService.getReviewTargets(o.id),
+    ])
+    const detail = detailResult.status === "fulfilled" ? detailResult.value : null
     if (!detail) {
       toast.error("Không thể tải thông tin đánh giá. Vui lòng thử lại.")
       return
     }
-    if (detail.recipientId && detail.recipientId !== user.id) {
-      toast.error("Chỉ người nhận voucher mới có thể đánh giá.")
+    if (targetResult.status === "rejected") {
+      toast.error("Không thể tải danh sách voucher để đánh giá. Vui lòng thử lại.")
       return
     }
-    const issued = detail.items?.flatMap((item) => item.issuedVouchers ?? []) ?? []
-    const selected = issuedVoucher ?? issued.find((voucher) => voucher.review) ?? issued[0]
-    if (!selected) {
+    const targets = targetResult.value
+    const availableTargets = targets.filter((target) => target.review || target.reviewable)
+    if (availableTargets.length === 0) {
       toast.error("Không tìm thấy voucher đã phát hành để đánh giá.")
       return
     }
-    if (!issuedVoucher && issued.length > 1 && !issued.some((voucher) => voucher.review)) {
-      setSelectedOrder(detail)
-      setPage("order-detail")
-      toast.info("Chọn mã voucher bạn muốn đánh giá trong chi tiết đơn hàng.")
+    if (availableTargets.length > 1) {
+      setReviewTargetOptions(availableTargets)
+      setReviewTargetOrder(detail)
+      setReviewTargetReturnPage(returnPage)
       return
     }
-    setReviewOrder(detail)
-    setReviewIssuedVoucher(selected)
-    setReviewReturnPage(returnPage)
-    navigate("review")
+    openReview(detail, availableTargets[0], returnPage)
   }
 
   const goComplaint = async (o: Order | OrderListItem, issuedVoucher?: IssuedVoucher, returnPage: CustomerPage = "orders") => {
@@ -214,8 +255,8 @@ export function CustomerApp({
       toast.error("Không thể tải thông tin khiếu nại. Vui lòng thử lại.")
       return
     }
-    if (detail.isGift && detail.recipientId !== user.id) {
-      toast.error("Chỉ người nhận voucher mới có thể gửi khiếu nại.")
+    if (!issuedVoucher && detail.userId !== user.id) {
+      toast.error("Chỉ người mua đơn hàng mới có thể gửi khiếu nại từ lịch sử.")
       return
     }
     setComplaintOrder(detail)
@@ -312,10 +353,17 @@ export function CustomerApp({
   }
 
   const returnFromFeedback = () => {
+    const feedbackOrderId = page === "review" ? reviewOrder?.id : complaintOrder?.id
+    orderService.invalidate(feedbackOrderId)
+    issuedVoucherService.invalidateMine()
     if (reviewReturnPage === "order-detail" && selectedOrder) {
-      void orderService.get(selectedOrder.id).then(setSelectedOrder).catch(() => undefined)
+      void orderService.get(selectedOrder.id, { force: true }).then(setSelectedOrder).catch(() => undefined)
     }
     setPage(reviewReturnPage)
+    setReviewOrder(null)
+    setReviewTarget(null)
+    setComplaintOrder(null)
+    setComplaintIssuedVoucher(null)
     onInitialPageConsumed?.()
   }
 
@@ -460,13 +508,31 @@ export function CustomerApp({
       {page === "order-detail" && selectedOrder && (
           <OrderDetailPage order={selectedOrder} onBack={() => navigate("orders")} onReview={(o, issuedVoucher) => goReview(o, issuedVoucher, "order-detail")} onComplaint={(o, issuedVoucher) => goComplaint(o, issuedVoucher, "order-detail")} onPayAgain={handlePayAgain} currentUserId={user.id} />
       )}
-       {page === "review" && reviewOrder && reviewIssuedVoucher && (
-        <ReviewPage
-          order={reviewOrder}
-           issuedVoucher={reviewIssuedVoucher}
+       {page === "review" && reviewOrder && reviewTarget && (
+         <ReviewPage
+           order={reviewOrder}
+            target={reviewTarget}
             onBack={returnFromFeedback}
             onSubmit={returnFromFeedback}
          />
+       )}
+       {reviewTargetOrder && reviewTargetOptions.length > 1 && (
+         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" role="presentation" onClick={() => { setReviewTargetOptions([]); setReviewTargetOrder(null) }}>
+           <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="review-target-title" onClick={(event) => event.stopPropagation()}>
+             <h2 id="review-target-title" className="text-lg font-black" style={{ color: C.indigo }}>Chọn voucher để đánh giá</h2>
+             <p className="mt-1 text-sm" style={{ color: "#8A8DA8" }}>Mỗi voucher có thể nhận một đánh giá riêng từ bạn.</p>
+             <div className="mt-5 max-h-80 space-y-2 overflow-y-auto">
+               {reviewTargetOptions.map((target, index) => (
+                 <button key={target.id} onClick={() => openReview(reviewTargetOrder, target, reviewTargetReturnPage)} className="flex w-full items-center gap-3 rounded-2xl border p-3 text-left hover:bg-gray-50" style={{ borderColor: "#E2DFC8" }}>
+                   <div className="h-12 w-14 flex-shrink-0 overflow-hidden rounded-xl" style={{ backgroundColor: C.eggshell }}>{target.image ? <img src={target.image} alt="" className="h-full w-full object-cover" /> : <AppIcon name="gift" className="m-auto h-full w-5" />}</div>
+                   <div className="min-w-0 flex-1"><div className="truncate text-sm font-bold" style={{ color: C.indigo }}>{target.voucherTitle}</div><div className="text-xs" style={{ color: "#8A8DA8" }}>{target.partnerName} · Voucher {index + 1}</div></div>
+                   <span className="text-xs font-bold" style={{ color: target.review ? C.teal : C.peach }}>{target.review ? "Xem" : "Đánh giá"}</span>
+                 </button>
+               ))}
+             </div>
+             <button onClick={() => { setReviewTargetOptions([]); setReviewTargetOrder(null) }} className="mt-5 w-full rounded-xl border py-2.5 text-sm font-bold" style={{ borderColor: "#E2DFC8", color: C.indigo }}>Hủy</button>
+           </div>
+         </div>
        )}
        {page === "complaint" && complaintOrder && (
          <ComplaintPage

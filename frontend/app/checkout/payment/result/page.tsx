@@ -1,5 +1,5 @@
-import App from "@/components/App"
+import { PaymentResultPage } from "@/pages/customer/PaymentResultPage"
 
 export default function PaymentResultRoute({ searchParams }: { searchParams: { orderId?: string; status?: string } }) {
-  return <App initialPage="orders" initialOrderId={searchParams.orderId} initialPaymentStatus={searchParams.status} />
+  return <PaymentResultPage orderId={searchParams.orderId} callbackStatus={searchParams.status} />
 }

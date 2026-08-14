@@ -53,6 +53,7 @@ export async function listIssuedVouchers(user: AuthUser, query: ListIssuedVouche
     page: query.page,
     limit: query.limit,
     ownerId: user.role === "buyer" ? user.id : undefined,
+    feedbackUserId: user.role === "buyer" ? user.id : undefined,
     partnerId: isPartnerStaff(user.role) ? (user.partnerId ?? undefined) : undefined,
   };
 
@@ -61,7 +62,7 @@ export async function listIssuedVouchers(user: AuthUser, query: ListIssuedVouche
 }
 
 export async function getIssuedVoucherById(user: AuthUser, id: string) {
-  const voucher = await issuedVoucherRepo.findIssuedVoucherById(id);
+  const voucher = await issuedVoucherRepo.findIssuedVoucherById(id, user.role === "buyer" ? user.id : undefined);
   if (!voucher) throw new HttpError(404, "Không tìm thấy voucher đã phát hành");
   assertCanViewIssuedVoucher(user, voucher);
   return voucher;

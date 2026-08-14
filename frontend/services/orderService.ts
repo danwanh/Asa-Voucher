@@ -1,5 +1,5 @@
 import { api } from "./api"
-import type { Complaint, IssuedVoucher, Order, OrderItem, OrderListItem, Payment, Review } from "@/types"
+import type { Complaint, IssuedVoucher, Order, OrderItem, OrderListItem, Payment, Review, ReviewTarget } from "@/types"
 import { useAuthStore } from "@/stores/authStore"
 
 type BackendRecord = Record<string, any>
@@ -44,15 +44,14 @@ function mapComplaint(value: BackendRecord): Complaint {
 }
 
 function mapIssuedVoucher(value: BackendRecord): IssuedVoucher {
+  const review = Array.isArray(value.reviews) ? value.reviews[0] : value.reviews
   return {
     id: String(value.id),
     code: String(value.voucher_code ?? value.code ?? ""),
     qrPayload: String(value.qr_code_payload ?? value.qrPayload ?? ""),
     status: value.status,
     expiredDate: value.expired_date,
-    review: value.reviews
-      ? mapReview(Array.isArray(value.reviews) ? value.reviews[0] : value.reviews)
-      : undefined,
+    review: review ? mapReview(review) : undefined,
     complaint: Array.isArray(value.complaints) && value.complaints[0] ? mapComplaint(value.complaints[0]) : undefined,
   }
 }
@@ -86,6 +85,7 @@ function mapOrderItem(value: BackendRecord): OrderItem {
     subtotal: num(value.subtotal),
     voucherTitle: voucher.name,
     partnerName: voucher.partners?.business_name,
+    image: voucher.thumbnail_url,
     issuedVouchers: (value.issued_vouchers ?? []).map(mapIssuedVoucher),
   }
 }
@@ -180,6 +180,10 @@ export type OrderStatusCounts = Partial<Record<Order["status"] | "all", number>>
 
 const orderDetailRequests = new Map<string, Promise<Order>>()
 const orderListRequests = new Map<string, Promise<OrderListPage>>()
+const orderDetailCache = new Map<string, { value: Order; expiresAt: number }>()
+const orderListCache = new Map<string, { value: OrderListPage; expiresAt: number }>()
+const CACHE_TTL_MS = 15_000
+let cacheVersion = 0
 
 export const orderService = {
   async lookupRecipient(identifier: string) {
@@ -197,18 +201,23 @@ export const orderService = {
       payment_method: input.paymentMethod ?? "vnpay",
       note: input.note,
     })
+    this.invalidate()
     return mapOrder(data<BackendRecord>(response))
   },
 
   async list(params?: { status?: string; search?: string; page?: number; limit?: number }): Promise<OrderListPage> {
     const requestParams = { ...params, page: params?.page ?? 1, limit: params?.limit ?? 20 }
     const key = `${useAuthStore.getState().user?.id ?? "anonymous"}:${JSON.stringify(requestParams)}`
+    const cached = orderListCache.get(key)
+    if (cached && cached.expiresAt > Date.now()) return cached.value
+    if (cached) orderListCache.delete(key)
     const existing = orderListRequests.get(key)
     if (existing) return existing
+    const requestVersion = cacheVersion
 
     const request = api.get("/orders", { params: requestParams }).then((response) => {
       const result = data<{ items: BackendRecord[]; pagination: { page: number; limit: number; total: number; total_pages: number }; countsByStatus?: OrderStatusCounts }>(response)
-      return {
+      const value = {
         items: result.items.map(mapOrderListItem),
         page: result.pagination.page,
         limit: result.pagination.limit,
@@ -216,6 +225,8 @@ export const orderService = {
         totalPages: result.pagination.total_pages,
         countsByStatus: result.countsByStatus ?? { all: result.pagination.total },
       }
+      if (requestVersion === cacheVersion) orderListCache.set(key, { value, expiresAt: Date.now() + CACHE_TTL_MS })
+      return value
     }).finally(() => {
       if (orderListRequests.get(key) === request) orderListRequests.delete(key)
     })
@@ -227,13 +238,25 @@ export const orderService = {
     return this.list(params)
   },
 
-  async get(id: string) {
+  async get(id: string, options?: { force?: boolean }) {
     const key = `${useAuthStore.getState().user?.id ?? "anonymous"}:${id}`
+    if (options?.force) {
+      cacheVersion += 1
+      orderDetailCache.delete(key)
+    }
+    const cached = orderDetailCache.get(key)
+    if (!options?.force && cached && cached.expiresAt > Date.now()) return cached.value
+    if (cached) orderDetailCache.delete(key)
     const existing = orderDetailRequests.get(key)
-    if (existing) return existing
+    if (!options?.force && existing) return existing
+    const requestVersion = cacheVersion
 
     const request = api.get(`/orders/${id}`)
-      .then((response) => mapOrder(data<BackendRecord>(response)))
+      .then((response) => {
+        const value = mapOrder(data<BackendRecord>(response))
+        if (requestVersion === cacheVersion) orderDetailCache.set(key, { value, expiresAt: Date.now() + CACHE_TTL_MS })
+        return value
+      })
       .finally(() => {
         if (orderDetailRequests.get(key) === request) orderDetailRequests.delete(key)
       })
@@ -245,8 +268,41 @@ export const orderService = {
     return this.get(id)
   },
 
+  invalidate(orderId?: string) {
+    cacheVersion += 1
+    orderDetailRequests.clear()
+    orderListRequests.clear()
+    if (orderId) {
+      for (const key of orderDetailCache.keys()) {
+        if (key.endsWith(`:${orderId}`)) orderDetailCache.delete(key)
+      }
+    } else {
+      orderDetailCache.clear()
+    }
+    orderListCache.clear()
+  },
+
+  async getReviewTargets(orderId: string): Promise<ReviewTarget[]> {
+    const response = await api.get(`/orders/${orderId}/review-targets`)
+    const result = data<{ order_items: BackendRecord[] }>(response)
+    return result.order_items.flatMap((item) => {
+      const product = item.voucher_product ?? {}
+      return (item.issued_vouchers ?? []).map((target: BackendRecord) => ({
+        id: String(target.issued_voucher_id),
+        voucherId: String(item.voucher_product_id),
+        voucherTitle: String(product.name ?? "Voucher"),
+        partnerName: String(product.partners?.business_name ?? ""),
+        image: product.thumbnail_url ?? undefined,
+        amount: num(item.unit_price),
+        reviewable: Boolean(target.reviewable),
+        review: target.review ? mapReview(target.review) : undefined,
+      }))
+    })
+  },
+
   async cancel(id: string) {
     const response = await api.patch(`/orders/${id}/cancel`)
+    this.invalidate(id)
     return mapOrder(data<BackendRecord>(response))
   },
 
@@ -256,11 +312,13 @@ export const orderService = {
 
   async refundOrder(id: string, reason?: string) {
     const response = await api.patch(`/orders/${id}/refund`, { reason })
+    this.invalidate(id)
     return mapOrder(data<BackendRecord>(response))
   },
 
   async updateOrder(id: string, input: { status?: string; note?: string }) {
     const response = await api.patch(`/orders/${id}`, input)
+    this.invalidate(id)
     return mapOrder(data<BackendRecord>(response))
   },
 

@@ -57,19 +57,28 @@ export async function createReview(user: AuthUser, input: CreateReviewInput) {
 
   const issuedVoucher = await issuedVoucherRepo.findIssuedVoucherById(input.issued_voucher_id);
   if (!issuedVoucher) throw new HttpError(404, "Không tìm thấy voucher đã mua");
-  if (issuedVoucher.owner_id !== user.id) {
-    throw new HttpError(403, "Bạn chỉ được đánh giá voucher của chính mình");
-  }
   const order = issuedVoucher.order_items?.orders;
+  const isOrderCreator = order?.user_id === user.id;
+  const isVoucherOwner = issuedVoucher.owner_id === user.id;
+  if (!isOrderCreator && !isVoucherOwner) {
+    throw new HttpError(403, "Bạn chỉ được đánh giá voucher mình đã mua hoặc được nhận");
+  }
   const isPaid = order?.status === "confirmed" || order?.status === "completed";
   if (!isPaid && issuedVoucher.status !== "used") {
     throw new HttpError(422, "Chỉ được đánh giá voucher đã thanh toán hoặc đã sử dụng");
   }
 
-  const existing = await reviewRepo.findReviewByIssuedVoucherId(input.issued_voucher_id);
+  const existing = await reviewRepo.findReviewByUserAndIssuedVoucherId(user.id, input.issued_voucher_id);
   if (existing) throw new HttpError(409, "Voucher này đã được đánh giá trước đó");
 
-  return reviewRepo.createReview(user.id, issuedVoucher.voucher_product_id, input);
+  try {
+    return await reviewRepo.createReview(user.id, issuedVoucher.voucher_product_id, input);
+  } catch (error) {
+    if ((error as { code?: string }).code === "P2002") {
+      throw new HttpError(409, "Voucher này đã được đánh giá trước đó");
+    }
+    throw error;
+  }
 }
 
 export async function updateReview(user: AuthUser, id: string, input: UpdateReviewInput) {

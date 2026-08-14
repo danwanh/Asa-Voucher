@@ -126,8 +126,8 @@ export function OrderHistoryPage({ orders, countsByStatus, onDetail, onReview, o
           const issuedCount = order.items.reduce((sum, item) => sum + item.issuedCount, 0)
           const hasIssuedCodes = issuedCount > 0
           const isRefunded = order.status === "refunded"
-          const canGiveFeedback = !order.isGift || order.recipientId === currentUserId
-          const canReview = canGiveFeedback && (order.status === "confirmed" || order.status === "completed")
+          const isCreator = order.userId === currentUserId
+          const canReview = isCreator && (order.status === "confirmed" || order.status === "completed")
           const hasReview = order.items.some((item) => item.hasReview)
           const canPayAgain = order.userId === currentUserId && (order.status === "pending_payment" || order.status === "payment_failed") && (!order.paymentExpiresAt || new Date(order.paymentExpiresAt).getTime() > Date.now())
           const voucherSummary = itemSummary(order)
@@ -161,7 +161,7 @@ export function OrderHistoryPage({ orders, countsByStatus, onDetail, onReview, o
                       : voucherSummary}
                   </div>
                   <p className="text-xs mt-1 font-semibold" style={{ color: "#8A8DA8" }}>{totalQuantity} voucher</p>
-                  {order.isGift && <p className="mt-1 text-xs font-bold" style={{ color: C.teal }}>{order.recipientId === currentUserId ? "Bạn là người nhận quà" : "Đơn quà tặng đã gửi"}</p>}
+                  {order.isGift && <p className="mt-1 text-xs font-bold" style={{ color: C.teal }}>Đơn quà tặng đã gửi</p>}
                   <div className="mt-2 text-xs font-semibold" style={{ color: hasIssuedCodes ? (isRefunded ? "#DC2626" : C.teal) : "#8A8DA8" }}>
                     {hasIssuedCodes
                       ? isRefunded
@@ -195,7 +195,7 @@ export function OrderHistoryPage({ orders, countsByStatus, onDetail, onReview, o
                     {hasReview ? "Xem đánh giá" : "Đánh giá"}
                   </button>
                 )}
-                {onComplaint && canGiveFeedback && (order.hasComplaint || order.status === "confirmed" || order.status === "completed") && (
+                {onComplaint && isCreator && (order.hasComplaint || order.status === "confirmed" || order.status === "completed") && (
                   <button
                     onClick={() => onComplaint(order)}
                     className="text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors"

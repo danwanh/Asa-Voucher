@@ -68,7 +68,7 @@ describe("Issued Voucher Service", () => {
       const result = await issuedVoucherService.listIssuedVouchers(BUYER, { page: 1, limit: 20 });
 
       expect(issuedVoucherRepo.listIssuedVouchers).toHaveBeenCalledWith(
-        expect.objectContaining({ ownerId: "u-buyer" })
+        expect.objectContaining({ ownerId: "u-buyer", feedbackUserId: "u-buyer" })
       );
       expect(result.items).toHaveLength(1);
       expect(result.pagination.total).toBe(1);
@@ -92,6 +92,7 @@ describe("Issued Voucher Service", () => {
 
       const result = await issuedVoucherService.getIssuedVoucherById(BUYER, "iv-1");
       expect(result.id).toBe("iv-1");
+      expect(issuedVoucherRepo.findIssuedVoucherById).toHaveBeenCalledWith("iv-1", "u-buyer");
     });
 
     it("throws 404 if not found", async () => {

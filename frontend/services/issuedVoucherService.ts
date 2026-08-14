@@ -1,4 +1,5 @@
 import { api } from "./api";
+import { useAuthStore } from "@/stores/authStore";
 import type {
   CheckVoucherResult,
   Complaint,
@@ -118,20 +119,37 @@ function mapMineVoucher(value: BackendRecord): Order {
   };
 }
 
+type MineVoucherPage = { items: Order[]; page: number; limit: number; total: number; totalPages: number };
+const mineCache = new Map<string, { value: MineVoucherPage; expiresAt: number }>();
+let mineCacheVersion = 0;
+
 export const issuedVoucherService = {
   async listMine(params?: { page?: number; limit?: number; status?: string }) {
+    const requestParams = { page: params?.page ?? 1, limit: params?.limit ?? 20, status: params?.status };
+    const key = `${useAuthStore.getState().user?.id ?? "anonymous"}:${JSON.stringify(requestParams)}`;
+    const cached = mineCache.get(key);
+    if (cached && cached.expiresAt > Date.now()) return cached.value;
+    if (cached) mineCache.delete(key);
+    const requestVersion = mineCacheVersion;
     const response = await api.get<ApiData<{ items: BackendRecord[]; pagination: { page: number; limit: number; total: number; total_pages: number } }>>(
       "/issued-vouchers",
-      { params: { page: params?.page ?? 1, limit: params?.limit ?? 20, status: params?.status } },
+      { params: requestParams },
     );
     const result = data<{ items: BackendRecord[]; pagination: { page: number; limit: number; total: number; total_pages: number } }>(response)
-    return {
+    const value = {
       items: result.items.map(mapMineVoucher),
       page: result.pagination.page,
       limit: result.pagination.limit,
       total: result.pagination.total,
       totalPages: result.pagination.total_pages,
     }
+    if (requestVersion === mineCacheVersion) mineCache.set(key, { value, expiresAt: Date.now() + 15_000 });
+    return value;
+  },
+
+  invalidateMine() {
+    mineCacheVersion += 1;
+    mineCache.clear();
   },
 
   async validate(code: string) {

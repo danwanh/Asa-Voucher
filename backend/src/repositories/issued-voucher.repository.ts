@@ -5,7 +5,8 @@ import type {
   IssuedVoucherStatus,
 } from "../types/issued-voucher.types.js";
 
-const INCLUDE = {
+function detailInclude(feedbackUserId?: string) {
+  return {
   voucher_products: { select: { id: true, name: true, partner_id: true, thumbnail_url: true, partners: { select: { business_name: true } } } },
   order_items: {
     select: {
@@ -30,29 +31,44 @@ const INCLUDE = {
       },
     },
   },
-  reviews: { select: { id: true, rating: true, comment: true, media_urls: true, created_at: true, updated_at: true } },
-  complaints: { select: { id: true, reason: true, description: true, evidence_urls: true, status: true, resolution_note: true, resolution_types: true, created_at: true, resolved_at: true } },
-} as const;
-
-const LIST_INCLUDE = {
-  voucher_products: { select: { id: true, name: true, partner_id: true, partners: { select: { business_name: true } } } },
-  order_items: {
-    select: {
-      id: true,
-      order_id: true,
-      quantity: true,
-      unit_price: true,
-      subtotal: true,
-      orders: { select: { id: true, user_id: true, recipient_id: true, total_amount: true, payment_method: true, status: true, is_gift: true, created_at: true, users: { select: { full_name: true } } } },
+    reviews: {
+      ...(feedbackUserId ? { where: { user_id: feedbackUserId } } : {}),
+      select: { id: true, rating: true, comment: true, media_urls: true, created_at: true, updated_at: true },
     },
-  },
-  reviews: { select: { id: true, rating: true, comment: true, media_urls: true, created_at: true } },
-  complaints: { select: { id: true, reason: true, description: true, evidence_urls: true, status: true, resolution_note: true, resolution_types: true, created_at: true, resolved_at: true } },
-} as const;
+    complaints: {
+      ...(feedbackUserId ? { where: { user_id: feedbackUserId } } : {}),
+      select: { id: true, reason: true, description: true, evidence_urls: true, status: true, resolution_note: true, resolution_types: true, created_at: true, resolved_at: true },
+    },
+  } as const;
+}
+
+function listInclude(feedbackUserId?: string) {
+  return {
+    voucher_products: { select: { id: true, name: true, partner_id: true, partners: { select: { business_name: true } } } },
+    order_items: {
+      select: {
+        id: true,
+        order_id: true,
+        quantity: true,
+        unit_price: true,
+        subtotal: true,
+        orders: { select: { id: true, user_id: true, recipient_id: true, total_amount: true, payment_method: true, status: true, is_gift: true, created_at: true, users: { select: { full_name: true } } } },
+      },
+    },
+    reviews: {
+      ...(feedbackUserId ? { where: { user_id: feedbackUserId } } : {}),
+      select: { id: true, rating: true, comment: true, media_urls: true, created_at: true },
+    },
+    complaints: {
+      ...(feedbackUserId ? { where: { user_id: feedbackUserId } } : {}),
+      select: { id: true, reason: true, description: true, evidence_urls: true, status: true, resolution_note: true, resolution_types: true, created_at: true, resolved_at: true },
+    },
+  } as const;
+}
 
 type IssuedVoucherWithRelations = IssuedVoucherRow & {
   voucher_products: { partner_id: string };
-  order_items: { order_id: string; orders?: { status: string } | null };
+  order_items: { order_id: string; orders?: { user_id: string; status: string } | null };
 };
 
 export async function listIssuedVouchers(
@@ -67,23 +83,23 @@ export async function listIssuedVouchers(
   const take = filter.limit;
 
   const [rows, total] = await Promise.all([
-    prisma.issuedVoucher.findMany({ where, include: LIST_INCLUDE, orderBy: { created_at: "desc" }, skip, take }),
+    prisma.issuedVoucher.findMany({ where, include: listInclude(filter.feedbackUserId), orderBy: { created_at: "desc" }, skip, take }),
     prisma.issuedVoucher.count({ where }),
   ]);
 
   return { rows: rows as unknown as IssuedVoucherRow[], total };
 }
 
-export async function findIssuedVoucherById(id: string) {
-  return prisma.issuedVoucher.findUnique({ where: { id }, include: INCLUDE }) as unknown as Promise<IssuedVoucherWithRelations | null>;
+export async function findIssuedVoucherById(id: string, feedbackUserId?: string) {
+  return prisma.issuedVoucher.findUnique({ where: { id }, include: detailInclude(feedbackUserId) }) as unknown as Promise<IssuedVoucherWithRelations | null>;
 }
 
 export async function findIssuedVoucherByCode(voucherCode: string) {
-  return prisma.issuedVoucher.findUnique({ where: { voucher_code: voucherCode }, include: INCLUDE }) as unknown as Promise<IssuedVoucherWithRelations | null>;
+  return prisma.issuedVoucher.findUnique({ where: { voucher_code: voucherCode }, include: detailInclude() }) as unknown as Promise<IssuedVoucherWithRelations | null>;
 }
 
 export async function findIssuedVoucherByQrPayload(qrCodePayload: string) {
-  return prisma.issuedVoucher.findUnique({ where: { qr_code_payload: qrCodePayload }, include: INCLUDE }) as unknown as Promise<IssuedVoucherWithRelations | null>;
+  return prisma.issuedVoucher.findUnique({ where: { qr_code_payload: qrCodePayload }, include: detailInclude() }) as unknown as Promise<IssuedVoucherWithRelations | null>;
 }
 
 export async function updateIssuedVoucherStatus(id: string, status: IssuedVoucherStatus) {

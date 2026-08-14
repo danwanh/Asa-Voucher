@@ -281,7 +281,7 @@ describe("Commerce Service", () => {
             subtotal: 200000,
             voucher_products: { name: "Spa voucher", partners: { business_name: "Partner One" } },
             _count: { issued_vouchers: 2 },
-            issued_vouchers: [{ reviews: { id: "review-1" } }],
+            issued_vouchers: [{ reviews: [{ id: "review-1" }] }],
           }],
           complaints: [{ id: "complaint-1" }],
         },
@@ -301,7 +301,7 @@ describe("Commerce Service", () => {
       expect(result.countsByStatus.all).toBe(1);
       expect(result.countsByStatus.payment_failed).toBe(1);
       expect(prisma.order.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { AND: [{ OR: [{ user_id: "u-buyer" }, { recipient_id: "u-buyer" }] }] } })
+        expect.objectContaining({ where: { AND: [{ user_id: "u-buyer" }] } })
       );
 
       const select = vi.mocked(prisma.order.findMany).mock.calls[0][0]?.select as any;
@@ -323,7 +323,9 @@ describe("Commerce Service", () => {
       expect(select.payments).toEqual({ select: { status: true } });
       expect(select).not.toHaveProperty("payment_status");
       expect(select).not.toHaveProperty("updated_at");
-      expect(select.order_items.select.issued_vouchers).toEqual({ select: { reviews: { select: { id: true } } } });
+      expect(select.order_items.select.issued_vouchers).toEqual({
+        select: { reviews: { where: { user_id: "u-buyer" }, select: { id: true } } },
+      });
       expect(select.order_items.select._count).toEqual({ select: { issued_vouchers: true } });
       expect(select.order_items.select).not.toHaveProperty("unit_price");
       expect(select.order_items.select.subtotal).toBe(true);
@@ -333,34 +335,17 @@ describe("Commerce Service", () => {
       });
     });
 
-    it("allows a gift recipient to list an order bought by another user", async () => {
-      vi.mocked(prisma.order.findMany).mockResolvedValue([
-        {
-          id: "o-gift",
-          user_id: "u-other",
-          recipient_id: "u-buyer",
-          is_gift: true,
-          status: "confirmed",
-          payment_status: "paid",
-          order_items: [],
-        },
-      ] as any);
-      vi.mocked(prisma.order.count).mockResolvedValue(1 as any);
-      vi.mocked(prisma.order.groupBy).mockResolvedValue([
-        { status: "confirmed", _count: { _all: 1 } },
-      ] as any);
+    it("does not include orders received as gifts in buyer history or counts", async () => {
+      vi.mocked(prisma.order.findMany).mockResolvedValue([] as any);
+      vi.mocked(prisma.order.count).mockResolvedValue(0 as any);
+      vi.mocked(prisma.order.groupBy).mockResolvedValue([] as any);
 
       const result = await commerceService.listOrders(BUYER);
 
-      expect(result.items).toHaveLength(1);
-      expect(result.items[0]).toMatchObject({
-        id: "o-gift",
-        user_id: "u-other",
-        recipient_id: "u-buyer",
-        is_gift: true,
-      });
+      expect(result.items).toHaveLength(0);
+      expect(result.countsByStatus.all).toBe(0);
       expect(prisma.order.findMany).toHaveBeenCalledWith(expect.objectContaining({
-        where: { AND: [{ OR: [{ user_id: "u-buyer" }, { recipient_id: "u-buyer" }] }] },
+        where: { AND: [{ user_id: "u-buyer" }] },
       }));
     });
 
@@ -396,6 +381,7 @@ describe("Commerce Service", () => {
       }));
       const select = vi.mocked(prisma.order.findMany).mock.calls[0][0]?.select as any;
       expect(select.order_items.where).toEqual({ voucher_products: { partner_id: "p1" } });
+      expect(select.order_items.select.issued_vouchers.select.reviews).toEqual({ select: { id: true } });
     });
 
     it("does not apply status filter to badge counts", async () => {
@@ -418,7 +404,7 @@ describe("Commerce Service", () => {
         expect.objectContaining({ where: expect.objectContaining({ status: { in: ["cancelled"] } }) })
       );
       expect(prisma.order.groupBy).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { AND: [{ OR: [{ user_id: "u-buyer" }, { recipient_id: "u-buyer" }] }] } })
+        expect.objectContaining({ where: { AND: [{ user_id: "u-buyer" }] } })
       );
     });
   });
@@ -441,7 +427,7 @@ describe("Commerce Service", () => {
       await expect(commerceService.getOrderById(BUYER, "o1")).rejects.toThrow(HttpError);
     });
 
-    it("allows a gift recipient to view the order", async () => {
+    it("rejects a gift recipient viewing the creator's order", async () => {
       vi.mocked(prisma.order.findUnique).mockResolvedValue({
         id: "o1",
         user_id: "u-other",
@@ -452,12 +438,7 @@ describe("Commerce Service", () => {
         payments: [{ id: "pay1", status: "success", transaction_ref: "PRIVATE-TXN", gateway_response: { payer: "private" }, paid_at: new Date() }],
       } as any);
 
-      const result = await commerceService.getOrderById(BUYER, "o1");
-      expect(result.id).toBe("o1");
-      expect(result.complaints).toEqual([{ id: "own", user_id: "u-buyer" }]);
-      expect((result.order_items as any[])[0].issued_vouchers[0].voucher_code).toBe("CODE");
-      expect((result.payments as any[])[0]).not.toHaveProperty("transaction_ref");
-      expect((result.payments as any[])[0]).not.toHaveProperty("gateway_response");
+      await expect(commerceService.getOrderById(BUYER, "o1")).rejects.toThrow(HttpError);
       expect(prisma.order.findUnique).toHaveBeenCalledWith(expect.objectContaining({
         include: expect.objectContaining({
           payments: true,
@@ -468,6 +449,18 @@ describe("Commerce Service", () => {
           },
         }),
       }));
+    });
+
+    it("keeps safe payments available to the order creator", async () => {
+      vi.mocked(prisma.order.findUnique).mockResolvedValue({
+        id: "o1", user_id: "u-buyer", recipient_id: "u-buyer", order_items: [], complaints: [],
+        payments: [{ id: "pay1", status: "success", transaction_ref: "PRIVATE", gateway_response: "PRIVATE" }],
+      } as any);
+
+      const result = await commerceService.getOrderById(BUYER, "o1");
+
+      expect((result.payments as any[])[0]).not.toHaveProperty("transaction_ref");
+      expect((result.payments as any[])[0]).not.toHaveProperty("gateway_response");
     });
 
     it("does not expose a gift recipient's voucher codes to the sender", async () => {
@@ -507,6 +500,85 @@ describe("Commerce Service", () => {
       expect(result.total_amount).toBe(40000);
       expect(result.complaints).toEqual([]);
       expect((result.payments as any[])[0]).not.toHaveProperty("transaction_ref");
+    });
+  });
+
+  describe("getOrderReviewTargets", () => {
+    it("returns only opaque voucher ids and caller-filtered reviews to the creator", async () => {
+      vi.mocked(prisma.order.findUnique).mockResolvedValue({
+        id: "o1",
+        user_id: "u-buyer",
+        status: "confirmed",
+        order_items: [{
+          id: "oi1",
+          voucher_product_id: "vp1",
+          quantity: 2,
+          voucher_products: { id: "vp1", name: "Spa", thumbnail_url: null, partners: { business_name: "Partner" } },
+          issued_vouchers: [
+            { id: "iv1", status: "active", reviews: [] },
+            { id: "iv2", status: "active", reviews: [{ id: "review1", rating: 5 }] },
+          ],
+        }],
+      } as any);
+
+      const result = await commerceService.getOrderReviewTargets("u-buyer", "o1");
+
+      expect(result.order_items[0].issued_vouchers).toEqual([
+        { issued_voucher_id: "iv1", review: null, reviewable: true },
+        { issued_voucher_id: "iv2", review: { id: "review1", rating: 5 }, reviewable: false },
+      ]);
+      expect(result.order_items[0].issued_vouchers[0]).not.toHaveProperty("status");
+      const select = vi.mocked(prisma.order.findUnique).mock.calls[0][0]?.select as any;
+      expect(select.order_items.select.issued_vouchers.select).not.toHaveProperty("voucher_code");
+      expect(select.order_items.select.issued_vouchers.select).not.toHaveProperty("qr_code_payload");
+      expect(select.order_items.select.issued_vouchers.select).not.toHaveProperty("owner_id");
+      expect(select.order_items.select.issued_vouchers.select.reviews.where).toEqual({ user_id: "u-buyer" });
+    });
+
+    it("rejects the gift recipient and non-creator callers", async () => {
+      vi.mocked(prisma.order.findUnique).mockResolvedValue({
+        id: "o1", user_id: "u-other", status: "confirmed", order_items: [],
+      } as any);
+
+      await expect(commerceService.getOrderReviewTargets("u-buyer", "o1")).rejects.toThrow(HttpError);
+    });
+
+    it("marks targets unreviewable when the order is unpaid and voucher unused", async () => {
+      vi.mocked(prisma.order.findUnique).mockResolvedValue({
+        id: "o1", user_id: "u-buyer", status: "pending_payment",
+        order_items: [{
+          id: "oi1", voucher_product_id: "vp1", quantity: 1, voucher_products: {},
+          issued_vouchers: [{ id: "iv1", status: "active", reviews: [] }],
+        }],
+      } as any);
+
+      const result = await commerceService.getOrderReviewTargets("u-buyer", "o1");
+      expect(result.order_items[0].issued_vouchers[0].reviewable).toBe(false);
+    });
+  });
+
+  describe("customer order subresources", () => {
+    it("rejects item and payment lists for a gift recipient", async () => {
+      vi.mocked(prisma.order.findUnique).mockResolvedValue({
+        id: "o1", user_id: "u-other", recipient_id: "u-buyer", order_items: [], payments: [],
+      } as any);
+
+      await expect(commerceService.listOrderItems(BUYER, "o1")).rejects.toThrow(HttpError);
+      await expect(commerceService.listPayments(BUYER, "o1")).rejects.toThrow(HttpError);
+    });
+
+    it("allows the creator to list safe items and payments", async () => {
+      vi.mocked(prisma.order.findUnique).mockResolvedValue({
+        id: "o1", user_id: "u-buyer", recipient_id: "u-other", complaints: [],
+        order_items: [{ id: "oi1", issued_vouchers: [] }],
+        payments: [{ id: "pay1", status: "success", transaction_ref: "PRIVATE" }],
+      } as any);
+
+      const items = await commerceService.listOrderItems(BUYER, "o1");
+      const payments = await commerceService.listPayments(BUYER, "o1") as any[];
+
+      expect(items).toHaveLength(1);
+      expect(payments[0]).not.toHaveProperty("transaction_ref");
     });
   });
 

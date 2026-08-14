@@ -1,17 +1,12 @@
 import axios, { type AxiosRequestConfig } from "axios"
 
-type PendingRequest = {
-  resolve: (value: unknown) => void
-  reject: (reason?: unknown) => void
-  config: AxiosRequestConfig
-}
-
 export const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5000/api"
 
 let accessToken: string | null = null
-let isRefreshing = false
-let pendingRequests: PendingRequest[] = []
 let tokenRefreshHandler: ((token: string | null) => void) | null = null
+let refreshPromise: Promise<{ accessToken: string; user: unknown }> | null = null
+let sessionMutationActive = false
+let sessionMutationTail = Promise.resolve()
 
 function isAuthEndpoint(url?: string) {
   return Boolean(url && /\/auth\/(login|register|register-partner|refresh|logout|forgot-password|reset-password|verify-email|resend-verification)/.test(url))
@@ -27,6 +22,54 @@ export function onAccessTokenRefreshed(handler: (token: string | null) => void) 
 
 export function getAccessToken() {
   return accessToken
+}
+
+export function refreshSession() {
+  if (refreshPromise) return refreshPromise
+  if (sessionMutationActive) return Promise.reject(new Error("Session update is in progress"))
+
+  refreshPromise = (async () => {
+    const { data } = await axios.post(
+      `${BASE_URL}/auth/refresh`,
+      {},
+      { withCredentials: true, timeout: 15_000 }
+    )
+    const session = { accessToken: data.data.access_token as string, user: data.data.user as unknown }
+    setAccessToken(session.accessToken)
+    tokenRefreshHandler?.(session.accessToken)
+    return session
+  })().catch((error) => {
+    const status = axios.isAxiosError(error) ? error.response?.status : undefined
+    if (status === 401 || status === 403) {
+      setAccessToken(null)
+      tokenRefreshHandler?.(null)
+    }
+    throw error
+  }).finally(() => {
+    refreshPromise = null
+  })
+
+  return refreshPromise
+}
+
+export function runSessionMutation<T>(operation: () => Promise<T>) {
+  const run = sessionMutationTail.then(async () => {
+    if (refreshPromise) {
+      try {
+        await refreshPromise
+      } catch {
+        // Login and logout must continue after an expired or unavailable refresh.
+      }
+    }
+    sessionMutationActive = true
+    try {
+      return await operation()
+    } finally {
+      sessionMutationActive = false
+    }
+  })
+  sessionMutationTail = run.then(() => undefined, () => undefined)
+  return run
 }
 
 export const api = axios.create({
@@ -53,38 +96,13 @@ api.interceptors.response.use(
       return Promise.reject(error)
     }
 
-    if (isRefreshing) {
-      return new Promise((resolve, reject) => {
-        pendingRequests.push({ resolve, reject, config: originalRequest })
-      })
-    }
-
     originalRequest._retry = true
-    isRefreshing = true
     try {
-      const { data } = await axios.post(
-        `${BASE_URL}/auth/refresh`,
-        {},
-        { withCredentials: true }
-      )
-      const newToken = data.data.access_token
-      setAccessToken(newToken)
-      tokenRefreshHandler?.(newToken)
-      pendingRequests.forEach(({ resolve, config }) => {
-        config.headers = { ...config.headers, Authorization: `Bearer ${newToken}` }
-        resolve(api(config))
-      })
-      pendingRequests = []
-    originalRequest.headers = { ...originalRequest.headers, Authorization: `Bearer ${newToken}` }
+      const session = await refreshSession()
+      originalRequest.headers = { ...originalRequest.headers, Authorization: `Bearer ${session.accessToken}` }
       return api(originalRequest)
     } catch (refreshError) {
-      setAccessToken(null)
-      tokenRefreshHandler?.(null)
-      pendingRequests.forEach(({ reject }) => reject(refreshError))
-      pendingRequests = []
       return Promise.reject(refreshError)
-    } finally {
-      isRefreshing = false
     }
   }
 )

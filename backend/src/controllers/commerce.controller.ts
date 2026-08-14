@@ -57,6 +57,10 @@ export async function cancelOrder(req: Request, res: Response) {
   ok(res, await commerceService.cancelOrder({ ...req.user!, partnerId: req.user!.partnerId ?? undefined }, req.params.id), "Order cancelled");
 }
 
+export async function getOrderReviewTargets(req: Request, res: Response) {
+  ok(res, await commerceService.getOrderReviewTargets(req.user!.id, req.params.orderId));
+}
+
 export async function deleteOrder(req: Request, res: Response) {
   ok(res, await commerceService.cancelOrder({ ...req.user!, partnerId: req.user!.partnerId ?? undefined }, req.params.id), "Order cancelled");
 }

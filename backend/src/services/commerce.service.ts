@@ -303,6 +303,7 @@ async function getOrder(id: string) {
             select: {
               id: true,
               name: true,
+              thumbnail_url: true,
               partner_id: true,
               partners: {
                 select: {
@@ -320,7 +321,7 @@ async function getOrder(id: string) {
 }
 
 function assertOrderAccess(user: CurrentUser, order: Record<string, unknown>) {
-  if (isAdmin(user) || order.user_id === user.id || order.recipient_id === user.id) return;
+  if (isAdmin(user) || order.user_id === user.id) return;
   const items = (order.order_items as Array<Record<string, unknown>> | undefined) ?? [];
   if (user.partnerId && items.some((item) => (item.voucher_products as Record<string, unknown>)?.partner_id === user.partnerId)) return;
   throw new HttpError(403, "Insufficient permissions", "FORBIDDEN");
@@ -335,7 +336,7 @@ function buildOrderListWhere(user: CurrentUser, query?: { status?: string; searc
   const and: Record<string, unknown>[] = [];
 
   if (user.role === "buyer") {
-    and.push({ OR: [{ user_id: user.id }, { recipient_id: user.id }] });
+    and.push({ user_id: user.id });
   } else if (isPartnerStaff(user.role)) {
     and.push(user.partnerId
       ? { order_items: { some: { voucher_products: { partner_id: user.partnerId } } } }
@@ -413,7 +414,13 @@ export async function listOrders(
           subtotal: true,
           voucher_products: { select: { name: true, partners: { select: { business_name: true } } } },
           _count: { select: { issued_vouchers: true } },
-          issued_vouchers: { select: { reviews: { select: { id: true } } } },
+          issued_vouchers: {
+            select: {
+              reviews: user.role === "buyer"
+                ? { where: { user_id: user.id }, select: { id: true } }
+                : { select: { id: true } },
+            },
+          },
         },
       },
     },
@@ -442,7 +449,7 @@ export async function listOrders(
       order_items: order_items.map(({ issued_vouchers, _count, subtotal: _subtotal, ...item }) => ({
         ...item,
         issued_voucher_count: _count.issued_vouchers,
-        has_review: (issued_vouchers ?? []).some((voucher) => Boolean(voucher.reviews)),
+        has_review: (issued_vouchers ?? []).some((voucher) => (voucher.reviews ?? []).length > 0),
       })),
     };
   });
@@ -516,6 +523,72 @@ export async function getOrderById(user: CurrentUser, id: string): Promise<Recor
     ...visibleOrder,
     status: normalizeOrderStatus(order.status),
     payment_status: derivePaymentStatus(order.payments as PaymentRecord[]),
+  };
+}
+
+export async function getOrderReviewTargets(userId: string, orderId: string) {
+  const order = requireData(await prisma.order.findUnique({
+    where: { id: orderId },
+    select: {
+      id: true,
+      user_id: true,
+      status: true,
+      order_items: {
+        select: {
+          id: true,
+          voucher_product_id: true,
+          quantity: true,
+          unit_price: true,
+          voucher_products: {
+            select: {
+              id: true,
+              name: true,
+              thumbnail_url: true,
+              partners: { select: { business_name: true } },
+            },
+          },
+          issued_vouchers: {
+            select: {
+              id: true,
+              status: true,
+              reviews: {
+                where: { user_id: userId },
+                select: {
+                  id: true,
+                  rating: true,
+                  comment: true,
+                  media_urls: true,
+                  is_published: true,
+                  created_at: true,
+                  updated_at: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }), "Order not found");
+
+  if (order.user_id !== userId) {
+    throw new HttpError(403, "Only the buyer who created the order can view review targets", "FORBIDDEN");
+  }
+
+  const paidOrder = ["confirmed", "completed"].includes(normalizeOrderStatus(order.status));
+  return {
+    order_id: order.id,
+    order_items: order.order_items.map((item) => ({
+      order_item_id: item.id,
+      voucher_product_id: item.voucher_product_id,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      voucher_product: item.voucher_products,
+      issued_vouchers: item.issued_vouchers.map((voucher) => ({
+        issued_voucher_id: voucher.id,
+        review: voucher.reviews[0] ?? null,
+        reviewable: (paidOrder || voucher.status === "used") && voucher.reviews.length === 0,
+      })),
+    })),
   };
 }
 

@@ -87,7 +87,7 @@ describe("Complaint Service", () => {
 
   describe("createComplaint", () => {
     it("creates complaint for buyer's order", async () => {
-      vi.mocked(complaintRepo.findOrderOwner).mockResolvedValue({ id: "order-1", user_id: "u-buyer", recipient_id: "u-buyer" });
+      vi.mocked(complaintRepo.findOrderOwner).mockResolvedValue({ id: "order-1", user_id: "u-buyer", recipient_id: "u-buyer", status: "confirmed" });
       vi.mocked(complaintRepo.createComplaint).mockResolvedValue(makeComplaint());
 
       const result = await complaintService.createComplaint(BUYER, {
@@ -99,7 +99,7 @@ describe("Complaint Service", () => {
     });
 
     it("rejects complaint for another buyer's order", async () => {
-      vi.mocked(complaintRepo.findOrderOwner).mockResolvedValue({ id: "order-1", user_id: "u-other", recipient_id: "u-other" });
+      vi.mocked(complaintRepo.findOrderOwner).mockResolvedValue({ id: "order-1", user_id: "u-other", recipient_id: "u-other", status: "confirmed" });
 
       await expect(
         complaintService.createComplaint(BUYER, {
@@ -108,6 +108,30 @@ describe("Complaint Service", () => {
           description: "Wrong item",
         })
       ).rejects.toThrow(HttpError);
+    });
+
+    it("rejects an order-level complaint from the gift recipient", async () => {
+      vi.mocked(complaintRepo.findOrderOwner).mockResolvedValue({
+        id: "order-1", user_id: "u-other", recipient_id: "u-buyer", status: "confirmed",
+      });
+
+      await expect(complaintService.createComplaint(BUYER, {
+        order_id: "order-1",
+        reason: "not_as_described",
+        description: "Wrong item",
+      })).rejects.toThrow(HttpError);
+    });
+
+    it("rejects an order-level complaint before payment", async () => {
+      vi.mocked(complaintRepo.findOrderOwner).mockResolvedValue({
+        id: "order-1", user_id: "u-buyer", recipient_id: "u-buyer", status: "pending_payment",
+      });
+
+      await expect(complaintService.createComplaint(BUYER, {
+        order_id: "order-1",
+        reason: "not_as_described",
+        description: "Wrong item",
+      })).rejects.toThrow(HttpError);
     });
 
     it("rejects non-buyer creating complaint", async () => {
@@ -136,6 +160,26 @@ describe("Complaint Service", () => {
           description: "Cannot redeem",
         })
       ).rejects.toThrow(HttpError);
+    });
+
+    it("allows the issued voucher owner to complain about a gift voucher", async () => {
+      vi.mocked(complaintRepo.findOrderOwner).mockResolvedValue({
+        id: "order-1", user_id: "u-other", recipient_id: "u-buyer", status: "confirmed",
+      });
+      vi.mocked(issuedVoucherRepo.findIssuedVoucherById).mockResolvedValue({
+        id: "iv-1", owner_id: "u-buyer", status: "active", voucher_product_id: "vp-1",
+        order_items: { order_id: "order-1", orders: { user_id: "u-other", status: "confirmed" } },
+      } as any);
+      vi.mocked(complaintRepo.createComplaint).mockResolvedValue(makeComplaint({ issued_voucher_id: "iv-1" }));
+
+      await complaintService.createComplaint(BUYER, {
+        order_id: "order-1",
+        issued_voucher_id: "iv-1",
+        reason: "cannot_redeem",
+        description: "Cannot redeem",
+      });
+
+      expect(complaintRepo.createComplaint).toHaveBeenCalledWith("u-buyer", expect.objectContaining({ issued_voucher_id: "iv-1" }));
     });
   });
 

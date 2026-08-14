@@ -4,20 +4,20 @@ import { toast } from "sonner"
 import { C, fmt } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import { ImageLightbox } from "@/components/ImageLightbox"
-import type { IssuedVoucher, Order } from "@/types"
+import type { Order, ReviewTarget } from "@/types"
 import { feedbackService } from "@/services/feedbackService"
 
 interface Props {
   order: Order
-  issuedVoucher: IssuedVoucher
+  target: ReviewTarget
   onBack: () => void
   onSubmit: () => void
 }
 
 const LABELS = ["", "Rất tệ", "Tệ", "Bình thường", "Tốt", "Tuyệt vời"]
 
-export function ReviewPage({ order, issuedVoucher, onBack, onSubmit }: Props) {
-  const review = issuedVoucher.review
+export function ReviewPage({ order, target, onBack, onSubmit }: Props) {
+  const review = target.review
   const [rating, setRating] = useState(review?.rating ?? 0)
   const [content, setContent] = useState(review?.comment ?? "")
   const [files, setFiles] = useState<File[]>([])
@@ -28,9 +28,8 @@ export function ReviewPage({ order, issuedVoucher, onBack, onSubmit }: Props) {
   const [lightbox, setLightbox] = useState<{ images: string[]; index: number } | null>(null)
 
   const isView = Boolean(review)
-  const orderItem = order.items?.find((item) => item.issuedVouchers?.some((voucher) => voucher.id === issuedVoucher.id))
-  const voucherTitle = orderItem?.voucherTitle ?? order.voucherTitle
-  const partnerName = orderItem?.partnerName ?? order.partnerName
+  const voucherTitle = target.voucherTitle || order.voucherTitle
+  const partnerName = target.partnerName || order.partnerName
 
   useEffect(() => {
     const urls = files.map((file) => URL.createObjectURL(file))
@@ -62,7 +61,7 @@ export function ReviewPage({ order, issuedVoucher, onBack, onSubmit }: Props) {
     setError("")
     try {
       const mediaUrls = await feedbackService.uploadImages(files)
-      await feedbackService.createReview({ issuedVoucherId: issuedVoucher.id, rating, comment: content.trim(), mediaUrls })
+      await feedbackService.createReview({ issuedVoucherId: target.id, rating, comment: content.trim(), mediaUrls })
       toast.success("Đánh giá đã được gửi thành công")
       onSubmit()
     } catch (errorResponse) {
@@ -79,7 +78,7 @@ export function ReviewPage({ order, issuedVoucher, onBack, onSubmit }: Props) {
     <div className="max-w-2xl mx-auto px-4 py-8">
       <button onClick={onBack} className="flex items-center gap-2 mb-6 text-sm font-semibold hover:underline" style={{ color: C.indigo }}><ArrowLeft className="w-4 h-4" /> Quay lại</button>
       <h1 className="text-2xl font-black mb-6" style={{ color: C.indigo }}>{isView ? "Đánh giá của bạn" : "Đánh giá voucher"}</h1>
-      <div className="bg-white rounded-2xl p-4 border border-black/5 mb-5 flex items-center gap-4"><div className="w-16 h-12 rounded-xl flex-shrink-0 flex items-center justify-center" style={{ backgroundColor: C.eggshell }}><AppIcon name="gift" className="w-5 h-5" /></div><div><div className="font-bold text-sm" style={{ color: C.indigo }}>{voucherTitle}</div><div className="text-xs" style={{ color: "#6B7280" }}>{partnerName} • {fmt(order.amount)}</div><div className="text-xs mt-1" style={{ color: "#9CA3AF" }}>Mã: {issuedVoucher.code}</div></div></div>
+      <div className="bg-white rounded-2xl p-4 border border-black/5 mb-5 flex items-center gap-4"><div className="w-16 h-12 rounded-xl flex-shrink-0 flex items-center justify-center overflow-hidden" style={{ backgroundColor: C.eggshell }}>{target.image ? <img src={target.image} alt={voucherTitle} className="h-full w-full object-cover" /> : <AppIcon name="gift" className="w-5 h-5" />}</div><div><div className="font-bold text-sm" style={{ color: C.indigo }}>{voucherTitle}</div><div className="text-xs" style={{ color: "#6B7280" }}>{partnerName}{target.amount !== undefined ? ` • ${fmt(target.amount)}` : ""}</div>{target.code && <div className="text-xs mt-1" style={{ color: "#9CA3AF" }}>Mã: {target.code}</div>}</div></div>
       <div className="bg-white rounded-2xl p-6 border border-black/5">
         <div className="text-center mb-6"><div className="text-sm font-bold mb-3" style={{ color: C.indigo }}>Trải nghiệm của bạn thế nào?</div><div className="flex justify-center gap-2 mb-2">{[1, 2, 3, 4, 5].map((star) => <button key={star} disabled={isView} onMouseEnter={() => setHover(star)} onMouseLeave={() => setHover(0)} onClick={() => { setRating(star); setError("") }} aria-label={`${star} sao`}><Star className="w-10 h-10" fill={(hover || rating) >= star ? C.apricot : "none"} style={{ color: (hover || rating) >= star ? C.apricot : "#D1D5DB" }} /></button>)}</div>{rating > 0 && <div className="text-sm font-bold" style={{ color: C.apricot }}>{LABELS[rating]}</div>}</div>
         <label className="block text-sm font-bold mb-1.5" style={{ color: C.indigo }}>Nội dung đánh giá</label>
