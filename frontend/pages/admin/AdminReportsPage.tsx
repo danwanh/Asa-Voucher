@@ -89,7 +89,7 @@ export function AdminReportsPage() {
               <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#8A8DA8" }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: "#8A8DA8" }} axisLine={false} tickLine={false} />
               <Tooltip />
-              <Bar dataKey="sold" fill={C.teal} radius={[4, 4, 0, 0]} name="Đã bán" />
+              <Bar dataKey="vouchers" fill={C.teal} radius={[4, 4, 0, 0]} name="Voucher" />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -103,7 +103,7 @@ export function AdminReportsPage() {
                 <span className="text-sm font-bold" style={{ color: C.indigo }}>{d.month}</span>
                 <div className="text-right">
                   <div className="text-sm font-bold" style={{ color: C.peach }}>{fmt(d.revenue)}</div>
-                  <div className="text-xs" style={{ color: "#8A8DA8" }}>{d.sold} voucher</div>
+                  <div className="text-xs" style={{ color: "#8A8DA8" }}>{d.vouchers} voucher</div>
                 </div>
               </div>
             ))}

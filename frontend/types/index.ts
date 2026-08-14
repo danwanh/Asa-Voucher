@@ -24,7 +24,7 @@ export type OrderStatus = "pending_payment" | "payment_failed" | "confirmed" | "
 // Kept for pages that still reference the old admin sub-role concept;
 // no longer used on AppUser (admin_content/admin_operations/admin_security are
 // full Role values now).
-export type AdminSubRole = "content" | "operations" | "security"
+export type AdminSubRole = "content" | "operations" | "security" | "system-hr" | "biz-ops" | "content-tech"
 
 export interface AdminUser {
   id: string

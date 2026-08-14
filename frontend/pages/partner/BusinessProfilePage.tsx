@@ -169,6 +169,7 @@ export function BusinessProfilePage({ user, partner, onPartnerUpdated }: Props) 
         setPartnerForm(mapPartnerToForm(createdPartner))
         toast.success("Đã tạo hồ sơ đối tác thành công")
       } else {
+        if (!partner) throw new Error("Partner profile is unavailable")
         const updatePayload: PartnerUpdateInput = {
           business_name: partnerForm.businessName,
           business_type: partnerForm.businessType || undefined,

@@ -523,7 +523,10 @@ export function AdminComplaintManagementPage() {
                       <td className="px-5 py-3.5">
                         <span
                           className="text-xs font-bold px-2.5 py-1 rounded-full"
-                          style={STATUS_COLOR[c.status] ?? STATUS_COLOR.open}
+                          style={{
+                            backgroundColor: (STATUS_COLOR[c.status] ?? STATUS_COLOR.open).bg,
+                            color: (STATUS_COLOR[c.status] ?? STATUS_COLOR.open).text,
+                          }}
                         >
                           {STATUS_LABEL[c.status] ?? c.status}
                         </span>
@@ -578,7 +581,10 @@ export function AdminComplaintManagementPage() {
                       <p className="text-[11px] font-semibold uppercase tracking-wider mb-1" style={{ color: "#8A8DA8" }}>Trạng thái</p>
                       <span
                         className="text-xs font-bold px-2.5 py-1 rounded-full"
-                        style={STATUS_COLOR[selectedComplaint.status] ?? STATUS_COLOR.open}
+                      style={{
+                        backgroundColor: (STATUS_COLOR[selectedComplaint.status] ?? STATUS_COLOR.open).bg,
+                        color: (STATUS_COLOR[selectedComplaint.status] ?? STATUS_COLOR.open).text,
+                      }}
                       >
                         {STATUS_LABEL[selectedComplaint.status] ?? selectedComplaint.status}
                       </span>

@@ -409,10 +409,11 @@ export function CustomerApp({
          />
        )}
       {page === "orders" && (
-         <OrderHistoryPage
-           orders={myOrders}
-           countsByStatus={orderCounts}
-           page={ordersPage}
+          <OrderHistoryPage
+            orders={myOrders}
+            countsByStatus={orderCounts}
+            loading={myOrdersLoading}
+            page={ordersPage}
            totalPages={ordersTotalPages}
            onPageChange={setOrdersPage}
            onFilterChange={(status, search) => {

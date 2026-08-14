@@ -7,7 +7,7 @@ type ApiEnvelope<T> = {
   message?: string
 }
 
-type BackendVoucherProduct = {
+export type BackendVoucherProduct = {
   id: string
   partner_id: string
   category_id: string

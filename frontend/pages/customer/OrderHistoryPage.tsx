@@ -46,7 +46,7 @@ function itemSummary(order: Order) {
   return items.map((item) => `${item.voucherTitle ?? order.voucherTitle} ×${item.quantity}`).join(" · ")
 }
 
-export function OrderHistoryPage({ orders, countsByStatus, onDetail, onReview, onComplaint, onPayAgain, page = 1, totalPages = 1, onPageChange, onFilterChange }: Props) {
+export function OrderHistoryPage({ orders, countsByStatus, onDetail, onReview, onComplaint, onPayAgain, page = 1, totalPages = 1, onPageChange, onFilterChange, loading = false }: Props) {
   const [tab, setTab] = useState<Order["status"] | "all">("all")
   const [search, setSearch] = useState("")
 
