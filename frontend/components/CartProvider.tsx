@@ -1,33 +1,37 @@
 "use client"
 
-import { createContext, useCallback, useContext, useEffect, useState } from "react"
+import { createContext, useCallback, useContext, useState } from "react"
 import { usePathname } from "next/navigation"
 import { useCart } from "@/hooks/useCart"
 import { useAuthStore } from "@/stores/authStore"
-import type { CartItem } from "@/types"
+import type { CartItem, CheckoutDraft } from "@/types"
 import type { Voucher } from "@/types"
 import { cartService } from "@/services/cartService"
 
-const CHECKOUT_SELECTION_KEY = "asa-selected-cart-items-v1"
+const CHECKOUT_DRAFT_KEY = "asa-checkout-draft-v2"
 
 type CartContextValue = ReturnType<typeof useCart> & {
   cartCount: number | null
   cartCountLoading: boolean
-  checkoutSelectionIds: string[] | null
+  checkoutDraft: CheckoutDraft | null
+  checkoutCartItemIds: string[]
   checkoutItems: CartItem[]
-  setCheckoutSelection: (cartItemIds: string[]) => void
-  clearCheckoutSelection: () => void
+  setCartCheckout: (items: CartItem[]) => void
+  setDirectCheckout: (voucher: Voucher) => void
+  clearCheckoutDraft: () => void
 }
 
 const CartContext = createContext<CartContextValue | null>(null)
 
-function readSelection(): string[] | null {
+function readCheckoutDraft(): CheckoutDraft | null {
   if (typeof window === "undefined") return null
   try {
-    const raw = window.sessionStorage.getItem(CHECKOUT_SELECTION_KEY)
+    const raw = window.sessionStorage.getItem(CHECKOUT_DRAFT_KEY)
     if (raw === null) return null
-    const value = JSON.parse(raw)
-    return Array.isArray(value) ? value.filter((id): id is string => typeof id === "string") : null
+    const value = JSON.parse(raw) as CheckoutDraft
+    if (value?.kind === "cart" && Array.isArray(value.voucherIds) && value.voucherIds.every((id) => typeof id === "string") && Array.isArray(value.cartItemIds) && value.cartItemIds.every((id) => typeof id === "string")) return value
+    if (value?.kind === "direct" && Array.isArray(value.items) && value.items.every((item) => item && typeof item === "object" && item.voucher && typeof item.voucher.id === "string" && Number.isInteger(item.qty) && item.qty > 0)) return value
+    return null
   } catch {
     return null
   }
@@ -39,15 +43,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const isCheckoutRoute = pathname?.startsWith("/checkout/") ?? false
   const isCreateOrderRoute = pathname === "/checkout/create-order"
-  const [checkoutSelectionIds, setCheckoutSelectionIds] = useState<string[] | null>(readSelection)
+  const [checkoutDraft, setCheckoutDraft] = useState<CheckoutDraft | null>(readCheckoutDraft)
   const cartState = useCart(
     userId,
-    !isCheckoutRoute,
-  )
-  const checkoutState = useCart(
-    userId,
-    isCreateOrderRoute && checkoutSelectionIds !== null,
-    checkoutSelectionIds ?? undefined,
+    !isCheckoutRoute || isCreateOrderRoute,
   )
   const add = useCallback(async (voucher: Voucher) => {
     const item = await cartState.add(voucher)
@@ -70,19 +69,37 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     cartState.removeMany(cartItemIds)
   }, [cartState.removeMany])
 
-  const setCheckoutSelection = useCallback((cartItemIds: string[]) => {
-    setCheckoutSelectionIds(cartItemIds)
-    window.sessionStorage.setItem(CHECKOUT_SELECTION_KEY, JSON.stringify(cartItemIds))
+  const saveCheckoutDraft = useCallback((draft: CheckoutDraft) => {
+    setCheckoutDraft(draft)
+    window.sessionStorage.setItem(CHECKOUT_DRAFT_KEY, JSON.stringify(draft))
   }, [])
 
-  const clearCheckoutSelection = useCallback(() => {
-    setCheckoutSelectionIds(null)
-    window.sessionStorage.removeItem(CHECKOUT_SELECTION_KEY)
+  const setCartCheckout = useCallback((items: CartItem[]) => {
+    saveCheckoutDraft({
+      kind: "cart",
+      voucherIds: items.map((item) => item.voucher.id),
+      cartItemIds: items.flatMap((item) => item.cartItemId ? [item.cartItemId] : []),
+    })
+  }, [saveCheckoutDraft])
+
+  const setDirectCheckout = useCallback((voucher: Voucher) => {
+    saveCheckoutDraft({ kind: "direct", items: [{ voucher, qty: 1 }] })
+  }, [saveCheckoutDraft])
+
+  const clearCheckoutDraft = useCallback(() => {
+    setCheckoutDraft(null)
+    window.sessionStorage.removeItem(CHECKOUT_DRAFT_KEY)
   }, [])
 
-  const checkoutItems = checkoutSelectionIds === null
-    ? []
-    : checkoutState.cart.filter((item) => item.cartItemId && checkoutSelectionIds.includes(item.cartItemId))
+  const selectedVoucherIds = checkoutDraft?.kind === "cart" ? new Set(checkoutDraft.voucherIds) : null
+  const checkoutItems = checkoutDraft?.kind === "direct"
+    ? checkoutDraft.items
+    : selectedVoucherIds
+      ? cartState.cart.filter((item) => selectedVoucherIds.has(item.voucher.id))
+      : []
+  const checkoutCartItemIds = checkoutDraft?.kind === "cart"
+    ? checkoutItems.flatMap((item) => item.cartItemId ? [item.cartItemId] : [])
+    : []
 
   const cartCount = cartState.count
   const cartCountLoading = Boolean(userId && !cartState.hasLoaded)
@@ -97,10 +114,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       removeMany,
       cartCount,
       cartCountLoading,
-      checkoutSelectionIds,
+      checkoutDraft,
+      checkoutCartItemIds,
       checkoutItems,
-      setCheckoutSelection,
-      clearCheckoutSelection,
+      setCartCheckout,
+      setDirectCheckout,
+      clearCheckoutDraft,
     }}>
       {children}
     </CartContext.Provider>

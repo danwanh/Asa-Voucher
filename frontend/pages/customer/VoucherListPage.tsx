@@ -9,7 +9,8 @@ import { parseApplicableAreas } from "@/utils/applicableArea"
 import { LoadingState } from "@/components/LoadingState"
 
 interface Props {
-  onBuy: (v: Voucher) => void
+  onAddToCart: (v: Voucher) => void
+  onBuyNow: (v: Voucher) => void
   onDetail: (v: Voucher) => void
   searchQuery: string
   filters: {
@@ -88,7 +89,7 @@ function inEffectiveStatus(voucher: Voucher, status: string): boolean {
   return true
 }
 
-export function VoucherListPage({ onBuy, onDetail, searchQuery, filters, onFiltersChange }: Props) {
+export function VoucherListPage({ onAddToCart, onBuyNow, onDetail, searchQuery, filters, onFiltersChange }: Props) {
   const [sort, setSort] = useState("popular")
   const [showFilters, setShowFilters] = useState(false)
   const [source, setSource] = useState<Voucher[]>([])
@@ -358,7 +359,7 @@ export function VoucherListPage({ onBuy, onDetail, searchQuery, filters, onFilte
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {filtered.map((v) => (
-              <VoucherCard key={v.id} voucher={v} onBuy={() => onBuy(v)} onClick={() => onDetail(v)} />
+              <VoucherCard key={v.id} voucher={v} onAddToCart={() => onAddToCart(v)} onBuyNow={() => onBuyNow(v)} onClick={() => onDetail(v)} />
             ))}
           </div>
           {totalPages > 1 && (

@@ -9,12 +9,13 @@ import { voucherService } from "@/services/voucherService"
 import { LoadingState } from "@/components/LoadingState"
 
 interface Props {
-  onBuy: (v: Voucher) => void
+  onAddToCart: (v: Voucher) => void
+  onBuyNow: (v: Voucher) => void
   onDetail: (v: Voucher) => void
   onNavigate: (p: CustomerPage) => void
 }
 
-export function HomePage({ onBuy, onDetail, onNavigate }: Props) {
+export function HomePage({ onAddToCart, onBuyNow, onDetail, onNavigate }: Props) {
   const [activeCat, setActiveCat] = useState("all")
   const [vouchers, setVouchers] = useState<Voucher[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -130,7 +131,7 @@ export function HomePage({ onBuy, onDetail, onNavigate }: Props) {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {featured.map((v) => (
-              <VoucherCard key={v.id} voucher={v} onBuy={() => onBuy(v)} onClick={() => onDetail(v)} />
+              <VoucherCard key={v.id} voucher={v} onAddToCart={() => onAddToCart(v)} onBuyNow={() => onBuyNow(v)} onClick={() => onDetail(v)} />
             ))}
           </div>
         )}

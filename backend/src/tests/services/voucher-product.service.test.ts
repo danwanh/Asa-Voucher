@@ -5,6 +5,7 @@ const { mockPrisma } = vi.hoisted(() => ({
   mockPrisma: {
     voucherProduct: {
       findMany: vi.fn(),
+      findFirst: vi.fn(),
       findUnique: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
@@ -30,6 +31,10 @@ const { mockPrisma } = vi.hoisted(() => ({
     },
     partnerBranch: {
       findUnique: vi.fn(),
+    },
+    review: {
+      findMany: vi.fn(),
+      aggregate: vi.fn(),
     },
     $transaction: vi.fn(),
   },
@@ -224,6 +229,22 @@ describe("Voucher Product Service", () => {
       vi.mocked(prisma.voucherProduct.findUnique).mockResolvedValue(makeVoucher({ approval_status: "pending" }) as any);
 
       await expect(voucherProductService.getVoucherProduct(OTHER_PARTNER, "vp1")).rejects.toThrow(HttpError);
+    });
+  });
+
+  describe("getPublicVoucherDetail", () => {
+    it("allows approved sold-out vouchers but excludes draft vouchers", async () => {
+      vi.mocked(prisma.voucherProduct.findFirst).mockResolvedValue(makeVoucher({ status: "sold_out" }) as any);
+      vi.mocked(prisma.voucherProductBranch.findMany).mockResolvedValue([] as any);
+      vi.mocked(prisma.review.findMany).mockResolvedValue([] as any);
+      vi.mocked(prisma.review.aggregate).mockResolvedValue({ _avg: { rating: null }, _count: { _all: 0 } } as any);
+
+      const result = await voucherProductService.getPublicVoucherDetail("vp1");
+
+      expect(result.voucher.id).toBe("vp1");
+      expect(prisma.voucherProduct.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+        where: { id: "vp1", approval_status: "approved", status: { in: ["active", "paused", "sold_out", "expired"] } },
+      }));
     });
   });
 

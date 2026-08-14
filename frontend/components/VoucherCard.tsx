@@ -1,8 +1,9 @@
-import { Star } from "lucide-react"
+import { ShoppingCart, Star } from "lucide-react"
 import { AppIcon } from "@/components/AppIcon"
 import { C, fmt } from "@/utils/constants"
 import { StatusBadge } from "./StatusBadge"
 import type { Voucher } from "@/types"
+import { isVoucherAvailable } from "@/hooks/useCart"
 
 const FALLBACK = "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=600&h=400&fit=crop"
 
@@ -15,11 +16,13 @@ const CAT_ICON: Record<string, string> = {
 
 interface Props {
   voucher: Voucher
-  onBuy: () => void
+  onAddToCart: () => void
+  onBuyNow: () => void
   onClick: () => void
 }
 
-export function VoucherCard({ voucher: v, onBuy, onClick }: Props) {
+export function VoucherCard({ voucher: v, onAddToCart, onBuyNow, onClick }: Props) {
+  const isAvailable = isVoucherAvailable(v)
   const discountLabel =
     v.discountType === "percent" ? `Giảm ${v.discount}%` : `Giảm ${fmt(v.discount)}`
 
@@ -74,7 +77,7 @@ export function VoucherCard({ voucher: v, onBuy, onClick }: Props) {
         </p>
         <p className="text-xs mb-3" style={{ color: "#8A8DA8" }}>{v.partnerName}</p>
 
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-3">
           <div>
             <span className="text-base font-extrabold" style={{ color: C.peach }}>
               {fmt(v.price)}
@@ -83,16 +86,26 @@ export function VoucherCard({ voucher: v, onBuy, onClick }: Props) {
               {fmt(v.originalPrice)}
             </span>
           </div>
-          {v.status === "active" && (
+        </div>
+
+        {isAvailable && (
+          <div className="grid grid-cols-2 gap-2">
             <button
-              onClick={(e) => { e.stopPropagation(); onBuy() }}
-              className="px-3 py-1.5 rounded-xl text-xs font-bold text-white transition-opacity hover:opacity-90 active:scale-95"
+              onClick={(event) => { event.stopPropagation(); onAddToCart() }}
+              className="flex items-center justify-center gap-1 rounded-xl border px-2 py-2 text-xs font-bold transition-colors hover:bg-orange-50 active:scale-95"
+              style={{ borderColor: C.peach, color: C.peach }}
+            >
+              <ShoppingCart className="h-3.5 w-3.5" /> Thêm giỏ
+            </button>
+            <button
+              onClick={(event) => { event.stopPropagation(); onBuyNow() }}
+              className="rounded-xl px-2 py-2 text-xs font-bold text-white transition-opacity hover:opacity-90 active:scale-95"
               style={{ backgroundColor: C.peach }}
             >
               Mua ngay
             </button>
-          )}
-        </div>
+          </div>
+        )}
 
         {v.rating > 0 && (
           <div className="flex items-center gap-1 mt-2">

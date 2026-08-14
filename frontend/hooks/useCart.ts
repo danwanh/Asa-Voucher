@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback, useEffect, useRef } from "react"
 import { toast } from "sonner"
 import { cartService } from "@/services/cartService"
 import type { CartItem, Voucher } from "@/types"
@@ -19,20 +19,25 @@ function readStoredCart(): CartItem[] {
 export function isVoucherAvailable(voucher: Voucher) {
   const today = new Date().toISOString().slice(0, 10)
   const remaining = voucher.quantity - voucher.sold
-  return voucher.status === "active" && remaining > 0 && voucher.validFrom <= today && voucher.validTo >= today
+  return voucher.status === "active" && remaining > 0 && voucher.validFrom.slice(0, 10) <= today && voucher.validTo.slice(0, 10) >= today
 }
 
-export function useCart(userId?: string, enabled = true, cartItemIds?: string[]) {
+export function useCart(userId?: string, enabled = true) {
   const [cart, setCart] = useState<CartItem[]>(readStoredCart)
   const [isLoading, setIsLoading] = useState(Boolean(userId && enabled))
-  const [hasLoaded, setHasLoaded] = useState(!userId)
+  const [loadedUserId, setLoadedUserId] = useState<string>()
+  const hasLoaded = !userId || loadedUserId === userId
+  const cartRef = useRef(cart)
 
   useEffect(() => {
-    setHasLoaded(!userId)
-  }, [userId])
+    cartRef.current = cart
+  }, [cart])
 
   useEffect(() => {
-    if (!userId) syncedUsers.clear()
+    if (!userId) {
+      syncedUsers.clear()
+      setLoadedUserId(undefined)
+    }
   }, [userId])
 
   useEffect(() => {
@@ -48,7 +53,6 @@ export function useCart(userId?: string, enabled = true, cartItemIds?: string[])
     }
     let cancelled = false
     setIsLoading(true)
-    setHasLoaded(false)
 
     const sync = async () => {
       if (!syncedUsers.has(userId)) {
@@ -67,10 +71,10 @@ export function useCart(userId?: string, enabled = true, cartItemIds?: string[])
       }
 
       try {
-        const serverCart = await cartService.get(cartItemIds)
+        const serverCart = await cartService.get()
         if (!cancelled) {
           setCart(serverCart)
-          setHasLoaded(true)
+          setLoadedUserId(userId)
         }
       } catch {
         toast.error("Không thể tải giỏ hàng. Vui lòng thử lại.")
@@ -81,28 +85,30 @@ export function useCart(userId?: string, enabled = true, cartItemIds?: string[])
 
     void sync()
     return () => { cancelled = true }
-  }, [userId, enabled, cartItemIds])
+  }, [userId, enabled])
 
   const add = useCallback(async (voucher: Voucher): Promise<CartItem | undefined> => {
-    let accepted = true
     if (!userId) {
-      setCart((prev) => {
-      const existing = prev.find((item) => item.voucher.id === voucher.id)
+      if (!isVoucherAvailable(voucher)) {
+        toast.error("Voucher hiện không khả dụng")
+        return undefined
+      }
+      const existing = cartRef.current.find((item) => item.voucher.id === voucher.id)
       const nextQty = (existing?.qty ?? 0) + 1
       const available = voucher.quantity - voucher.sold
       if (nextQty > available) {
-        accepted = false
         toast.error("Số lượng yêu cầu vượt quá số lượng voucher còn lại trong kho")
-        return prev
+        return undefined
       }
-      return existing
-        ? prev.map((item) => item.voucher.id === voucher.id ? { ...item, qty: nextQty } : item)
-        : [...prev, { voucher, qty: 1 }]
-      })
-      return undefined
+      const item = { voucher, qty: nextQty }
+      const nextCart = existing
+        ? cartRef.current.map((entry) => entry.voucher.id === voucher.id ? item : entry)
+        : [...cartRef.current, item]
+      cartRef.current = nextCart
+      setCart(nextCart)
+      return item
     }
 
-    if (!accepted) return undefined
     try {
       const serverItem = await cartService.add(voucher.id)
       const item = {

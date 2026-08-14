@@ -5,11 +5,13 @@ import { AppIcon } from "@/components/AppIcon"
 import type { Voucher } from "@/types"
 import { voucherService } from "@/services/voucherService"
 import { LoadingState } from "@/components/LoadingState"
+import { isVoucherAvailable } from "@/hooks/useCart"
 
 interface Props {
   onDetail: (v: Voucher) => void
   onLogin: () => void
   onAddToCart: (v: Voucher) => void
+  onBuyNow: (v: Voucher) => void
 }
 
 const SORT_OPTIONS = [
@@ -21,7 +23,7 @@ const SORT_OPTIONS = [
   { value: "rating", label: "Đánh giá cao" },
 ]
 
-export function GuestVoucherListPage({ onDetail, onLogin, onAddToCart }: Props) {
+export function GuestVoucherListPage({ onDetail, onLogin, onAddToCart, onBuyNow }: Props) {
   const [search, setSearch] = useState("")
   const [category, setCategory] = useState("all")
   const [sort, setSort] = useState("newest")
@@ -220,7 +222,7 @@ export function GuestVoucherListPage({ onDetail, onLogin, onAddToCart }: Props) 
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {paged.map((v) => (
-            <VoucherCard key={v.id} voucher={v} onDetail={onDetail} onLogin={onLogin} onAddToCart={onAddToCart} />
+            <VoucherCard key={v.id} voucher={v} onDetail={onDetail} onAddToCart={onAddToCart} onBuyNow={onBuyNow} />
           ))}
         </div>
       )}
@@ -247,9 +249,10 @@ export function GuestVoucherListPage({ onDetail, onLogin, onAddToCart }: Props) 
   )
 }
 
-function VoucherCard({ voucher: v, onDetail, onLogin, onAddToCart }: { voucher: Voucher; onDetail: (v: Voucher) => void; onLogin: () => void; onAddToCart: (v: Voucher) => void }) {
+function VoucherCard({ voucher: v, onDetail, onAddToCart, onBuyNow }: { voucher: Voucher; onDetail: (v: Voucher) => void; onAddToCart: (v: Voucher) => void; onBuyNow: (v: Voucher) => void }) {
   const pct = Math.round(((v.originalPrice - v.price) / v.originalPrice) * 100)
   const remaining = v.quantity - v.sold
+  const isAvailable = isVoucherAvailable(v)
   return (
     <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-black/5 hover:shadow-md transition-shadow cursor-pointer group" onClick={() => onDetail(v)}>
       <div className="relative h-44 overflow-hidden">
@@ -274,18 +277,27 @@ function VoucherCard({ voucher: v, onDetail, onLogin, onAddToCart }: { voucher: 
             <span>Còn: {remaining}</span>
           </div>
         </div>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-1 text-xs" style={{ color: "#6B7280" }}>
             <Star className="w-3 h-3 fill-current" style={{ color: C.apricot }} /> {v.rating}
           </div>
+        </div>
+        {isAvailable ? <div className="grid grid-cols-2 gap-2">
           <button
             onClick={(e) => { e.stopPropagation(); onAddToCart(v) }}
-            className="text-xs font-bold px-3 py-1.5 rounded-lg text-white"
-            style={{ backgroundColor: C.peach }}
+            className="rounded-lg border px-2 py-1.5 text-xs font-bold"
+            style={{ borderColor: C.peach, color: C.peach }}
           >
             + Giỏ hàng
           </button>
-        </div>
+          <button
+            onClick={(e) => { e.stopPropagation(); onBuyNow(v) }}
+            className="rounded-lg px-2 py-1.5 text-xs font-bold text-white"
+            style={{ backgroundColor: C.peach }}
+          >
+            Mua ngay
+          </button>
+        </div> : <div className="rounded-lg bg-gray-100 px-3 py-2 text-center text-xs font-bold text-gray-500">Không khả dụng</div>}
       </div>
     </div>
   )

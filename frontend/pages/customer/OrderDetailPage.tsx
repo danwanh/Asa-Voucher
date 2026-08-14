@@ -1,15 +1,16 @@
 import { useState } from "react"
+import Link from "next/link"
 import { ArrowLeft, Copy, CheckCircle2, Download, Star, MessageSquare, CreditCard } from "lucide-react"
 import { C, fmt, fmtDate } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
-import type { Order, OrderStatus } from "@/types"
+import type { IssuedVoucher, Order, OrderStatus } from "@/types"
 import { MockQR } from "@/components/MockQR"
 
 interface Props {
   order: Order
   onBack: () => void
-  onReview: (order: Order) => void
-  onComplaint?: (order: Order) => void
+  onReview: (order: Order, issuedVoucher?: IssuedVoucher) => void
+  onComplaint?: (order: Order, issuedVoucher?: IssuedVoucher) => void
   onPayAgain?: (order: Order) => void
   currentUserId?: string
 }
@@ -39,6 +40,9 @@ export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAga
   const voucherReceiveDone = issuedVouchers.length > 0 && !isRefunded
   const displayedVouchers = order.status === "cancelled" ? [] : issuedVouchers
   const successfulPayment = order.payments?.find((payment) => payment.status === "success" || payment.status === "refunded")
+  const canGiveFeedback = (!order.isGift || order.recipientId === currentUserId) && order.recipientId === currentUserId
+  const canCreateFeedback = order.status === "confirmed" || order.status === "completed"
+  const isGiftSender = Boolean(order.isGift && order.recipientId !== currentUserId)
 
   const copy = () => {
     navigator.clipboard.writeText(displayedVouchers[0]?.code ?? order.orderCode ?? order.id).catch(() => {})
@@ -113,11 +117,11 @@ export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAga
           {(order.items ?? []).map((item) => (
             <div key={item.id} className="rounded-2xl border p-4" style={{ borderColor: "#F0EDD8" }}>
               <div className="flex items-start gap-4">
-                <div className="w-20 h-16 rounded-xl flex-shrink-0 flex items-center justify-center" style={{ backgroundColor: C.eggshell }}>
+                <Link href={`/vouchers/${item.voucherId}`} className="w-20 h-16 rounded-xl flex-shrink-0 flex items-center justify-center" style={{ backgroundColor: C.eggshell }} aria-label={`Xem ${item.voucherTitle ?? "voucher"}`}>
                   <AppIcon name="gift" className="w-6 h-6" />
-                </div>
+                </Link>
                 <div className="flex-1 min-w-0">
-                  <div className="font-bold text-sm mb-1" style={{ color: C.indigo }}>{item.voucherTitle}</div>
+                  <Link href={`/vouchers/${item.voucherId}`} className="block font-bold text-sm mb-1 hover:underline" style={{ color: C.indigo }}>{item.voucherTitle}</Link>
                   <div className="text-xs mb-2" style={{ color: "#6B7280" }}>{item.partnerName}</div>
                   <div className="flex flex-wrap gap-3 text-sm">
                     <span className="font-semibold" style={{ color: C.indigo }}>SL: {item.quantity}</span>
@@ -137,8 +141,18 @@ export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAga
                           <div className="font-black tracking-widest text-base break-all" style={{ color: C.indigo, fontFamily: "'Inter', monospace" }}>{voucher.code}</div>
                           <div className="mt-1 text-xs" style={{ color: "#6B7280" }}>
                             Trạng thái: {issuedVoucherStatusLabel(voucher.status)}
-                            {voucher.expiredDate ? ` • Hết hạn: ${fmtDate(voucher.expiredDate)}` : ""}
+                           {voucher.expiredDate ? ` • Hết hạn: ${fmtDate(voucher.expiredDate)}` : ""}
                           </div>
+                          {canGiveFeedback && (canCreateFeedback || voucher.status === "used") && (
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <button onClick={() => onReview(order, voucher)} className="rounded-lg border px-3 py-1.5 text-xs font-bold" style={{ borderColor: C.apricot, color: "#D97706" }}>
+                                <Star className="mr-1 inline h-3 w-3" /> {voucher.review ? "Xem đánh giá" : "Đánh giá"}
+                              </button>
+                              {onComplaint && <button onClick={() => onComplaint(order, voucher)} className="rounded-lg border px-3 py-1.5 text-xs font-bold" style={{ borderColor: "#93C5FD", color: "#2563EB" }}>
+                                <MessageSquare className="mr-1 inline h-3 w-3" /> {voucher.complaint ? "Xem khiếu nại" : "Khiếu nại"}
+                              </button>}
+                            </div>
+                          )}
                         </div>
 
                         <div className="flex items-center gap-3">
@@ -149,7 +163,7 @@ export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAga
                   ))
                 ) : (
                   <div className="text-sm font-semibold" style={{ color: "#8A8DA8" }}>
-                    {hasPaid ? "Mã voucher đang được phát hành." : "Chưa phát hành mã voucher vì đơn chưa thanh toán."}
+                    {isGiftSender ? "Mã voucher được bảo mật và đã gửi cho người nhận." : hasPaid ? "Mã voucher đang được phát hành." : "Chưa phát hành mã voucher vì đơn chưa thanh toán."}
                   </div>
                 )}
               </div>
@@ -204,16 +218,7 @@ export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAga
             <CreditCard className="w-4 h-4" /> Thanh toán lại
           </button>
         )}
-        {(order.status === "confirmed" || order.status === "completed") && (
-          <button
-            onClick={() => onReview(order)}
-            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm border-2"
-            style={{ borderColor: C.apricot, color: C.indigo }}
-          >
-            <Star className="w-4 h-4" style={{ color: C.apricot }} /> Đánh giá
-          </button>
-        )}
-        {onComplaint && (order.complaints?.[0] || order.status === "confirmed" || order.status === "completed") && (
+        {onComplaint && canGiveFeedback && (order.complaints?.[0] || canCreateFeedback) && (
           <button onClick={() => onComplaint(order)} className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm border-2" style={{ borderColor: "#93C5FD", color: "#2563EB" }}>
             <MessageSquare className="w-4 h-4" /> {order.complaints?.[0] ? "Xem khiếu nại đơn hàng" : "Khiếu nại đơn hàng"}
           </button>

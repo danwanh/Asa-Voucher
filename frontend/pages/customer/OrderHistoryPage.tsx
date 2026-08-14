@@ -1,19 +1,20 @@
 import { useEffect, useRef, useState } from "react"
+import Link from "next/link"
 import { Search, Star, CreditCard, MessageSquare, ChevronLeft, ChevronRight } from "lucide-react"
 import { C, fmt, fmtDate } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import type { OrderStatusCounts } from "@/services/orderService"
-import type { Order, OrderStatus } from "@/types"
+import type { OrderListItem, OrderStatus } from "@/types"
 import { LoadingState } from "@/components/LoadingState"
 
 interface Props {
-  orders: Order[]
+  orders: OrderListItem[]
   countsByStatus?: OrderStatusCounts
   pendingOrderId?: string
-  onDetail?: (o: Order) => void
-  onReview?: (o: Order, existing?: { rating: number; content: string }) => void
-  onComplaint?: (o: Order) => void
-  onPayAgain?: (o: Order) => void
+  onDetail?: (o: OrderListItem) => void
+  onReview?: (o: OrderListItem) => void
+  onComplaint?: (o: OrderListItem) => void
+  onPayAgain?: (o: OrderListItem) => void
   page?: number
   totalPages?: number
   onPageChange?: (page: number) => void
@@ -22,7 +23,7 @@ interface Props {
   currentUserId?: string
 }
 
-const ORDER_TABS: { label: string; value: Order["status"] | "all" }[] = [
+const ORDER_TABS: { label: string; value: OrderListItem["status"] | "all" }[] = [
   { label: "Tất cả", value: "all" },
   { label: "Chờ thanh toán", value: "pending_payment" },
   { label: "Thanh toán thất bại", value: "payment_failed" },
@@ -41,14 +42,14 @@ function orderStatusLabel(status: OrderStatus) {
   return "Đã hoàn tiền cho khách"
 }
 
-function itemSummary(order: Order) {
-  const items = order.items ?? []
+function itemSummary(order: OrderListItem) {
+  const items = order.items
   if (items.length === 0) return order.voucherTitle
   return items.map((item) => `${item.voucherTitle ?? order.voucherTitle} ×${item.quantity}`).join(" · ")
 }
 
 export function OrderHistoryPage({ orders, countsByStatus, onDetail, onReview, onComplaint, onPayAgain, page = 1, totalPages = 1, onPageChange, onFilterChange, loading = false, currentUserId }: Props) {
-  const [tab, setTab] = useState<Order["status"] | "all">("all")
+  const [tab, setTab] = useState<OrderListItem["status"] | "all">("all")
   const [search, setSearch] = useState("")
   const searchTimer = useRef<ReturnType<typeof setTimeout>>()
 
@@ -121,11 +122,13 @@ export function OrderHistoryPage({ orders, countsByStatus, onDetail, onReview, o
         {loading ? (
           <LoadingState label="Đang tải danh sách đơn hàng..." variant="section" />
         ) : orders.map((order) => {
-          const totalQuantity = order.items?.reduce((sum, item) => sum + item.quantity, 0) ?? 1
-          const issuedCount = order.items?.flatMap((item) => item.issuedVouchers ?? []).length ?? 0
+          const totalQuantity = order.items.reduce((sum, item) => sum + item.quantity, 0) || 1
+          const issuedCount = order.items.reduce((sum, item) => sum + item.issuedCount, 0)
           const hasIssuedCodes = issuedCount > 0
           const isRefunded = order.status === "refunded"
-          const canReview = order.status === "confirmed" || order.status === "completed"
+          const canGiveFeedback = !order.isGift || order.recipientId === currentUserId
+          const canReview = canGiveFeedback && (order.status === "confirmed" || order.status === "completed")
+          const hasReview = order.items.some((item) => item.hasReview)
           const canPayAgain = order.userId === currentUserId && (order.status === "pending_payment" || order.status === "payment_failed") && (!order.paymentExpiresAt || new Date(order.paymentExpiresAt).getTime() > Date.now())
           const voucherSummary = itemSummary(order)
 
@@ -150,10 +153,15 @@ export function OrderHistoryPage({ orders, countsByStatus, onDetail, onReview, o
 
               <div className="px-4 py-3 flex flex-wrap gap-4 items-start">
                 <div className="flex-1 min-w-0">
-                  <p className="font-bold text-sm" style={{ color: C.indigo }}>{order.voucherTitle}</p>
+                  <Link href={`/vouchers/${order.voucherId}`} className="font-bold text-sm hover:underline" style={{ color: C.indigo }}>{order.voucherTitle}</Link>
                   <p className="text-xs mt-0.5" style={{ color: "#8A8DA8" }}>{order.partnerName}</p>
-                  <p className="text-xs mt-1" style={{ color: "#8A8DA8" }}>{voucherSummary}</p>
+                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs" style={{ color: "#8A8DA8" }}>
+                    {order.items.length > 0
+                      ? order.items.map((item) => <Link key={item.voucherId} href={`/vouchers/${item.voucherId}`} className="hover:underline">{item.voucherTitle} ×{item.quantity}</Link>)
+                      : voucherSummary}
+                  </div>
                   <p className="text-xs mt-1 font-semibold" style={{ color: "#8A8DA8" }}>{totalQuantity} voucher</p>
+                  {order.isGift && <p className="mt-1 text-xs font-bold" style={{ color: C.teal }}>{order.recipientId === currentUserId ? "Bạn là người nhận quà" : "Đơn quà tặng đã gửi"}</p>}
                   <div className="mt-2 text-xs font-semibold" style={{ color: hasIssuedCodes ? (isRefunded ? "#DC2626" : C.teal) : "#8A8DA8" }}>
                     {hasIssuedCodes
                       ? isRefunded
@@ -184,16 +192,16 @@ export function OrderHistoryPage({ orders, countsByStatus, onDetail, onReview, o
                     style={{ backgroundColor: C.apricot + "20", color: "#D97706" }}
                   >
                     <Star className="w-3 h-3" />
-                    Đánh giá
+                    {hasReview ? "Xem đánh giá" : "Đánh giá"}
                   </button>
                 )}
-                {onComplaint && (order.complaints?.[0] || order.status === "confirmed" || order.status === "completed") && (
+                {onComplaint && canGiveFeedback && (order.hasComplaint || order.status === "confirmed" || order.status === "completed") && (
                   <button
                     onClick={() => onComplaint(order)}
                     className="text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors"
-                    style={{ backgroundColor: order.complaints?.[0] ? "#DBEAFE" : "#EFF6FF", color: "#2563EB" }}
+                    style={{ backgroundColor: order.hasComplaint ? "#DBEAFE" : "#EFF6FF", color: "#2563EB" }}
                   >
-                    <MessageSquare className="w-3 h-3" /> {order.complaints?.[0] ? "Xem khiếu nại đơn" : "Khiếu nại đơn"}
+                    <MessageSquare className="w-3 h-3" /> {order.hasComplaint ? "Xem khiếu nại đơn" : "Khiếu nại đơn"}
                   </button>
                 )}
                 {canPayAgain && onPayAgain && (

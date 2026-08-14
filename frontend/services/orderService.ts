@@ -1,5 +1,6 @@
 import { api } from "./api"
-import type { Complaint, IssuedVoucher, Order, OrderItem, Payment, Review } from "@/types"
+import type { Complaint, IssuedVoucher, Order, OrderItem, OrderListItem, Payment, Review } from "@/types"
+import { useAuthStore } from "@/stores/authStore"
 
 type BackendRecord = Record<string, any>
 
@@ -132,8 +133,42 @@ export function mapOrder(value: BackendRecord): Order {
   }
 }
 
+function mapOrderListItem(value: BackendRecord): OrderListItem {
+  const items = (value.order_items ?? []).map((item: BackendRecord) => ({
+    voucherId: String(item.voucher_product_id),
+    quantity: num(item.quantity),
+    voucherTitle: String(item.voucher_products?.name ?? "Voucher"),
+    partnerName: String(item.voucher_products?.partners?.business_name ?? ""),
+    issuedCount: num(item.issued_voucher_count ?? item._count?.issued_vouchers),
+    hasReview: Boolean(item.has_review),
+  }))
+  const first = items[0]
+  const partnerNames = [...new Set<string>(items.map((item: { partnerName: string }) => item.partnerName).filter(Boolean))]
+
+  return {
+    id: String(value.id),
+    userId: String(value.user_id),
+    userName: value.users?.full_name,
+    orderCode: String(value.order_code ?? value.id),
+    code: String(value.order_code ?? value.id),
+    voucherId: first?.voucherId ?? "",
+    voucherTitle: first?.voucherTitle ?? "Đơn hàng voucher",
+    partnerName: partnerNames.join(", "),
+    amount: num(value.total_amount),
+    status: value.status,
+    paymentStatus: value.payment_status ?? "pending",
+    paymentMethod: String(value.payment_method ?? ""),
+    createdAt: value.created_at,
+    recipientId: value.recipient_id,
+    isGift: Boolean(value.is_gift),
+    paymentExpiresAt: value.payment_expires_at,
+    hasComplaint: Boolean(value.has_complaint),
+    items,
+  }
+}
+
 export type OrderListPage = {
-  items: Order[]
+  items: OrderListItem[]
   page: number
   limit: number
   total: number
@@ -143,15 +178,19 @@ export type OrderListPage = {
 
 export type OrderStatusCounts = Partial<Record<Order["status"] | "all", number>>
 
+const orderDetailRequests = new Map<string, Promise<Order>>()
+const orderListRequests = new Map<string, Promise<OrderListPage>>()
+
 export const orderService = {
   async lookupRecipient(identifier: string) {
     const response = await api.get("/users/recipient-lookup", { params: { identifier } })
     return data<BackendRecord>(response)
   },
 
-  async createFromCart(input: { cartItemIds?: string[]; recipientIdentifier: string; isGift: boolean; note?: string; paymentMethod?: "vnpay" | "paypal"; expectedPrices?: Record<string, number> }) {
+  async createFromCart(input: { cartItemIds?: string[]; items?: Array<{ voucherId: string; quantity: number }>; recipientIdentifier: string; isGift: boolean; note?: string; paymentMethod?: "vnpay" | "paypal"; expectedPrices?: Record<string, number> }) {
     const response = await api.post("/orders", {
       cart_item_ids: input.cartItemIds,
+      items: input.items?.map((item) => ({ voucher_product_id: item.voucherId, quantity: item.quantity })),
       recipient_identifier: input.recipientIdentifier,
       is_gift: input.isGift,
       expected_prices: input.expectedPrices,
@@ -162,16 +201,26 @@ export const orderService = {
   },
 
   async list(params?: { status?: string; search?: string; page?: number; limit?: number }): Promise<OrderListPage> {
-    const response = await api.get("/orders", { params: { ...params, page: params?.page ?? 1, limit: params?.limit ?? 20 } })
-    const result = data<{ items: BackendRecord[]; pagination: { page: number; limit: number; total: number; total_pages: number }; countsByStatus?: OrderStatusCounts }>(response)
-    return {
-      items: result.items.map(mapOrder),
-      page: result.pagination.page,
-      limit: result.pagination.limit,
-      total: result.pagination.total,
-      totalPages: result.pagination.total_pages,
-      countsByStatus: result.countsByStatus ?? { all: result.pagination.total },
-    }
+    const requestParams = { ...params, page: params?.page ?? 1, limit: params?.limit ?? 20 }
+    const key = `${useAuthStore.getState().user?.id ?? "anonymous"}:${JSON.stringify(requestParams)}`
+    const existing = orderListRequests.get(key)
+    if (existing) return existing
+
+    const request = api.get("/orders", { params: requestParams }).then((response) => {
+      const result = data<{ items: BackendRecord[]; pagination: { page: number; limit: number; total: number; total_pages: number }; countsByStatus?: OrderStatusCounts }>(response)
+      return {
+        items: result.items.map(mapOrderListItem),
+        page: result.pagination.page,
+        limit: result.pagination.limit,
+        total: result.pagination.total,
+        totalPages: result.pagination.total_pages,
+        countsByStatus: result.countsByStatus ?? { all: result.pagination.total },
+      }
+    }).finally(() => {
+      if (orderListRequests.get(key) === request) orderListRequests.delete(key)
+    })
+    orderListRequests.set(key, request)
+    return request
   },
 
   async listOrders(params?: { status?: string; search?: string }) {
@@ -179,8 +228,17 @@ export const orderService = {
   },
 
   async get(id: string) {
-    const response = await api.get(`/orders/${id}`)
-    return mapOrder(data<BackendRecord>(response))
+    const key = `${useAuthStore.getState().user?.id ?? "anonymous"}:${id}`
+    const existing = orderDetailRequests.get(key)
+    if (existing) return existing
+
+    const request = api.get(`/orders/${id}`)
+      .then((response) => mapOrder(data<BackendRecord>(response)))
+      .finally(() => {
+        if (orderDetailRequests.get(key) === request) orderDetailRequests.delete(key)
+      })
+    orderDetailRequests.set(key, request)
+    return request
   },
 
   async getOrder(id: string) {

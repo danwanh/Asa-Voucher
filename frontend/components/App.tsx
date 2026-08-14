@@ -42,8 +42,8 @@ export default function App({ initialPage, initialOrderId, initialVoucherId, ini
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
   const {
-    cart, add, remove, update, clear, removeMany, total, count, cartCount, cartCountLoading, isLoading: cartLoading,
-    checkoutSelectionIds, checkoutItems, setCheckoutSelection, clearCheckoutSelection,
+    cart, add, remove, update, clear, removeMany, total, count, cartCount, cartCountLoading, isLoading: cartLoading, hasLoaded: cartHasLoaded,
+    checkoutDraft, checkoutCartItemIds, checkoutItems, setCartCheckout, setDirectCheckout, clearCheckoutDraft,
   } = useCartContext()
 
   useEffect(() => {
@@ -51,15 +51,31 @@ export default function App({ initialPage, initialOrderId, initialVoucherId, ini
   }, [initialize])
 
   useEffect(() => {
-    if (!pendingCheckout || !user || cartLoading) return
-    const cartItemIds = cart.map((item) => item.cartItemId).filter((id): id is string => Boolean(id))
-    if (cartItemIds.length > 0) setCheckoutSelection(cartItemIds)
-  }, [pendingCheckout, user, cartLoading, cart, setCheckoutSelection])
+    if (!pendingCheckout || !user || !checkoutDraft) return
+    if (user.role !== "buyer") {
+      toast.error("Chỉ tài khoản khách hàng có thể đặt voucher.")
+      setPendingCheckout(false)
+      clearCheckoutDraft()
+      return
+    }
+    if (checkoutDraft.kind === "cart" && (cartLoading || !cartHasLoaded)) return
+    const hasCompleteCartSelection = checkoutDraft.kind !== "cart"
+      || (checkoutItems.length === checkoutDraft.voucherIds.length && checkoutItems.every((item) => item.cartItemId))
+    if (checkoutItems.length === 0 || !hasCompleteCartSelection) {
+      toast.error("Không thể chuẩn bị sản phẩm đã chọn. Vui lòng kiểm tra lại giỏ hàng.")
+      setPendingCheckout(false)
+      return
+    }
+    setPendingCheckout(false)
+    router.push("/checkout/create-order")
+  }, [pendingCheckout, user, checkoutDraft, checkoutItems, cartLoading, cartHasLoaded, router, clearCheckoutDraft])
 
   const handleRequestLogin = () => router.push("/login")
   const handleRequestRegister = () => router.push("/signup")
 
-  const handleCheckoutAsGuest = (_items?: CartItem[]) => {
+  const handleCheckoutAsGuest = (items: CartItem[], kind: "cart" | "direct" = "cart") => {
+    if (kind === "direct") setDirectCheckout(items[0].voucher)
+    else setCartCheckout(items)
     setPendingCheckout(true)
     setShowLogin(true)
   }
@@ -71,6 +87,7 @@ export default function App({ initialPage, initialOrderId, initialVoucherId, ini
   const handleLoginBack = () => {
     setShowLogin(false)
     setPendingCheckout(false)
+    clearCheckoutDraft()
   }
 
   const handleLogout = () => setShowLogoutConfirm(true)
@@ -80,7 +97,7 @@ export default function App({ initialPage, initialOrderId, initialVoucherId, ini
     try {
       await logout()
       clear()
-      clearCheckoutSelection()
+      clearCheckoutDraft()
     } catch {
       toast.error("Đăng xuất thất bại. Vui lòng thử lại.")
     }
@@ -135,11 +152,13 @@ export default function App({ initialPage, initialOrderId, initialVoucherId, ini
       update={update}
        removeMany={removeMany}
        cartLoading={cartLoading}
-       checkoutSelectionIds={checkoutSelectionIds}
+       checkoutDraft={checkoutDraft}
+       checkoutCartItemIds={checkoutCartItemIds}
        checkoutItems={checkoutItems}
-       setCheckoutSelection={setCheckoutSelection}
-       clearCheckoutSelection={clearCheckoutSelection}
-      initialPage={pendingCheckout ? "create-order" : initialPage}
+       setCartCheckout={setCartCheckout}
+       setDirectCheckout={setDirectCheckout}
+       clearCheckoutDraft={clearCheckoutDraft}
+      initialPage={initialPage}
        initialOrderId={initialOrderId}
        initialVoucherId={initialVoucherId}
       initialPaymentStatus={initialPaymentStatus}

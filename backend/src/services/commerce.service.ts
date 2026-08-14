@@ -348,7 +348,10 @@ function buildOrderListWhere(user: CurrentUser, query?: { status?: string; searc
         { order_code: { contains: query.search, mode: "insensitive" } },
         { users: { full_name: { contains: query.search, mode: "insensitive" } } },
         { users: { email: { contains: query.search, mode: "insensitive" } } },
-        { order_items: { some: { voucher_products: { name: { contains: query.search, mode: "insensitive" } } } } },
+        { order_items: { some: { voucher_products: {
+          ...(isPartnerStaff(user.role) && user.partnerId ? { partner_id: user.partnerId } : {}),
+          name: { contains: query.search, mode: "insensitive" },
+        } } } },
       ],
     });
   }
@@ -385,28 +388,34 @@ export async function listOrders(
     select: {
       id: true,
       user_id: true,
-      order_code: true,
       recipient_id: true,
+      is_gift: true,
+      order_code: true,
+      subtotal: true,
+      discount_amount: true,
       total_amount: true,
       status: true,
       payment_method: true,
       payment_expires_at: true,
-      is_gift: true,
       created_at: true,
-      updated_at: true,
       users: { select: { full_name: true } },
+      complaints: {
+        where: user.role === "buyer" ? { user_id: user.id, issued_voucher_id: null } : { issued_voucher_id: null },
+        select: { id: true },
+        take: 1,
+      },
+      payments: { select: { status: true } },
       order_items: {
+        where: isPartnerStaff(user.role) && user.partnerId ? { voucher_products: { partner_id: user.partnerId } } : undefined,
         select: {
-          id: true,
           voucher_product_id: true,
           quantity: true,
-          unit_price: true,
           subtotal: true,
-          voucher_products: { select: { id: true, name: true, partner_id: true, partners: { select: { business_name: true } } } },
-          issued_vouchers: { select: { id: true, voucher_code: true, qr_code_payload: true, status: true, expired_date: true } },
+          voucher_products: { select: { name: true, partners: { select: { business_name: true } } } },
+          _count: { select: { issued_vouchers: true } },
+          issued_vouchers: { select: { reviews: { select: { id: true } } } },
         },
       },
-      payments: true,
     },
     orderBy: { created_at: "desc" }
     , skip, take: limit }),
@@ -414,20 +423,29 @@ export async function listOrders(
     prisma.order.groupBy({ by: ["status"], where: countsWhere, orderBy: { status: "asc" }, _count: { _all: true } }),
   ]);
 
-  const items = data
-    .filter((order: Record<string, unknown> & { payments?: PaymentRecord[] }) => {
-      try {
-        assertOrderAccess(user, order as unknown as Record<string, unknown>);
-        return true;
-      } catch {
-        return false;
-      }
-    })
-    .map((order: Record<string, unknown> & { payments?: PaymentRecord[] }) => ({
-      ...order,
+  const items = data.map((order) => {
+    const { complaints, order_items, payments } = order;
+    const summary = { ...order } as Record<string, unknown>;
+    delete summary.complaints;
+    delete summary.order_items;
+    delete summary.payments;
+    delete summary.subtotal;
+    delete summary.discount_amount;
+    return {
+      ...summary,
       status: normalizeOrderStatus(order.status),
-      payment_status: derivePaymentStatus(order.payments as PaymentRecord[])
-    }));
+      payment_status: derivePaymentStatus((payments ?? []) as PaymentRecord[]),
+      total_amount: isPartnerStaff(user.role)
+        ? order_items.reduce((sum, item) => sum + Number(item.subtotal), 0)
+        : summary.total_amount,
+      has_complaint: !isPartnerStaff(user.role) && (complaints ?? []).length > 0,
+      order_items: order_items.map(({ issued_vouchers, _count, subtotal: _subtotal, ...item }) => ({
+        ...item,
+        issued_voucher_count: _count.issued_vouchers,
+        has_review: (issued_vouchers ?? []).some((voucher) => Boolean(voucher.reviews)),
+      })),
+    };
+  });
 
   return {
     ...buildPaginatedResult(items, total, { page, limit }),
@@ -435,11 +453,67 @@ export async function listOrders(
   };
 }
 
+function toSafePayment(payment: Record<string, unknown>) {
+  return {
+    id: payment.id,
+    order_id: payment.order_id,
+    method: payment.method,
+    amount: payment.amount,
+    status: payment.status,
+    paid_at: payment.paid_at,
+    refunded_at: payment.refunded_at,
+    created_at: payment.created_at,
+  };
+}
+
+function toPartnerPayment(payment: Record<string, unknown>) {
+  return {
+    id: payment.id,
+    order_id: payment.order_id,
+    method: payment.method,
+    status: payment.status,
+    paid_at: payment.paid_at,
+    refunded_at: payment.refunded_at,
+    created_at: payment.created_at,
+  };
+}
+
 export async function getOrderById(user: CurrentUser, id: string): Promise<Record<string, unknown>> {
   const order = await getOrder(id);
   assertOrderAccess(user, order);
-  return {
+  const isBuyer = user.role === "buyer";
+  const ownsIssuedVouchers = order.recipient_id ? order.recipient_id === user.id : order.user_id === user.id;
+  const safePayments = ((order.payments as Array<Record<string, unknown>> | undefined) ?? []).map(toSafePayment);
+  const buyerOrder = {
     ...order,
+    payments: safePayments,
+    complaints: ((order.complaints as Array<Record<string, unknown>> | undefined) ?? [])
+      .filter((complaint) => complaint.user_id === user.id),
+    order_items: ((order.order_items as Array<Record<string, unknown>> | undefined) ?? []).map((item) => ({
+      ...item,
+      issued_vouchers: ownsIssuedVouchers
+        ? ((item.issued_vouchers as Array<Record<string, unknown>> | undefined) ?? []).map((voucher) => ({
+            ...voucher,
+            complaints: ((voucher.complaints as Array<Record<string, unknown>> | undefined) ?? [])
+              .filter((complaint) => complaint.user_id === user.id),
+          }))
+        : [],
+    })),
+  };
+  const partnerItems = ((order.order_items as Array<Record<string, unknown>> | undefined) ?? [])
+    .filter((item) => (item.voucher_products as Record<string, unknown> | undefined)?.partner_id === user.partnerId);
+  const partnerOrder = {
+    ...order,
+    subtotal: partnerItems.reduce((sum, item) => sum + Number(item.subtotal ?? 0), 0),
+    discount_amount: 0,
+    total_amount: partnerItems.reduce((sum, item) => sum + Number(item.subtotal ?? 0), 0),
+    order_items: partnerItems,
+    complaints: [],
+    payments: ((order.payments as Array<Record<string, unknown>> | undefined) ?? []).map(toPartnerPayment),
+  };
+  const visibleOrder = isBuyer ? buyerOrder : isPartnerStaff(user.role) ? partnerOrder : order;
+  return {
+    ...visibleOrder,
     status: normalizeOrderStatus(order.status),
     payment_status: derivePaymentStatus(order.payments as PaymentRecord[]),
   };
@@ -680,8 +754,7 @@ export async function refundOrder(user: CurrentUser, id: string, note?: string) 
 }
 
 export async function listOrderItems(user: CurrentUser, orderId: string) {
-  const order = await getOrder(orderId);
-  assertOrderAccess(user, order);
+  const order = await getOrderById(user, orderId);
   return order.order_items ?? [];
 }
 
@@ -690,14 +763,33 @@ export async function getOrderItem(user: CurrentUser, id: string) {
     where: { id },
     include: { orders: { include: { order_items: { include: { voucher_products: { select: { id: true, name: true, partner_id: true, partners: { select: { business_name: true } } } } } } } } }
   }) as unknown as Record<string, unknown> | null, "Order item not found");
-  assertOrderAccess(user, item.orders as Record<string, unknown>);
+  const order = item.orders as Record<string, unknown>;
+  assertOrderAccess(user, order);
+  if (isPartnerStaff(user.role)) {
+    const orderItems = (order.order_items as Array<Record<string, unknown>> | undefined) ?? [];
+    const targetItem = orderItems.find((orderItem) => orderItem.id === item.id);
+    if ((targetItem?.voucher_products as Record<string, unknown> | undefined)?.partner_id !== user.partnerId) {
+      throw new HttpError(403, "Insufficient permissions", "FORBIDDEN");
+    }
+    const partnerOrderItems = orderItems.filter((orderItem) => (orderItem.voucher_products as Record<string, unknown> | undefined)?.partner_id === user.partnerId);
+    const partnerTotal = partnerOrderItems.reduce((sum, orderItem) => sum + Number(orderItem.subtotal ?? 0), 0);
+    return {
+      ...item,
+      orders: {
+        ...order,
+        subtotal: partnerTotal,
+        discount_amount: 0,
+        total_amount: partnerTotal,
+        order_items: partnerOrderItems,
+      },
+    };
+  }
   return item;
 }
 
 export async function listPayments(user: CurrentUser, orderId: string) {
-  const order = await getOrder(orderId);
-  assertOrderAccess(user, order);
-  return prisma.payment.findMany({ where: { order_id: orderId }, orderBy: { created_at: "desc" } });
+  const order = await getOrderById(user, orderId);
+  return order.payments ?? [];
 }
 
 export async function createPayment(
@@ -1039,7 +1131,9 @@ async function getPayment(id: string) {
 export async function getPaymentById(user: CurrentUser, id: string) {
   const payment = await getPayment(id);
   assertOrderAccess(user, payment.orders as Record<string, unknown>);
-  return payment;
+  if (isAdmin(user)) return payment;
+  if (isPartnerStaff(user.role)) return toPartnerPayment(payment);
+  return toSafePayment(payment);
 }
 
 export async function simulatePaymentSuccess(user: CurrentUser, id: string) {

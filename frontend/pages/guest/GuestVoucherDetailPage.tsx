@@ -5,6 +5,7 @@ import { AppIcon } from "@/components/AppIcon"
 import type { Voucher } from "@/types"
 import { voucherService, type VoucherApplicableBranch, type VoucherDetailData, type VoucherPublicReview } from "@/services/voucherService"
 import { LoadingState } from "@/components/LoadingState"
+import { isVoucherAvailable } from "@/hooks/useCart"
 
 interface Props {
   voucher: Voucher
@@ -152,7 +153,7 @@ export function GuestVoucherDetailPage({ voucher: v, detail, onBack, onLogin, on
           </div>
 
           {/* Action buttons */}
-          <div className="flex flex-col gap-2 mb-2">
+          {isVoucherAvailable(detailVoucher) ? <div className="flex flex-col gap-2 mb-2">
             <button
               onClick={() => onBuyNow(detailVoucher)}
               className="w-full py-3.5 rounded-2xl font-black text-white text-sm hover:opacity-90 transition-opacity"
@@ -176,7 +177,7 @@ export function GuestVoucherDetailPage({ voucher: v, detail, onBack, onLogin, on
                 <Heart className="w-5 h-5" fill={liked ? "#EF4444" : "none"} style={{ color: liked ? "#EF4444" : "#9CA3AF" }} />
               </button>
             </div>
-          </div>
+          </div> : <div className="mb-2 w-full rounded-2xl py-4 text-center text-sm font-bold" style={{ backgroundColor: C.muted, color: "#8A8DA8" }}>Voucher không khả dụng</div>}
           <p className="text-xs text-center" style={{ color: "#6B7280" }}>Đăng nhập để xem đơn hàng &amp; quản lý voucher</p>
         </div>
       </div>

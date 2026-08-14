@@ -20,11 +20,12 @@ import { NotificationsPage } from "@/pages/customer/NotificationsPage"
 import { CustomerSettingsPage } from "@/pages/customer/CustomerSettingsPage"
 import { C } from "@/utils/constants"
 import { customerPagePath } from "@/utils/customerRoutes"
-import type { AppUser, CartItem, IssuedVoucher, Voucher, Order } from "@/types"
+import type { AppUser, CartItem, CheckoutDraft, IssuedVoucher, Voucher, Order, OrderListItem } from "@/types"
 import { orderService, paymentService, type OrderStatusCounts } from "@/services/orderService"
 import { issuedVoucherService } from "@/services/issuedVoucherService"
 import { voucherService, type VoucherDetailData } from "@/services/voucherService"
 import { LoadingState } from "@/components/LoadingState"
+import { isVoucherAvailable } from "@/hooks/useCart"
 
 interface Props {
   user: AppUser
@@ -40,10 +41,12 @@ interface Props {
   update: (id: string, qty: number) => void
   removeMany: (cartItemIds: string[]) => void
   cartLoading: boolean
-  checkoutSelectionIds: string[] | null
+  checkoutDraft: CheckoutDraft | null
+  checkoutCartItemIds: string[]
   checkoutItems: CartItem[]
-  setCheckoutSelection: (cartItemIds: string[]) => void
-  clearCheckoutSelection: () => void
+  setCartCheckout: (items: CartItem[]) => void
+  setDirectCheckout: (voucher: Voucher) => void
+  clearCheckoutDraft: () => void
   // When set, start directly at this page (e.g. "create-order" after guest checkout redirect)
   initialPage?: CustomerPage
   initialOrderId?: string
@@ -79,7 +82,7 @@ const DEFAULT_VOUCHER_FILTERS: VoucherListFilters = {
 export function CustomerApp({
   user, onLogout,
   cart, total, count, cartCount, cartCountLoading, add, remove, update, removeMany, cartLoading,
-  checkoutSelectionIds, checkoutItems, setCheckoutSelection, clearCheckoutSelection,
+  checkoutDraft, checkoutCartItemIds, checkoutItems, setCartCheckout, setDirectCheckout, clearCheckoutDraft,
   initialPage, onInitialPageConsumed,
   initialOrderId,
   initialVoucherId,
@@ -102,7 +105,7 @@ export function CustomerApp({
   const [isRedirectingToPayment, setIsRedirectingToPayment] = useState(false)
   const [voucherSearch, setVoucherSearch] = useState("")
   const [voucherFilters, setVoucherFilters] = useState<VoucherListFilters>(DEFAULT_VOUCHER_FILTERS)
-  const [myOrders, setMyOrders] = useState<Order[]>([])
+  const [myOrders, setMyOrders] = useState<OrderListItem[]>([])
   const [orderCounts, setOrderCounts] = useState<OrderStatusCounts>({ all: 0 })
   const [ordersPage, setOrdersPage] = useState(1)
   const [ordersTotalPages, setOrdersTotalPages] = useState(1)
@@ -114,7 +117,6 @@ export function CustomerApp({
   const [issuedPage, setIssuedPage] = useState(1)
   const [issuedTotalPages, setIssuedTotalPages] = useState(1)
   const [issuedStatus, setIssuedStatus] = useState<string | undefined>()
-  const [issuedSearch, setIssuedSearch] = useState("")
   const [myIssuedVouchersLoading, setMyIssuedVouchersLoading] = useState(initialPage === "my-vouchers")
 
   useEffect(() => {
@@ -126,7 +128,7 @@ export function CustomerApp({
       setPendingOrderLoading(false)
       return
     }
-    if (initialPage === "orders") {
+    if (initialPage === "order-detail") {
       void orderService.get(initialOrderId).then((order) => {
         setSelectedOrder(order)
         setPage("order-detail")
@@ -174,41 +176,68 @@ export function CustomerApp({
   }
 
   const goDetail = (v: Voucher) => router.push(`/vouchers/${v.id}`)
-  const goOrderDetail = (o: Order) => {
-    setSelectedOrder(o)
+  const goOrderDetail = (o: OrderListItem) => {
     router.push(`/orders/${o.id}`)
   }
 
-  const goReview = (o: Order, issuedVoucher?: IssuedVoucher, returnPage: CustomerPage = "orders") => {
-    const selected = issuedVoucher ?? o.items?.flatMap((item) => item.issuedVouchers ?? [])[0]
+  const goReview = async (o: Order | OrderListItem, issuedVoucher?: IssuedVoucher, returnPage: CustomerPage = "orders") => {
+    const detail = issuedVoucher ? o as Order : await orderService.get(o.id).catch(() => null)
+    if (!detail) {
+      toast.error("Không thể tải thông tin đánh giá. Vui lòng thử lại.")
+      return
+    }
+    if (detail.recipientId && detail.recipientId !== user.id) {
+      toast.error("Chỉ người nhận voucher mới có thể đánh giá.")
+      return
+    }
+    const issued = detail.items?.flatMap((item) => item.issuedVouchers ?? []) ?? []
+    const selected = issuedVoucher ?? issued.find((voucher) => voucher.review) ?? issued[0]
     if (!selected) {
       toast.error("Không tìm thấy voucher đã phát hành để đánh giá.")
       return
     }
-    setReviewOrder(o)
+    if (!issuedVoucher && issued.length > 1 && !issued.some((voucher) => voucher.review)) {
+      setSelectedOrder(detail)
+      setPage("order-detail")
+      toast.info("Chọn mã voucher bạn muốn đánh giá trong chi tiết đơn hàng.")
+      return
+    }
+    setReviewOrder(detail)
     setReviewIssuedVoucher(selected)
     setReviewReturnPage(returnPage)
     navigate("review")
   }
 
-  const goComplaint = (o: Order, issuedVoucher?: IssuedVoucher, returnPage: CustomerPage = "orders") => {
-    setComplaintOrder(o)
+  const goComplaint = async (o: Order | OrderListItem, issuedVoucher?: IssuedVoucher, returnPage: CustomerPage = "orders") => {
+    const detail = issuedVoucher ? o as Order : await orderService.get(o.id).catch(() => null)
+    if (!detail) {
+      toast.error("Không thể tải thông tin khiếu nại. Vui lòng thử lại.")
+      return
+    }
+    if (detail.isGift && detail.recipientId !== user.id) {
+      toast.error("Chỉ người nhận voucher mới có thể gửi khiếu nại.")
+      return
+    }
+    setComplaintOrder(detail)
     setComplaintIssuedVoucher(issuedVoucher ?? null)
     setReviewReturnPage(returnPage)
     navigate("complaint")
   }
 
-  const handleBuyNow = async (v: Voucher) => {
-    const item = await add(v)
-    if (!item?.cartItemId) {
-      toast.error("Không thể chuẩn bị sản phẩm để đặt hàng. Vui lòng thử lại.")
+  const handleAddToCart = async (voucher: Voucher) => {
+    const item = await add(voucher)
+    if (item) toast.success(`Đã thêm "${voucher.title.slice(0, 30)}..." vào giỏ hàng`)
+  }
+
+  const handleBuyNow = (v: Voucher) => {
+    if (!isVoucherAvailable(v)) {
+      toast.error("Voucher hiện không khả dụng.")
       return
     }
-    setCheckoutSelection([item.cartItemId])
+    setDirectCheckout(v)
     router.push("/checkout/create-order")
   }
 
-  const checkoutCartItemIds = checkoutSelectionIds ?? []
   const selectedCart = checkoutItems
   const selectedTotal = selectedCart.reduce((sum, item) => sum + item.voucher.price * item.qty, 0)
 
@@ -216,14 +245,17 @@ export function CustomerApp({
     setIsRedirectingToPayment(true)
     try {
       const order = await orderService.createFromCart({
-        cartItemIds: checkoutCartItemIds,
+        cartItemIds: checkoutDraft?.kind === "cart" ? checkoutCartItemIds : undefined,
+        items: checkoutDraft?.kind === "direct"
+          ? selectedCart.map((item) => ({ voucherId: item.voucher.id, quantity: item.qty }))
+          : undefined,
         recipientIdentifier: info.identifier,
         isGift: !info.forSelf,
         note: info.note,
         expectedPrices: Object.fromEntries(selectedCart.map((item) => [item.voucher.id, item.voucher.price])),
       })
-      removeMany(checkoutCartItemIds)
-       clearCheckoutSelection()
+      if (checkoutDraft?.kind === "cart") removeMany(checkoutCartItemIds)
+      clearCheckoutDraft()
       setPendingOrder({ id: order.id, recipient: info })
       router.push(`/checkout/payment/${order.id}`)
     } catch (error) {
@@ -233,10 +265,10 @@ export function CustomerApp({
        if (code === "RECIPIENT_NOT_FOUND" || code === "RECIPIENT_REQUIRED") {
          toast.error("Không tìm thấy tài khoản người nhận. Vui lòng kiểm tra lại email hoặc số điện thoại.")
        } else {
-         toast.error(code === "PRICE_CHANGED"
-           ? "Giá voucher đã thay đổi. Vui lòng kiểm tra lại giỏ hàng."
-           : "Không thể tạo đơn hàng. Vui lòng kiểm tra giỏ hàng và tồn kho.")
-         navigate("cart")
+          toast.error(code === "PRICE_CHANGED"
+            ? "Giá voucher đã thay đổi. Vui lòng kiểm tra lại giỏ hàng."
+            : "Không thể tạo đơn hàng. Vui lòng kiểm tra giỏ hàng và tồn kho.")
+          if (checkoutDraft?.kind === "cart") navigate("cart")
        }
     }
   }
@@ -261,8 +293,7 @@ export function CustomerApp({
     window.location.assign(payment.checkout_url)
   }
 
-  const handlePayAgain = (order: Order) => {
-    setPendingOrder({ id: order.id, order, recipient: { name: "", identifier: "", note: "", forSelf: true } })
+  const handlePayAgain = (order: Order | OrderListItem) => {
     setSelectedOrder(null)
     router.push(`/checkout/payment/${order.id}`)
   }
@@ -270,16 +301,6 @@ export function CustomerApp({
   const handlePaymentBack = () => {
     // Order stays alive as pending — go to orders list
     navigate("orders")
-  }
-
-  const reloadOrders = () => {
-    const requestId = ++ordersRequestIdRef.current
-    void orderService.list({ page: ordersPage, limit: 20, status: orderStatusFilter, search: orderSearch || undefined }).then((result) => {
-      if (requestId !== ordersRequestIdRef.current) return
-      setMyOrders(result.items)
-      setOrderCounts(result.countsByStatus)
-      setOrdersTotalPages(result.totalPages)
-    }).catch(() => undefined)
   }
 
   const reloadIssuedVouchers = () => {
@@ -291,17 +312,14 @@ export function CustomerApp({
   }
 
   const returnFromFeedback = () => {
-    if (reviewReturnPage === "my-vouchers") reloadIssuedVouchers()
-    else reloadOrders()
+    if (reviewReturnPage === "order-detail" && selectedOrder) {
+      void orderService.get(selectedOrder.id).then(setSelectedOrder).catch(() => undefined)
+    }
     setPage(reviewReturnPage)
     onInitialPageConsumed?.()
   }
 
   useEffect(() => {
-    if (page === "my-vouchers") {
-      reloadIssuedVouchers()
-      return
-    }
     if (page !== "orders") return
     setMyOrdersLoading(true)
     const requestId = ++ordersRequestIdRef.current
@@ -316,7 +334,12 @@ export function CustomerApp({
     }).finally(() => {
       if (requestId === ordersRequestIdRef.current) setMyOrdersLoading(false)
     })
-  }, [page, ordersPage, issuedPage, orderStatusFilter, orderSearch, issuedStatus, issuedSearch])
+  }, [page, ordersPage, orderStatusFilter, orderSearch])
+
+  useEffect(() => {
+    if (page !== "my-vouchers") return
+    reloadIssuedVouchers()
+  }, [page, issuedPage, issuedStatus])
 
   return (
     <CustomerLayout
@@ -329,10 +352,11 @@ export function CustomerApp({
       onNavigate={navigate}
       onLogout={onLogout}
     >
-      {page === "home" && <HomePage onBuy={add} onDetail={goDetail} onNavigate={navigate} />}
+      {page === "home" && <HomePage onAddToCart={handleAddToCart} onBuyNow={handleBuyNow} onDetail={goDetail} onNavigate={navigate} />}
       {page === "vouchers" && (
         <VoucherListPage
-          onBuy={add}
+          onAddToCart={handleAddToCart}
+          onBuyNow={handleBuyNow}
           onDetail={goDetail}
           searchQuery={voucherSearch}
           filters={voucherFilters}
@@ -343,10 +367,7 @@ export function CustomerApp({
         <VoucherDetailPage
           voucher={selectedVoucher}
           detail={selectedVoucherDetail!}
-          onBuy={() => {
-            add(selectedVoucher)
-            toast.success(`Đã thêm "${selectedVoucher.title.slice(0, 30)}..." vào giỏ hàng`)
-          }}
+          onBuy={() => handleAddToCart(selectedVoucher)}
           onBuyNow={() => handleBuyNow(selectedVoucher)}
            onBack={() => router.push("/vouchers")}
         />
@@ -358,8 +379,7 @@ export function CustomerApp({
           onRemove={remove}
           onUpdate={update}
            onCheckout={(items) => {
-             const cartItemIds = items.map((item) => item.cartItemId).filter((id): id is string => Boolean(id))
-             setCheckoutSelection(cartItemIds)
+             setCartCheckout(items)
              router.push("/checkout/create-order")
            }}
           onContinue={() => navigate("vouchers")}
@@ -373,8 +393,8 @@ export function CustomerApp({
           userName={user.name}
           userEmail={user.email}
           onCreateOrder={handleCreateOrder}
-          onBack={() => navigate("cart")}
-           loading={cartLoading || isRedirectingToPayment}
+          onBack={() => checkoutDraft?.kind === "direct" ? router.back() : navigate("cart")}
+           loading={(checkoutDraft?.kind === "cart" && cartLoading) || isRedirectingToPayment}
          />
        )}
        {page === "payment" && pendingOrderLoading && (
@@ -438,7 +458,7 @@ export function CustomerApp({
         />
       )}
       {page === "order-detail" && selectedOrder && (
-          <OrderDetailPage order={selectedOrder} onBack={() => navigate("orders")} onReview={(o) => goReview(o)} onComplaint={(o) => goComplaint(o, undefined, "order-detail")} onPayAgain={handlePayAgain} currentUserId={user.id} />
+          <OrderDetailPage order={selectedOrder} onBack={() => navigate("orders")} onReview={(o, issuedVoucher) => goReview(o, issuedVoucher, "order-detail")} onComplaint={(o, issuedVoucher) => goComplaint(o, issuedVoucher, "order-detail")} onPayAgain={handlePayAgain} currentUserId={user.id} />
       )}
        {page === "review" && reviewOrder && reviewIssuedVoucher && (
         <ReviewPage

@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
+import Link from "next/link"
 import { Plus, Minus, Trash2, AlertTriangle, ShoppingBag } from "lucide-react"
 import { toast } from "sonner"
 import { C, fmt } from "@/utils/constants"
@@ -27,9 +28,19 @@ export function CartPage({ cart, total: _total, onRemove, onUpdate, onCheckout, 
   const [pendingDelete, setPendingDelete] = useState<CartItem | null>(null)
   const [quantityDraft, setQuantityDraft] = useState<Record<string, string>>({})
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(() => new Set(cart.map(cartKey)))
+  const previousCartKeys = useRef<Set<string>>(new Set())
 
   useEffect(() => {
-    setSelectedKeys(new Set(cart.map(cartKey)))
+    const currentKeys = new Set(cart.map(cartKey))
+    setSelectedKeys((previous) => {
+      if (previousCartKeys.current.size === 0) return currentKeys
+      const next = new Set([...previous].filter((key) => currentKeys.has(key)))
+      currentKeys.forEach((key) => {
+        if (!previousCartKeys.current.has(key)) next.add(key)
+      })
+      return next
+    })
+    previousCartKeys.current = currentKeys
   }, [cart.length])
 
   const handleRemove = (id: string) => {
@@ -77,11 +88,6 @@ export function CartPage({ cart, total: _total, onRemove, onUpdate, onCheckout, 
     }
     if (hasSelectedUnavailable) {
       toast.error("Vui lòng bỏ chọn hoặc xóa sản phẩm không khả dụng")
-      return
-    }
-    const cartItemIds = selectedItems.map((item) => item.cartItemId).filter((id): id is string => Boolean(id))
-    if (cartItemIds.length !== selectedItems.length) {
-      toast.error("Giỏ hàng đang đồng bộ. Vui lòng thử lại sau một chút")
       return
     }
     onCheckout(selectedItems)
@@ -159,15 +165,17 @@ export function CartPage({ cart, total: _total, onRemove, onUpdate, onCheckout, 
                   aria-label={`Chọn ${v.title}`}
                   className="mt-1 h-4 w-4 shrink-0 accent-[#E07A5F]"
                 />
-                <img
-                  src={v.image}
-                  alt={v.title}
-                  className="w-20 h-16 rounded-xl object-cover shrink-0"
-                  onError={(e) => { (e.target as HTMLImageElement).src = FALLBACK }}
-                />
+                <Link href={`/vouchers/${v.id}`} className="shrink-0">
+                  <img
+                    src={v.image}
+                    alt={v.title}
+                    className="w-20 h-16 rounded-xl object-cover"
+                    onError={(e) => { (e.target as HTMLImageElement).src = FALLBACK }}
+                  />
+                </Link>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start gap-2">
-                    <p className={`font-bold text-sm leading-snug line-clamp-2 flex-1 ${isUnavailable ? "line-through" : ""}`} style={{ color: C.indigo }}>{v.title}</p>
+                    <Link href={`/vouchers/${v.id}`} className={`font-bold text-sm leading-snug line-clamp-2 flex-1 hover:underline ${isUnavailable ? "line-through" : ""}`} style={{ color: C.indigo }}>{v.title}</Link>
                     {isUnavailable && (
                       <span className="shrink-0 text-xs px-2 py-0.5 rounded-full font-bold" style={{ backgroundColor: "#FEE2E2", color: "#B91C1C" }}>
                         Không khả dụng
@@ -266,17 +274,17 @@ export function CartPage({ cart, total: _total, onRemove, onUpdate, onCheckout, 
             </div>
           </div>
 
-          {hasUnavailable ? (
+          {hasSelectedUnavailable ? (
             <div className="space-y-2">
               <div
                 className="w-full py-3.5 rounded-2xl font-bold text-center text-sm flex items-center justify-center gap-2"
                 style={{ backgroundColor: "#FEE2E2", color: "#B91C1C" }}
               >
                 <AlertTriangle className="w-4 h-4" />
-                Xóa voucher không khả dụng
+                Bỏ chọn voucher không khả dụng
               </div>
               <p className="text-xs text-center" style={{ color: "#DC2626" }}>
-                Giỏ hàng có voucher không thể mua. Hãy xóa trước khi tiếp tục.
+                Sản phẩm đang chọn có voucher không thể mua.
               </p>
             </div>
           ) : (

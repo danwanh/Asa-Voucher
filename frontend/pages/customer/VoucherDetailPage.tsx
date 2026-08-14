@@ -6,6 +6,7 @@ import { StatusBadge } from "@/components/StatusBadge"
 import type { Voucher } from "@/types"
 import { type VoucherApplicableBranch, type VoucherDetailData, type VoucherPublicReview } from "@/services/voucherService"
 import { LoadingState } from "@/components/LoadingState"
+import { isVoucherAvailable } from "@/hooks/useCart"
 
 const FALLBACK = "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=600&h=400&fit=crop"
 
@@ -185,7 +186,7 @@ export function VoucherDetailPage({ voucher: v, detail, onBuy, onBuyNow, onBack,
             )}
           </div>
 
-          {detailVoucher.status === "active" ? (
+          {isVoucherAvailable(detailVoucher) ? (
             <div className="flex flex-col gap-3">
               {onBuyNow && (
                 <button

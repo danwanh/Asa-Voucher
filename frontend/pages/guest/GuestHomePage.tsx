@@ -4,12 +4,14 @@ import { C, fmt } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import type { Voucher } from "@/types"
 import { voucherService } from "@/services/voucherService"
+import { isVoucherAvailable } from "@/hooks/useCart"
 
 interface Props {
   onNavigate: (p: string) => void
   onVoucherDetail: (v: Voucher) => void
   onLogin: () => void
   onAddToCart: (v: Voucher) => void
+  onBuyNow: (v: Voucher) => void
 }
 
 const CATEGORIES = [
@@ -36,7 +38,7 @@ const FAQ = [
   { q: "Có thể hoàn tiền nếu không dùng được?", a: "ASA Voucher hỗ trợ hoàn tiền trong vòng 7 ngày kể từ ngày mua, với điều kiện voucher chưa được sử dụng." },
 ]
 
-export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCart }: Props) {
+export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCart, onBuyNow }: Props) {
   const [search, setSearch] = useState("")
   const [openFaq, setOpenFaq] = useState<number | null>(null)
   const [vouchers, setVouchers] = useState<Voucher[]>([])
@@ -183,7 +185,7 @@ export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCar
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {flashSale.map((v) => (
-                <VoucherCard key={v.id} voucher={v} onDetail={onVoucherDetail} onBuy={onAddToCart} isGuest />
+                <VoucherCard key={v.id} voucher={v} onDetail={onVoucherDetail} onAddToCart={onAddToCart} onBuyNow={onBuyNow} />
               ))}
             </div>
           )}
@@ -204,7 +206,7 @@ export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCar
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {featured.map((v) => (
-                <VoucherCard key={v.id} voucher={v} onDetail={onVoucherDetail} onBuy={onAddToCart} isGuest />
+                <VoucherCard key={v.id} voucher={v} onDetail={onVoucherDetail} onAddToCart={onAddToCart} onBuyNow={onBuyNow} />
               ))}
             </div>
           )}
@@ -303,8 +305,9 @@ export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCar
   )
 }
 
-function VoucherCard({ voucher: v, onDetail, onBuy, isGuest }: { voucher: Voucher; onDetail: (v: Voucher) => void; onBuy: (v: Voucher) => void; isGuest?: boolean }) {
+function VoucherCard({ voucher: v, onDetail, onAddToCart, onBuyNow }: { voucher: Voucher; onDetail: (v: Voucher) => void; onAddToCart: (v: Voucher) => void; onBuyNow: (v: Voucher) => void }) {
   const pct = Math.round(((v.originalPrice - v.price) / v.originalPrice) * 100)
+  const isAvailable = isVoucherAvailable(v)
   return (
     <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-black/5 hover:shadow-md transition-shadow cursor-pointer group" onClick={() => onDetail(v)}>
       <div className="relative h-40 overflow-hidden">
@@ -320,19 +323,28 @@ function VoucherCard({ voucher: v, onDetail, onBuy, isGuest }: { voucher: Vouche
           <span className="font-black text-base" style={{ color: C.peach }}>{fmt(v.price)}</span>
           <span className="text-xs line-through" style={{ color: "#9CA3AF" }}>{fmt(v.originalPrice)}</span>
         </div>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-1 text-xs" style={{ color: "#6B7280" }}>
             <Star className="w-3 h-3 fill-current" style={{ color: C.apricot }} />
             {v.rating} ({v.reviews})
           </div>
+        </div>
+        {isAvailable ? <div className="grid grid-cols-2 gap-2">
           <button
-            onClick={(e) => { e.stopPropagation(); onBuy(v) }}
-            className="text-xs font-bold px-3 py-1.5 rounded-lg text-white hover:opacity-90 transition-opacity"
-            style={{ backgroundColor: C.peach }}
+            onClick={(e) => { e.stopPropagation(); onAddToCart(v) }}
+            className="rounded-lg border px-2 py-1.5 text-xs font-bold"
+            style={{ borderColor: C.peach, color: C.peach }}
           >
             + Giỏ hàng
           </button>
-        </div>
+          <button
+            onClick={(e) => { e.stopPropagation(); onBuyNow(v) }}
+            className="rounded-lg px-2 py-1.5 text-xs font-bold text-white"
+            style={{ backgroundColor: C.peach }}
+          >
+            Mua ngay
+          </button>
+        </div> : <div className="rounded-lg bg-gray-100 px-3 py-2 text-center text-xs font-bold text-gray-500">Không khả dụng</div>}
       </div>
     </div>
   )

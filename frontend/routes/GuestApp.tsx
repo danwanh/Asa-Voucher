@@ -10,13 +10,14 @@ import { CartPage } from "@/pages/customer/CartPage"
 import type { Voucher, CartItem } from "@/types"
 import { voucherService, type VoucherDetailData } from "@/services/voucherService"
 import { LoadingState } from "@/components/LoadingState"
+import { isVoucherAvailable } from "@/hooks/useCart"
 
 interface Props {
   onLogin: () => void
   onRegister: () => void
   // Called when guest clicks "Tiến hành đặt hàng" — triggers login then redirects to create-order
-  onCheckout: (items?: CartItem[]) => void
-  cartAdd: (v: Voucher) => void
+  onCheckout: (items: CartItem[], kind?: "cart" | "direct") => void
+  cartAdd: (v: Voucher) => Promise<CartItem | undefined>
   cartCount: number | null
   cartCountLoading?: boolean
   cart: CartItem[]
@@ -35,8 +36,8 @@ interface Props {
 interface FullProps {
   onLogin: () => void
   onRegister: () => void
-  onCheckout: (items?: CartItem[]) => void
-  cartAdd: (v: Voucher) => void
+  onCheckout: (items: CartItem[], kind?: "cart" | "direct") => void
+  cartAdd: (v: Voucher) => Promise<CartItem | undefined>
   cartCount: number | null
   cartCountLoading?: boolean
   cart: CartItem[]
@@ -75,14 +76,17 @@ export function GuestApp({ onLogin, onRegister, onCheckout, cartAdd, cartCount, 
     else setPage(nextPage)
   }
 
-  const handleAddToCart = (v: Voucher) => {
-    cartAdd(v)
-    toast.success(`Đã thêm "${v.title.slice(0, 30)}..." vào giỏ hàng`)
+  const handleAddToCart = async (v: Voucher) => {
+    const item = await cartAdd(v)
+    if (item) toast.success(`Đã thêm "${v.title.slice(0, 30)}..." vào giỏ hàng`)
   }
 
   const handleBuyNow = (v: Voucher) => {
-    cartAdd(v)
-    onCheckout()
+    if (!isVoucherAvailable(v)) {
+      toast.error("Voucher hiện không khả dụng.")
+      return
+    }
+    onCheckout([{ voucher: v, qty: 1 }], "direct")
   }
 
   return (
@@ -100,6 +104,7 @@ export function GuestApp({ onLogin, onRegister, onCheckout, cartAdd, cartCount, 
           onVoucherDetail={goDetail}
           onLogin={onLogin}
           onAddToCart={handleAddToCart}
+          onBuyNow={handleBuyNow}
         />
       )}
       {page === "vouchers" && (
@@ -107,6 +112,7 @@ export function GuestApp({ onLogin, onRegister, onCheckout, cartAdd, cartCount, 
           onDetail={goDetail}
           onLogin={onLogin}
           onAddToCart={handleAddToCart}
+          onBuyNow={handleBuyNow}
         />
       )}
       {page === "detail" && !selectedVoucher && <LoadingState label="Đang tải chi tiết voucher..." variant="page" />}

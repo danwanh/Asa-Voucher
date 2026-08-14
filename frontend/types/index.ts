@@ -170,6 +170,36 @@ export interface Order {
   note?: string
 }
 
+export interface OrderListItem {
+  id: string
+  userId: string
+  userName?: string
+  orderCode: string
+  code: string
+  voucherId: string
+  voucherTitle: string
+  partnerName: string
+  amount: number
+  status: OrderStatus
+  paymentStatus: OrderPaymentStatus
+  paymentMethod: string
+  createdAt: string
+  recipientId?: string
+  isGift: boolean
+  paymentExpiresAt?: string
+  hasComplaint: boolean
+  items: OrderListProduct[]
+}
+
+export interface OrderListProduct {
+  voucherId: string
+  quantity: number
+  voucherTitle: string
+  partnerName: string
+  issuedCount: number
+  hasReview: boolean
+}
+
 export interface OrderItem {
   id: string
   voucherId: string
@@ -236,6 +266,10 @@ export interface CartItem {
   qty: number
   cartItemId?: string
 }
+
+export type CheckoutDraft =
+  | { kind: "cart"; voucherIds: string[]; cartItemIds: string[] }
+  | { kind: "direct"; items: CartItem[] }
 
 export interface User {
   id: string

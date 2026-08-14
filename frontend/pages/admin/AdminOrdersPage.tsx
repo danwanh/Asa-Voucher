@@ -3,7 +3,7 @@ import { C, fmt, fmtDate, STATUS_DESCRIPTION } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import { StatusBadge } from "@/components/StatusBadge"
 import { orderService } from "@/services/orderService"
-import type { Order } from "@/types"
+import type { Order, OrderListItem } from "@/types"
 
 type Action = "cancel" | "cancel_refund_prompt" | "refund"
 
@@ -25,7 +25,7 @@ export function AdminOrdersPage() {
   const [filter, setFilter] = useState("all")
   const [cancelledSubFilter, setCancelledSubFilter] = useState<"all" | "no_refund" | "pending_refund">("all")
   const [search, setSearch] = useState("")
-  const [orders, setOrders] = useState<Order[]>([])
+  const [orders, setOrders] = useState<OrderListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -98,7 +98,7 @@ export function AdminOrdersPage() {
       })
     : orders
 
-  const handleSelectOrder = async (order: Order) => {
+  const handleSelectOrder = async (order: OrderListItem) => {
     setDetailLoading(true)
     setShowPanel(true)
     try {

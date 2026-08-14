@@ -362,7 +362,7 @@ export async function getVoucherProduct(user: CurrentUser | undefined, id: strin
 export async function getPublicVoucherDetail(id: string) {
   const [voucher, branches, reviews] = await Promise.all([
     prisma.voucherProduct.findFirst({
-      where: { id, approval_status: "approved", status: "active" },
+      where: { id, approval_status: "approved", status: { in: ["active", "paused", "sold_out", "expired"] } },
       select: {
         id: true,
         partner_id: true,

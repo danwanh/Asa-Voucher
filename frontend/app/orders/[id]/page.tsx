@@ -1,5 +1,5 @@
 import App from "@/components/App"
 
 export default function OrderDetailRoute({ params }: { params: { id: string } }) {
-  return <App initialPage="orders" initialOrderId={params.id} />
+  return <App initialPage="order-detail" initialOrderId={params.id} />
 }
