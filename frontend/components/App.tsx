@@ -97,17 +97,6 @@ export default function App({ initialPage, initialOrderId, initialVoucherId, ini
     ? initialPage
     : undefined
 
-  if (!isInitialized) {
-    return (
-      <div className="min-h-screen flex items-center justify-center px-6" style={{ backgroundColor: "#F4F1DE" }} role="status" aria-live="polite">
-        <div className="text-center">
-          <div className="w-12 h-12 mx-auto mb-4 rounded-2xl flex items-center justify-center font-black text-lg animate-pulse" style={{ backgroundColor: "#E07A5F", color: "white" }}>A</div>
-          <p className="text-sm font-semibold" style={{ color: "#3D405B" }}>Đang kiểm tra phiên đăng nhập...</p>
-        </div>
-      </div>
-    )
-  }
-
   if (!user && !showLogin && (!initialPage || guestInitialPage)) return (
     <GuestApp
       onLogin={handleRequestLogin}

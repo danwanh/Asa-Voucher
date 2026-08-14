@@ -5,6 +5,7 @@ import { C, fmt } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import type { CartItem } from "@/types"
 import { isVoucherAvailable } from "@/hooks/useCart"
+import { LoadingState } from "@/components/LoadingState"
 
 const FALLBACK = "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=200&h=150&fit=crop"
 
@@ -87,18 +88,7 @@ export function CartPage({ cart, total: _total, onRemove, onUpdate, onCheckout, 
   }
 
   if (loading) {
-    return (
-      <div className="max-w-4xl mx-auto px-4 py-8" role="status" aria-live="polite">
-        <div className="h-8 w-56 rounded-xl bg-gray-200 animate-pulse mb-6" />
-        <div className="grid md:grid-cols-3 gap-6">
-          <div className="md:col-span-2 space-y-3">
-            {[1, 2, 3].map((item) => <div key={item} className="h-28 rounded-2xl bg-white animate-pulse" />)}
-          </div>
-          <div className="h-52 rounded-2xl bg-white animate-pulse" />
-        </div>
-        <span className="sr-only">Đang tải danh sách giỏ hàng...</span>
-      </div>
-    )
+    return <LoadingState label="Đang tải danh sách giỏ hàng..." variant="page" />
   }
 
   if (cart.length === 0) {

@@ -3,6 +3,7 @@ import { ArrowLeft, ShoppingBag } from "lucide-react"
 import { C, fmt } from "@/utils/constants"
 import type { CartItem } from "@/types"
 import { orderService } from "@/services/orderService"
+import { LoadingState } from "@/components/LoadingState"
 
 export interface RecipientInfo {
   name: string
@@ -71,16 +72,7 @@ export function CreateOrderPage({ cart, total, userName = "", userEmail = "", on
   const inputCls = "w-full px-4 py-2.5 rounded-xl border-2 text-sm outline-none transition-colors"
 
   if (loading) {
-    return (
-      <div className="max-w-4xl mx-auto px-4 py-8" role="status" aria-live="polite">
-        <div className="h-5 w-40 rounded-lg bg-gray-200 animate-pulse mb-6" />
-        <div className="grid md:grid-cols-3 gap-6">
-          <div className="md:col-span-2 h-80 rounded-2xl bg-white animate-pulse" />
-          <div className="h-64 rounded-2xl bg-white animate-pulse" />
-        </div>
-        <span className="sr-only">Đang tải sản phẩm đã chọn...</span>
-      </div>
-    )
+    return <LoadingState label="Đang tải sản phẩm đã chọn..." variant="page" />
   }
 
   if (!cart.length) {

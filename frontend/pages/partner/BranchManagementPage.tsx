@@ -5,6 +5,7 @@ import { C } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import type { AppUser } from "@/types"
 import { partnerService, type PartnerBranch, type PartnerProfile } from "@/services/partnerService"
+import { LoadingState } from "@/components/LoadingState"
 
 type Props = {
   user: AppUser
@@ -211,7 +212,7 @@ export function BranchManagementPage({ user, partner, embedded = false }: Props)
 
         {isLoading ? (
           <div className="rounded-2xl p-6 bg-white flex items-center gap-2 text-sm" style={{ color: "#8A8DA8" }}>
-            <Loader2 className="w-4 h-4 animate-spin" /> Đang tải chi nhánh...
+            <LoadingState label="Đang tải chi nhánh..." variant="inline" size="sm" />
           </div>
         ) : (
           <>

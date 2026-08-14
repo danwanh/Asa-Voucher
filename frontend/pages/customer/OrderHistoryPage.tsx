@@ -3,6 +3,7 @@ import { Search, Star, CreditCard, MessageSquare, ChevronLeft, ChevronRight } fr
 import { C, fmt, fmtDate } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import type { Order, OrderStatus } from "@/types"
+import { LoadingState } from "@/components/LoadingState"
 
 interface Props {
   orders: Order[]
@@ -15,6 +16,7 @@ interface Props {
   totalPages?: number
   onPageChange?: (page: number) => void
   onFilterChange?: (status?: string, search?: string) => void
+  loading?: boolean
 }
 
 const ORDER_TABS: { label: string; value: Order["status"] | "all" }[] = [
@@ -42,7 +44,7 @@ function itemSummary(order: Order) {
   return items.map((item) => `${item.voucherTitle ?? order.voucherTitle} ×${item.quantity}`).join(" · ")
 }
 
-export function OrderHistoryPage({ orders, onDetail, onReview, onComplaint, onPayAgain, page = 1, totalPages = 1, onPageChange, onFilterChange }: Props) {
+export function OrderHistoryPage({ orders, onDetail, onReview, onComplaint, onPayAgain, page = 1, totalPages = 1, onPageChange, onFilterChange, loading = false }: Props) {
   const [tab, setTab] = useState<Order["status"] | "all">("all")
   const [search, setSearch] = useState("")
 
@@ -113,7 +115,9 @@ export function OrderHistoryPage({ orders, onDetail, onReview, onComplaint, onPa
       </div>
 
       <div className="space-y-3">
-        {filtered.map((order) => {
+        {loading ? (
+          <LoadingState label="Đang tải danh sách đơn hàng..." variant="section" />
+        ) : filtered.map((order) => {
           const totalQuantity = order.items?.reduce((sum, item) => sum + item.quantity, 0) ?? 1
           const issuedCount = order.items?.flatMap((item) => item.issuedVouchers ?? []).length ?? 0
           const hasIssuedCodes = issuedCount > 0
@@ -203,7 +207,7 @@ export function OrderHistoryPage({ orders, onDetail, onReview, onComplaint, onPa
           )
         })}
 
-        {filtered.length === 0 && (
+        {!loading && filtered.length === 0 && (
           <div className="text-center py-16 bg-white rounded-2xl">
             <AppIcon name="package" className="w-10 h-10 mb-3 mx-auto" />
             <div className="font-bold" style={{ color: C.indigo }}>

@@ -1,4 +1,4 @@
-import { C } from "@/utils/constants"
+import { LoadingState } from "@/components/LoadingState"
 
 interface Props {
   className?: string
@@ -11,7 +11,7 @@ export function Skeleton({ className = "", style, rounded = "lg" }: Props) {
   return (
     <div
       className={`animate-pulse ${className}`}
-      style={{ backgroundColor: "#E5E7EB", borderRadius: radiusMap[rounded], ...style }}
+      style={{ backgroundColor: "#E8E5D7", borderRadius: radiusMap[rounded], ...style }}
     />
   )
 }
@@ -56,12 +56,5 @@ export function TableRowSkeleton({ cols = 5 }: { cols?: number }) {
 }
 
 export function PageLoadingSpinner() {
-  return (
-    <div className="flex items-center justify-center min-h-64">
-      <div
-        className="w-10 h-10 rounded-full animate-spin"
-        style={{ border: `3px solid ${C.peach}`, borderTopColor: "transparent" }}
-      />
-    </div>
-  )
+  return <LoadingState variant="page" />
 }

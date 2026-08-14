@@ -14,6 +14,7 @@ import { PartnerSettingsPage } from "@/pages/partner/PartnerSettingsPage"
 import { C } from "@/utils/constants"
 import type { AppUser, Voucher } from "@/types"
 import { partnerService, type PartnerProfile } from "@/services/partnerService"
+import { LoadingState } from "@/components/LoadingState"
 
 interface Props {
   user: AppUser
@@ -88,9 +89,7 @@ export function PartnerApp({ user, onLogout, initialPage }: Props) {
   if (isPartnerLoading) {
     return (
       <PartnerLayout user={user} partner={partner} page={page} onNavigate={setPage} onLogout={onLogout}>
-        <div className="p-6">
-          <div className="text-sm" style={{ color: "#8A8DA8" }}>Đang tải dữ liệu đối tác...</div>
-        </div>
+        <LoadingState label="Đang tải dữ liệu đối tác..." variant="page" />
       </PartnerLayout>
     )
   }
@@ -105,7 +104,6 @@ export function PartnerApp({ user, onLogout, initialPage }: Props) {
           onDetail={goDetail}
           sessionDrafts={sessionDrafts}
           onEditDraft={handleEditDraft}
-          partnerId={user.partnerId}
         />
       )}
       {page === "create" && (

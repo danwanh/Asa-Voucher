@@ -20,6 +20,7 @@ import {
 } from "@/services/dashboardService"
 import { orderService } from "@/services/orderService"
 import type { Order } from "@/types"
+import { LoadingState, LoadingSpinner } from "@/components/LoadingState"
 
 export function AdminOperationsDashboardPage() {
   const uid = useId().replace(/:/g, "")
@@ -85,29 +86,29 @@ export function AdminOperationsDashboardPage() {
   const kpis = [
     {
       label: "Tổng khách hàng",
-      value: loading ? "0" : stats.users.toLocaleString("vi-VN"),
-      delta: "Tổng số người dùng",
+      value: loading ? "..." : stats.users.toLocaleString("vi-VN"),
+      delta: loading ? "Đang tải dữ liệu" : "Tổng số người dùng",
       icon: <Users className="w-5 h-5" />,
       color: C.teal,
     },
     {
       label: "Đối tác hoạt động",
-      value: loading ? "0" : stats.partners.toLocaleString("vi-VN"),
-      delta: "Tổng số đối tác",
+      value: loading ? "..." : stats.partners.toLocaleString("vi-VN"),
+      delta: loading ? "Đang tải dữ liệu" : "Tổng số đối tác",
       icon: <Store className="w-5 h-5" />,
       color: C.indigo,
     },
     {
       label: "Đơn hàng",
-      value: loading ? "0" : stats.orders.toLocaleString("vi-VN"),
-      delta: "Tổng số đơn hàng",
+      value: loading ? "..." : stats.orders.toLocaleString("vi-VN"),
+      delta: loading ? "Đang tải dữ liệu" : "Tổng số đơn hàng",
       icon: <ShoppingBag className="w-5 h-5" />,
       color: C.peach,
     },
     {
       label: "Doanh thu",
-      value: loading ? "0" : fmt(Number(stats.revenue)),
-      delta: "Tổng doanh thu",
+      value: loading ? "..." : fmt(Number(stats.revenue)),
+      delta: loading ? "Đang tải dữ liệu" : "Tổng doanh thu",
       icon: <Banknote className="w-5 h-5" />,
       color: "#7C3AED",
     },
@@ -165,7 +166,7 @@ export function AdminOperationsDashboardPage() {
           )}
           {loading && (
             <div className="ml-auto flex items-center gap-2 text-xs" style={{ color: "#8A8DA8" }}>
-              <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: C.indigo, borderTopColor: "transparent" }} />
+              <LoadingSpinner size="sm" />
               Đang tải...
             </div>
           )}
@@ -262,7 +263,12 @@ export function AdminOperationsDashboardPage() {
           Đơn hàng gần đây
         </h3>
 
-        {stats.recentOrders.length === 0 && !loading ? (
+        {loading ? (
+          <div className="flex items-center justify-center gap-2 py-8 text-sm" style={{ color: "#8A8DA8" }} role="status" aria-live="polite">
+            <LoadingSpinner size="sm" />
+            Đang tải dữ liệu đơn hàng...
+          </div>
+        ) : stats.recentOrders.length === 0 ? (
           <div className="py-8 text-center text-sm text-gray-400">
             Chưa có dữ liệu đơn hàng gần đây.
           </div>
@@ -348,7 +354,7 @@ export function AdminOperationsDashboardPage() {
 
             {detailLoading && (
               <div className="py-12 text-center">
-                <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin mx-auto mb-3" style={{ borderColor: C.indigo, borderTopColor: "transparent" }} />
+                <LoadingSpinner size="md" />
                 <p className="text-sm" style={{ color: "#8A8DA8" }}>Đang tải chi tiết...</p>
               </div>
             )}

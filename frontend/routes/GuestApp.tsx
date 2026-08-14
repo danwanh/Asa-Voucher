@@ -9,6 +9,7 @@ import { GuestVoucherDetailPage } from "@/pages/guest/GuestVoucherDetailPage"
 import { CartPage } from "@/pages/customer/CartPage"
 import type { Voucher, CartItem } from "@/types"
 import { voucherService, type VoucherDetailData } from "@/services/voucherService"
+import { LoadingState } from "@/components/LoadingState"
 
 interface Props {
   onLogin: () => void
@@ -108,7 +109,7 @@ export function GuestApp({ onLogin, onRegister, onCheckout, cartAdd, cartCount, 
           onAddToCart={handleAddToCart}
         />
       )}
-      {page === "detail" && !selectedVoucher && <div className="max-w-3xl mx-auto px-4 py-20 text-center font-semibold" style={{ color: "#3D405B" }}>Đang tải chi tiết voucher...</div>}
+      {page === "detail" && !selectedVoucher && <LoadingState label="Đang tải chi tiết voucher..." variant="page" />}
       {page === "detail" && selectedVoucher && (
         <GuestVoucherDetailPage
           voucher={selectedVoucher}

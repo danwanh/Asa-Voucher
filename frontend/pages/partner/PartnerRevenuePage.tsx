@@ -12,6 +12,7 @@ import {
   YAxis,
 } from "recharts"
 import { C, fmt } from "@/utils/constants"
+import { LoadingState } from "@/components/LoadingState"
 import { partnerService, type PartnerBranch } from "@/services/partnerService"
 import { reportService, type RevenuePoint, type VoucherReportItem } from "@/services/reportService"
 
@@ -245,9 +246,7 @@ export function PartnerRevenuePage({ partnerId, partnerName }: Props) {
       )}
 
       {isLoading ? (
-        <div className="rounded-2xl p-6 bg-white flex items-center gap-2 text-sm" style={{ color: "#8A8DA8" }}>
-          <Loader2 className="w-4 h-4 animate-spin" /> Đang tổng hợp báo cáo...
-        </div>
+        <LoadingState label="Đang tổng hợp báo cáo..." variant="section" size="sm" className="rounded-2xl bg-white" />
       ) : !hasReportData ? (
         <div className="rounded-2xl p-8 bg-white text-center text-sm" style={{ color: "#8A8DA8" }}>
           Không có dữ liệu phù hợp.

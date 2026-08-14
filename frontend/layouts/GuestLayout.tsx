@@ -70,9 +70,7 @@ export function GuestLayout({ page, onNavigate, onLogin, onRegister, cartCount =
               title="Giỏ hàng"
             >
               <ShoppingCart className="w-5 h-5" style={{ color: C.indigo }} />
-              {cartCountLoading ? (
-                <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full animate-pulse" style={{ backgroundColor: "#D6D2B8" }} aria-label="Đang tải số lượng giỏ hàng" />
-              ) : cartCount !== null && cartCount > 0 ? (
+              {cartCount !== null && cartCount > 0 ? (
                 <span
                   className="absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-xs font-black text-white"
                   style={{ backgroundColor: C.peach }}
@@ -104,9 +102,7 @@ export function GuestLayout({ page, onNavigate, onLogin, onRegister, cartCount =
               className="relative p-2 rounded-lg"
             >
               <ShoppingCart className="w-5 h-5" style={{ color: C.indigo }} />
-              {cartCountLoading ? (
-                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full animate-pulse" style={{ backgroundColor: "#D6D2B8" }} aria-label="Đang tải số lượng giỏ hàng" />
-              ) : cartCount !== null && cartCount > 0 ? (
+              {cartCount !== null && cartCount > 0 ? (
                 <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center text-xs font-black text-white" style={{ backgroundColor: C.peach, fontSize: 10 }}>
                   {cartCount}
                 </span>

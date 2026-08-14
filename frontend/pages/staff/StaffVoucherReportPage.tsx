@@ -3,6 +3,7 @@ import { Filter, Loader2, RefreshCcw } from "lucide-react";
 import { reportService } from "@/services/reportService";
 import type { StaffVoucherReportItem } from "@/types";
 import { C, fmt } from "@/utils/constants";
+import { LoadingState } from "@/components/LoadingState";
 
 interface Filters {
   date_from: string;
@@ -149,15 +150,7 @@ export function StaffVoucherReportPage() {
 
       {/* ═══ LOADING STATE ═══ */}
       {isLoading && (
-        <div className="flex items-center justify-center py-12">
-          <Loader2
-            className="w-6 h-6 animate-spin"
-            style={{ color: C.indigo }}
-          />
-          <span className="ml-2 text-sm" style={{ color: "#8A8DA8" }}>
-            Đang tải báo cáo...
-          </span>
-        </div>
+        <LoadingState label="Đang tải báo cáo..." variant="section" size="sm" />
       )}
 
       {/* ═══ EMPTY STATE ═══ */}

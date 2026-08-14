@@ -3,6 +3,7 @@
 import { FormEvent, Suspense, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { authService } from "@/services/authService"
+import { LoadingState, LoadingSpinner } from "@/components/LoadingState"
 
 function ResetPasswordContent() {
   const params = useSearchParams()
@@ -50,7 +51,7 @@ function ResetPasswordContent() {
         <input className="mt-3 w-full rounded-2xl border p-3" type="password" value={confirm} onChange={(event) => setConfirm(event.target.value)} placeholder="Xác nhận mật khẩu" />
         {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
         {message && <p className="mt-3 text-sm text-green-700">{message}</p>}
-        <button disabled={loading || Boolean(message)} className="mt-6 w-full rounded-2xl bg-[#E07A5F] py-3 font-bold text-white disabled:opacity-60">{loading ? "Đang cập nhật..." : "Cập nhật mật khẩu"}</button>
+         <button disabled={loading || Boolean(message)} className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#E07A5F] py-3 font-bold text-white disabled:opacity-60">{loading && <LoadingSpinner size="sm" />}{loading ? "Đang cập nhật..." : "Cập nhật mật khẩu"}</button>
         {message && <button type="button" onClick={() => router.push("/")} className="mt-3 w-full rounded-2xl border border-[#E07A5F] py-3 font-bold text-[#E07A5F]">Đăng nhập</button>}
       </form>
     </main>
@@ -58,5 +59,5 @@ function ResetPasswordContent() {
 }
 
 export default function ResetPasswordPage() {
-  return <Suspense fallback={<main className="min-h-screen flex items-center justify-center">Đang tải...</main>}><ResetPasswordContent /></Suspense>
+  return <Suspense fallback={null}><ResetPasswordContent /></Suspense>
 }

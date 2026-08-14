@@ -7,6 +7,7 @@ import { C } from "@/utils/constants"
 import type { AppUser, Role } from "@/types"
 import { authService } from "@/services/authService"
 import { useAuthStore } from "@/stores/authStore"
+import { LoadingState } from "@/components/LoadingState"
 
 interface Props {
   user: AppUser
@@ -193,7 +194,7 @@ export function PersonalProfilePage({ user, onLogout, showPasswordSection = true
           </div>
         </div>
 
-        {loading ? <p className="py-8 text-center text-sm" style={{ color: "#8A8DA8" }}>Đang tải thông tin hồ sơ...</p> : (
+        {loading ? <LoadingState label="Đang tải thông tin hồ sơ..." variant="section" size="sm" /> : (
           <div className="space-y-4">
             <label className="block text-sm font-bold" style={{ color: C.indigo }}>
               Họ và tên *

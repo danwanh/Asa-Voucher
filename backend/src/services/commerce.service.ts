@@ -89,13 +89,17 @@ export async function getCart(userId: string) {
 }
 
 export async function addCartItem(userId: string, input: { voucher_product_id: string; quantity: number }) {
-  await getSellableVoucher(input.voucher_product_id, input.quantity);
-  const cart = await getOrCreateCart(userId);
+  const [voucher, cart] = await Promise.all([
+    getSellableVoucher(input.voucher_product_id, input.quantity),
+    getOrCreateCart(userId)
+  ]);
   const existing = await prisma.cartItem.findFirst({ where: { cart_id: cart.id as string, voucher_product_id: input.voucher_product_id } }) as unknown as Record<string, unknown> | null;
 
   if (existing) {
     const quantity = Number(existing.quantity) + input.quantity;
-    await getSellableVoucher(input.voucher_product_id, quantity);
+    if (Number(voucher.remaining_quantity) < quantity) {
+      throw new HttpError(409, "Insufficient voucher quantity", "INSUFFICIENT_STOCK");
+    }
     const item = await prisma.cartItem.update({ where: { id: existing.id as string }, data: { quantity, updated_at: new Date() } });
     return { item, created: false };
   }

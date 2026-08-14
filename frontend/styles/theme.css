@@ -134,9 +134,42 @@
     cursor: pointer;
   }
 
+  button:not(:disabled) {
+    transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease, background-color 180ms ease, border-color 180ms ease;
+  }
+
+  button:not(:disabled):hover {
+    transform: translateY(-1px);
+    filter: brightness(0.88) saturate(1.35);
+    box-shadow: 0 6px 16px rgba(61, 64, 91, 0.16);
+  }
+
+  button:not(:disabled):active {
+    transform: translateY(0) scale(0.98);
+    filter: brightness(0.98);
+  }
+
+  button:focus-visible,
+  a:focus-visible,
+  [role="button"]:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--ring) 45%, transparent);
+    outline-offset: 3px;
+  }
+
   button:disabled,
   [aria-disabled="true"] {
     cursor: not-allowed;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    button:not(:disabled) {
+      transition: none;
+    }
+
+    button:not(:disabled):hover,
+    button:not(:disabled):active {
+      transform: none;
+    }
   }
 
   body {

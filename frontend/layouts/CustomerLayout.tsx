@@ -19,7 +19,6 @@ interface Props {
   notifCount?: number
   voucherSearch: string
   onVoucherSearchChange: (value: string) => void
-  onVoucherSearchFocus: () => void
   onNavigate: (p: CustomerPage) => void
   onLogout: () => void
   children: React.ReactNode
@@ -50,7 +49,6 @@ export function CustomerLayout({
   notifCount = 0,
   voucherSearch,
   onVoucherSearchChange,
-  onVoucherSearchFocus,
   onNavigate,
   onLogout,
   children
@@ -75,8 +73,10 @@ export function CustomerLayout({
                 className="w-full pl-9 pr-4 py-2 rounded-xl text-sm outline-none"
                 style={{ backgroundColor: "rgba(255,255,255,0.12)", color: "white", fontFamily: "'Inter', sans-serif" }}
                 placeholder="Tìm voucher..."
+                type="search"
+                name="voucher-search"
+                autoComplete="new-password"
                 value={voucherSearch}
-                onFocus={onVoucherSearchFocus}
                 onChange={(e) => onVoucherSearchChange(e.target.value)}
               />
             </div>
@@ -117,9 +117,7 @@ export function CustomerLayout({
             {/* Cart */}
             <button onClick={() => router.push("/cart")} className="relative p-2 rounded-xl hover:bg-white/10">
               <ShoppingCart className="w-5 h-5 text-white" />
-              {cartCountLoading ? (
-                <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full animate-pulse" style={{ backgroundColor: "rgba(244,241,222,0.45)" }} aria-label="Đang tải số lượng giỏ hàng" />
-              ) : cartCount !== null && cartCount > 0 ? (
+              {cartCount !== null && cartCount > 0 ? (
                 <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center" style={{ backgroundColor: C.peach, color: "white" }}>
                   {cartCount}
                 </span>
@@ -194,9 +192,7 @@ export function CustomerLayout({
             >
               <div className="relative">
                 {n.icon}
-                {cartCountLoading && n.pg === "cart" ? (
-                  <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full animate-pulse" style={{ backgroundColor: "#D6D2B8" }} aria-label="Đang tải số lượng giỏ hàng" />
-                ) : (showBadge || showNotifBadge) && (
+                {(showBadge || showNotifBadge) && (
                   <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full text-xs font-bold flex items-center justify-center" style={{ backgroundColor: C.peach, color: "white", fontSize: "10px" }}>
                     {showBadge ? cartCount : notifCount}
                   </span>

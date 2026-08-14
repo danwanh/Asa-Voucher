@@ -43,11 +43,13 @@ api.interceptors.request.use((config) => {
 })
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    return response
+  },
   async (error) => {
-    const originalRequest = error.config
+    const originalRequest = error.config as (AxiosRequestConfig & { _retry?: boolean }) | undefined
 
-    if (error.response?.status !== 401 || originalRequest._retry || isAuthEndpoint(originalRequest.url)) {
+    if (!originalRequest || error.response?.status !== 401 || originalRequest._retry || isAuthEndpoint(originalRequest.url)) {
       return Promise.reject(error)
     }
 
@@ -59,7 +61,6 @@ api.interceptors.response.use(
 
     originalRequest._retry = true
     isRefreshing = true
-
     try {
       const { data } = await axios.post(
         `${BASE_URL}/auth/refresh`,
@@ -74,7 +75,7 @@ api.interceptors.response.use(
         resolve(api(config))
       })
       pendingRequests = []
-      originalRequest.headers.Authorization = `Bearer ${newToken}`
+    originalRequest.headers = { ...originalRequest.headers, Authorization: `Bearer ${newToken}` }
       return api(originalRequest)
     } catch (refreshError) {
       setAccessToken(null)

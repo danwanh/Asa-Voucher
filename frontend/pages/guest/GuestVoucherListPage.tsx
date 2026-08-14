@@ -4,6 +4,7 @@ import { C, fmt, formatCategoryLabel } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import type { Voucher } from "@/types"
 import { voucherService } from "@/services/voucherService"
+import { LoadingState } from "@/components/LoadingState"
 
 interface Props {
   onDetail: (v: Voucher) => void
@@ -200,7 +201,7 @@ export function GuestVoucherListPage({ onDetail, onLogin, onAddToCart }: Props) 
 
       {/* Results info */}
       {isLoading ? (
-        <div className="text-sm mb-4" style={{ color: "#6B7280" }}>Đang tải voucher...</div>
+        <LoadingState label="Đang tải voucher..." variant="section" size="sm" />
       ) : loadError ? (
         <div className="text-sm mb-4" style={{ color: "#6B7280" }}>{loadError}</div>
       ) : (

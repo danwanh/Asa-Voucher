@@ -6,6 +6,7 @@ import { VoucherCard } from "@/components/VoucherCard"
 import type { Voucher } from "@/types"
 import { voucherService } from "@/services/voucherService"
 import { parseApplicableAreas } from "@/utils/applicableArea"
+import { LoadingState } from "@/components/LoadingState"
 
 interface Props {
   onBuy: (v: Voucher) => void
@@ -331,9 +332,7 @@ export function VoucherListPage({ onBuy, onDetail, searchQuery, filters, onFilte
       </div>
 
       {isLoading ? (
-        <div className="text-center py-20">
-          <div className="font-bold text-lg" style={{ color: C.indigo }}>Đang tải voucher...</div>
-        </div>
+        <LoadingState label="Đang tải voucher..." variant="section" />
       ) : loadError ? (
         <div className="text-center py-20">
           <div className="font-bold text-lg" style={{ color: C.indigo }}>{loadError}</div>

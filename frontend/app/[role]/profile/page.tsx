@@ -38,9 +38,8 @@ export default function RoleProfilePage({ params }: { params: { role: string } }
     }
   }, [isInitialized, params.role, router, user])
 
-  if (!isInitialized || !user || !VALID_ROLES.has(params.role as Role) || user.role !== params.role) {
-    return <main className="flex min-h-screen items-center justify-center">Đang tải hồ sơ...</main>
-  }
+  if (!isInitialized) return null
+  if (!user || !VALID_ROLES.has(params.role as Role) || user.role !== params.role) return null
 
   return <App initialPage="profile" />
 }

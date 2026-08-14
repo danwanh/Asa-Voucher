@@ -24,6 +24,7 @@ import type { AppUser, CartItem, IssuedVoucher, Voucher, Order } from "@/types"
 import { orderService, paymentService } from "@/services/orderService"
 import { issuedVoucherService } from "@/services/issuedVoucherService"
 import { voucherService, type VoucherDetailData } from "@/services/voucherService"
+import { LoadingState } from "@/components/LoadingState"
 
 interface Props {
   user: AppUser
@@ -85,7 +86,7 @@ export function CustomerApp({
   initialPaymentStatus,
 }: Props) {
   const router = useRouter()
-  const [page, setPage] = useState<CustomerPage>(initialPage ?? "home")
+  const [page, setPage] = useState<CustomerPage>(() => initialPage ?? "home")
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null)
   const [selectedVoucherDetail, setSelectedVoucherDetail] = useState<VoucherDetailData | null>(null)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
@@ -166,11 +167,6 @@ export function CustomerApp({
 
   const handleVoucherSearchChange = (value: string) => {
     setVoucherSearch(value)
-    if (page !== "vouchers") setPage("vouchers")
-  }
-
-  const handleVoucherSearchFocus = () => {
-    if (page !== "vouchers") setPage("vouchers")
   }
 
   const goDetail = (v: Voucher) => router.push(`/vouchers/${v.id}`)
@@ -312,7 +308,6 @@ export function CustomerApp({
       cartCountLoading={cartCountLoading}
       voucherSearch={voucherSearch}
       onVoucherSearchChange={handleVoucherSearchChange}
-      onVoucherSearchFocus={handleVoucherSearchFocus}
       onNavigate={navigate}
       onLogout={onLogout}
     >
@@ -365,11 +360,8 @@ export function CustomerApp({
          />
        )}
        {page === "payment" && pendingOrderLoading && (
-         <div className="max-w-md mx-auto px-4 py-20 text-center" role="status" aria-live="polite">
-           <div className="w-12 h-12 rounded-full mx-auto mb-4 animate-pulse" style={{ backgroundColor: C.apricot }} />
-           <p className="font-bold" style={{ color: C.indigo }}>Đang tải đơn hàng...</p>
-         </div>
-       )}
+          <LoadingState label="Đang tải đơn hàng..." variant="page" />
+        )}
        {page === "payment" && !pendingOrderLoading && pendingOrder?.order && (
          <PaymentPage
            total={pendingOrder.order.amount}
@@ -406,9 +398,10 @@ export function CustomerApp({
          />
        )}
       {page === "orders" && (
-         <OrderHistoryPage
-           orders={myOrders}
-           page={ordersPage}
+          <OrderHistoryPage
+            orders={myOrders}
+            loading={myOrdersLoading}
+            page={ordersPage}
            totalPages={ordersTotalPages}
            onPageChange={setOrdersPage}
            onFilterChange={(status, search) => {

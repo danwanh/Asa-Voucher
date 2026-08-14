@@ -6,6 +6,7 @@ import { VoucherCard } from "@/components/VoucherCard"
 import type { Voucher } from "@/types"
 import type { CustomerPage } from "@/layouts/CustomerLayout"
 import { voucherService } from "@/services/voucherService"
+import { LoadingState } from "@/components/LoadingState"
 
 interface Props {
   onBuy: (v: Voucher) => void
@@ -120,9 +121,7 @@ export function HomePage({ onBuy, onDetail, onNavigate }: Props) {
         </div>
 
         {isLoading ? (
-          <div className="text-center py-16">
-            <div className="font-bold" style={{ color: C.indigo }}>Đang tải voucher...</div>
-          </div>
+          <LoadingState label="Đang tải voucher..." variant="section" size="sm" />
         ) : featured.length === 0 ? (
           <div className="text-center py-16">
             <AppIcon name="search" className="w-10 h-10 mb-3 mx-auto" />

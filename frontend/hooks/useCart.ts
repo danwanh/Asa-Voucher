@@ -104,10 +104,19 @@ export function useCart(userId?: string, enabled = true, cartItemIds?: string[])
 
     if (!accepted) return undefined
     try {
-      await cartService.add(voucher.id)
-      const serverCart = await cartService.get()
-      setCart(serverCart)
-      return serverCart.find((item) => item.voucher.id === voucher.id)
+      const serverItem = await cartService.add(voucher.id)
+      const item = {
+        cartItemId: serverItem.id,
+        voucher,
+        qty: serverItem.quantity,
+      }
+      setCart((prev) => {
+        const existing = prev.some((entry) => entry.voucher.id === voucher.id)
+        return existing
+          ? prev.map((entry) => entry.voucher.id === voucher.id ? item : entry)
+          : [item, ...prev]
+      })
+      return item
     } catch {
       toast.error("Không thể cập nhật giỏ hàng trên máy chủ.")
       setCart(await cartService.get().catch(() => []))
