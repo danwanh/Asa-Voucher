@@ -54,7 +54,7 @@ export const updateUserSchema = z.object({
   phone: z.string().trim().regex(/^(0|\+84)[0-9]{8,9}$/).nullable().optional(),
   full_name: z.string().trim().min(1).max(100).optional(),
   avatar_url: z.string().url().nullable().optional(),
-  dob: z.string().date().nullable().optional(),
+  dob: z.union([z.string().date(), z.literal(""), z.null()]).optional(),
   gender: z.enum(["male", "female", "other"]).nullable().optional(),
   address: z.string().trim().max(255).nullable().optional(),
   city: z.string().trim().max(100).nullable().optional(),

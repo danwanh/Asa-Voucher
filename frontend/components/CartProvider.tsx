@@ -6,7 +6,6 @@ import { useCart } from "@/hooks/useCart"
 import { useAuthStore } from "@/stores/authStore"
 import type { CartItem, CheckoutDraft } from "@/types"
 import type { Voucher } from "@/types"
-import { cartService } from "@/services/cartService"
 
 const CHECKOUT_DRAFT_KEY = "asa-checkout-draft-v2"
 
@@ -65,6 +64,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     await cartState.clear()
   }, [cartState.clear])
 
+  const resetLocalState = useCallback(() => {
+    cartState.resetLocalState()
+  }, [cartState.resetLocalState])
+
   const removeMany = useCallback((cartItemIds: string[]) => {
     cartState.removeMany(cartItemIds)
   }, [cartState.removeMany])
@@ -111,6 +114,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       remove,
       update,
       clear,
+      resetLocalState,
       removeMany,
       cartCount,
       cartCountLoading,

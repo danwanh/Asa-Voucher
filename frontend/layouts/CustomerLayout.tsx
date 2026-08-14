@@ -182,6 +182,43 @@ export function CustomerLayout({
       </header>
 
       <main>{children}</main>
+      <footer className="border-t border-black/8 py-12" style={{ backgroundColor: C.indigo }}>
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+            <div>
+              <div className="flex items-center gap-2 font-black text-lg mb-3" style={{ fontFamily: "'Nunito', sans-serif", color: "white" }}>
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: C.peach }}>
+                  <Tag className="w-3.5 h-3.5 text-white" />
+                </div>
+                ASA Voucher
+              </div>
+              <p className="text-sm leading-relaxed" style={{ color: "rgba(255,255,255,0.6)" }}>
+                Nền tảng mua bán voucher điện tử hàng đầu Việt Nam. Tiết kiệm thông minh, trải nghiệm đỉnh cao.
+              </p>
+            </div>
+            {[
+              { title: "Sản phẩm", links: ["Ẩm thực", "Làm đẹp", "Du lịch", "Giải trí", "Thể thao"] },
+              { title: "Hỗ trợ", links: ["Trung tâm trợ giúp", "Liên hệ", "Chính sách hoàn tiền", "Điều khoản dịch vụ"] },
+              { title: "Doanh nghiệp", links: ["Đăng ký đối tác", "Bảng giá", "API tích hợp", "Tài liệu"] },
+            ].map((col) => (
+              <div key={col.title}>
+                <div className="font-bold text-sm mb-3" style={{ color: "rgba(255,255,255,0.9)" }}>{col.title}</div>
+                {col.links.map((l) => (
+                  <div key={l} className="text-sm py-0.5 cursor-pointer hover:text-white transition-colors" style={{ color: "rgba(255,255,255,0.5)" }}>{l}</div>
+                ))}
+              </div>
+            ))}
+          </div>
+          <div className="border-t border-white/10 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <p className="text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>© 2026 ASA Voucher. Tất cả quyền được bảo lưu.</p>
+            <div className="flex gap-4 text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>
+              <span className="cursor-pointer hover:text-white">Chính sách</span>
+              <span className="cursor-pointer hover:text-white">Bảo mật</span>
+              <span className="cursor-pointer hover:text-white">Cookie</span>
+            </div>
+          </div>
+        </div>
+      </footer>
 
       {/* Mobile bottom navigation */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around h-16 border-t" style={{ backgroundColor: "white", borderColor: "#E2DFC8" }}>

@@ -130,6 +130,7 @@ export type VoucherDetailData = {
   usageInstructions: string[]
   applicableArea: string | null
   partnerId: string
+  partnerName: string
   categoryName: string
 }
 
@@ -391,6 +392,7 @@ export const voucherService = {
         usageInstructions,
         applicableArea: voucherProduct.applicable_area,
         partnerId: voucherProduct.partner_id,
+        partnerName: voucherProduct.partners?.business_name ?? current.partnerName,
         categoryName: category.name
       }
     })()

@@ -220,7 +220,11 @@ export async function updateUser(req: Request, res: Response) {
   }
 
   try {
-    const user = await prisma.user.update({ where: { id: req.params.id }, data: { ...req.body, updated_at: new Date() } as never });
+    const updateData: Record<string, unknown> = { ...req.body, updated_at: new Date() };
+    if ("dob" in req.body) {
+      updateData.dob = req.body.dob ? new Date(req.body.dob) : null;
+    }
+    const user = await prisma.user.update({ where: { id: req.params.id }, data: updateData as never });
     if (isAdmin && req.user!.id !== req.params.id) {
       const changes = Object.keys(req.body).filter((k) => k !== "updated_at").join(", ");
       await writeAuditLog({

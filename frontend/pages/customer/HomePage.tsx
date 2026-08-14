@@ -155,6 +155,7 @@ export function HomePage({ onAddToCart, onBuyNow, onDetail, onNavigate }: Props)
           ))}
         </div>
       </div>
+      
     </div>
   )
 }

@@ -97,7 +97,7 @@ export function VoucherDetailPage({ voucher: v, detail, onBuy, onBuyNow, onBack,
               {detailVoucher.partnerLogo}
             </div>
             <div>
-              <div className="font-bold" style={{ color: C.indigo }}>{detailMeta.partnerId || detailVoucher.partnerName}</div>
+              <div className="font-bold" style={{ color: C.indigo }}>{detailVoucher.partnerName || detail.partnerName}</div>
               <div className="text-xs flex items-center gap-1 mt-0.5" style={{ color: "#8A8DA8" }}>
                 <MapPin className="w-3 h-3" /> {detailMeta.applicableArea || (branches.length > 0 ? `${branches.length} chi nhánh áp dụng` : "Đang cập nhật")}
               </div>

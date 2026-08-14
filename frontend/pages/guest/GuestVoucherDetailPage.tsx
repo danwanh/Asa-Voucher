@@ -107,7 +107,7 @@ export function GuestVoucherDetailPage({ voucher: v, detail, onBack, onLogin, on
         <div>
           <div className="flex items-center gap-2 mb-2">
             <AppIcon name={detailVoucher.partnerLogo} className="w-6 h-6" />
-            <span className="text-sm font-semibold" style={{ color: C.teal }}>{detailMeta.partnerId || detailVoucher.partnerName}</span>
+            <span className="text-sm font-semibold" style={{ color: C.teal }}>{detailVoucher.partnerName || detail.partnerName}</span>
           </div>
           <h1 className="text-2xl font-black mb-3 leading-tight" style={{ color: C.indigo, fontFamily: "'Nunito', sans-serif" }}>{detailVoucher.title}</h1>
 

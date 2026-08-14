@@ -47,7 +47,7 @@ export default function App({ initialPage, initialOrderId, initialVoucherId, ini
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
   const {
-    cart, add, remove, update, clear, removeMany, total, count, cartCount, cartCountLoading, isLoading: cartLoading, hasLoaded: cartHasLoaded,
+    cart, add, remove, update, clear, resetLocalState, removeMany, total, count, cartCount, cartCountLoading, isLoading: cartLoading, hasLoaded: cartHasLoaded,
     checkoutDraft, checkoutCartItemIds, checkoutItems, setCartCheckout, setDirectCheckout, clearCheckoutDraft,
   } = useCartContext()
 
@@ -101,7 +101,7 @@ export default function App({ initialPage, initialOrderId, initialVoucherId, ini
     setShowLogoutConfirm(false)
     try {
       await logout()
-      clear()
+      resetLocalState()
       clearCheckoutDraft()
     } catch {
       toast.error("Đăng xuất thất bại. Vui lòng thử lại.")

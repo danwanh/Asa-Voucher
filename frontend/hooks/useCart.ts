@@ -124,6 +124,23 @@ export function useCart(userId?: string, enabled = true) {
       })
       return item
     } catch {
+    }
+
+    try {
+      const serverItem = await cartService.add(voucher.id)
+      const item = {
+        cartItemId: serverItem.id,
+        voucher,
+        qty: serverItem.quantity,
+      }
+      setCart((prev) => {
+        const existing = prev.some((entry) => entry.voucher.id === voucher.id)
+        return existing
+          ? prev.map((entry) => entry.voucher.id === voucher.id ? item : entry)
+          : [item, ...prev]
+      })
+      return item
+    } catch {
       toast.error("Không thể cập nhật giỏ hàng trên máy chủ.")
       setCart(await cartService.get().catch(() => []))
     }
@@ -131,40 +148,50 @@ export function useCart(userId?: string, enabled = true) {
   }, [userId])
 
   const remove = useCallback(async (id: string) => {
-    const item = cart.find((entry) => entry.voucher.id === id)
-    if (!userId || !item?.cartItemId) {
-      setCart((prev) => prev.filter((entry) => entry.voucher.id !== id))
+    const item = cartRef.current.find((entry) => entry.voucher.id === id)
+    if (!item) return
+    const previousCart = cartRef.current
+    const nextCart = cartRef.current.filter((entry) => entry.voucher.id !== id)
+    cartRef.current = nextCart
+    setCart(nextCart)
+
+    if (!userId || !item.cartItemId) {
       return
     }
     try {
       await cartService.remove(item.cartItemId)
-      setCart(await cartService.get())
     } catch {
       toast.error("Không thể xóa voucher khỏi giỏ hàng.")
-      setCart(await cartService.get().catch(() => []))
+      cartRef.current = previousCart
+      setCart(previousCart)
     }
-  }, [cart, userId])
+  }, [userId])
 
   const update = useCallback(async (id: string, qty: number) => {
-    const item = cart.find((entry) => entry.voucher.id === id)
+    const item = cartRef.current.find((entry) => entry.voucher.id === id)
     if (!item) return
     const available = item.voucher.quantity - item.voucher.sold
     if (qty > available) {
       toast.error("Số lượng yêu cầu vượt quá số lượng voucher còn lại trong kho")
       return
     }
+    const previousQty = item.qty
+    const nextCart = cartRef.current.map((entry) => entry.voucher.id === id ? { ...entry, qty } : entry)
+    cartRef.current = nextCart
+    setCart(nextCart)
+
     if (!userId || !item.cartItemId) {
-      setCart((prev) => prev.map((entry) => entry.voucher.id === id ? { ...entry, qty } : entry))
       return
     }
     try {
       await cartService.update(item.cartItemId, qty)
-      setCart(await cartService.get())
     } catch {
       toast.error("Không thể cập nhật số lượng voucher.")
-      setCart(await cartService.get().catch(() => []))
+      const rollbackCart = cartRef.current.map((entry) => entry.voucher.id === id ? { ...entry, qty: previousQty } : entry)
+      cartRef.current = rollbackCart
+      setCart(rollbackCart)
     }
-  }, [cart, userId])
+  }, [userId])
 
   const clear = useCallback(async () => {
     if (!userId) {
@@ -181,6 +208,16 @@ export function useCart(userId?: string, enabled = true) {
     }
   }, [userId])
 
+  const resetLocalState = useCallback(() => {
+    cartRef.current = []
+    setCart([])
+    syncedUsers.clear()
+    setLoadedUserId(undefined)
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(STORAGE_KEY)
+    }
+  }, [])
+
   const removeMany = useCallback((cartItemIds: string[]) => {
     const selected = new Set(cartItemIds)
     setCart((prev) => prev.filter((item) => !item.cartItemId || !selected.has(item.cartItemId)))
@@ -191,5 +228,5 @@ export function useCart(userId?: string, enabled = true) {
   ), 0)
   const count = cart.reduce((sum, item) => sum + item.qty, 0)
 
-  return { cart, add, remove, update, clear, removeMany, total, count, isLoading, hasLoaded }
+  return { cart, add, remove, update, clear, resetLocalState, removeMany, total, count, isLoading, hasLoaded }
 }
