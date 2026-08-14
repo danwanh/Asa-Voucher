@@ -182,6 +182,7 @@ describe("Issued Voucher Service", () => {
           issuedVoucher: {
             findUnique: vi.fn().mockResolvedValue(voucher),
             update: vi.fn().mockResolvedValue({ ...voucher, status: "used" }),
+            count: vi.fn().mockResolvedValue(1),
           },
           voucherUsage: {
             create: vi.fn().mockResolvedValue({
@@ -189,11 +190,38 @@ describe("Issued Voucher Service", () => {
               redeemed_by: "u-staff", used_at: new Date(),
             }),
           },
+          order: { updateMany: vi.fn() },
+          orderLog: { create: vi.fn() },
         } as never);
       });
 
       const result = await issuedVoucherService.confirmVoucher(STORE_STAFF, { voucher_code: "VC-001" });
       expect(result.message).toContain("thành công");
+    });
+
+    it("completes the order after the final voucher is used", async () => {
+      const voucher = makeIssuedVoucher();
+      vi.mocked(issuedVoucherRepo.findIssuedVoucherByCode).mockResolvedValue(voucher);
+      vi.mocked(issuedVoucherRepo.findEligibleBranchIds).mockResolvedValue(["branch-1"]);
+      const orderUpdate = vi.fn().mockResolvedValue({ count: 1 });
+
+      const { prisma } = await import("../../config/prisma.js");
+      vi.mocked(prisma.$transaction).mockImplementation(async (fn: (tx: never) => Promise<unknown>) => fn({
+        issuedVoucher: {
+          findUnique: vi.fn().mockResolvedValue(voucher),
+          update: vi.fn().mockResolvedValue({ ...voucher, status: "used" }),
+          count: vi.fn().mockResolvedValue(0),
+        },
+        voucherUsage: { create: vi.fn().mockResolvedValue({ id: "usage-1" }) },
+        order: { updateMany: orderUpdate },
+        orderLog: { create: vi.fn().mockResolvedValue({}) },
+      } as never));
+
+      await issuedVoucherService.confirmVoucher(STORE_STAFF, { voucher_code: "VC-001" });
+
+      expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ status: "completed" }),
+      }));
     });
 
     it("rejects non-store-staff user", async () => {

@@ -20,9 +20,9 @@ export interface ComplaintRow {
   status: ComplaintStatus;
   assigned_to: string | null;
   resolution_note: string | null;
-  resolution_type: ComplaintResolutionType | null;
-  created_at: string;
-  resolved_at: string | null;
+  resolution_types: ComplaintResolutionType[] | null;
+  created_at: string | Date;
+  resolved_at: string | Date | null;
 }
 
 export interface ComplaintResponseRow {

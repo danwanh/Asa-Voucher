@@ -19,7 +19,8 @@ export type VoucherStatus =
   | "locked"
   | "cancelled"
   | "used"
-export type OrderStatus = "pending_payment" | "payment_failed" | "confirmed" | "completed" | "cancelled" | "pending_manual" | "used" | "refunded"
+export type OrderStatus = "pending_payment" | "payment_failed" | "confirmed" | "completed" | "cancelled" | "refunded"
+export type OrderPaymentStatus = "pending" | "paid" | "failed" | "refunded"
 
 // Kept for pages that still reference the old admin sub-role concept;
 // no longer used on AppUser (admin_content/admin_operations/admin_security are
@@ -151,7 +152,7 @@ export interface Order {
   partnerName: string
   amount: number
   status: OrderStatus
-  paymentStatus: string
+  paymentStatus: OrderPaymentStatus
   paymentMethod: string
   refundRef?: string
   refundedAt?: string
@@ -220,12 +221,14 @@ export interface Payment {
   orderId: string
   method: "vnpay" | "paypal"
   amount: number
-  status: "pending" | "success" | "failed" | "refunded"
+  status: "pending" | "processing" | "success" | "failed" | "refunded"
   transactionRef?: string
+  paidAt?: string
   refundRef?: string
   refundedAt?: string
   gatewayResponse?: string
   checkout_url?: string
+  createdAt?: string
 }
 
 export interface CartItem {

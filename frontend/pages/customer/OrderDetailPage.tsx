@@ -11,6 +11,7 @@ interface Props {
   onReview: (order: Order) => void
   onComplaint?: (order: Order) => void
   onPayAgain?: (order: Order) => void
+  currentUserId?: string
 }
 
 function orderStatusLabel(status: OrderStatus) {
@@ -29,23 +30,25 @@ function issuedVoucherStatusLabel(status: string) {
   return "Đang hoạt động"
 }
 
-export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAgain }: Props) {
+export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAgain, currentUserId }: Props) {
   const [copied, setCopied] = useState(false)
   const issuedVouchers = (order.items ?? []).flatMap((item) => item.issuedVouchers ?? [])
   const isRefunded = order.status === "refunded"
-  const hasPaid = order.status === "confirmed" || order.status === "completed" || order.status === "refunded"
+  const hasPaid = order.paymentStatus === "paid" || order.paymentStatus === "refunded"
   const paymentStepDone = hasPaid
   const voucherReceiveDone = issuedVouchers.length > 0 && !isRefunded
+  const displayedVouchers = order.status === "cancelled" ? [] : issuedVouchers
+  const successfulPayment = order.payments?.find((payment) => payment.status === "success" || payment.status === "refunded")
 
   const copy = () => {
-    navigator.clipboard.writeText(order.orderCode ?? order.id).catch(() => {})
+    navigator.clipboard.writeText(displayedVouchers[0]?.code ?? order.orderCode ?? order.id).catch(() => {})
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
 
   const TIMELINE = [
     { label: "Đặt hàng", done: true, time: fmtDate(order.createdAt) },
-    { label: "Thanh toán", done: paymentStepDone, time: paymentStepDone ? fmtDate(order.updatedAt ?? order.createdAt) : "" },
+    { label: "Thanh toán", done: paymentStepDone, time: successfulPayment?.paidAt ? fmtDate(successfulPayment.paidAt) : "" },
     { label: "Nhận voucher", done: voucherReceiveDone, time: voucherReceiveDone ? fmtDate(order.updatedAt ?? order.createdAt) : "" },
     { label: "Đã sử dụng", done: voucherReceiveDone && issuedVouchers.some((voucher) => voucher.status === "used"), time: voucherReceiveDone && issuedVouchers.some((voucher) => voucher.status === "used") ? fmtDate(order.updatedAt ?? order.createdAt) : "" },
   ]
@@ -125,7 +128,7 @@ export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAga
               </div>
 
               <div className="mt-4 space-y-3">
-                {item.issuedVouchers && item.issuedVouchers.length > 0 ? (
+                {order.status !== "cancelled" && item.issuedVouchers && item.issuedVouchers.length > 0 ? (
                   item.issuedVouchers.map((voucher) => (
                     <div key={voucher.id} className="rounded-2xl border p-4" style={{ borderColor: voucher.status === "used" ? C.teal + "60" : "#E2DFC8" }}>
                       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -155,21 +158,21 @@ export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAga
         </div>
       </div>
 
-      {issuedVouchers.length > 0 && (
+      {displayedVouchers.length > 0 && (
         <div className="bg-white rounded-2xl p-6 border border-black/5 mb-4 text-center">
           <h3 className="font-bold text-sm mb-4" style={{ color: C.indigo }}>Mã voucher</h3>
           <div className="flex items-center justify-center gap-2 mb-4">
             <code className="text-lg font-black tracking-widest px-4 py-2 rounded-xl" style={{ backgroundColor: C.muted, color: C.indigo }}>
-              {issuedVouchers[0].code}
+              {displayedVouchers[0].code}
             </code>
             <button onClick={copy} className="p-2 rounded-xl hover:bg-gray-100 transition-colors" title="Copy">
               {copied ? <CheckCircle2 className="w-5 h-5" style={{ color: C.teal }} /> : <Copy className="w-5 h-5" style={{ color: "#6B7280" }} />}
             </button>
           </div>
           <div className="flex justify-center mb-4">
-            <MockQR code={issuedVouchers[0].qrPayload || issuedVouchers[0].code} size={160} />
+            <MockQR code={displayedVouchers[0].qrPayload || displayedVouchers[0].code} size={160} />
           </div>
-          {issuedVouchers.some((voucher) => voucher.status === "used") && (
+          {displayedVouchers.some((voucher) => voucher.status === "used") && (
             <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-bold" style={{ backgroundColor: "#E0EEFF", color: "#1A5FAD" }}>
               <CheckCircle2 className="w-4 h-4" /> Đã sử dụng
             </div>
@@ -186,13 +189,13 @@ export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAga
         <h3 className="font-bold text-sm mb-3" style={{ color: C.indigo }}>Thông tin thanh toán</h3>
         <div className="space-y-2 text-sm">
           <div className="flex justify-between"><span style={{ color: "#6B7280" }}>Phương thức</span><span className="font-semibold" style={{ color: C.indigo }}>{order.paymentMethod}</span></div>
-          <div className="flex justify-between"><span style={{ color: "#6B7280" }}>Trạng thái</span><span className="font-semibold" style={{ color: C.indigo }}>{orderStatusLabel(order.status)}</span></div>
+           <div className="flex justify-between"><span style={{ color: "#6B7280" }}>Trạng thái thanh toán</span><span className="font-semibold" style={{ color: C.indigo }}>{order.paymentStatus === "paid" ? "Đã thanh toán" : order.paymentStatus === "failed" ? "Thanh toán thất bại" : order.paymentStatus === "refunded" ? "Đã hoàn tiền" : "Chờ thanh toán"}</span></div>
           <div className="flex justify-between"><span style={{ color: "#6B7280" }}>Số tiền</span><span className="font-black" style={{ color: C.peach }}>{fmt(order.amount)}</span></div>
         </div>
       </div>
 
       <div className="flex gap-3">
-        {(order.status === "pending_payment" || order.status === "payment_failed") && (!order.paymentExpiresAt || new Date(order.paymentExpiresAt).getTime() > Date.now()) && onPayAgain && (
+        {order.userId === currentUserId && (order.status === "pending_payment" || order.status === "payment_failed") && (!order.paymentExpiresAt || new Date(order.paymentExpiresAt).getTime() > Date.now()) && onPayAgain && (
           <button
             onClick={() => onPayAgain(order)}
             className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm text-white"

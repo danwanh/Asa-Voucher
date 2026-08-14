@@ -34,7 +34,7 @@ export function VerifyVoucherPage({ initialCode = "", branchId = "" }: { initial
     setShowConfirmDialog(false)
     setLoading(true)
     try {
-      await issuedVoucherService.redeem(voucher.issued_voucher.id, branchId)
+      await issuedVoucherService.redeem(voucher.issued_voucher.voucher_code)
       setConfirmed(true)
     } catch {
       setResult("invalid")

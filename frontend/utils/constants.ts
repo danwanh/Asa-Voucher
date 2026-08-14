@@ -30,7 +30,6 @@ export const STATUS_LABEL: Record<string, string> = {
   locked: "Đã khóa",
   confirmed: "Đã xác nhận",
   cancelled: "Đã hủy",
-  pending_manual: "Chờ xử lý HC",
   refunded: "Đã hoàn tiền",
   used: "Đã dùng",
   pending_payment: "Chờ thanh toán",
@@ -48,7 +47,6 @@ export const STATUS_DESCRIPTION: Record<string, string> = {
   completed: "Hoàn thành, voucher đã sử dụng",
   cancelled: "Đã hủy",
   refunded: "Đã hoàn tiền (tự động hoặc từ khiếu nại)",
-  pending_manual: "Hủy nhưng voucher đã dùng, cần xử lý tay",
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -83,7 +81,7 @@ export function statusColor(s: string): { bg: string; text: string } {
     s === "selling"
   )
     return { bg: "#E8F5EE", text: "#2D7A52" };
-  if (s === "pending" || s === "pending_payment" || s === "draft" || s === "pending_manual")
+  if (s === "pending" || s === "pending_payment" || s === "draft")
     return { bg: "#FFF3CD", text: "#856404" };
   if (s === "used" || s === "confirmed") return { bg: "#E0EEFF", text: "#1A5FAD" };
   if (s === "refunded") return { bg: "#E8F5EE", text: "#2D7A52" };

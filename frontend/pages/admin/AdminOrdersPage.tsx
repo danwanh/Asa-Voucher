@@ -5,13 +5,12 @@ import { StatusBadge } from "@/components/StatusBadge"
 import { orderService } from "@/services/orderService"
 import type { Order } from "@/types"
 
-type Action = "cancel" | "cancel_refund_prompt" | "refund" | "reject"
+type Action = "cancel" | "cancel_refund_prompt" | "refund"
 
 const ACTION_CONFIG: Record<Action, { label: string; icon: string; color: string; confirmLabel: string; description: string }> = {
   cancel: { label: "Hủy đơn", icon: "trash", color: "#C0392B", confirmLabel: "Hủy đơn", description: "Bạn có chắc chắn muốn hủy đơn hàng này không? Thao tác này không thể hoàn tác." },
   cancel_refund_prompt: { label: "Hủy đơn", icon: "trash", color: "#C0392B", confirmLabel: "", description: "" },
   refund: { label: "Hoàn tiền", icon: "wallet", color: C.peach, confirmLabel: "Xác nhận hoàn tiền", description: "Gọi VNPay/PayPal để hoàn tiền cho đơn hàng này?" },
-  reject: { label: "Từ chối", icon: "x", color: "#856404", confirmLabel: "Từ chối", description: "Từ chối xử lý thủ công, đơn sẽ trở về trạng thái trước đó?" },
 }
 
 function getActionsForStatus(status: string, paymentStatus: string): Action[] {
@@ -19,7 +18,6 @@ function getActionsForStatus(status: string, paymentStatus: string): Action[] {
   if (status === "confirmed") return ["cancel_refund_prompt"]
   if (status === "completed") return []
   if (status === "cancelled" && paymentStatus === "paid") return ["refund"]
-  if (status === "pending_manual") return ["cancel_refund_prompt", "reject"]
   return []
 }
 
@@ -163,9 +161,6 @@ export function AdminOrdersPage() {
           ? `Hoàn tiền thành công (Ref: ${refundRef})`
           : "Hoàn tiền thành công")
         setRefundNote("")
-      } else if (action === "reject") {
-        await orderService.updateOrder(order.id, { status: "confirmed" })
-        showToast("success", "Đã từ chối xử lý thủ công")
       }
 
       closeDialog()
@@ -188,7 +183,6 @@ export function AdminOrdersPage() {
     { v: "completed", l: "Hoàn thành", desc: "Đơn đã hoàn thành, voucher đã sử dụng" },
     { v: "cancelled", l: "Đã hủy", desc: "Đơn đã hủy" },
     { v: "refunded", l: "Đã hoàn tiền", desc: "Hoàn tiền từ khiếu nại hoặc tự động" },
-    { v: "pending_manual", l: "Chờ xử lý thủ công", desc: "Voucher đã dùng, cần xử lý tay" },
   ]
 
   const availableActions = selectedOrder ? getActionsForStatus(selectedOrder.status, selectedOrder.paymentStatus) : []
@@ -495,20 +489,6 @@ export function AdminOrdersPage() {
                         )}
                       </div>
                     ))}
-                  </div>
-                )}
-
-                {selectedOrder.status === "pending_manual" && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6">
-                    <div className="flex items-start gap-2">
-                      <AppIcon name="alert" className="w-5 h-5 mt-0.5 shrink-0" style={{ color: "#856404" }} />
-                      <div>
-                        <p className="text-sm font-bold" style={{ color: "#856404" }}>Cần xử lý thủ công</p>
-                        <p className="text-xs mt-1" style={{ color: "#856404" }}>
-                          Đơn hàng này đã bị hủy nhưng voucher đã được sử dụng. Vui lòng xử lý thủ công.
-                        </p>
-                      </div>
-                    </div>
                   </div>
                 )}
 

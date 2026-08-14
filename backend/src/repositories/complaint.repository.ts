@@ -62,7 +62,7 @@ export async function listComplaints(
 }
 
 export async function findComplaintById(id: string) {
-  return prisma.complaint.findUnique({ where: { id }, include: INCLUDE }) as Promise<
+  return prisma.complaint.findUnique({ where: { id }, include: INCLUDE }) as unknown as Promise<
     | (ComplaintRow & {
         issued_vouchers: { voucher_products: { partner_id: string } } | null;
         orders: { user_id: string } | null;
@@ -82,7 +82,7 @@ export async function createComplaint(userId: string, input: CreateComplaintInpu
       evidence_urls: input.evidence_urls ?? undefined,
       status: "open",
     },
-  }) as Promise<ComplaintRow>;
+  }) as unknown as Promise<ComplaintRow>;
 }
 
 export async function findOrderOwner(orderId: string): Promise<{ id: string; user_id: string; recipient_id: string } | null> {
@@ -104,5 +104,5 @@ export async function findOrderLevelComplaint(userId: string, orderId: string) {
 }
 
 export async function updateComplaint(id: string, patch: Record<string, unknown>) {
-  return prisma.complaint.update({ where: { id }, data: patch }) as Promise<ComplaintRow>;
+  return prisma.complaint.update({ where: { id }, data: patch }) as unknown as Promise<ComplaintRow>;
 }

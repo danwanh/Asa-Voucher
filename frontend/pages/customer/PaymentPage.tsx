@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { ArrowLeft, CheckCircle2 } from "lucide-react"
 import { C, fmt } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
@@ -18,15 +18,29 @@ interface Props {
   order?: Order
   onPay: (method: PaymentMethod) => Promise<void>
   onBack: () => void
+  canPay?: boolean
 }
 
 const FALLBACK = "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=200&h=150&fit=crop"
 
-export function PaymentPage({ total, order, orderId, onPay, onBack }: Props) {
+export function PaymentPage({ total, order, orderId, onPay, onBack, canPay = true }: Props) {
   const [payment, setPayment] = useState<PaymentMethod>("vnpay")
   const [processing, setProcessing] = useState(false)
+  const [now, setNow] = useState<number | null>(null)
+  const expiresAt = order?.paymentExpiresAt ? new Date(order.paymentExpiresAt).getTime() : undefined
+  const expired = now !== null && expiresAt !== undefined && expiresAt <= now
+  const payableStatus = order?.status === "pending_payment" || order?.status === "payment_failed"
+  const remainingSeconds = expiresAt && now !== null ? Math.max(0, Math.ceil((expiresAt - now) / 1000)) : undefined
+
+  useEffect(() => {
+    if (!expiresAt) return
+    setNow(Date.now())
+    const timer = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [expiresAt])
 
   const handlePay = async () => {
+    if (!canPay || !payableStatus || expired) return
     setProcessing(true)
     try {
       await onPay(payment)
@@ -79,8 +93,12 @@ export function PaymentPage({ total, order, orderId, onPay, onBack }: Props) {
         <AppIcon name="clock" className="w-5 h-5" />
         <div>
           <div className="text-sm font-bold" style={{ color: C.indigo }}>Mã đơn hàng: #{orderId}</div>
-          <div className="text-xs mt-0.5 font-semibold" style={{ color: "#D97706" }}>
-            Trạng thái: Chờ thanh toán
+          <div className="text-xs mt-0.5 font-semibold" style={{ color: expired ? "#DC2626" : "#D97706" }}>
+            {expired
+              ? "Đơn hàng đã hết thời hạn thanh toán"
+              : remainingSeconds !== undefined
+                ? `Còn ${Math.floor(remainingSeconds / 60)}:${String(remainingSeconds % 60).padStart(2, "0")} để thanh toán`
+                : "Trạng thái: Chờ thanh toán"}
           </div>
         </div>
         <div className="ml-auto text-xs px-2 py-1 rounded-full font-bold" style={{ backgroundColor: C.apricot + "30", color: "#D97706" }}>
@@ -160,10 +178,11 @@ export function PaymentPage({ total, order, orderId, onPay, onBack }: Props) {
 
             <button
               onClick={handlePay}
-              className="w-full py-3.5 rounded-2xl font-black text-white hover:opacity-90 transition-opacity"
+              disabled={!canPay || !payableStatus || expired}
+              className="w-full py-3.5 rounded-2xl font-black text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ backgroundColor: C.peach }}
             >
-              Thanh toán ngay — {fmt(total)}
+              {!canPay ? "Chỉ người đặt hàng được thanh toán" : expired ? "Đã hết hạn thanh toán" : !payableStatus ? "Đơn hàng không thể thanh toán" : `Thanh toán ngay — ${fmt(total)}`}
             </button>
             <p className="text-xs text-center mt-2" style={{ color: "#9CA3AF" }}>Bảo mật SSL 256-bit</p>
           </div>

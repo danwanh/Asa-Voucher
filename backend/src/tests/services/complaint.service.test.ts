@@ -21,6 +21,11 @@ vi.mock("../../repositories/issued-voucher.repository.js", () => ({
   findIssuedVoucherById: vi.fn(),
 }));
 
+vi.mock("../../services/notification.service.js", () => ({
+  createComplaintNotifications: vi.fn(),
+  createAssignmentNotification: vi.fn(),
+}));
+
 import * as complaintRepo from "../../repositories/complaint.repository.js";
 import * as complaintResponseRepo from "../../repositories/complaint-response.repository.js";
 import * as issuedVoucherRepo from "../../repositories/issued-voucher.repository.js";
@@ -43,7 +48,7 @@ function makeComplaint(overrides: Record<string, unknown> = {}) {
     status: "open" as const,
     assigned_to: null,
     resolution_note: null,
-    resolution_type: null,
+    resolution_types: null,
     created_at: "2026-01-01T00:00:00Z",
     resolved_at: null,
     issued_vouchers: { voucher_product_id: "vp-1", voucher_products: { partner_id: "partner-1" } },
@@ -235,15 +240,15 @@ describe("Complaint Service", () => {
     it("admin can resolve open complaint", async () => {
       vi.mocked(complaintRepo.findComplaintById).mockResolvedValue(makeComplaint());
       vi.mocked(complaintRepo.updateComplaint).mockResolvedValue(makeComplaint({
-        status: "resolved", resolution_note: "Refunded", resolution_type: "refund",
+        status: "resolved", resolution_note: "Reviewed", resolution_types: ["no_action"],
       }));
 
       const result = await complaintService.resolveComplaint(ADMIN, "comp-1", {
-        resolution_note: "Refunded",
-        resolution_type: "refund",
+        resolution_note: "Reviewed",
+        resolution_types: ["no_action"],
       });
       expect(result.status).toBe("resolved");
-      expect(result.resolution_note).toBe("Refunded");
+      expect(result.resolution_note).toBe("Reviewed");
     });
 
     it("rejects resolving already resolved complaint", async () => {
@@ -251,7 +256,7 @@ describe("Complaint Service", () => {
       await expect(
         complaintService.resolveComplaint(ADMIN, "comp-1", {
           resolution_note: "Already done",
-          resolution_type: "refund",
+          resolution_types: ["refund"],
         })
       ).rejects.toThrow(HttpError);
     });
@@ -260,7 +265,7 @@ describe("Complaint Service", () => {
       await expect(
         complaintService.resolveComplaint(BUYER, "comp-1", {
           resolution_note: "Note",
-          resolution_type: "refund",
+          resolution_types: ["refund"],
         })
       ).rejects.toThrow(HttpError);
     });

@@ -22,13 +22,16 @@ commerceRoutes.get("/orders/:id", requireAuth, validateParams(idParamSchema), as
 commerceRoutes.patch("/orders/:id", requireAuth, validateParams(idParamSchema), validateBody(updateOrderSchema), asyncHandler(updateOrder));
 commerceRoutes.delete("/orders/:id", requireAuth, validateParams(idParamSchema), asyncHandler(deleteOrder));
 commerceRoutes.patch("/orders/:id/cancel", requireAuth, validateParams(idParamSchema), asyncHandler(cancelOrder));
-commerceRoutes.patch("/orders/:id/refund", requireAuth, requireRole("admin_operations", "partner_owner", "partner_voucher_staff"), validateParams(idParamSchema), validateBody(refundOrderSchema), asyncHandler(refundOrder));
+commerceRoutes.patch("/orders/:id/refund", requireAuth, requireRole("admin_operations"), validateParams(idParamSchema), validateBody(refundOrderSchema), asyncHandler(refundOrder));
 
 commerceRoutes.get("/orders/:orderId/items", requireAuth, validateParams(orderIdParamSchema), asyncHandler(listOrderItems));
 commerceRoutes.get("/order-items/:id", requireAuth, validateParams(idParamSchema), asyncHandler(getOrderItem));
 
 commerceRoutes.get("/orders/:orderId/payments", requireAuth, validateParams(orderIdParamSchema), asyncHandler(listPayments));
 commerceRoutes.post("/orders/:orderId/payments", requireAuth, validateParams(orderIdParamSchema), validateBody(createPaymentSchema), asyncHandler(createPayment));
+commerceRoutes.get("/payments/vnpay/return", asyncHandler(vnpayReturn));
+commerceRoutes.get("/payments/paypal/return", asyncHandler(paypalReturn));
+commerceRoutes.get("/payments/paypal/cancel", asyncHandler(paypalCancel));
 commerceRoutes.get("/payments/:id", requireAuth, validateParams(idParamSchema), asyncHandler(getPaymentController));
 commerceRoutes.patch("/payments/:id/simulate-success", requireAuth, validateParams(idParamSchema), asyncHandler(simulatePaymentSuccess));
 commerceRoutes.patch("/payments/:id/simulate-failed", requireAuth, validateParams(idParamSchema), asyncHandler(simulatePaymentFailed));

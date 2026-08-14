@@ -39,7 +39,7 @@ function mapFeedback(value: BackendRecord): {
   review?: Review;
   complaint?: Complaint;
 } {
-  const reviewValue = value.reviews?.[0];
+  const reviewValue = Array.isArray(value.reviews) ? value.reviews[0] : value.reviews;
   const complaintValue = value.complaints?.[0];
   return {
     review: reviewValue
@@ -61,7 +61,7 @@ function mapFeedback(value: BackendRecord): {
           evidenceUrls: strings(complaintValue.evidence_urls),
           status: complaintValue.status,
           resolutionNote: complaintValue.resolution_note,
-          resolutionType: complaintValue.resolution_type,
+          resolutionTypes: strings(complaintValue.resolution_types),
           createdAt: complaintValue.created_at,
           resolvedAt: complaintValue.resolved_at,
         }
@@ -93,7 +93,7 @@ function mapMineVoucher(value: BackendRecord): Order {
     ),
     amount: Number(item.subtotal ?? order.total_amount ?? 0),
     status: order.status,
-    paymentStatus: "pending",
+    paymentStatus: order.status === "refunded" ? "refunded" : "paid",
     paymentMethod: String(order.payment_method ?? ""),
     createdAt: order.created_at ?? value.issued_date,
     code: issuedVoucher.code,
@@ -147,14 +147,13 @@ export const issuedVoucherService = {
     } catch {
       // Manual input is a voucher code.
     }
-    const response = await api.post("/issued-vouchers/validate", payload);
-    return data<IssuedVoucherResult>(response);
+    const response = await api.post("/issued-vouchers/check", payload);
+    const result = data<Omit<IssuedVoucherResult, "redeemable" | "reason">>(response);
+    return { ...result, redeemable: true, reason: null };
   },
 
-  async redeem(id: string, branchId: string) {
-    const response = await api.post(`/issued-vouchers/${id}/redeem`, {
-      branch_id: branchId,
-    });
+  async redeem(voucherCode: string) {
+    const response = await api.post("/issued-vouchers/confirm", { voucher_code: voucherCode });
     return data(response);
   },
 

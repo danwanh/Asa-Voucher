@@ -1,14 +1,15 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 import { HttpError } from "../../utils/http-error.js";
 
 const { mockPrisma, mockTx } = vi.hoisted(() => {
-  const tx: Record<string, Record<string, vi.Mock>> = {
-    order: { create: vi.fn(), update: vi.fn() },
+  const tx: Record<string, Record<string, Mock>> = {
+    order: { create: vi.fn(), update: vi.fn(), updateMany: vi.fn(), findUnique: vi.fn() },
     orderItem: { create: vi.fn() },
     orderLog: { create: vi.fn() },
-    payment: { create: vi.fn(), update: vi.fn() },
+    cartItem: { deleteMany: vi.fn() },
+    payment: { create: vi.fn(), update: vi.fn(), updateMany: vi.fn(), findUnique: vi.fn(), findFirst: vi.fn() },
     paymentLog: { create: vi.fn() },
-    voucherProduct: { updateMany: vi.fn() },
+    voucherProduct: { updateMany: vi.fn(), update: vi.fn() },
     issuedVoucher: { createMany: vi.fn() },
   };
   return {
@@ -45,6 +46,7 @@ const { mockPrisma, mockTx } = vi.hoisted(() => {
       },
       payment: {
         findUnique: vi.fn(),
+        update: vi.fn(),
       },
       $transaction: vi.fn((input: unknown) => Array.isArray(input) ? Promise.all(input) : (input as Function)(tx)),
     },
@@ -76,6 +78,8 @@ function makeVoucher(overrides: Record<string, unknown> = {}) {
 describe("Commerce Service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockTx.order.updateMany.mockResolvedValue({ count: 1 });
+    mockTx.payment.updateMany.mockResolvedValue({ count: 1 });
   });
 
   describe("getCart", () => {
@@ -187,6 +191,7 @@ describe("Commerce Service", () => {
       const result = await commerceService.checkout("u-buyer", { payment_method: "simulated" });
       expect(result.total_amount).toBe(160000);
       expect(mockTx.orderLog.create).toHaveBeenCalled();
+      expect(mockTx.cartItem.deleteMany).toHaveBeenCalledWith({ where: { cart_id: "cart1", id: { in: ["ci1"] } } });
     });
 
     it("rejects empty cart", async () => {
@@ -209,6 +214,15 @@ describe("Commerce Service", () => {
         payment_method: "simulated",
       });
       expect(result.total_amount).toBe(80000);
+      expect(mockTx.order.create).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({
+          user_id: "u-buyer",
+          recipient_id: "u-buyer",
+          status: "pending_payment",
+          payment_status: "pending",
+          payment_expires_at: expect.any(Date),
+        }),
+      }));
     });
 
     it("resolves a gift recipient and stores the recipient on the order", async () => {
@@ -221,7 +235,7 @@ describe("Commerce Service", () => {
       await commerceService.createOrder("u-buyer", {
         items: [{ voucher_product_id: "vp1", quantity: 1 }],
         payment_method: "vnpay",
-        recipient_email: "recipient@example.com",
+        recipient_identifier: "recipient@example.com",
         is_gift: true,
       });
 
@@ -236,7 +250,7 @@ describe("Commerce Service", () => {
       await expect(commerceService.createOrder("u-buyer", {
         items: [{ voucher_product_id: "vp1", quantity: 1 }],
         payment_method: "vnpay",
-        recipient_email: "missing@example.com",
+        recipient_identifier: "missing@example.com",
         is_gift: true,
       })).rejects.toThrow(HttpError);
     });
@@ -303,7 +317,7 @@ describe("Commerce Service", () => {
       expect(result.countsByStatus.payment_failed).toBe(1);
       expect(result.countsByStatus.cancelled).toBe(1);
       expect(prisma.order.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: expect.objectContaining({ status: "cancelled" }) })
+        expect.objectContaining({ where: expect.objectContaining({ status: { in: ["cancelled"] } }) })
       );
       expect(prisma.order.groupBy).toHaveBeenCalledWith(
         expect.objectContaining({ where: { AND: [{ OR: [{ user_id: "u-buyer" }, { recipient_id: "u-buyer" }] }] } })
@@ -328,6 +342,15 @@ describe("Commerce Service", () => {
 
       await expect(commerceService.getOrderById(BUYER, "o1")).rejects.toThrow(HttpError);
     });
+
+    it("allows a gift recipient to view the order", async () => {
+      vi.mocked(prisma.order.findUnique).mockResolvedValue({
+        id: "o1", user_id: "u-other", recipient_id: "u-buyer", status: "confirmed", order_items: [], payments: [],
+      } as any);
+
+      const result = await commerceService.getOrderById(BUYER, "o1");
+      expect(result.id).toBe("o1");
+    });
   });
 
   describe("cancelOrder", () => {
@@ -340,6 +363,7 @@ describe("Commerce Service", () => {
 
       const result = await commerceService.cancelOrder(BUYER, "o1");
       expect(result.status).toBe("cancelled");
+      expect(mockTx.voucherProduct.update).not.toHaveBeenCalled();
     });
 
     it("rejects cancelling paid order", async () => {
@@ -359,6 +383,7 @@ describe("Commerce Service", () => {
       } as any);
       mockTx.payment.create.mockResolvedValue({ id: "pay1", amount: 100000 });
       mockTx.paymentLog.create.mockResolvedValue({});
+      vi.mocked(prisma.payment.update).mockResolvedValue({ id: "pay1", amount: 100000 } as any);
 
       const result = await commerceService.createPayment(BUYER, "o1");
       expect(result.amount).toBe(100000);
@@ -370,6 +395,15 @@ describe("Commerce Service", () => {
       } as any);
 
       await expect(commerceService.createPayment(BUYER, "o1")).rejects.toThrow(HttpError);
+    });
+
+    it("rejects payment by a gift recipient", async () => {
+      vi.mocked(prisma.order.findUnique).mockResolvedValue({
+        id: "o1", user_id: "u-other", recipient_id: "u-buyer", status: "pending_payment", order_items: [], payments: [],
+      } as any);
+
+      await expect(commerceService.createPayment(BUYER, "o1")).rejects.toThrow(HttpError);
+      expect(mockTx.payment.create).not.toHaveBeenCalled();
     });
   });
 
@@ -386,6 +420,8 @@ describe("Commerce Service", () => {
       mockTx.payment.update.mockResolvedValue({ id: "pay1", status: "success" });
       mockTx.order.update.mockResolvedValue({});
       mockTx.paymentLog.create.mockResolvedValue({});
+      mockTx.orderLog.create.mockResolvedValue({});
+      vi.mocked(prisma.payment.update).mockResolvedValue({ id: "pay1" } as any);
 
       const result = await commerceService.simulatePaymentSuccess(BUYER, "pay1");
       expect(result.status).toBe("success");
@@ -414,9 +450,13 @@ describe("Commerce Service", () => {
       mockTx.payment.update.mockResolvedValue({ id: "pay1", status: "failed" });
       mockTx.order.update.mockResolvedValue({});
       mockTx.paymentLog.create.mockResolvedValue({});
+      mockTx.payment.findUnique.mockResolvedValue({ id: "pay1", order_id: "o1", amount: 100000, status: "failed" });
 
       const result = await commerceService.simulatePaymentFailed(BUYER, "pay1");
       expect(result.status).toBe("failed");
+      expect(mockTx.order.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ status: "payment_failed" }),
+      }));
     });
   });
 });

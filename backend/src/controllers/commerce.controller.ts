@@ -39,7 +39,10 @@ export async function createOrder(req: Request, res: Response) {
 }
 
 export async function listOrders(req: Request, res: Response) {
-  ok(res, await commerceService.listOrders({ ...req.user!, partnerId: req.user!.partnerId ?? undefined }, req.query as { status?: string; search?: string }));
+  ok(res, await commerceService.listOrders(
+    { ...req.user!, partnerId: req.user!.partnerId ?? undefined },
+    req.query as { status?: string; search?: string; page?: number; limit?: number },
+  ));
 }
 
 export async function getOrderController(req: Request, res: Response) {
@@ -51,12 +54,7 @@ export async function updateOrder(req: Request, res: Response) {
 }
 
 export async function cancelOrder(req: Request, res: Response) {
-  try {
-    ok(res, await commerceService.cancelOrder({ ...req.user!, partnerId: req.user!.partnerId ?? undefined }, req.params.id), "Order cancelled");
-  } catch (err) {
-    console.error("CANCEL ORDER ERROR:", err);
-    throw err;
-  }
+  ok(res, await commerceService.cancelOrder({ ...req.user!, partnerId: req.user!.partnerId ?? undefined }, req.params.id), "Order cancelled");
 }
 
 export async function deleteOrder(req: Request, res: Response) {

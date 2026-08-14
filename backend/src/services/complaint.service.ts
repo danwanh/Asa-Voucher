@@ -1,9 +1,9 @@
 import { HttpError } from "../utils/http-error.js";
-import { buildPaginatedResult } from "../utils/pagination.js";
 import * as complaintRepo from "../repositories/complaint.repository.js";
 import * as complaintResponseRepo from "../repositories/complaint-response.repository.js";
 import * as issuedVoucherRepo from "../repositories/issued-voucher.repository.js";
-import { isAdminRole, isPartnerStaff, type AuthUser, type AppRole } from "../types/auth.types.js";
+import { isAdminRole, isPartnerStaff, type AuthUser } from "../types/auth.types.js";
+import type { ComplaintStatus } from "../types/complaint.types.js";
 import type {
   AssignComplaintInput,
   CreateComplaintInput,
@@ -13,7 +13,7 @@ import type {
 } from "../validations/complaint.validation.js";
 import { prisma } from "../config/prisma.js";
 import { refundVnpayPayment, refundPayPalPayment, formatVnpayDate, safeParseJson, extractPaypalCaptureId } from "./payment-provider.service.js";
-import { createComplaintNotifications, createAssignmentNotification, createRequestInfoNotification } from "./notification.service.js";
+import { createComplaintNotifications, createAssignmentNotification } from "./notification.service.js";
 
 type ComplaintWithRelations = NonNullable<Awaited<ReturnType<typeof complaintRepo.findComplaintById>>>;
 
@@ -32,7 +32,8 @@ export async function listComplaints(user: AuthUser, query: { status?: string; p
   const { status, page = 1, limit = 20 } = query;
   const partnerId = isPartnerStaff(user.role) ? (user.partnerId ?? undefined) : undefined;
   const result = await complaintRepo.listComplaints({
-    status: status as any,
+    status: status as ComplaintStatus | undefined,
+    userId: user.role === "buyer" ? user.id : undefined,
     partnerId,
     page,
     limit,
@@ -139,16 +140,16 @@ export async function resolveComplaint(user: AuthUser, id: string, input: Resolv
     throw new HttpError(409, "Khiếu nại đã được xử lý hoặc đóng trước đó");
   }
 
+  if (input.resolution_types.includes("refund") && complaint.order_id) {
+    await processRefundForComplaint(complaint.order_id, user.id, complaint.id, input.resolution_note);
+  }
+
   const updated = await complaintRepo.updateComplaint(id, {
     status: "resolved",
     resolution_note: input.resolution_note,
     resolution_types: input.resolution_types,
     resolved_at: new Date().toISOString(),
   });
-
-  if (input.resolution_types.includes("refund") && complaint.order_id) {
-    await processRefundForComplaint(complaint.order_id, user.id, complaint.id, input.resolution_note);
-  }
 
   const partnerId = complaint.issued_vouchers?.voucher_products?.partner_id ?? null;
   await createComplaintNotifications(
@@ -171,11 +172,13 @@ async function processRefundForComplaint(
 ) {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    include: { payments: true },
+    include: { payments: true, order_items: { include: { issued_vouchers: true } } },
   });
   if (!order) throw new HttpError(404, "Không tìm thấy đơn hàng để hoàn tiền");
 
-  const successPayment = (order.payments as Array<Record<string, unknown>> ?? []).find(
+  const payments = (order.payments as Array<Record<string, unknown>>) ?? [];
+  if (payments.some((payment) => payment.status === "refunded")) return;
+  const successPayment = payments.find(
     (p) => p.status === "success"
   );
   if (!successPayment) throw new HttpError(409, "Đơn hàng chưa thanh toán, không thể hoàn tiền");
@@ -192,7 +195,10 @@ async function processRefundForComplaint(
       gatewayResponse: { provider, mode: "simulated-refund", transactionRef },
     };
   } else if (provider === "paypal" && transactionRef) {
-    const gatewayData = safeParseJson(successPayment.gateway_response);
+    const rawGatewayData = safeParseJson(successPayment.gateway_response);
+    const gatewayData = rawGatewayData.provider_response && typeof rawGatewayData.provider_response === "object"
+      ? rawGatewayData.provider_response as Record<string, unknown>
+      : rawGatewayData;
     const realCaptureId = extractPaypalCaptureId(gatewayData) ?? transactionRef;
     refundResult = await refundPayPalPayment({
       captureId: realCaptureId,
@@ -201,7 +207,10 @@ async function processRefundForComplaint(
       note: note || `Refund for complaint ${complaintId}`,
     });
   } else if (provider === "vnpay" && transactionRef) {
-    const gatewayData = safeParseJson(successPayment.gateway_response);
+    const rawGatewayData = safeParseJson(successPayment.gateway_response);
+    const gatewayData = rawGatewayData.provider_response && typeof rawGatewayData.provider_response === "object"
+      ? rawGatewayData.provider_response as Record<string, unknown>
+      : rawGatewayData;
     const transactionNo = String(gatewayData.vnp_TransactionNo || "");
     if (!transactionNo) {
       throw new HttpError(422, "Thiếu vnp_TransactionNo của giao dịch gốc, không thể hoàn tiền", "VNPAY_TRANSACTION_NO_MISSING");
@@ -246,8 +255,21 @@ async function processRefundForComplaint(
 
     await tx.order.update({
       where: { id: orderId },
-      data: { status: "refunded" },
+      data: { status: "refunded", payment_status: "refunded", updated_at: new Date() },
     });
+
+    for (const item of order.order_items) {
+      const activeVoucherCount = item.issued_vouchers.filter((voucher) => voucher.status === "active").length;
+      if (activeVoucherCount === 0) continue;
+      await tx.issuedVoucher.updateMany({
+        where: { order_item_id: item.id, status: "active" },
+        data: { status: "refunded", updated_at: new Date() },
+      });
+      await tx.voucherProduct.update({
+        where: { id: item.voucher_product_id },
+        data: { remaining_quantity: { increment: activeVoucherCount } },
+      });
+    }
 
     await tx.orderLog.create({
       data: {

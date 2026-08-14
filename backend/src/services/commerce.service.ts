@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { prisma } from "../config/prisma.js";
-import { adminRoles, isAdminRole, isPartnerStaff, type UserRole } from "../types/auth.types.js";
+import { adminRoles, isPartnerStaff, type UserRole } from "../types/auth.types.js";
 import { requireData } from "../utils/db.js";
 import { HttpError } from "../utils/http-error.js";
 import {
@@ -48,6 +48,31 @@ function isAdmin(user: CurrentUser) {
 type PaymentRecord = { status: string };
 
 const ORDER_STATUS_VALUES = ["pending_payment", "payment_failed", "confirmed", "completed", "cancelled", "refunded"] as const;
+type OrderStatus = typeof ORDER_STATUS_VALUES[number];
+
+type CreateOrderInput = {
+  items?: Array<{ voucher_product_id: string; quantity: number }>;
+  cart_item_ids?: string[];
+  payment_method: string;
+  recipient_identifier?: string;
+  is_gift?: boolean;
+  expected_prices?: Record<string, number>;
+  note?: string;
+};
+
+function normalizeOrderStatus(status: unknown): OrderStatus {
+  if (status === "pending") return "pending_payment";
+  if (status === "used") return "completed";
+  if (status === "pending_manual") return "confirmed";
+  return ORDER_STATUS_VALUES.includes(status as OrderStatus) ? status as OrderStatus : "pending_payment";
+}
+
+function storedStatuses(status: string) {
+  if (status === "pending_payment") return ["pending_payment", "pending"];
+  if (status === "confirmed") return ["confirmed", "pending_manual"];
+  if (status === "completed") return ["completed", "used"];
+  return [status];
+}
 
 function derivePaymentStatus(payments: PaymentRecord[] | undefined): "pending" | "paid" | "failed" | "refunded" {
   const list = payments ?? [];
@@ -139,11 +164,22 @@ export async function clearCart(userId: string) {
   await prisma.cartItem.deleteMany({ where: { cart_id: cart.id as string } });
 }
 
-async function buildOrderItems(items: Array<{ voucher_product_id: string; quantity: number }>) {
+async function buildOrderItems(
+  items: Array<{ voucher_product_id: string; quantity: number }>,
+  expectedPrices?: Record<string, number>,
+) {
   const orderItems = [];
   for (const item of items) {
     const voucher = await getSellableVoucher(item.voucher_product_id, item.quantity);
     const unitPrice = Number(voucher.selling_price);
+    const expectedPrice = expectedPrices?.[voucher.id];
+    if (expectedPrice !== undefined && expectedPrice !== unitPrice) {
+      throw new HttpError(409, "Voucher price has changed", "PRICE_CHANGED", {
+        voucher_product_id: voucher.id,
+        expected_price: expectedPrice,
+        current_price: unitPrice,
+      });
+    }
     orderItems.push({
       voucher,
       quantity: item.quantity,
@@ -161,15 +197,61 @@ async function buildOrderItems(items: Array<{ voucher_product_id: string; quanti
   return orderItems;
 }
 
-async function createOrderFromItems(userId: string, items: Array<{ voucher_product_id: string; quantity: number }>, paymentMethod: string, note?: string) {
-  const builtItems = await buildOrderItems(items);
+async function resolveRecipient(userId: string, identifier: string | undefined, isGift: boolean) {
+  if (!isGift) return userId;
+  const value = identifier?.trim();
+  if (!value) throw new HttpError(422, "Recipient identifier is required", "RECIPIENT_REQUIRED");
+  const phone = value.replace(/\s/g, "");
+  const normalizedPhone = phone.startsWith("+84") ? `0${phone.slice(3)}` : phone;
+  const recipient = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { email: { equals: value, mode: "insensitive" } },
+        { phone },
+        { phone: normalizedPhone },
+      ],
+      is_active: true,
+    },
+    select: { id: true },
+  });
+  if (!recipient) throw new HttpError(404, "Recipient account was not found", "RECIPIENT_NOT_FOUND");
+  return recipient.id;
+}
+
+async function createOrderFromItems(
+  userId: string,
+  items: Array<{ voucher_product_id: string; quantity: number }>,
+  input: CreateOrderInput,
+  cart?: { id: string; itemIds: string[] },
+) {
+  const [builtItems, recipientId] = await Promise.all([
+    buildOrderItems(items, input.expected_prices),
+    resolveRecipient(userId, input.recipient_identifier, Boolean(input.is_gift)),
+  ]);
   const subtotal = builtItems.reduce((sum, item) => sum + Number(item.orderItem.subtotal), 0);
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
   return prisma.$transaction(async (tx) => {
-    const orderData: any = { order_code: orderCode(), user_id: userId, subtotal, discount_amount: 0, total_amount: subtotal, payment_method: paymentMethod, note };
+    const orderData = {
+      order_code: orderCode(),
+      user_id: userId,
+      recipient_id: recipientId,
+      is_gift: Boolean(input.is_gift),
+      subtotal,
+      discount_amount: 0,
+      total_amount: subtotal,
+      payment_method: input.payment_method,
+      payment_status: "pending",
+      status: "pending_payment",
+      payment_expires_at: expiresAt,
+      note: input.note,
+    };
     const order = await tx.order.create({ data: orderData });
     const orderItems = await Promise.all(builtItems.map((item) => tx.orderItem.create({ data: { ...item.orderItem, order_id: order.id } })));
     await tx.orderLog.create({ data: { order_id: order.id, user_id: userId, action: "CREATE_ORDER", description: "Order created" } });
+    if (cart?.itemIds.length) {
+      await tx.cartItem.deleteMany({ where: { cart_id: cart.id, id: { in: cart.itemIds } } });
+    }
     return { ...order, items: orderItems };
   });
 }
@@ -180,27 +262,33 @@ async function itemsFromCart(userId: string, cartItemIds?: string[]) {
     where: { cart_id: cart.id as string, ...(cartItemIds?.length ? { id: { in: cartItemIds } } : {}) }
   });
   if (!cartItems.length) throw new HttpError(422, "Cart is empty", "EMPTY_CART");
+  if (cartItemIds?.length && new Set(cartItemIds).size !== cartItems.length) {
+    throw new HttpError(422, "One or more cart items are invalid", "INVALID_CART_ITEMS");
+  }
   return { cart, cartItems: cartItems as unknown as Array<Record<string, unknown>> };
 }
 
-export async function checkout(userId: string, input: { cart_item_ids?: string[]; payment_method: string; note?: string }) {
+export async function checkout(userId: string, input: CreateOrderInput) {
   const { cart, cartItems } = await itemsFromCart(userId, input.cart_item_ids);
-  const order = await createOrderFromItems(
+  return createOrderFromItems(
     userId,
     cartItems.map((item) => ({ voucher_product_id: item.voucher_product_id as string, quantity: Number(item.quantity) })),
-    input.payment_method,
-    input.note
+    input,
+    { id: cart.id as string, itemIds: cartItems.map((item) => item.id as string) },
   );
-  await prisma.cartItem.deleteMany({ where: { cart_id: cart.id as string, id: { in: cartItems.map((item) => item.id as string) } } });
-  return order;
 }
 
-export async function createOrder(userId: string, input: { items?: Array<{ voucher_product_id: string; quantity: number }>; cart_item_ids?: string[]; payment_method: string; note?: string }) {
+export async function createOrder(userId: string, input: CreateOrderInput) {
   if (input.cart_item_ids?.length) {
-    const { cartItems } = await itemsFromCart(userId, input.cart_item_ids);
-    return createOrderFromItems(userId, cartItems.map((item) => ({ voucher_product_id: item.voucher_product_id as string, quantity: Number(item.quantity) })), input.payment_method, input.note);
+    const { cart, cartItems } = await itemsFromCart(userId, input.cart_item_ids);
+    return createOrderFromItems(
+      userId,
+      cartItems.map((item) => ({ voucher_product_id: item.voucher_product_id as string, quantity: Number(item.quantity) })),
+      input,
+      { id: cart.id as string, itemIds: cartItems.map((item) => item.id as string) },
+    );
   }
-  return createOrderFromItems(userId, input.items ?? [], input.payment_method, input.note);
+  return createOrderFromItems(userId, input.items ?? [], input);
 }
 
 async function getOrder(id: string) {
@@ -232,10 +320,15 @@ async function getOrder(id: string) {
 }
 
 function assertOrderAccess(user: CurrentUser, order: Record<string, unknown>) {
-  if (isAdmin(user) || order.user_id === user.id) return;
+  if (isAdmin(user) || order.user_id === user.id || order.recipient_id === user.id) return;
   const items = (order.order_items as Array<Record<string, unknown>> | undefined) ?? [];
   if (user.partnerId && items.some((item) => (item.voucher_products as Record<string, unknown>)?.partner_id === user.partnerId)) return;
   throw new HttpError(403, "Insufficient permissions", "FORBIDDEN");
+}
+
+function assertCanMutateOrder(user: CurrentUser, order: Record<string, unknown>) {
+  if (user.role === "admin_operations" || order.user_id === user.id) return;
+  throw new HttpError(403, "Only the buyer who created the order can modify it", "FORBIDDEN");
 }
 
 function buildOrderListWhere(user: CurrentUser, query?: { status?: string; search?: string }) {
@@ -255,12 +348,13 @@ function buildOrderListWhere(user: CurrentUser, query?: { status?: string; searc
         { order_code: { contains: query.search, mode: "insensitive" } },
         { users: { full_name: { contains: query.search, mode: "insensitive" } } },
         { users: { email: { contains: query.search, mode: "insensitive" } } },
+        { order_items: { some: { voucher_products: { name: { contains: query.search, mode: "insensitive" } } } } },
       ],
     });
   }
 
   const where: Record<string, unknown> = and.length > 0 ? { AND: and } : {};
-  if (query?.status) where.status = query.status;
+  if (query?.status) where.status = { in: storedStatuses(query.status) };
   return where;
 }
 
@@ -268,7 +362,8 @@ function buildCountsByStatus(grouped: Array<{ status: string; _count: { _all: nu
   const counts: Record<string, number> = { all: 0 };
   for (const status of ORDER_STATUS_VALUES) counts[status] = 0;
   for (const row of grouped) {
-    counts[row.status] = row._count._all;
+    const status = normalizeOrderStatus(row.status);
+    counts[status] += row._count._all;
     counts.all += row._count._all;
   }
   return counts;
@@ -311,7 +406,7 @@ export async function listOrders(
           issued_vouchers: { select: { id: true, voucher_code: true, qr_code_payload: true, status: true, expired_date: true } },
         },
       },
-      payments: { select: { status: true } },
+      payments: true,
     },
     orderBy: { created_at: "desc" }
     , skip, take: limit }),
@@ -330,6 +425,7 @@ export async function listOrders(
     })
     .map((order: Record<string, unknown> & { payments?: PaymentRecord[] }) => ({
       ...order,
+      status: normalizeOrderStatus(order.status),
       payment_status: derivePaymentStatus(order.payments as PaymentRecord[])
     }));
 
@@ -339,28 +435,24 @@ export async function listOrders(
   };
 }
 
-export async function getOrderById(user: CurrentUser, id: string) {
+export async function getOrderById(user: CurrentUser, id: string): Promise<Record<string, unknown>> {
   const order = await getOrder(id);
   assertOrderAccess(user, order);
-  return { ...order, payment_status: derivePaymentStatus(order.payments as PaymentRecord[]) };
+  return {
+    ...order,
+    status: normalizeOrderStatus(order.status),
+    payment_status: derivePaymentStatus(order.payments as PaymentRecord[]),
+  };
 }
 
 export async function updateOrder(user: CurrentUser, id: string, input: Record<string, unknown>) {
   const order = await getOrder(id);
   assertOrderAccess(user, order);
-  if (!isAdmin(user) && input.status) throw new HttpError(403, "Only admin can update order status", "FORBIDDEN");
-
+  assertCanMutateOrder(user, order);
   if (input.status) {
-    const allowedStatuses = ["confirmed", "completed", "cancelled"];
-    if (!allowedStatuses.includes(String(input.status))) {
-      throw new HttpError(400, "Trạng thái không hợp lệ", "INVALID_STATUS");
-    }
-    if (order.status !== "pending_manual") {
-      throw new HttpError(409, "Chỉ có thể thay đổi trạng thái từ chờ xử lý thủ công", "INVALID_STATUS_TRANSITION");
-    }
+    throw new HttpError(409, "Order status must be changed through its dedicated action", "INVALID_STATUS_TRANSITION");
   }
-
-  return prisma.order.update({ where: { id }, data: { ...input, updated_at: new Date() } as never });
+  return prisma.order.update({ where: { id }, data: { note: input.note as string | null | undefined, updated_at: new Date() } });
 }
 
 export async function cancelOrder(user: CurrentUser, id: string, reason?: string) {
@@ -368,18 +460,26 @@ export async function cancelOrder(user: CurrentUser, id: string, reason?: string
     await prisma.order.findUnique({
       where: { id },
       include: {
+        payments: true,
         order_items: { include: { issued_vouchers: { include: { voucher_usages: true } } } }
       }
     }) as unknown as Record<string, unknown> | null,
     "Order not found"
   );
   assertOrderAccess(user, order);
-  if (["completed", "refunded"].includes(String(order.status))) {
-    throw new HttpError(409, "Đơn hàng đã hoàn thành không thể hủy trực tiếp. Vui lòng chuyển sang chờ xử lý thủ công.", "ORDER_CANNOT_CANCEL");
+  assertCanMutateOrder(user, order);
+  const status = normalizeOrderStatus(order.status);
+
+  if (["completed", "refunded"].includes(status)) {
+    throw new HttpError(409, "Completed or refunded orders cannot be cancelled", "ORDER_CANNOT_CANCEL");
   }
 
-  if (order.status === "cancelled") {
+  if (status === "cancelled") {
     throw new HttpError(409, "Đơn hàng đã bị hủy", "ORDER_ALREADY_CANCELLED");
+  }
+
+  if (status === "confirmed" && user.role !== "admin_operations") {
+    throw new HttpError(403, "Only operations administrators can cancel a paid order", "FORBIDDEN");
   }
 
   const orderItems = (order.order_items as Array<Record<string, unknown>>) ?? [];
@@ -388,28 +488,50 @@ export async function cancelOrder(user: CurrentUser, id: string, reason?: string
       (v) => ((v.voucher_usages as unknown[]) ?? []).length > 0
     )
   );
-
-  // pending_manual: always cancel (already in manual review)
-  // other statuses: pending_manual if vouchers used, cancelled otherwise
-  const nextStatus = order.status === "pending_manual" ? "cancelled" : (hasUsedVoucher ? "pending_manual" : "cancelled");
+  if (hasUsedVoucher) {
+    throw new HttpError(409, "An order with used vouchers cannot be cancelled", "ORDER_HAS_USED_VOUCHERS");
+  }
+  const wasPaid = ((order.payments as Array<Record<string, unknown>>) ?? []).some((payment) => payment.status === "success");
+  const pendingPayments = ((order.payments as Array<Record<string, unknown>>) ?? [])
+    .filter((payment) => payment.status === "pending" || payment.status === "processing");
 
   return prisma.$transaction(async (tx) => {
     const data = await tx.order.update({
       where: { id },
-      data: { status: nextStatus, updated_at: new Date() }
+      data: { status: "cancelled", payment_status: wasPaid ? "paid" : "failed", updated_at: new Date() }
     });
 
-    // Restore vouchers when: no used vouchers OR cancelling from pending_manual
-    const shouldRestore = !hasUsedVoucher || order.status === "pending_manual";
-    if (shouldRestore) {
+    if (pendingPayments.length > 0) {
+      await tx.payment.updateMany({
+        where: { id: { in: pendingPayments.map((payment) => payment.id as string) } },
+        data: { status: "failed", gateway_response: reason ?? "ORDER_CANCELLED" },
+      });
+      for (const payment of pendingPayments) {
+        await tx.paymentLog.create({
+          data: {
+            payment_id: payment.id as string,
+            order_id: id,
+            user_id: user.id,
+            action: "PAYMENT_CANCELLED_WITH_ORDER",
+            status: "failed",
+            amount: payment.amount as never,
+          },
+        });
+      }
+    }
+
+    if (wasPaid) {
       for (const item of orderItems) {
+        const activeVoucherCount = ((item.issued_vouchers as Array<Record<string, unknown>>) ?? [])
+          .filter((voucher) => voucher.status === "active").length;
+        if (activeVoucherCount === 0) continue;
         await tx.issuedVoucher.updateMany({
           where: { order_item_id: item.id as string, status: "active" },
           data: { status: "refunded" }
         });
         await tx.voucherProduct.update({
           where: { id: item.voucher_product_id as string },
-          data: { remaining_quantity: { increment: Number(item.quantity) } }
+          data: { remaining_quantity: { increment: activeVoucherCount } }
         });
       }
     }
@@ -418,22 +540,18 @@ export async function cancelOrder(user: CurrentUser, id: string, reason?: string
       data: {
         order_id: id,
         user_id: user.id,
-        action: order.status === "pending_manual" ? "CANCEL_ORDER" : (hasUsedVoucher ? "CANCEL_BLOCKED_MANUAL_REVIEW" : "CANCEL_ORDER"),
-        description: order.status === "pending_manual"
-          ? "Hủy đơn từ chờ xử lý thủ công"
-          : (hasUsedVoucher ? "Voucher đã được sử dụng, chuyển sang chờ xử lý thủ công" : (reason ?? "Order cancelled"))
+        action: "CANCEL_ORDER",
+        description: reason ?? "Order cancelled"
       }
     });
 
-    if (isAdmin(user)) {
+    if (user.role === "admin_operations") {
       await tx.adminLog.create({
         data: {
           admin_id: user.id,
           target_order_id: id,
-          action: order.status === "pending_manual" ? "order.cancel" : (hasUsedVoucher ? "order.cancel_blocked" : "order.cancel"),
-          description: order.status === "pending_manual"
-            ? `Hủy đơn từ chờ xử lý thủ công ${order.order_code}`
-            : `${hasUsedVoucher ? "Chờ xử lý thủ công" : "Hủy"} đơn ${order.order_code}`
+          action: "order.cancel",
+          description: `Hủy đơn ${order.order_code}`
         }
       });
     }
@@ -443,7 +561,7 @@ export async function cancelOrder(user: CurrentUser, id: string, reason?: string
 }
 
 export async function refundOrder(user: CurrentUser, id: string, note?: string) {
-  if (!isAdminRole(user.role) && !isPartnerStaff(user.role)) {
+  if (user.role !== "admin_operations") {
     throw new HttpError(403, "Không có quyền thực hiện hoàn tiền", "FORBIDDEN");
   }
 
@@ -454,14 +572,14 @@ export async function refundOrder(user: CurrentUser, id: string, note?: string) 
     throw new HttpError(409, "Chỉ hoàn tiền cho đơn hàng đã hủy", "ORDER_NOT_CANCELLED");
   }
 
-  const successPayment = (order.payments as Array<Record<string, unknown>> ?? []).find((p) => p.status === "success");
+  const payments = (order.payments as Array<Record<string, unknown>>) ?? [];
+  if (payments.some((payment) => payment.status === "refunded")) {
+    throw new HttpError(409, "Đơn hàng đã được hoàn tiền", "ORDER_ALREADY_REFUNDED");
+  }
+  const successPayment = payments.find((payment) => payment.status === "success");
 
   if (!successPayment) {
     throw new HttpError(409, "Chỉ hoàn tiền cho đơn đã thanh toán", "ORDER_NOT_PAID");
-  }
-
-  if (successPayment.status === "refunded") {
-    throw new HttpError(409, "Đơn hàng đã được hoàn tiền", "ORDER_ALREADY_REFUNDED");
   }
 
   const provider = String(successPayment.method);
@@ -476,7 +594,7 @@ export async function refundOrder(user: CurrentUser, id: string, note?: string) 
       gatewayResponse: { provider, mode: "simulated-refund", transactionRef },
     };
   } else if (provider === "paypal" && transactionRef) {
-    const gatewayData = safeParseJson(successPayment.gateway_response);
+    const gatewayData = providerResponse(successPayment.gateway_response);
     const realCaptureId = extractPaypalCaptureId(gatewayData) ?? transactionRef;
     refundResult = await refundPayPalPayment({
       captureId: realCaptureId,
@@ -485,7 +603,7 @@ export async function refundOrder(user: CurrentUser, id: string, note?: string) 
       note,
     });
   } else if (provider === "vnpay" && transactionRef) {
-    const gatewayData = safeParseJson(successPayment.gateway_response);
+    const gatewayData = providerResponse(successPayment.gateway_response);
     const transactionNo = String(gatewayData.vnp_TransactionNo || "");
     if (!transactionNo) {
       throw new HttpError(422, "Thiếu vnp_TransactionNo của giao dịch gốc, không thể hoàn tiền", "VNPAY_TRANSACTION_NO_MISSING");
@@ -519,7 +637,7 @@ export async function refundOrder(user: CurrentUser, id: string, note?: string) 
 
     await tx.order.update({
       where: { id },
-      data: { status: "refunded", updated_at: new Date() }
+      data: { status: "refunded", payment_status: "refunded", updated_at: new Date() }
     });
 
     await tx.paymentLog.create({
@@ -553,6 +671,7 @@ export async function refundOrder(user: CurrentUser, id: string, note?: string) 
 
     return {
       ...order,
+      status: "refunded",
       payment_status: "refunded" as const,
       refund_ref: refundResult.refundId,
       refunded_at: new Date(),
@@ -585,22 +704,24 @@ export async function createPayment(
   user: CurrentUser,
   orderId: string,
   method?: string
-) {
+): Promise<Record<string, unknown> & { checkout_url: string }> {
   const order = await getOrder(orderId);
 
   assertOrderAccess(user, order);
+  assertCanMutateOrder(user, order);
+  const orderStatus = normalizeOrderStatus(order.status);
 
   if (
     ![
       "pending_payment",
       "payment_failed",
-    ].includes(String(order.status))
+    ].includes(orderStatus)
   ) {
     const isPaid = [
       "confirmed",
       "completed",
       "refunded",
-    ].includes(String(order.status));
+    ].includes(orderStatus);
 
     throw new HttpError(
       409,
@@ -650,7 +771,22 @@ export async function createPayment(
     );
   }
 
-  const payment = await prisma.$transaction(async (tx) => {
+  const pendingPayment = ((order.payments as Array<Record<string, unknown>>) ?? [])
+    .find((candidate) => candidate.status === "pending" && candidate.method === provider);
+  if (pendingPayment) {
+    const gatewayData = safeParseJson(pendingPayment.gateway_response);
+    const checkoutUrl = typeof gatewayData.checkout_url === "string" ? gatewayData.checkout_url : undefined;
+    if (checkoutUrl) return { ...pendingPayment, checkout_url: checkoutUrl };
+    throw new HttpError(409, "Payment session is still being initialized", "PAYMENT_INITIALIZING");
+  }
+
+  const paymentAttempt = await prisma.$transaction(async (tx) => {
+    const existing = await tx.payment.findFirst({
+      where: { order_id: orderId, method: provider, status: "pending" },
+      orderBy: { created_at: "desc" },
+    });
+    if (existing) return { payment: existing, reused: true };
+
     const data = await tx.payment.create({
       data: {
         order_id: orderId,
@@ -674,23 +810,33 @@ export async function createPayment(
       where: { id: orderId },
       data: {
         payment_method: provider,
+        payment_status: "pending",
         updated_at: new Date(),
       },
     });
 
-    return data;
-  });
+    return { payment: data, reused: false };
+  }, { isolationLevel: "Serializable" });
+
+  const payment = paymentAttempt.payment;
+  if (paymentAttempt.reused) {
+    const gatewayData = safeParseJson(payment.gateway_response);
+    const checkoutUrl = typeof gatewayData.checkout_url === "string" ? gatewayData.checkout_url : undefined;
+    if (checkoutUrl) return { ...payment, checkout_url: checkoutUrl };
+    throw new HttpError(409, "Payment session is still being initialized", "PAYMENT_INITIALIZING");
+  }
 
   try {
     if (provider === "simulated") {
       const legacy = createSimulatedPayment(provider, orderId);
-
-      return {
-        ...payment,
-        transaction_ref: legacy.transactionRef,
-        gateway_response: legacy.gatewayResponse,
-        checkout_url: legacy.checkoutUrl,
-      };
+      const data = await prisma.payment.update({
+        where: { id: payment.id },
+        data: {
+          transaction_ref: legacy.transactionRef,
+          gateway_response: JSON.stringify({ provider_response: safeParseJson(legacy.gatewayResponse), checkout_url: legacy.checkoutUrl }),
+        },
+      });
+      return { ...data, checkout_url: legacy.checkoutUrl };
     }
 
     const request = {
@@ -709,9 +855,7 @@ export async function createPayment(
         where: { id: payment.id },
         data: {
           transaction_ref: gateway.transactionRef,
-          gateway_response: JSON.stringify(
-            gateway.gatewayResponse
-          ),
+          gateway_response: JSON.stringify({ provider_response: gateway.gatewayResponse, checkout_url: gateway.checkoutUrl }),
         },
       })
       .then((data) => ({
@@ -756,9 +900,14 @@ export async function createPayment(
 
 async function cancelExpiredOrder(orderId: string, userId: string) {
   return prisma.$transaction(async (tx) => {
-    const data = await tx.order.update({
-      where: { id: orderId },
+    const updated = await tx.order.updateMany({
+      where: { id: orderId, status: { in: ["pending", "pending_payment", "payment_failed"] } },
       data: { status: "cancelled", payment_status: "failed", updated_at: new Date() }
+    });
+    if (updated.count === 0) return null;
+    await tx.payment.updateMany({
+      where: { order_id: orderId, status: { in: ["pending", "processing"] } },
+      data: { status: "failed", gateway_response: "ORDER_PAYMENT_EXPIRED" },
     });
     await tx.orderLog.create({
       data: {
@@ -768,24 +917,41 @@ async function cancelExpiredOrder(orderId: string, userId: string) {
         description: "Order cancelled because the payment window expired"
       }
     });
-    return data;
+    return tx.order.findUnique({ where: { id: orderId } });
   });
+}
+
+export async function expirePendingOrders(now = new Date()) {
+  const expiredOrders = await prisma.order.findMany({
+    where: {
+      status: { in: ["pending", "pending_payment", "payment_failed"] },
+      payment_expires_at: { lte: now },
+    },
+    select: { id: true, user_id: true },
+  });
+  for (const order of expiredOrders) {
+    await cancelExpiredOrder(order.id, order.user_id);
+  }
+  return expiredOrders.length;
 }
 
 async function markPaymentFailed(paymentId: string, userId: string, reason: string) {
   return prisma.$transaction(async (tx) => {
-    const payment = await tx.payment.update({
-      where: { id: paymentId },
+    const claimed = await tx.payment.updateMany({
+      where: { id: paymentId, status: { in: ["pending", "processing"] } },
       data: { status: "failed", gateway_response: reason }
     });
-    await tx.order.update({
-      where: { id: payment.order_id as string },
+    const payment = await tx.payment.findUnique({ where: { id: paymentId } });
+    if (!payment) throw new HttpError(404, "Payment not found", "PAYMENT_NOT_FOUND");
+    if (claimed.count === 0) return payment;
+    await tx.order.updateMany({
+      where: { id: payment.order_id, status: { in: ["pending", "pending_payment", "payment_failed"] } },
       data: { payment_status: "failed", status: "payment_failed", updated_at: new Date() }
     });
     await tx.paymentLog.create({
       data: {
         payment_id: paymentId,
-        order_id: payment.order_id as string,
+        order_id: payment.order_id,
         user_id: userId,
         action: "PAYMENT_FAILED",
         status: "failed",
@@ -805,6 +971,18 @@ async function completePayment(
 ) {
   const now = new Date();
   return prisma.$transaction(async (tx) => {
+    const orderClaim = await tx.order.updateMany({
+      where: { id: order.id as string, status: { in: ["pending", "pending_payment", "payment_failed"] } },
+      data: { payment_status: "paid", status: "confirmed", updated_at: now },
+    });
+    if (orderClaim.count === 0) {
+      const currentOrder = await tx.order.findUnique({ where: { id: order.id as string }, select: { status: true } });
+      if (currentOrder && ["confirmed", "completed", "refunded"].includes(normalizeOrderStatus(currentOrder.status))) {
+        throw new HttpError(409, "Payment already completed", "PAYMENT_ALREADY_COMPLETED");
+      }
+      throw new HttpError(409, "Order is not payable", "ORDER_NOT_PAYABLE");
+    }
+
     for (const item of orderItems) {
       const voucher = item.voucher_products as Voucher;
       await getSellableVoucher(voucher.id, Number(item.quantity));
@@ -824,7 +1002,7 @@ async function completePayment(
           qr_code_payload: code,
           order_item_id: item.id as string,
           voucher_product_id: voucher.id,
-          owner_id: order.user_id as string,
+          owner_id: order.recipient_id as string,
           issued_date: issuedDate,
           expired_date: expiredDate,
           status: "active"
@@ -834,8 +1012,8 @@ async function completePayment(
     }
 
     const data = await tx.payment.update({ where: { id: paymentId }, data: { status: "success", paid_at: now } });
-    await tx.order.update({ where: { id: order.id as string }, data: { payment_status: "paid", status: "confirmed", updated_at: now } });
     await tx.paymentLog.create({ data: { payment_id: paymentId, order_id: order.id as string, user_id: userId, action: "PAYMENT_SUCCESS", status: "success", amount: payment.amount as never } });
+    await tx.orderLog.create({ data: { order_id: order.id as string, user_id: userId, action: "PAYMENT_SUCCESS", description: "Payment completed and vouchers issued" } });
     return data;
   });
 }
@@ -868,48 +1046,45 @@ export async function simulatePaymentSuccess(user: CurrentUser, id: string) {
   const payment = await getPayment(id);
   const order = payment.orders as Record<string, unknown>;
   assertOrderAccess(user, order);
+  assertCanMutateOrder(user, order);
   if (payment.status === "success" || ["confirmed", "completed", "refunded"].includes(String(order.status))) throw new HttpError(409, "Payment already completed", "PAYMENT_ALREADY_COMPLETED");
-  if (!["pending", "pending_payment", "payment_failed"].includes(String(order.status))) throw new HttpError(409, "Order is not payable", "ORDER_NOT_PAYABLE");
+  if (!["pending_payment", "payment_failed"].includes(normalizeOrderStatus(order.status))) throw new HttpError(409, "Order is not payable", "ORDER_NOT_PAYABLE");
   if (order.payment_expires_at && new Date(order.payment_expires_at as string | Date) <= new Date()) {
     await cancelExpiredOrder(order.id as string, user.id);
     throw new HttpError(409, "Order payment window has expired", "ORDER_PAYMENT_EXPIRED");
   }
   const orderItems = (order.order_items as Array<Record<string, unknown>>) ?? [];
-  const now = new Date();
+  await prisma.payment.update({
+    where: { id },
+    data: { transaction_ref: `SIM-${Date.now()}`, gateway_response: "simulated success" },
+  });
+  return completePayment(id, user.id, payment, order, orderItems);
+}
 
+function providerResponse(value: unknown): Record<string, unknown> {
+  const parsed = safeParseJson(value);
+  return parsed.provider_response && typeof parsed.provider_response === "object"
+    ? parsed.provider_response as Record<string, unknown>
+    : parsed;
+}
+
+async function markCapturedPaymentUnfulfilled(paymentId: string, userId: string, reason: string) {
   return prisma.$transaction(async (tx) => {
-    for (const item of orderItems) {
-      const voucher = item.voucher_products as Voucher;
-      await getSellableVoucher(voucher.id, Number(item.quantity));
-      const stockUpdate = await tx.voucherProduct.updateMany({
-        where: { id: voucher.id, remaining_quantity: { gte: Number(item.quantity) } },
-        data: { remaining_quantity: { decrement: Number(item.quantity) } }
-      });
-      if (stockUpdate.count === 0) throw new HttpError(409, "Insufficient voucher quantity", "INSUFFICIENT_STOCK");
-
-      const issued = Array.from({ length: Number(item.quantity) }, () => {
-        const code = voucherCode();
-        const issuedDate = new Date();
-        const expiredDate = new Date(issuedDate);
-        expiredDate.setDate(expiredDate.getDate() + Number(voucher.validity_days));
-        return {
-          voucher_code: code,
-          qr_code_payload: code,
-          order_item_id: item.id as string,
-          voucher_product_id: voucher.id,
-          owner_id: order.user_id as string,
-          issued_date: issuedDate,
-          expired_date: expiredDate,
-          status: "active"
-        };
-      });
-      await tx.issuedVoucher.createMany({ data: issued });
-    }
-
-    const data = await tx.payment.update({ where: { id }, data: { status: "success", paid_at: now, transaction_ref: `SIM-${Date.now()}`, gateway_response: "simulated success" } });
-    await tx.order.update({ where: { id: order.id as string }, data: { payment_status: "paid", status: "confirmed", updated_at: now } });
-    await tx.paymentLog.create({ data: { payment_id: id, order_id: order.id as string, user_id: user.id, action: "PAYMENT_SUCCESS", status: "success", amount: payment.amount as never } });
-    return data;
+    const payment = await tx.payment.update({
+      where: { id: paymentId },
+      data: { status: "success", paid_at: new Date() },
+    });
+    await tx.order.updateMany({
+      where: { id: payment.order_id, status: { in: ["pending", "pending_payment", "payment_failed"] } },
+      data: { status: "cancelled", payment_status: "paid", updated_at: new Date() },
+    });
+    await tx.paymentLog.create({
+      data: { payment_id: paymentId, order_id: payment.order_id, user_id: userId, action: "PAYMENT_CAPTURED_FULFILLMENT_FAILED", status: "success", amount: payment.amount },
+    });
+    await tx.orderLog.create({
+      data: { order_id: payment.order_id, user_id: userId, action: "CANCEL_ORDER_FULFILLMENT_FAILED", description: reason },
+    });
+    return payment;
   });
 }
 
@@ -917,12 +1092,9 @@ export async function simulatePaymentFailed(user: CurrentUser, id: string) {
   const payment = await getPayment(id);
   const order = payment.orders as Record<string, unknown>;
   assertOrderAccess(user, order);
-  return prisma.$transaction(async (tx) => {
-    const data = await tx.payment.update({ where: { id }, data: { status: "failed", gateway_response: "simulated failed" } });
-    await tx.order.update({ where: { id: order.id as string }, data: { payment_status: "failed", updated_at: new Date() } });
-    await tx.paymentLog.create({ data: { payment_id: id, order_id: order.id as string, user_id: user.id, action: "PAYMENT_FAILED", status: "failed", amount: payment.amount as never } });
-    return data;
-  });
+  assertCanMutateOrder(user, order);
+  if (payment.status === "success") throw new HttpError(409, "Payment already completed", "PAYMENT_ALREADY_COMPLETED");
+  return markPaymentFailed(id, user.id, "SIMULATED_PAYMENT_FAILED");
 }
 
 async function paymentByTransactionRef(transactionRef: string) {
@@ -944,28 +1116,34 @@ export async function handleVnpayReturn(query: Record<string, unknown>) {
   const result = verifyVnpayReturn(query);
   const payment = await paymentByTransactionRef(result.transactionRef);
   const order = payment.orders as Record<string, unknown>;
+  if (payment.status === "success" || ["confirmed", "completed", "refunded"].includes(normalizeOrderStatus(order.status))) {
+    return redirectResult(order.id as string, "success");
+  }
   const successfulReturn = result.validSignature && result.validTmnCode && result.responseCode === "00" && result.transactionStatus === "00" && result.amount === Number(payment.amount);
+  if (successfulReturn && normalizeOrderStatus(order.status) === "cancelled") {
+    await markCapturedPaymentUnfulfilled(payment.id as string, order.user_id as string, "VNPAY payment returned after the order was cancelled");
+    return redirectResult(order.id as string, "failed");
+  }
   if (successfulReturn && paymentWindowExpired(order)) {
-    await markPaymentFailed(payment.id as string, order.user_id as string, "VNPAY_PAYMENT_EXPIRED");
-    await cancelExpiredOrder(order.id as string, order.user_id as string);
+    await markCapturedPaymentUnfulfilled(payment.id as string, order.user_id as string, "VNPAY payment returned after the order expired");
     return redirectResult(order.id as string, "failed");
   }
   if (successfulReturn) {
     try {
-      const existing = (() => { try { return JSON.parse(String(payment.gateway_response ?? "{}")); } catch { return {}; } })();
+      const existing = safeParseJson(payment.gateway_response);
       await prisma.payment.update({
         where: { id: payment.id as string },
-        data: { gateway_response: JSON.stringify({ ...existing, vnp_TransactionNo: result.transactionNo, vnp_ResponseCode: result.responseCode }) }
+        data: { gateway_response: JSON.stringify({
+          ...existing,
+          provider_response: { ...providerResponse(existing), vnp_TransactionNo: result.transactionNo, vnp_ResponseCode: result.responseCode },
+        }) }
       });
       await completePayment(payment.id as string, order.user_id as string, payment, order, order.order_items as Array<Record<string, unknown>>);
       return redirectResult(order.id as string, "success");
     } catch (error) {
       console.error("VNPay fulfillment failed", error instanceof Error ? error.message : "UnknownError");
-      try {
-        await markPaymentFailed(payment.id as string, order.user_id as string, "VNPAY_FULFILLMENT_FAILED");
-      } catch (markError) {
-        console.error("Unable to record VNPay failure", markError instanceof Error ? markError.message : "UnknownError");
-      }
+      if (error instanceof HttpError && error.code === "PAYMENT_ALREADY_COMPLETED") return redirectResult(order.id as string, "success");
+      await markCapturedPaymentUnfulfilled(payment.id as string, order.user_id as string, "VNPAY_FULFILLMENT_FAILED");
       return redirectResult(order.id as string, "failed");
     }
   }
@@ -976,15 +1154,35 @@ export async function handleVnpayReturn(query: Record<string, unknown>) {
 export async function handlePayPalReturn(token: string) {
   const payment = await paymentByTransactionRef(token);
   const order = payment.orders as Record<string, unknown>;
-  if (payment.status === "success" || ["confirmed", "completed", "refunded"].includes(String(order.status))) return redirectResult(order.id as string, "success");
+  if (payment.status === "success" || ["confirmed", "completed", "refunded"].includes(normalizeOrderStatus(order.status))) return redirectResult(order.id as string, "success");
+  if (normalizeOrderStatus(order.status) === "cancelled") return redirectResult(order.id as string, "failed");
   if (paymentWindowExpired(order)) {
     await markPaymentFailed(payment.id as string, order.user_id as string, "PAYPAL_PAYMENT_EXPIRED");
     await cancelExpiredOrder(order.id as string, order.user_id as string);
     return redirectResult(order.id as string, "failed");
   }
+  let captured: Awaited<ReturnType<typeof capturePayPalPayment>>;
   try {
-    const captured = await capturePayPalPayment(token, Number(payment.amount));
-    await prisma.payment.update({ where: { id: payment.id as string }, data: { gateway_response: JSON.stringify(captured.gatewayResponse) } });
+    captured = await capturePayPalPayment(token, Number(payment.amount));
+  } catch (error) {
+    console.error(JSON.stringify({
+      event: "payment.paypal.capture.failed",
+      provider: "paypal",
+      paymentId: payment.id,
+      orderId: order.id,
+      transactionRef: token,
+      error: errorForLog(error),
+    }));
+    await markPaymentFailed(payment.id as string, order.user_id as string, "PAYPAL_CAPTURE_FAILED");
+    return redirectResult(order.id as string, "failed");
+  }
+
+  try {
+    const existing = safeParseJson(payment.gateway_response);
+    await prisma.payment.update({
+      where: { id: payment.id as string },
+      data: { gateway_response: JSON.stringify({ ...existing, provider_response: captured.gatewayResponse }) },
+    });
     await completePayment(payment.id as string, order.user_id as string, payment, order, order.order_items as Array<Record<string, unknown>>);
     return redirectResult(order.id as string, "success");
   } catch (error) {
@@ -994,11 +1192,11 @@ export async function handlePayPalReturn(token: string) {
       paymentId: payment.id,
       orderId: order.id,
       transactionRef: token,
-      stage: "capture_or_fulfillment",
+      stage: "fulfillment",
       error: errorForLog(error),
     }));
-    await markPaymentFailed(payment.id as string, order.user_id as string, "PAYPAL_PAYMENT_FAILED");
     if (error instanceof HttpError && error.code === "PAYMENT_ALREADY_COMPLETED") return redirectResult(order.id as string, "success");
+    await markCapturedPaymentUnfulfilled(payment.id as string, order.user_id as string, "PAYPAL_FULFILLMENT_FAILED");
     return redirectResult(order.id as string, "failed");
   }
 }

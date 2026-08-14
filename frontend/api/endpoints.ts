@@ -45,10 +45,10 @@ export const API = {
   PAYMENT_FAILED: (id: string) => `${BASE_URL}/payments/${id}/simulate-failed`,
 
   // ── Voucher Code Verification ────────────────────────────────
-  // POST /issued-vouchers/validate    (Partner) { code } → { order, valid }
-  VOUCHER_VERIFY: `${BASE_URL}/issued-vouchers/validate`,
-  // POST /issued-vouchers/:id/redeem  (Partner) → Order (status=used)
-  VOUCHER_REDEEM: (id: string) => `${BASE_URL}/issued-vouchers/${id}/redeem`,
+  // POST /issued-vouchers/check       (Partner) { voucher_code | qr_code_payload }
+  VOUCHER_VERIFY: `${BASE_URL}/issued-vouchers/check`,
+  // POST /issued-vouchers/confirm     (Store staff) → issued voucher (status=used)
+  VOUCHER_REDEEM: `${BASE_URL}/issued-vouchers/confirm`,
 
   // ── Users ────────────────────────────────────────────────────
   // GET  /users              (Admin) ?role=&status= → User[]

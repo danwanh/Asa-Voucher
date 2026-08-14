@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Search, Star, CreditCard, MessageSquare, ChevronLeft, ChevronRight } from "lucide-react"
 import { C, fmt, fmtDate } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
@@ -19,6 +19,7 @@ interface Props {
   onPageChange?: (page: number) => void
   onFilterChange?: (status?: string, search?: string) => void
   loading?: boolean
+  currentUserId?: string
 }
 
 const ORDER_TABS: { label: string; value: Order["status"] | "all" }[] = [
@@ -46,18 +47,12 @@ function itemSummary(order: Order) {
   return items.map((item) => `${item.voucherTitle ?? order.voucherTitle} ×${item.quantity}`).join(" · ")
 }
 
-export function OrderHistoryPage({ orders, countsByStatus, onDetail, onReview, onComplaint, onPayAgain, page = 1, totalPages = 1, onPageChange, onFilterChange, loading = false }: Props) {
+export function OrderHistoryPage({ orders, countsByStatus, onDetail, onReview, onComplaint, onPayAgain, page = 1, totalPages = 1, onPageChange, onFilterChange, loading = false, currentUserId }: Props) {
   const [tab, setTab] = useState<Order["status"] | "all">("all")
   const [search, setSearch] = useState("")
+  const searchTimer = useRef<ReturnType<typeof setTimeout>>()
 
-  const filtered = orders.filter((order) => {
-    const matchTab = tab === "all" || order.status === tab
-    const matchSearch =
-      !search ||
-      order.voucherTitle.toLowerCase().includes(search.toLowerCase()) ||
-      (order.orderCode ?? order.id).toLowerCase().includes(search.toLowerCase())
-    return matchTab && matchSearch
-  })
+  useEffect(() => () => clearTimeout(searchTimer.current), [])
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
@@ -80,7 +75,8 @@ export function OrderHistoryPage({ orders, countsByStatus, onDetail, onReview, o
             <button
               key={tabItem.value}
                onClick={() => {
-                 setTab(tabItem.value)
+                  clearTimeout(searchTimer.current)
+                  setTab(tabItem.value)
                  onFilterChange?.(tabItem.value === "all" ? undefined : tabItem.value, search.trim() || undefined)
                  onPageChange?.(1)
                }}
@@ -110,24 +106,27 @@ export function OrderHistoryPage({ orders, countsByStatus, onDetail, onReview, o
           placeholder="Tìm theo mã đơn, tên voucher..."
           value={search}
            onChange={(event) => {
-             const value = event.target.value
-             setSearch(value)
-             onFilterChange?.(tab === "all" ? undefined : tab, value.trim() || undefined)
-             onPageChange?.(1)
-           }}
+              const value = event.target.value
+              setSearch(value)
+              clearTimeout(searchTimer.current)
+              searchTimer.current = setTimeout(() => {
+                onFilterChange?.(tab === "all" ? undefined : tab, value.trim() || undefined)
+                onPageChange?.(1)
+              }, 300)
+            }}
         />
       </div>
 
       <div className="space-y-3">
         {loading ? (
           <LoadingState label="Đang tải danh sách đơn hàng..." variant="section" />
-        ) : filtered.map((order) => {
+        ) : orders.map((order) => {
           const totalQuantity = order.items?.reduce((sum, item) => sum + item.quantity, 0) ?? 1
           const issuedCount = order.items?.flatMap((item) => item.issuedVouchers ?? []).length ?? 0
           const hasIssuedCodes = issuedCount > 0
           const isRefunded = order.status === "refunded"
           const canReview = order.status === "confirmed" || order.status === "completed"
-          const canPayAgain = (order.status === "pending_payment" || order.status === "payment_failed") && (!order.paymentExpiresAt || new Date(order.paymentExpiresAt).getTime() > Date.now())
+          const canPayAgain = order.userId === currentUserId && (order.status === "pending_payment" || order.status === "payment_failed") && (!order.paymentExpiresAt || new Date(order.paymentExpiresAt).getTime() > Date.now())
           const voucherSummary = itemSummary(order)
 
           return (
@@ -211,7 +210,7 @@ export function OrderHistoryPage({ orders, countsByStatus, onDetail, onReview, o
           )
         })}
 
-        {!loading && filtered.length === 0 && (
+        {!loading && orders.length === 0 && (
           <div className="text-center py-16 bg-white rounded-2xl">
             <AppIcon name="package" className="w-10 h-10 mb-3 mx-auto" />
             <div className="font-bold" style={{ color: C.indigo }}>

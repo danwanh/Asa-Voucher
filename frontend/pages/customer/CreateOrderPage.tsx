@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { ArrowLeft, ShoppingBag } from "lucide-react"
 import { C, fmt } from "@/utils/constants"
 import type { CartItem } from "@/types"
@@ -30,24 +30,33 @@ export function CreateOrderPage({ cart, total, userName = "", userEmail = "", on
   const [lookupLoading, setLookupLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const lookupRequest = useRef(0)
 
   useEffect(() => {
-    if (forSelf || form.identifier.trim().length < 3) return
+    const requestId = ++lookupRequest.current
+    if (forSelf || form.identifier.trim().length < 3) {
+      setLookupLoading(false)
+      return
+    }
     const timer = window.setTimeout(() => {
       setLookupLoading(true)
       void orderService.lookupRecipient(form.identifier).then((recipient) => {
+        if (requestId !== lookupRequest.current) return
         setForm((current) => ({ ...current, name: String(recipient.full_name ?? "") }))
         setErrors((current) => ({ ...current, identifier: "" }))
       }).catch(() => {
+        if (requestId !== lookupRequest.current) return
         setForm((current) => ({ ...current, name: "" }))
         setErrors((current) => ({ ...current, identifier: "Không tìm thấy tài khoản người nhận" }))
-      }).finally(() => setLookupLoading(false))
+      }).finally(() => {
+        if (requestId === lookupRequest.current) setLookupLoading(false)
+      })
     }, 400)
     return () => window.clearTimeout(timer)
   }, [forSelf, form.identifier])
 
   const set = (k: string, v: string) => {
-    setForm((f) => ({ ...f, [k]: v }))
+    setForm((f) => ({ ...f, [k]: v, ...(k === "identifier" && !forSelf ? { name: "" } : {}) }))
     setErrors((e) => ({ ...e, [k]: "" }))
   }
 
@@ -225,13 +234,13 @@ export function CreateOrderPage({ cart, total, userName = "", userEmail = "", on
 
             <button
               onClick={handleCreate}
-              disabled={submitting || !cart.length}
+              disabled={submitting || lookupLoading || !cart.length}
               aria-busy={submitting}
               className="w-full py-3.5 rounded-2xl font-black text-white hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
               style={{ backgroundColor: C.peach }}
             >
               <ShoppingBag className="w-4 h-4" />
-              {submitting ? "Đang tạo đơn hàng..." : "Tạo đơn hàng"}
+              {submitting ? "Đang tạo đơn hàng..." : lookupLoading ? "Đang xác minh người nhận..." : "Tạo đơn hàng"}
             </button>
             <p className="text-xs text-center mt-2" style={{ color: "#9CA3AF" }}>
               Đơn hàng → Trạng thái: Chờ thanh toán

@@ -130,6 +130,13 @@ export function CustomerApp({
       void orderService.get(initialOrderId).then((order) => {
         setSelectedOrder(order)
         setPage("order-detail")
+        if (initialPaymentStatus === "success" && (order.status === "confirmed" || order.status === "completed")) {
+          toast.success("Thanh toán thành công, voucher đã được phát hành.")
+        } else if (initialPaymentStatus) {
+          toast.error(order.status === "cancelled"
+            ? "Đơn hàng đã bị hủy. Nếu giao dịch đã thu tiền, yêu cầu hoàn tiền sẽ được xử lý."
+            : "Thanh toán chưa thành công. Bạn có thể thử lại khi đơn hàng còn hạn.")
+        }
       }).catch(() => undefined)
       return
     }
@@ -137,7 +144,7 @@ export function CustomerApp({
       setPendingOrder({ id: initialOrderId, order, recipient: { name: "", identifier: "", note: "", forSelf: true } })
     }).catch(() => setPendingOrder({ id: initialOrderId, recipient: { name: "", identifier: "", note: "", forSelf: false } }))
       .finally(() => setPendingOrderLoading(false))
-  }, [initialOrderId, initialPage])
+  }, [initialOrderId, initialPage, initialPaymentStatus])
 
   useEffect(() => {
     if (!initialVoucherId) return
@@ -150,11 +157,6 @@ export function CustomerApp({
       router.push("/vouchers")
     })
   }, [initialVoucherId, router])
-
-  useEffect(() => {
-    if (initialPaymentStatus === "success") toast.success("Thanh toán thành công, voucher đã được phát hành.")
-    if (initialPaymentStatus === "failed") toast.error("Thanh toán thất bại. Đơn hàng vẫn được giữ để bạn thanh toán lại.")
-  }, [initialPaymentStatus])
 
   const navigate = (p: CustomerPage) => {
     const path = customerPagePath(p, user.role)
@@ -226,11 +228,16 @@ export function CustomerApp({
       router.push(`/checkout/payment/${order.id}`)
     } catch (error) {
       setIsRedirectingToPayment(false)
-      const apiError = error as { response?: { data?: { code?: string } } }
-      toast.error(apiError.response?.data?.code === "PRICE_CHANGED"
-        ? "Giá voucher đã thay đổi. Vui lòng kiểm tra lại giỏ hàng."
-        : "Không thể tạo đơn hàng. Vui lòng kiểm tra email người nhận, giỏ hàng và tồn kho.")
-      navigate("cart")
+       const apiError = error as { response?: { data?: { error?: { code?: string } } } }
+       const code = apiError.response?.data?.error?.code
+       if (code === "RECIPIENT_NOT_FOUND" || code === "RECIPIENT_REQUIRED") {
+         toast.error("Không tìm thấy tài khoản người nhận. Vui lòng kiểm tra lại email hoặc số điện thoại.")
+       } else {
+         toast.error(code === "PRICE_CHANGED"
+           ? "Giá voucher đã thay đổi. Vui lòng kiểm tra lại giỏ hàng."
+           : "Không thể tạo đơn hàng. Vui lòng kiểm tra giỏ hàng và tồn kho.")
+         navigate("cart")
+       }
     }
   }
 
@@ -374,12 +381,13 @@ export function CustomerApp({
           <LoadingState label="Đang tải đơn hàng..." variant="page" />
         )}
        {page === "payment" && !pendingOrderLoading && pendingOrder?.order && (
-         <PaymentPage
+          <PaymentPage
            total={pendingOrder.order.amount}
            orderId={pendingOrder.id}
            order={pendingOrder.order}
            onPay={handlePayment}
-           onBack={handlePaymentBack}
+            onBack={handlePaymentBack}
+            canPay={pendingOrder.order.userId === user.id}
          />
        )}
        {page === "payment" && !pendingOrderLoading && !pendingOrder?.order && (
@@ -425,11 +433,12 @@ export function CustomerApp({
           onDetail={goOrderDetail}
            onReview={(o) => goReview(o)}
            onComplaint={(o) => goComplaint(o, undefined, "orders")}
-          onPayAgain={handlePayAgain}
+            onPayAgain={handlePayAgain}
+            currentUserId={user.id}
         />
       )}
       {page === "order-detail" && selectedOrder && (
-          <OrderDetailPage order={selectedOrder} onBack={() => navigate("orders")} onReview={(o) => goReview(o)} onComplaint={(o) => goComplaint(o, undefined, "order-detail")} onPayAgain={handlePayAgain} />
+          <OrderDetailPage order={selectedOrder} onBack={() => navigate("orders")} onReview={(o) => goReview(o)} onComplaint={(o) => goComplaint(o, undefined, "order-detail")} onPayAgain={handlePayAgain} currentUserId={user.id} />
       )}
        {page === "review" && reviewOrder && reviewIssuedVoucher && (
         <ReviewPage

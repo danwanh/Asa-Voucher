@@ -36,7 +36,7 @@ function mapComplaint(value: BackendRecord): Complaint {
     evidenceUrls: strings(value.evidence_urls),
     status: value.status,
     resolutionNote: value.resolution_note,
-    resolutionType: value.resolution_type,
+    resolutionTypes: strings(value.resolution_types),
     createdAt: value.created_at,
     resolvedAt: value.resolved_at,
   }
@@ -49,7 +49,9 @@ function mapIssuedVoucher(value: BackendRecord): IssuedVoucher {
     qrPayload: String(value.qr_code_payload ?? value.qrPayload ?? ""),
     status: value.status,
     expiredDate: value.expired_date,
-    review: Array.isArray(value.reviews) && value.reviews[0] ? mapReview(value.reviews[0]) : undefined,
+    review: value.reviews
+      ? mapReview(Array.isArray(value.reviews) ? value.reviews[0] : value.reviews)
+      : undefined,
     complaint: Array.isArray(value.complaints) && value.complaints[0] ? mapComplaint(value.complaints[0]) : undefined,
   }
 }
@@ -93,9 +95,10 @@ export function mapOrder(value: BackendRecord): Order {
   const issued = items.flatMap((item) => item.issuedVouchers ?? [])
   const allPartnerNames = [...new Set(items.map((item) => item.partnerName).filter((name): name is string => Boolean(name)))]
   const payments = Array.isArray(value.payments) ? value.payments.map(mapPayment) : []
-  const unpaidPayment = payments.find((p) => p.status === "pending")
+  const unpaidPayment = payments.find((p) => p.status === "pending" || p.status === "processing")
   const paidPayment = payments.find((p) => p.status === "success")
   const refundedPayment = payments.find((p) => p.status === "refunded")
+  const failedPayment = payments.length > 0 && payments.every((p) => p.status === "failed")
   return {
     id: String(value.id),
     userId: String(value.user_id),
@@ -110,7 +113,7 @@ export function mapOrder(value: BackendRecord): Order {
         : allPartnerNames.join(", "),
     amount: num(value.total_amount),
     status: value.status,
-    paymentStatus: value.payment_status ?? (paidPayment ? "paid" : unpaidPayment ? "pending" : value.status === "refunded" ? "refunded" : "pending"),
+    paymentStatus: value.payment_status ?? (refundedPayment ? "refunded" : paidPayment ? "paid" : unpaidPayment ? "pending" : failedPayment ? "failed" : "pending"),
     paymentMethod: String(value.payment_method ?? ""),
     refundRef: refundedPayment?.refundRef,
     refundedAt: refundedPayment?.refundedAt,

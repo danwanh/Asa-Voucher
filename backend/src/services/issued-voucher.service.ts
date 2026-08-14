@@ -185,6 +185,29 @@ export async function confirmVoucher(user: AuthUser, input: ConfirmVoucherInput)
       },
     });
 
+    const remainingVouchers = await tx.issuedVoucher.count({
+      where: {
+        order_items: { order_id: voucher.order_items.order_id },
+        status: { not: "used" },
+      },
+    });
+    if (remainingVouchers === 0) {
+      const completed = await tx.order.updateMany({
+        where: { id: voucher.order_items.order_id, status: { in: ["confirmed", "pending_manual", "used"] } },
+        data: { status: "completed", updated_at: new Date() },
+      });
+      if (completed.count > 0) {
+        await tx.orderLog.create({
+          data: {
+            order_id: voucher.order_items.order_id,
+            user_id: user.id,
+            action: "COMPLETE_ORDER",
+            description: "All issued vouchers have been used",
+          },
+        });
+      }
+    }
+
     return { message: "Xác nhận sử dụng voucher thành công", issued_voucher: updatedVoucher, usage };
   });
 }

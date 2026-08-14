@@ -31,7 +31,7 @@ const INCLUDE = {
     },
   },
   reviews: { select: { id: true, rating: true, comment: true, media_urls: true, created_at: true, updated_at: true } },
-  complaints: { select: { id: true, reason: true, description: true, evidence_urls: true, status: true, resolution_note: true, resolution_type: true, created_at: true, resolved_at: true } },
+  complaints: { select: { id: true, reason: true, description: true, evidence_urls: true, status: true, resolution_note: true, resolution_types: true, created_at: true, resolved_at: true } },
 } as const;
 
 const LIST_INCLUDE = {
@@ -47,12 +47,12 @@ const LIST_INCLUDE = {
     },
   },
   reviews: { select: { id: true, rating: true, comment: true, media_urls: true, created_at: true } },
-  complaints: { select: { id: true, reason: true, description: true, evidence_urls: true, status: true, resolution_note: true, resolution_type: true, created_at: true, resolved_at: true } },
+  complaints: { select: { id: true, reason: true, description: true, evidence_urls: true, status: true, resolution_note: true, resolution_types: true, created_at: true, resolved_at: true } },
 } as const;
 
 type IssuedVoucherWithRelations = IssuedVoucherRow & {
   voucher_products: { partner_id: string };
-  order_items?: { order_id: string; orders?: { status: string } | null };
+  order_items: { order_id: string; orders?: { status: string } | null };
 };
 
 export async function listIssuedVouchers(
@@ -79,11 +79,11 @@ export async function findIssuedVoucherById(id: string) {
 }
 
 export async function findIssuedVoucherByCode(voucherCode: string) {
-  return prisma.issuedVoucher.findUnique({ where: { voucher_code: voucherCode }, include: INCLUDE }) as unknown as Promise<(IssuedVoucherRow & { voucher_products: { partner_id: string } }) | null>;
+  return prisma.issuedVoucher.findUnique({ where: { voucher_code: voucherCode }, include: INCLUDE }) as unknown as Promise<IssuedVoucherWithRelations | null>;
 }
 
 export async function findIssuedVoucherByQrPayload(qrCodePayload: string) {
-  return prisma.issuedVoucher.findUnique({ where: { qr_code_payload: qrCodePayload }, include: INCLUDE }) as unknown as Promise<(IssuedVoucherRow & { voucher_products: { partner_id: string } }) | null>;
+  return prisma.issuedVoucher.findUnique({ where: { qr_code_payload: qrCodePayload }, include: INCLUDE }) as unknown as Promise<IssuedVoucherWithRelations | null>;
 }
 
 export async function updateIssuedVoucherStatus(id: string, status: IssuedVoucherStatus) {
