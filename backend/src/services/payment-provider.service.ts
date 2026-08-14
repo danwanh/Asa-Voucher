@@ -177,6 +177,117 @@ export function createVnpayPayment(input: PaymentRequest) {
   };
 }
 
+export type RefundResult = { refundId: string; gatewayResponse: unknown };
+
+export async function refundVnpayPayment(input: {
+  transactionRef: string;
+  transactionNo: string;
+  transactionDate: string;
+  amountVnd: number;
+  orderCode: string;
+  createdBy: string;
+  reason?: string;
+}): Promise<RefundResult> {
+  const url = requireConfig(env.VNPAY_URL, "VNPAY_URL");
+  const tmnCode = requireConfig(env.VNPAY_TMN_CODE, "VNPAY_TMN_CODE");
+  const secret = requireConfig(env.VNPAY_HASH_SECRET, "VNPAY_HASH_SECRET");
+
+  const requestId = crypto.randomBytes(16).toString("hex");
+  const createDate = formatVnpayDate(new Date());
+
+  const fields = {
+    vnp_RequestId: requestId,
+    vnp_Version: "2.1.0",
+    vnp_Command: "refund",
+    vnp_TmnCode: tmnCode,
+    vnp_TransactionType: "02",
+    vnp_TxnRef: input.transactionRef,
+    vnp_Amount: String(Math.round(input.amountVnd) * 100),
+    vnp_TransactionNo: input.transactionNo || "0",
+    vnp_TransactionDate: input.transactionDate,
+    vnp_CreateBy: input.createdBy,
+    vnp_CreateDate: createDate,
+    vnp_IpAddr: "127.0.0.1",
+    vnp_OrderInfo: input.reason || `Refund don hang ${input.orderCode}`,
+  };
+
+  const hashData = [
+    fields.vnp_RequestId, fields.vnp_Version, fields.vnp_Command, fields.vnp_TmnCode,
+    fields.vnp_TransactionType, fields.vnp_TxnRef, fields.vnp_Amount, fields.vnp_TransactionNo,
+    fields.vnp_TransactionDate, fields.vnp_CreateBy, fields.vnp_CreateDate, fields.vnp_IpAddr,
+    fields.vnp_OrderInfo,
+  ].join("|");
+
+  const hash = crypto.createHmac("sha512", secret).update(hashData).digest("hex");
+
+  const refundUrl = url.replace("/paymentv2/vpcpay.html", "/merchant_webapi/api/transaction");
+
+  const response = await fetch(refundUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...fields, vnp_SecureHash: hash }),
+  });
+
+  const body = await response.json() as { vnp_ResponseCode?: string; vnp_Message?: string; vnp_TransactionNo?: string };
+
+  if (body.vnp_ResponseCode !== "00") {
+    throw new HttpError(502, `VNPay refund failed: ${body.vnp_Message || body.vnp_ResponseCode}`, "VNPAY_REFUND_FAILED", body);
+  }
+
+  return { refundId: body.vnp_TransactionNo || `VNPAY-${Date.now()}`, gatewayResponse: body };
+}
+
+export async function refundPayPalPayment(input: {
+  captureId: string;
+  amountVnd: number;
+  orderCode: string;
+  note?: string;
+}): Promise<RefundResult> {
+  const token = await paypalAccessToken();
+  const response = await fetch(
+    `${paypalBaseUrl()}/v2/payments/captures/${encodeURIComponent(input.captureId)}/refund`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        "PayPal-Request-Id": `REFUND-${input.captureId}-${Date.now()}`,
+      },
+      body: JSON.stringify({
+        amount: {
+          value: paypalAmount(input.amountVnd),
+          currency_code: env.PAYPAL_CURRENCY,
+        },
+        note_to_payer: input.note || `Refund for order ${input.orderCode}`,
+      }),
+    }
+  );
+
+  const body = await response.json() as {
+    id?: string;
+    status?: string;
+    message?: string;
+    name?: string;
+    details?: unknown;
+  };
+
+  const success = response.ok && body.status === "COMPLETED";
+
+  if (!success) {
+    throw new HttpError(
+      502,
+      `PayPal refund failed: ${body.message || body.name || body.status}`,
+      "PAYPAL_REFUND_FAILED",
+      body
+    );
+  }
+
+  return {
+    refundId: body.id || `PAYPAL-${Date.now()}`,
+    gatewayResponse: body,
+  };
+}
+
 export function verifyVnpayReturn(query: Record<string, unknown>) {
   const secret = requireConfig(env.VNPAY_HASH_SECRET, "VNPAY_HASH_SECRET");
   const receivedHash = String(query.vnp_SecureHash ?? "");
@@ -197,7 +308,7 @@ export function verifyVnpayReturn(query: Record<string, unknown>) {
   };
 }
 
-function formatVnpayDate(date: Date) {
+export function formatVnpayDate(date: Date) {
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Asia/Ho_Chi_Minh",
     year: "numeric",
@@ -210,4 +321,21 @@ function formatVnpayDate(date: Date) {
   }).formatToParts(date);
   const values = Object.fromEntries(parts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
   return `${values.year}${values.month}${values.day}${values.hour}${values.minute}${values.second}`;
+}
+
+export function safeParseJson(value: unknown): Record<string, unknown> {
+  if (typeof value !== "string") return {};
+  try {
+    const parsed = JSON.parse(value);
+    return typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function extractPaypalCaptureId(gatewayResponse: Record<string, unknown>): string | undefined {
+  const purchaseUnits = gatewayResponse.purchase_units as Array<Record<string, unknown>> | undefined;
+  const captures = (purchaseUnits?.[0]?.payments as Record<string, unknown> | undefined)?.captures as Array<Record<string, unknown>> | undefined;
+  const id = captures?.[0]?.id;
+  return typeof id === "string" ? id : undefined;
 }

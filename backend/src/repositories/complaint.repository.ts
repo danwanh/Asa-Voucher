@@ -11,7 +11,26 @@ const INCLUDE = {
       voucher_products: { select: { id: true, name: true, partner_id: true } },
     },
   },
-  orders: { select: { id: true, user_id: true, order_code: true, total_amount: true, status: true } },
+  orders: {
+    select: {
+      id: true,
+      user_id: true,
+      order_code: true,
+      total_amount: true,
+      status: true,
+      payments: {
+        select: {
+          id: true,
+          method: true,
+          amount: true,
+          status: true,
+          transaction_ref: true,
+          refund_ref: true,
+          refunded_at: true,
+        },
+      },
+    },
+  },
 } as const;
 
 export async function listComplaints(

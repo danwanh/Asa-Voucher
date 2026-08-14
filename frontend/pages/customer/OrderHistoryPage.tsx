@@ -2,11 +2,13 @@ import { useState } from "react"
 import { Search, Star, CreditCard, MessageSquare, ChevronLeft, ChevronRight } from "lucide-react"
 import { C, fmt, fmtDate } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
+import type { OrderStatusCounts } from "@/services/orderService"
 import type { Order, OrderStatus } from "@/types"
 import { LoadingState } from "@/components/LoadingState"
 
 interface Props {
   orders: Order[]
+  countsByStatus?: OrderStatusCounts
   pendingOrderId?: string
   onDetail?: (o: Order) => void
   onReview?: (o: Order, existing?: { rating: number; content: string }) => void
@@ -44,7 +46,7 @@ function itemSummary(order: Order) {
   return items.map((item) => `${item.voucherTitle ?? order.voucherTitle} ×${item.quantity}`).join(" · ")
 }
 
-export function OrderHistoryPage({ orders, onDetail, onReview, onComplaint, onPayAgain, page = 1, totalPages = 1, onPageChange, onFilterChange, loading = false }: Props) {
+export function OrderHistoryPage({ orders, countsByStatus, onDetail, onReview, onComplaint, onPayAgain, page = 1, totalPages = 1, onPageChange, onFilterChange }: Props) {
   const [tab, setTab] = useState<Order["status"] | "all">("all")
   const [search, setSearch] = useState("")
 
@@ -68,9 +70,11 @@ export function OrderHistoryPage({ orders, onDetail, onReview, onComplaint, onPa
 
       <div className="flex gap-1 overflow-x-auto pb-2 mb-4 scrollbar-hide">
         {ORDER_TABS.map((tabItem) => {
-          const count = tabItem.value === "all"
-            ? orders.length
-            : orders.filter((order) => order.status === tabItem.value).length
+          const count = countsByStatus
+            ? countsByStatus[tabItem.value] ?? 0
+            : tabItem.value === "all"
+              ? orders.length
+              : orders.filter((order) => order.status === tabItem.value).length
 
           return (
             <button

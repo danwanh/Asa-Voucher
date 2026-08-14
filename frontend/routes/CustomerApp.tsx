@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { AppIcon } from "@/components/AppIcon"
 import { toast } from "sonner"
@@ -21,7 +21,7 @@ import { CustomerSettingsPage } from "@/pages/customer/CustomerSettingsPage"
 import { C } from "@/utils/constants"
 import { customerPagePath } from "@/utils/customerRoutes"
 import type { AppUser, CartItem, IssuedVoucher, Voucher, Order } from "@/types"
-import { orderService, paymentService } from "@/services/orderService"
+import { orderService, paymentService, type OrderStatusCounts } from "@/services/orderService"
 import { issuedVoucherService } from "@/services/issuedVoucherService"
 import { voucherService, type VoucherDetailData } from "@/services/voucherService"
 import { LoadingState } from "@/components/LoadingState"
@@ -103,11 +103,13 @@ export function CustomerApp({
   const [voucherSearch, setVoucherSearch] = useState("")
   const [voucherFilters, setVoucherFilters] = useState<VoucherListFilters>(DEFAULT_VOUCHER_FILTERS)
   const [myOrders, setMyOrders] = useState<Order[]>([])
+  const [orderCounts, setOrderCounts] = useState<OrderStatusCounts>({ all: 0 })
   const [ordersPage, setOrdersPage] = useState(1)
   const [ordersTotalPages, setOrdersTotalPages] = useState(1)
   const [orderStatusFilter, setOrderStatusFilter] = useState<string | undefined>()
   const [orderSearch, setOrderSearch] = useState("")
   const [myOrdersLoading, setMyOrdersLoading] = useState(initialPage === "orders" || initialPage === "my-vouchers")
+  const ordersRequestIdRef = useRef(0)
   const [myIssuedVouchers, setMyIssuedVouchers] = useState<Order[]>([])
   const [issuedPage, setIssuedPage] = useState(1)
   const [issuedTotalPages, setIssuedTotalPages] = useState(1)
@@ -264,8 +266,11 @@ export function CustomerApp({
   }
 
   const reloadOrders = () => {
+    const requestId = ++ordersRequestIdRef.current
     void orderService.list({ page: ordersPage, limit: 20, status: orderStatusFilter, search: orderSearch || undefined }).then((result) => {
+      if (requestId !== ordersRequestIdRef.current) return
       setMyOrders(result.items)
+      setOrderCounts(result.countsByStatus)
       setOrdersTotalPages(result.totalPages)
     }).catch(() => undefined)
   }
@@ -292,12 +297,18 @@ export function CustomerApp({
     }
     if (page !== "orders") return
     setMyOrdersLoading(true)
+    const requestId = ++ordersRequestIdRef.current
     void orderService.list({ page: ordersPage, limit: 20, status: orderStatusFilter, search: orderSearch || undefined }).then((result) => {
+      if (requestId !== ordersRequestIdRef.current) return
       setMyOrders(result.items)
+      setOrderCounts(result.countsByStatus)
       setOrdersTotalPages(result.totalPages)
     }).catch(() => {
+      if (requestId !== ordersRequestIdRef.current) return
       toast.error("Không thể tải đơn hàng. Vui lòng thử lại.")
-    }).finally(() => setMyOrdersLoading(false))
+    }).finally(() => {
+      if (requestId === ordersRequestIdRef.current) setMyOrdersLoading(false)
+    })
   }, [page, ordersPage, issuedPage, orderStatusFilter, orderSearch, issuedStatus, issuedSearch])
 
   return (
@@ -398,10 +409,10 @@ export function CustomerApp({
          />
        )}
       {page === "orders" && (
-          <OrderHistoryPage
-            orders={myOrders}
-            loading={myOrdersLoading}
-            page={ordersPage}
+         <OrderHistoryPage
+           orders={myOrders}
+           countsByStatus={orderCounts}
+           page={ordersPage}
            totalPages={ordersTotalPages}
            onPageChange={setOrdersPage}
            onFilterChange={(status, search) => {

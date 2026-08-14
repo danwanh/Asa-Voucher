@@ -37,6 +37,11 @@ const { mockPrisma } = vi.hoisted(() => ({
 
 vi.mock("../../config/prisma.js", () => ({ prisma: mockPrisma }));
 
+vi.mock("../../services/notification.service.js", () => ({
+  notifyVoucherApproved: vi.fn().mockResolvedValue(undefined),
+  notifyVoucherRejected: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { prisma } from "../../config/prisma.js";
 import * as voucherProductService from "../../services/voucher-product.service.js";
 import type { UserRole } from "../../types/auth.types.js";
@@ -55,7 +60,12 @@ function makeVoucher(overrides: Record<string, unknown> = {}) {
     selling_price: 80000, discount_rate: 20, total_quantity: 100, remaining_quantity: 80,
     approval_status: "approved", status: "active", sale_start_date: "2026-01-01",
     sale_end_date: "2026-12-31", validity_days: 30, description: "Desc",
-    category_id: "cat1", terms_and_conditions: ["Term"], submitted_at: null, ...overrides,
+    category_id: "cat1", terms_and_conditions: ["Term"], submitted_at: null,
+    partners: {
+      business_name: "Partner A",
+      representative_user: { email: "partner@test.com", full_name: "Partner Owner" },
+    },
+    ...overrides,
   };
 }
 
@@ -302,9 +312,17 @@ describe("Voucher Product Service", () => {
 
   describe("approveVoucherProduct", () => {
     it("approves voucher with admin id", async () => {
-      vi.mocked(prisma.voucherProduct.update).mockResolvedValue(makeVoucher() as any);
+      mockPrisma.voucherProduct.findUnique.mockResolvedValue(
+        makeVoucher({ approval_status: "pending" }) as any
+      );
+      mockPrisma.$transaction.mockImplementation(async (fn: (tx: never) => Promise<unknown>) => {
+        return fn({
+          voucherProduct: { update: vi.fn().mockResolvedValue(makeVoucher({ approval_status: "approved" })) },
+          adminLog: { create: vi.fn() },
+        } as never);
+      });
 
-      const result = await voucherProductService.approveVoucherProduct("u-admin", "vp1", "approved");
+      const result = await voucherProductService.approveVoucherProduct("u-admin", "vp1", { approval_status: "approved" });
       expect(result.approval_status).toBe("approved");
     });
   });

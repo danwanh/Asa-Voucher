@@ -64,7 +64,7 @@ export async function resolveComplaint(req: Request, res: Response) {
   await writeAuditLog({
     adminId: req.user!.id,
     action: "complaint_resolved",
-    description: `Giải quyết khiếu nại: ${input.resolution_type ?? ""}`,
+    description: `Giải quyết khiếu nại: ${(input.resolution_types ?? []).join(", ")}`,
   });
   sendSuccess(res, complaint, "Đã hoàn tất xử lý khiếu nại");
 }

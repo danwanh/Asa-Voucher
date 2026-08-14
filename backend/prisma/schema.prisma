@@ -24,6 +24,7 @@ model User {
   is_active             Boolean             @default(true)
   is_verified           Boolean             @default(false)
   partner_branches_id   String?             @db.Uuid
+  partner_id            String?             @db.Uuid
   created_at            DateTime            @default(now()) @db.Timestamptz(6)
   updated_at            DateTime            @default(now()) @updatedAt @db.Timestamptz(6)
   failed_login_attempts Int                 @default(0)
@@ -48,12 +49,14 @@ model User {
   review_responses      ReviewResponse[]
   reviews               Review[]
   partner_branches      PartnerBranch?      @relation("UserBranch", fields: [partner_branches_id], references: [id], onUpdate: NoAction, map: "users_partner_branch_fk")
+  partner               Partner?            @relation("PartnerEmployees", fields: [partner_id], references: [id], onUpdate: NoAction, map: "users_partner_fk")
   approved_vouchers     VoucherProduct[]    @relation("VoucherApprover")
   created_vouchers      VoucherProduct[]    @relation("VoucherCreator")
   submitted_vouchers    VoucherProduct[]    @relation("VoucherSubmitter")
   voucher_usages        VoucherUsage[]      @relation("VoucherUsageRedeemer")
   security_alerts       SecurityAlert[]     @relation("SecurityAlertUser")
   reviewed_alerts       SecurityAlert[]     @relation("SecurityAlertReviewer")
+  notifications         Notification[]
   cms_contents  CmsContent[]  @relation("CmsContentCreator")
 
   @@index([role])
@@ -138,6 +141,7 @@ model Partner {
   updated_at             DateTime         @default(now()) @updatedAt @db.Timestamptz(6)
   admin_logs             AdminLog[]
   partner_branches       PartnerBranch[]
+  employees              User[]             @relation("PartnerEmployees")
   approver               User?            @relation("PartnerApprover", fields: [approved_by], references: [id], onUpdate: NoAction)
   representative_user    User             @relation("PartnerRepresentative", fields: [representative_user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   voucher_products       VoucherProduct[]
@@ -282,6 +286,7 @@ model Order {
   total_amount       Decimal      @db.Decimal(15, 0)
   payment_method     String       @db.VarChar(30)
   status             String       @default("pending") @db.VarChar(20)
+  payment_status     String       @default("pending") @db.VarChar(20)
   note               String?
   created_at         DateTime     @default(now()) @db.Timestamptz(6)
   updated_at         DateTime     @default(now()) @updatedAt @db.Timestamptz(6)
@@ -329,6 +334,8 @@ model Payment {
   status           String       @default("pending") @db.VarChar(20)
   transaction_ref  String?      @db.VarChar(255)
   gateway_response String?
+  refund_ref       String?      @db.VarChar(255)
+  refunded_at      DateTime?    @db.Timestamptz(6)
   paid_at          DateTime?    @db.Timestamptz(6)
   created_at       DateTime     @default(now()) @db.Timestamptz(6)
   payment_logs     PaymentLog[]
@@ -452,7 +459,7 @@ model Complaint {
   status              String              @default("open") @db.VarChar(20)
   assigned_to         String?             @db.Uuid
   resolution_note     String?
-  resolution_type     String?             @db.VarChar(50)
+  resolution_types    Json?              @db.Json
   created_at          DateTime            @default(now()) @db.Timestamptz(6)
   resolved_at         DateTime?           @db.Timestamptz(6)
   complaint_responses ComplaintResponse[]
@@ -553,4 +560,22 @@ model CmsContent {
   @@index([content_type])
   @@index([status])
   @@map("cms_contents")
+}
+
+model Notification {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id    String   @db.Uuid
+  type       String   @db.VarChar(50)
+  title      String   @db.VarChar(255)
+  content    String?  @db.Text
+  ref_type   String?  @db.VarChar(50)
+  ref_id     String?  @db.Uuid
+  is_read    Boolean  @default(false)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  users User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, is_read])
+  @@index([user_id, created_at(sort: Desc)])
+  @@map("notifications")
 }

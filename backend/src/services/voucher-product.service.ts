@@ -4,6 +4,7 @@ import { requireData, throwDbError } from "../utils/db.js";
 import { HttpError } from "../utils/http-error.js";
 import { getAreaMatchCandidates, serializeApplicableAreas } from "../utils/applicable-area.js";
 import { rangeFromPagination } from "../validations/common.validation.js";
+import { notifyVoucherApproved, notifyVoucherRejected } from "./notification.service.js";
 
 type CurrentUser = { id: string; role: UserRole; partnerId?: string | null; branchId?: string | null };
 type WorkflowStatus = "draft" | "pending_approval" | "rejected" | "approved" | "active" | "paused" | "sold_out" | "expired";
@@ -539,8 +540,23 @@ export async function approveVoucherProduct(adminId: string, id: string, input: 
   approval_status: string;
   reject_reason?: string
 }) {
-  // Kiểm tra voucher
-  const voucher = await getVoucher(id);
+  // Kiểm tra voucher (include partner info + representative email)
+  const voucher = await requireData<Record<string, unknown>>(
+    await prisma.voucherProduct.findUnique({
+      where: { id },
+      include: {
+        partners: {
+          select: {
+            business_name: true,
+            representative_user: {
+              select: { email: true, full_name: true },
+            },
+          },
+        },
+      },
+    }) as unknown as Record<string, unknown> | null,
+    "Voucher product not found"
+  );
 
   if (voucher.approval_status !== "pending") {
     throw new HttpError(400, "Voucher không ở trạng thái chờ duyệt", "INVALID_APPROVAL_STATUS");
@@ -553,24 +569,24 @@ export async function approveVoucherProduct(adminId: string, id: string, input: 
 
   // Nếu là voucher được duyệt --> kiểm tra BR
   if (input.approval_status === "approved") {
-    // Kiểm tra giá bán < original_price
+    // RB-02: Kiểm tra giá bán < original_price
     const sellingPrice = Number(voucher.selling_price);
     const originalPrice = Number(voucher.original_price);
     if (isNaN(sellingPrice) || isNaN(originalPrice) || sellingPrice >= originalPrice) {
       throw new HttpError(400, "Giá bán phải nhỏ hơn giá gốc (Vi phạm quy tắc giá RB-02)", "INVALID_PRICE_RULE");
     }
 
-    // Kiểm tra có đầy đủ thời gian bán bắt đầu, kết thúc và số ngày sử dụng
+    // RB-03: Kiểm tra có đầy đủ thời gian bán bắt đầu, kết thúc và số ngày sử dụng
     const hasSaleTime = voucher.sale_start_date && voucher.sale_end_date;
     const hasValidTime = voucher.validity_days;
     if (!hasSaleTime || !hasValidTime) {
       throw new HttpError(400, "Voucher thiếu thời gian bán hàng hoặc thời gian sử dụng", "MISSING_TIME_RANGE");
     }
 
-    // Kiểm tra voucher hết số lượng phát hành hoặc hết thời gian bán
+    // RB-04: Kiểm tra voucher hết số lượng phát hành hoặc hết thời gian bán
     const saleEndDate = voucher.sale_end_date instanceof Date ? voucher.sale_end_date : new Date(String(voucher.sale_end_date));
-    const totalQuantity = Number(voucher.total_quantity);
-    const isOutOfQuantity = totalQuantity <= 0;
+    const remainingQuantity = Number(voucher.remaining_quantity);
+    const isOutOfQuantity = remainingQuantity <= 0;
     const isSaleExpired = !isNaN(saleEndDate.getTime()) && saleEndDate.getTime() <= Date.now();
     if (isOutOfQuantity || isSaleExpired) {
       throw new HttpError(400, "Voucher đã hết số lượng phát hành hoặc hết thời hạn bán", "VOUCHER_EXPIRED_OR_OUT_OF_STOCK");
@@ -578,7 +594,7 @@ export async function approveVoucherProduct(adminId: string, id: string, input: 
   }
 
   // Transaction: cập nhật và audit log
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const updated = await tx.voucherProduct.update({
       where: { id },
       data: {
@@ -603,6 +619,28 @@ export async function approveVoucherProduct(adminId: string, id: string, input: 
 
     return withWorkflow(updated as Record<string, unknown>);
   });
+
+  // Gửi email notification cho partner (fire-and-forget)
+  const partner = voucher.partners as { business_name: string; representative_user: { email: string; full_name: string } } | null;
+  if (partner?.representative_user?.email) {
+    const emailParams = {
+      partnerEmail: partner.representative_user.email,
+      partnerName: partner.representative_user.full_name || partner.business_name,
+      voucherName: voucher.name as string,
+    };
+
+    if (input.approval_status === "approved") {
+      notifyVoucherApproved(emailParams).catch((err) =>
+        console.error("[Notification] Failed to send approval email:", err)
+      );
+    } else {
+      notifyVoucherRejected({ ...emailParams, rejectReason: input.reject_reason! }).catch((err) =>
+        console.error("[Notification] Failed to send rejection email:", err)
+      );
+    }
+  }
+
+  return result;
 }
 
 export async function updateVoucherStatus(user: CurrentUser, id: string, status: string) {

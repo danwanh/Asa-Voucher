@@ -64,6 +64,9 @@ function mapPayment(value: BackendRecord): Payment {
     status: value.status,
     paidAt: value.paid_at,
     transactionRef: value.transaction_ref,
+    refundRef: value.refund_ref,
+    refundedAt: value.refunded_at,
+    gatewayResponse: value.gateway_response,
     createdAt: value.created_at,
   }
 
@@ -92,6 +95,7 @@ export function mapOrder(value: BackendRecord): Order {
   const payments = Array.isArray(value.payments) ? value.payments.map(mapPayment) : []
   const unpaidPayment = payments.find((p) => p.status === "pending")
   const paidPayment = payments.find((p) => p.status === "success")
+  const refundedPayment = payments.find((p) => p.status === "refunded")
   return {
     id: String(value.id),
     userId: String(value.user_id),
@@ -106,11 +110,13 @@ export function mapOrder(value: BackendRecord): Order {
         : allPartnerNames.join(", "),
     amount: num(value.total_amount),
     status: value.status,
-    paymentStatus: paidPayment ? "paid" : unpaidPayment ? "pending" : value.status === "refunded" ? "refunded" : "pending",
+    paymentStatus: value.payment_status ?? (paidPayment ? "paid" : unpaidPayment ? "pending" : value.status === "refunded" ? "refunded" : "pending"),
     paymentMethod: String(value.payment_method ?? ""),
+    refundRef: refundedPayment?.refundRef,
+    refundedAt: refundedPayment?.refundedAt,
     createdAt: value.created_at,
     updatedAt: value.updated_at,
-    code: issued[0]?.code ?? String(value.order_code ?? value.id),
+    code: String(value.order_code ?? value.id),
     qrPayload: issued[0]?.qrPayload,
     recipientId: value.recipient_id,
     isGift: Boolean(value.is_gift),
@@ -129,7 +135,10 @@ export type OrderListPage = {
   limit: number
   total: number
   totalPages: number
+  countsByStatus: OrderStatusCounts
 }
+
+export type OrderStatusCounts = Partial<Record<Order["status"] | "all", number>>
 
 export const orderService = {
   async lookupRecipient(identifier: string) {
@@ -151,13 +160,14 @@ export const orderService = {
 
   async list(params?: { status?: string; search?: string; page?: number; limit?: number }): Promise<OrderListPage> {
     const response = await api.get("/orders", { params: { ...params, page: params?.page ?? 1, limit: params?.limit ?? 20 } })
-    const result = data<{ items: BackendRecord[]; pagination: { page: number; limit: number; total: number; total_pages: number } }>(response)
+    const result = data<{ items: BackendRecord[]; pagination: { page: number; limit: number; total: number; total_pages: number }; countsByStatus?: OrderStatusCounts }>(response)
     return {
       items: result.items.map(mapOrder),
       page: result.pagination.page,
       limit: result.pagination.limit,
       total: result.pagination.total,
       totalPages: result.pagination.total_pages,
+      countsByStatus: result.countsByStatus ?? { all: result.pagination.total },
     }
   },
 
@@ -185,6 +195,11 @@ export const orderService = {
 
   async refundOrder(id: string, reason?: string) {
     const response = await api.patch(`/orders/${id}/refund`, { reason })
+    return mapOrder(data<BackendRecord>(response))
+  },
+
+  async updateOrder(id: string, input: { status?: string; note?: string }) {
+    const response = await api.patch(`/orders/${id}`, input)
     return mapOrder(data<BackendRecord>(response))
   },
 
