@@ -300,6 +300,7 @@ export async function listVoucherProducts(user: CurrentUser | undefined, queryIn
         sale_end_date: true,
         status: true,
         approval_status: true,
+        submitted_at: true,
         partners: { select: { business_name: true } },
       },
       skip: from,
@@ -466,6 +467,12 @@ export async function updateVoucherProduct(user: CurrentUser, id: string, input:
     applicable_area: input.applicable_area === undefined
       ? undefined
       : serializeApplicableAreas(String(input.applicable_area).split(",")),
+    sale_start_date: input.sale_start_date === undefined
+      ? undefined
+      : requireValidDate(input.sale_start_date, "Sale start date is invalid", "INVALID_DATE_RANGE"),
+    sale_end_date: input.sale_end_date === undefined
+      ? undefined
+      : requireValidDate(input.sale_end_date, "Sale end date is invalid", "INVALID_DATE_RANGE"),
     discount_rate: calcDiscount(originalPrice, sellingPrice),
     updated_at: new Date()
   };

@@ -24,6 +24,7 @@ type FormState = {
   name: string
   categoryId: string
   description: string
+  image: string
   applicableArea: string
   originalPrice: string
   sellingPrice: string
@@ -40,6 +41,7 @@ const INITIAL_FORM: FormState = {
   name: "",
   categoryId: "",
   description: "",
+  image: "",
   applicableArea: "",
   originalPrice: "",
   sellingPrice: "",
@@ -200,6 +202,7 @@ export function CreateVoucherPage({ partnerId, onBack }: Props) {
           category_id: form.categoryId,
           name: form.name.trim(),
           description: form.description.trim(),
+          thumbnail_url: form.image.trim() || undefined,
           applicable_area: derivedApplicableArea || undefined,
           original_price: Number(form.originalPrice),
           selling_price: Number(form.sellingPrice),
@@ -292,6 +295,14 @@ export function CreateVoucherPage({ partnerId, onBack }: Props) {
               <p className="text-xs mt-1" style={{ color: "#8A8DA8" }}>
                 Hệ thống tự động lấy khu vực từ tỉnh/thành của chi nhánh áp dụng.
               </p>
+            </Field>
+            <Field label="Ảnh đại diện (URL)">
+              <input className={inputCls()} value={form.image} onChange={(event) => updateField("image", event.target.value)} disabled={Boolean(createdVoucherId)} placeholder="https://..." />
+              {form.image && (
+                <div className="mt-2 w-32 h-20 rounded-xl overflow-hidden">
+                  <img src={form.image} alt="" className="w-full h-full object-cover" onError={(event) => (event.currentTarget.style.display = "none")} />
+                </div>
+              )}
             </Field>
           </div>
         </section>

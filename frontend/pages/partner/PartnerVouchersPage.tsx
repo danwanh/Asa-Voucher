@@ -68,9 +68,18 @@ export function PartnerVouchersPage({ partnerId, onCreateNew, onEdit, onDetail, 
     ? allVouchers.filter((v) => v.status === "pending")
     : allVouchers.filter((v) => !["draft", "active", "pending"].includes(v.status))
 
-  const draftCount = allVouchers.filter((v) => v.status === "draft").length
+  const draftVouchers = allVouchers.filter((v) => v.status === "draft")
+  const draftCount = draftVouchers.length
   const pendingCount = allVouchers.filter((v) => v.status === "pending").length
   const rejectedCount = allVouchers.filter((v) => v.status === "rejected").length
+
+  const viewDrafts = () => {
+    if (draftVouchers.length === 1) {
+      onDetail(draftVouchers[0])
+      return
+    }
+    setTab("draft")
+  }
 
   const submitVoucher = async () => {
     if (!submittingVoucher) return
@@ -129,7 +138,7 @@ export function PartnerVouchersPage({ partnerId, onCreateNew, onEdit, onDetail, 
         <div
           className="flex items-center gap-3 mb-4 px-4 py-3 rounded-xl cursor-pointer text-sm font-semibold"
           style={{ backgroundColor: C.apricot + "25", color: "#6B4F00" }}
-          onClick={() => setTab("draft")}
+          onClick={viewDrafts}
         >
           <AppIcon name="document" className="w-4 h-4" />
           <span>

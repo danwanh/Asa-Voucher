@@ -93,6 +93,7 @@ export type VoucherCreateInput = {
   category_id: string
   name: string
   description: string
+  thumbnail_url?: string
   original_price: number
   selling_price: number
   applicable_area?: string
@@ -118,8 +119,16 @@ export type VoucherPublicReview = {
 
 export type VoucherApplicableBranch = {
   id: string
+  branchId: string
   name: string
   address: string
+}
+
+export type VoucherManageDetailData = {
+  voucher: Voucher
+  conditions: string[]
+  usageInstructions: string[]
+  validityDays: number
 }
 
 export type VoucherDetailData = {
@@ -219,6 +228,7 @@ function mapBranch(item: BackendVoucherBranch): VoucherApplicableBranch {
   const district = branch.district ? `, ${branch.district}` : ""
   return {
     id: item.id,
+    branchId: item.branch_id,
     name: branch.branch_name,
     address: `${branch.address}${district}, ${branch.city}`
   }
@@ -341,11 +351,38 @@ export const voucherService = {
     ])
     const item = extractData(updateRes)
     const category = categoryFromMap(categoryMap, item.category_id)
+    voucherDetailPromises.delete(voucherId)
     return mapVoucherProduct(item, category.slug)
   },
 
   async assignBranch(voucherId: string, branchId: string): Promise<void> {
     await api.post(`/voucher-products/${voucherId}/branches`, { branch_id: branchId })
+    voucherDetailPromises.delete(voucherId)
+  },
+
+  async removeBranch(voucherId: string, branchId: string): Promise<void> {
+    await api.delete(`/voucher-products/${voucherId}/branches/${branchId}`)
+    voucherDetailPromises.delete(voucherId)
+  },
+
+  async listVoucherBranches(voucherId: string): Promise<VoucherApplicableBranch[]> {
+    const res = await api.get<ApiEnvelope<BackendVoucherBranch[]>>(`/voucher-products/${voucherId}/branches`)
+    return extractData(res).map(mapBranch)
+  },
+
+  async getManageDetail(id: string): Promise<VoucherManageDetailData> {
+    const [categoryMap, voucherRes] = await Promise.all([
+      getCategoryMap(),
+      api.get<ApiEnvelope<BackendVoucherProduct>>(`/voucher-products/${id}`)
+    ])
+    const product = extractData(voucherRes)
+    const category = product.categories ?? categoryFromMap(categoryMap, product.category_id)
+    return {
+      voucher: mapVoucherProduct(product, category.slug),
+      conditions: parseStringArray(product.terms_and_conditions),
+      usageInstructions: parseStringArray(product.usage_instructions),
+      validityDays: product.validity_days,
+    }
   },
 
   async submitVoucher(voucherId: string): Promise<Voucher> {
@@ -363,14 +400,17 @@ export const voucherService = {
     if (existing) return existing
 
     const request = (async () => {
-      const detailRes = await api.get<ApiEnvelope<{
-        voucher: BackendVoucherProduct
-        branches: BackendVoucherBranch[]
-        reviews: BackendReviewList
-      }>>(`/voucher-products/${id}/detail`)
+      const [detailRes, categoryMap] = await Promise.all([
+        api.get<ApiEnvelope<{
+          voucher: BackendVoucherProduct
+          branches: BackendVoucherBranch[]
+          reviews: BackendReviewList
+        }>>(`/voucher-products/${id}/detail`),
+        getCategoryMap(),
+      ])
       const detail = extractData(detailRes)
       const voucherProduct = detail.voucher
-      const category = voucherProduct.categories ?? { name: voucherProduct.category_id, slug: voucherProduct.category_id }
+      const category = voucherProduct.categories ?? categoryFromMap(categoryMap, voucherProduct.category_id)
 
       const current = mapVoucherProduct(voucherProduct, category.slug)
       const reviewList = detail.reviews

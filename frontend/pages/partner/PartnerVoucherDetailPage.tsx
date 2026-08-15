@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { AlertTriangle, ArrowLeft, Calendar, Edit2, Loader2, MapPin, Send, Users } from "lucide-react"
 import { toast } from "sonner"
-import { C, fmt, fmtDate, STATUS_LABEL, statusColor } from "@/utils/constants"
+import { C, fmt, fmtDate, formatCategoryLabel, STATUS_LABEL, statusColor } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import type { Voucher } from "@/types"
 import { voucherService } from "@/services/voucherService"
@@ -27,7 +27,23 @@ export function PartnerVoucherDetailPage({ voucher: initialVoucher, onBack, onEd
     async function loadDetail() {
       setIsLoadingDetail(true)
       try {
-        const result = await voucherService.getDetail(initialVoucher.id)
+        const result = await voucherService.getDetail(initialVoucher.id).catch(async () => {
+          const [manageDetail, branches] = await Promise.all([
+            voucherService.getManageDetail(initialVoucher.id),
+            voucherService.listVoucherBranches(initialVoucher.id),
+          ])
+          return {
+            voucher: manageDetail.voucher,
+            reviews: [],
+            branches,
+            conditions: manageDetail.conditions,
+            usageInstructions: manageDetail.usageInstructions,
+            applicableArea: manageDetail.voucher.applicableArea ?? null,
+            partnerId: manageDetail.voucher.partnerId,
+            partnerName: manageDetail.voucher.partnerName,
+            categoryName: "",
+          }
+        })
         if (!isMounted) return
         setDetail(result)
         setVoucher(result.voucher)
@@ -58,10 +74,12 @@ export function PartnerVoucherDetailPage({ voucher: initialVoucher, onBack, onEd
   const displayApplicableArea =
     serializeApplicableAreas(parseApplicableAreas(detail?.applicableArea ?? voucher.applicableArea)) || "Toàn quốc"
 
+  const displayCategory = detail?.categoryName || formatCategoryLabel(voucher.category)
+
   const detailRows = useMemo(
     () => [
       { label: "Đối tác", value: voucher.partnerName },
-      { label: "Danh mục", value: detail?.categoryName ?? voucher.category },
+      { label: "Danh mục", value: displayCategory },
       { label: "Giá gốc", value: fmt(voucher.originalPrice) },
       { label: "Giá bán", value: fmt(voucher.price) },
       { label: "Mức giảm", value: `${pct.toFixed(2)}%` },
@@ -71,7 +89,7 @@ export function PartnerVoucherDetailPage({ voucher: initialVoucher, onBack, onEd
       { label: "Khu vực áp dụng", value: displayApplicableArea },
       { label: "Trạng thái", value: STATUS_LABEL[voucher.status] ?? voucher.status },
     ],
-    [detail?.categoryName, displayApplicableArea, pct, voucher.category, voucher.originalPrice, voucher.partnerName, voucher.price, voucher.quantity, voucher.sold, voucher.status, voucher.validFrom, voucher.validTo],
+    [displayApplicableArea, displayCategory, pct, voucher.originalPrice, voucher.partnerName, voucher.price, voucher.quantity, voucher.sold, voucher.status, voucher.validFrom, voucher.validTo],
   )
 
   const submitVoucher = async () => {
