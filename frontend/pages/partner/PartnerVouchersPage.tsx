@@ -12,6 +12,7 @@ interface Props {
   onCreateNew: () => void
   onEdit: (v: Voucher) => void
   onDetail: (v: Voucher) => void
+  canCreate?: boolean
   sessionDrafts?: Voucher[]
   onEditDraft?: (v: Voucher) => void
 }
@@ -22,7 +23,7 @@ const TAB_LABELS: Record<FilterTab, string> = {
   all: "Tất cả", active: "Đang hoạt động", draft: "Bản nháp", pending: "Chờ duyệt", other: "Khác",
 }
 
-export function PartnerVouchersPage({ partnerId, onCreateNew, onEdit, onDetail, sessionDrafts = [], onEditDraft }: Props) {
+export function PartnerVouchersPage({ partnerId, onCreateNew, onEdit, onDetail, canCreate = true, sessionDrafts = [], onEditDraft }: Props) {
   const [tab, setTab] = useState<FilterTab>("all")
   const [baseVouchers, setBaseVouchers] = useState<Voucher[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -117,6 +118,7 @@ export function PartnerVouchersPage({ partnerId, onCreateNew, onEdit, onDetail, 
           >
             {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Tải lại
           </button>
+          {canCreate && (
           <button
             onClick={onCreateNew}
             className="flex items-center gap-2 px-4 py-2.5 rounded-2xl font-bold text-white text-sm"
@@ -124,6 +126,7 @@ export function PartnerVouchersPage({ partnerId, onCreateNew, onEdit, onDetail, 
           >
             <Plus className="w-4 h-4" /> Tạo mới
           </button>
+          )}
         </div>
       </div>
 

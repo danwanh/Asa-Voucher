@@ -5,6 +5,7 @@ import { C } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import type { AppUser } from "@/types"
 import { partnerService, type PartnerBranch, type PartnerProfile } from "@/services/partnerService"
+import { vietnamAddressService, type VietnamDistrict, type VietnamProvince } from "@/services/vietnamAddressService"
 import { LoadingState } from "@/components/LoadingState"
 
 type Props = {
@@ -42,6 +43,10 @@ export function BranchManagementPage({ user, partner, embedded = false }: Props)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [provinces, setProvinces] = useState<VietnamProvince[]>([])
+  const [districts, setDistricts] = useState<VietnamDistrict[]>([])
+  const [isAddressLoading, setIsAddressLoading] = useState(false)
+  const [addressLoadError, setAddressLoadError] = useState(false)
 
   useEffect(() => {
     let isMounted = true
@@ -73,6 +78,68 @@ export function BranchManagementPage({ user, partner, embedded = false }: Props)
     }
   }, [partner?.id])
 
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadProvinces() {
+      if (!showForm || provinces.length > 0 || addressLoadError) return
+
+      setIsAddressLoading(true)
+      try {
+        const items = await vietnamAddressService.listProvinces()
+        if (!isMounted) return
+        setProvinces(items)
+      } catch {
+        if (!isMounted) return
+        setAddressLoadError(true)
+      } finally {
+        if (!isMounted) return
+        setIsAddressLoading(false)
+      }
+    }
+
+    void loadProvinces()
+    return () => {
+      isMounted = false
+    }
+  }, [addressLoadError, provinces.length, showForm])
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadDistricts() {
+      if (!showForm || !form.city || provinces.length === 0 || addressLoadError) {
+        setDistricts([])
+        return
+      }
+
+      const province = provinces.find((item) => item.name === form.city)
+      if (!province) {
+        setDistricts([])
+        return
+      }
+
+      setIsAddressLoading(true)
+      try {
+        const items = await vietnamAddressService.listDistricts(province.code)
+        if (!isMounted) return
+        setDistricts(items)
+      } catch {
+        if (!isMounted) return
+        setAddressLoadError(true)
+        setDistricts([])
+      } finally {
+        if (!isMounted) return
+        setIsAddressLoading(false)
+      }
+    }
+
+    void loadDistricts()
+    return () => {
+      isMounted = false
+    }
+  }, [addressLoadError, form.city, provinces, showForm])
+
   const filtered = useMemo(
     () =>
       branches.filter((branch) =>
@@ -85,6 +152,7 @@ export function BranchManagementPage({ user, partner, embedded = false }: Props)
 
   const openCreate = () => {
     setForm(EMPTY_FORM)
+    setDistricts([])
     setEditId(null)
     setShowForm(true)
   }
@@ -270,7 +338,7 @@ export function BranchManagementPage({ user, partner, embedded = false }: Props)
               {[
                 { key: "branchName", label: "Tên chi nhánh *", placeholder: "Nhập tên chi nhánh" },
                 { key: "address", label: "Địa chỉ *", placeholder: "Nhập địa chỉ" },
-                { key: "city", label: "Thành phố *", placeholder: "VD: TP. Hồ Chí Minh" },
+                { key: "city", label: "Tỉnh/Thành phố *", placeholder: "VD: TP. Hồ Chí Minh" },
                 { key: "district", label: "Quận/Huyện", placeholder: "VD: Quận 1" },
                 { key: "phone", label: "Điện thoại", placeholder: "VD: 028 1234 5678" },
               ].map((field) => (
@@ -280,11 +348,32 @@ export function BranchManagementPage({ user, partner, embedded = false }: Props)
                     className="w-full px-4 py-2.5 rounded-xl border text-sm outline-none"
                     style={{ borderColor: "#E2DFC8", fontFamily: "'Inter', sans-serif" }}
                     placeholder={field.placeholder}
+                    list={field.key === "city" && !addressLoadError ? "vietnam-provinces" : field.key === "district" && !addressLoadError ? "vietnam-districts" : undefined}
                     value={form[field.key as keyof FormData] as string}
-                    onChange={(event) => setForm((prev) => ({ ...prev, [field.key]: event.target.value }))}
+                    onChange={(event) => setForm((prev) => ({
+                      ...prev,
+                      [field.key]: event.target.value,
+                      ...(field.key === "city" ? { district: "" } : {}),
+                    }))}
+                    disabled={field.key === "district" && !addressLoadError && !form.city}
                   />
                 </div>
               ))}
+
+              {!addressLoadError && (
+                <>
+                  <datalist id="vietnam-provinces">
+                    {provinces.map((province) => (
+                      <option key={province.code} value={province.name} />
+                    ))}
+                  </datalist>
+                  <datalist id="vietnam-districts">
+                    {districts.map((district) => (
+                      <option key={district.code} value={district.name} />
+                    ))}
+                  </datalist>
+                </>
+              )}
 
               <label className="flex items-center gap-2 text-sm" style={{ color: C.indigo }}>
                 <input

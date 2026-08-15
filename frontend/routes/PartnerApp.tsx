@@ -37,6 +37,12 @@ export function PartnerApp({ user, onLogout, initialPage }: Props) {
   }, [initialPage])
 
   useEffect(() => {
+    if (user.role === "partner_owner" && page === "create") {
+      setPage("vouchers")
+    }
+  }, [page, user.role])
+
+  useEffect(() => {
     let isMounted = true
 
     async function loadPartner() {
@@ -102,11 +108,12 @@ export function PartnerApp({ user, onLogout, initialPage }: Props) {
           onCreateNew={() => setPage("create")}
           onEdit={goEdit}
           onDetail={goDetail}
+          canCreate={false}
           sessionDrafts={sessionDrafts}
           onEditDraft={handleEditDraft}
         />
       )}
-      {page === "create" && (
+      {page === "create" && user.role !== "partner_owner" && (
         <CreateVoucherPage
           partnerId={user.partnerId}
           partnerName={partner?.businessName}
