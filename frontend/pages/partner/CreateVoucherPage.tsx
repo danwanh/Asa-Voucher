@@ -4,9 +4,11 @@ import { toast } from "sonner"
 import { C } from "@/utils/constants"
 import { partnerService, type PartnerBranch } from "@/services/partnerService"
 import { voucherService } from "@/services/voucherService"
+import { mediaUploadService } from "@/services/mediaUploadService"
 import { useAuthStore } from "@/stores/authStore"
 import type { Voucher } from "@/types"
 import { serializeApplicableAreas } from "@/utils/applicableArea"
+import { VoucherImageUpload } from "@/components/VoucherImageUpload"
 
 interface Props {
   partnerId?: string
@@ -79,6 +81,7 @@ export function CreateVoucherPage({ partnerId, onBack }: Props) {
   const [confirmSave, setConfirmSave] = useState(false)
   const [createdVoucherId, setCreatedVoucherId] = useState<string | null>(null)
   const [assignedBranchIds, setAssignedBranchIds] = useState<string[]>([])
+  const [imageFile, setImageFile] = useState<File | null>(null)
 
   useEffect(() => {
     let isMounted = true
@@ -198,11 +201,19 @@ export function CreateVoucherPage({ partnerId, onBack }: Props) {
     let voucherId = createdVoucherId
     try {
       if (!voucherId) {
+        const uploadedImageUrl = imageFile
+          ? await mediaUploadService.uploadImage(imageFile)
+          : form.image.trim()
+        if (uploadedImageUrl) {
+          setForm((current) => ({ ...current, image: uploadedImageUrl }))
+          setImageFile(null)
+        }
+
         const created = await voucherService.createVoucher({
           category_id: form.categoryId,
           name: form.name.trim(),
           description: form.description.trim(),
-          thumbnail_url: form.image.trim() || undefined,
+          thumbnail_url: uploadedImageUrl || undefined,
           applicable_area: derivedApplicableArea || undefined,
           original_price: Number(form.originalPrice),
           selling_price: Number(form.sellingPrice),
@@ -296,13 +307,14 @@ export function CreateVoucherPage({ partnerId, onBack }: Props) {
                 Hệ thống tự động lấy khu vực từ tỉnh/thành của chi nhánh áp dụng.
               </p>
             </Field>
-            <Field label="Ảnh đại diện (URL)">
-              <input className={inputCls()} value={form.image} onChange={(event) => updateField("image", event.target.value)} disabled={Boolean(createdVoucherId)} placeholder="https://..." />
-              {form.image && (
-                <div className="mt-2 w-32 h-20 rounded-xl overflow-hidden">
-                  <img src={form.image} alt="" className="w-full h-full object-cover" onError={(event) => (event.currentTarget.style.display = "none")} />
-                </div>
-              )}
+            <Field label="Ảnh đại diện">
+              <VoucherImageUpload
+                imageUrl={form.image}
+                selectedFile={imageFile}
+                disabled={Boolean(createdVoucherId)}
+                onFileChange={setImageFile}
+                onError={toast.error}
+              />
             </Field>
           </div>
         </section>

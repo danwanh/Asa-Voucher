@@ -4,8 +4,10 @@ import { toast } from "sonner"
 import { C } from "@/utils/constants"
 import { partnerService, type PartnerBranch } from "@/services/partnerService"
 import { voucherService } from "@/services/voucherService"
+import { mediaUploadService } from "@/services/mediaUploadService"
 import type { Voucher } from "@/types"
 import { serializeApplicableAreas } from "@/utils/applicableArea"
+import { VoucherImageUpload } from "@/components/VoucherImageUpload"
 
 interface Props {
   voucher: Voucher
@@ -74,6 +76,7 @@ export function EditVoucherPage({ voucher, onBack, onSave }: Props) {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [imageFile, setImageFile] = useState<File | null>(null)
 
   useEffect(() => {
     let isMounted = true
@@ -202,11 +205,19 @@ export function EditVoucherPage({ voucher, onBack, onSave }: Props) {
 
     setIsSaving(true)
     try {
+      const uploadedImageUrl = imageFile
+        ? await mediaUploadService.uploadImage(imageFile)
+        : form.image.trim()
+      if (uploadedImageUrl && uploadedImageUrl !== form.image) {
+        setForm((current) => ({ ...current, image: uploadedImageUrl }))
+        setImageFile(null)
+      }
+
       const updated = await voucherService.updateVoucher(voucher.id, {
         category_id: form.categoryId,
         name: form.name.trim(),
         description: form.description.trim(),
-        thumbnail_url: form.image.trim() || undefined,
+        thumbnail_url: uploadedImageUrl || undefined,
         applicable_area: derivedApplicableArea || undefined,
         original_price: Number(form.originalPrice),
         selling_price: Number(form.sellingPrice),
@@ -285,13 +296,14 @@ export function EditVoucherPage({ voucher, onBack, onSave }: Props) {
                 Hệ thống tự động lấy khu vực từ tỉnh/thành của chi nhánh áp dụng.
               </p>
             </Field>
-            <Field label="Ảnh đại diện (URL)">
-              <input className={inputCls()} value={form.image} onChange={(event) => updateField("image", event.target.value)} disabled={isSaving} placeholder="https://..." />
-              {form.image && (
-                <div className="mt-2 w-32 h-20 rounded-xl overflow-hidden">
-                  <img src={form.image} alt="" className="w-full h-full object-cover" onError={(event) => (event.currentTarget.style.display = "none")} />
-                </div>
-              )}
+            <Field label="Ảnh đại diện">
+              <VoucherImageUpload
+                imageUrl={form.image}
+                selectedFile={imageFile}
+                disabled={isSaving}
+                onFileChange={setImageFile}
+                onError={toast.error}
+              />
             </Field>
           </div>
         </section>
