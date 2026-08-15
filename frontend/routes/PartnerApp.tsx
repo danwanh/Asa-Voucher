@@ -145,6 +145,7 @@ export function PartnerApp({ user, onLogout, initialPage }: Props) {
           <PersonalProfilePage user={user} onLogout={onLogout} />
         </>
       )}
+      {/*
       {page === "notifications" && (
         <div className="p-6 max-w-xl mx-auto">
           <h1 className="text-2xl font-black mb-4" style={{ color: C.indigo, fontFamily: "'Nunito', sans-serif" }}>Thông báo</h1>
@@ -155,6 +156,7 @@ export function PartnerApp({ user, onLogout, initialPage }: Props) {
         </div>
       )}
       {page === "settings" && <PartnerSettingsPage onLogout={onLogout} />}
+      */}
     </PartnerLayout>
   )
 }
