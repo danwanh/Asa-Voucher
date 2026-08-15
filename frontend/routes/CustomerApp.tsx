@@ -186,6 +186,12 @@ export function CustomerApp({
     setVoucherSearch(value)
   }
 
+  const handleVoucherSearchFocus = () => {
+    if (page === "vouchers") return
+    setPage("vouchers")
+    onInitialPageConsumed?.()
+  }
+
   const goDetail = (v: Voucher) => startTransition(() => router.push(`/vouchers/${v.id}`))
   const goOrderDetail = (o: OrderListItem) => {
     startTransition(() => router.push(`/orders/${o.id}`))
@@ -397,6 +403,7 @@ export function CustomerApp({
       cartCountLoading={cartCountLoading}
       voucherSearch={voucherSearch}
       onVoucherSearchChange={handleVoucherSearchChange}
+      onVoucherSearchFocus={handleVoucherSearchFocus}
       onNavigate={navigate}
       onLogout={onLogout}
     >

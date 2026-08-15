@@ -19,6 +19,7 @@ interface Props {
   notifCount?: number
   voucherSearch: string
   onVoucherSearchChange: (value: string) => void
+  onVoucherSearchFocus: () => void
   onNavigate: (p: CustomerPage) => void
   onLogout: () => void
   children: React.ReactNode
@@ -49,6 +50,7 @@ export function CustomerLayout({
   notifCount = 0,
   voucherSearch,
   onVoucherSearchChange,
+  onVoucherSearchFocus,
   onNavigate,
   onLogout,
   children
@@ -87,6 +89,7 @@ export function CustomerLayout({
                 name="voucher-search"
                 autoComplete="new-password"
                 value={voucherSearch}
+                onFocus={onVoucherSearchFocus}
                 onChange={(e) => onVoucherSearchChange(e.target.value)}
               />
             </div>
