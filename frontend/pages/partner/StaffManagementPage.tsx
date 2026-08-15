@@ -85,10 +85,9 @@ export function StaffManagementPage() {
     [branches, form?.branchId],
   )
 
-  const openDetail = async (item: PartnerStaffMember) => {
+  const loadStaffDetail = async (item: PartnerStaffMember) => {
     setSelectedStaff(item)
     setForm(getInitialForm(item))
-    setIsEditing(false)
     try {
       const detail = await partnerService.getPartnerStaff(item.id)
       setSelectedStaff(detail)
@@ -98,9 +97,14 @@ export function StaffManagementPage() {
     }
   }
 
+  const openDetail = async (item: PartnerStaffMember) => {
+    setIsEditing(false)
+    await loadStaffDetail(item)
+  }
+
   const openEdit = async (item: PartnerStaffMember) => {
-    await openDetail(item)
     setIsEditing(true)
+    await loadStaffDetail(item)
   }
 
   const requestSave = () => {
@@ -355,7 +359,7 @@ export function StaffManagementPage() {
               >
                 Đóng
               </button>
-              {isEditing ? (
+              {isEditing && (
                 <button
                   onClick={requestSave}
                   disabled={isSaving}
@@ -363,14 +367,6 @@ export function StaffManagementPage() {
                   style={{ backgroundColor: C.peach }}
                 >
                   Lưu
-                </button>
-              ) : (
-                <button
-                  onClick={() => setIsEditing(true)}
-                  className="flex-1 py-2.5 rounded-xl font-bold text-white"
-                  style={{ backgroundColor: C.peach }}
-                >
-                  Chỉnh sửa
                 </button>
               )}
             </div>
