@@ -9,6 +9,13 @@ export const orderStatusSchema = z.enum([
   "refunded",
 ]);
 
+export const orderPaymentStatusSchema = z.enum([
+  "pending",
+  "paid",
+  "failed",
+  "refunded",
+]);
+
 export const cartItemSchema = z.object({
   voucher_product_id: z.string().uuid(),
   quantity: z.number().int().positive()
@@ -57,6 +64,7 @@ export const createPaymentSchema = z.object({
 
 export const listOrdersQuerySchema = z.object({
   status: orderStatusSchema.optional(),
+  payment_status: orderPaymentStatusSchema.optional(),
   search: z.string().trim().min(1).optional(),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20)

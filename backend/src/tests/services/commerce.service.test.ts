@@ -315,13 +315,13 @@ describe("Commerce Service", () => {
         discount_amount: true,
         total_amount: true,
         status: true,
+        payment_status: true,
         payment_method: true,
         payment_expires_at: true,
         created_at: true,
         users: { select: { full_name: true } },
       }));
       expect(select.payments).toEqual({ select: { status: true } });
-      expect(select).not.toHaveProperty("payment_status");
       expect(select).not.toHaveProperty("updated_at");
       expect(select.order_items.select.issued_vouchers).toEqual({
         select: { reviews: { where: { user_id: "u-buyer" }, select: { id: true } } },
