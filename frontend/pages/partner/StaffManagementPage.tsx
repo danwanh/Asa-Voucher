@@ -256,71 +256,96 @@ export function StaffManagementPage() {
               </button>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Họ tên</label>
-                <input
-                  className="w-full px-4 py-2.5 rounded-xl border text-sm outline-none disabled:bg-gray-50"
-                  style={{ borderColor: "#E2DFC8", fontFamily: "'Inter', sans-serif" }}
-                  value={form.fullName}
-                  disabled={!isEditing}
-                  onChange={(event) => setForm((prev) => prev ? { ...prev, fullName: event.target.value } : prev)}
-                />
+            {!isEditing ? (
+              <div className="grid md:grid-cols-2 gap-3">
+                {[
+                  { label: "Họ tên", value: selectedStaff.fullName },
+                  { label: "Email", value: selectedStaff.email },
+                  { label: "Số điện thoại", value: selectedStaff.phone || "Chưa cập nhật" },
+                  { label: "Vai trò nghiệp vụ", value: ROLE_LABELS[selectedStaff.role] },
+                  { label: "Chi nhánh phụ trách", value: selectedStaff.branchName || "Chưa phân công" },
+                ].map((item) => (
+                  <div key={item.label} className="rounded-xl border bg-white px-4 py-3" style={{ borderColor: "#E2DFC8" }}>
+                    <div className="text-xs font-bold mb-1" style={{ color: "#8A8DA8" }}>{item.label}</div>
+                    <div className="text-sm font-bold" style={{ color: C.indigo }}>{item.value}</div>
+                  </div>
+                ))}
+                <div className="rounded-xl border bg-white px-4 py-3" style={{ borderColor: "#E2DFC8" }}>
+                  <div className="text-xs font-bold mb-1" style={{ color: "#8A8DA8" }}>Trạng thái tài khoản</div>
+                  <span
+                    className="inline-flex px-2.5 py-1 rounded-full text-xs font-bold"
+                    style={{
+                      backgroundColor: selectedStaff.isActive ? "#E8F5EE" : "#FEE2E2",
+                      color: selectedStaff.isActive ? "#2D7A52" : "#B91C1C",
+                    }}
+                  >
+                    {selectedStaff.isActive ? "Đang hoạt động" : "Ngưng hoạt động"}
+                  </span>
+                </div>
               </div>
-              <div>
-                <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Email</label>
-                <input
-                  className="w-full px-4 py-2.5 rounded-xl border text-sm outline-none bg-gray-50"
-                  style={{ borderColor: "#E2DFC8", fontFamily: "'Inter', sans-serif" }}
-                  value={selectedStaff.email}
-                  disabled
-                />
+            ) : (
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Họ tên</label>
+                  <input
+                    className="w-full px-4 py-2.5 rounded-xl border text-sm outline-none"
+                    style={{ borderColor: "#E2DFC8", fontFamily: "'Inter', sans-serif" }}
+                    value={form.fullName}
+                    onChange={(event) => setForm((prev) => prev ? { ...prev, fullName: event.target.value } : prev)}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Email</label>
+                  <input
+                    className="w-full px-4 py-2.5 rounded-xl border text-sm outline-none bg-gray-50"
+                    style={{ borderColor: "#E2DFC8", fontFamily: "'Inter', sans-serif" }}
+                    value={selectedStaff.email}
+                    disabled
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Số điện thoại</label>
+                  <input
+                    className="w-full px-4 py-2.5 rounded-xl border text-sm outline-none"
+                    style={{ borderColor: "#E2DFC8", fontFamily: "'Inter', sans-serif" }}
+                    value={form.phone}
+                    onChange={(event) => setForm((prev) => prev ? { ...prev, phone: event.target.value } : prev)}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Trạng thái tài khoản</label>
+                  <input
+                    className="w-full px-4 py-2.5 rounded-xl border text-sm outline-none bg-gray-50"
+                    style={{ borderColor: "#E2DFC8", fontFamily: "'Inter', sans-serif" }}
+                    value={selectedStaff.isActive ? "Đang hoạt động" : "Ngưng hoạt động"}
+                    disabled
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Vai trò nghiệp vụ</label>
+                  <select
+                    className="w-full px-4 py-2.5 rounded-xl border text-sm outline-none bg-white"
+                    style={{ borderColor: "#E2DFC8", fontFamily: "'Inter', sans-serif" }}
+                    value={form.role}
+                    onChange={(event) => setForm((prev) => prev ? { ...prev, role: event.target.value as PartnerStaffRole } : prev)}
+                  >
+                    {ROLE_OPTIONS.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Chi nhánh phụ trách</label>
+                  <select
+                    className="w-full px-4 py-2.5 rounded-xl border text-sm outline-none bg-white"
+                    style={{ borderColor: "#E2DFC8", fontFamily: "'Inter', sans-serif" }}
+                    value={form.branchId}
+                    onChange={(event) => setForm((prev) => prev ? { ...prev, branchId: event.target.value } : prev)}
+                  >
+                    <option value="">Chọn chi nhánh</option>
+                    {activeBranches.map((branch) => <option key={branch.id} value={branch.id}>{branch.branchName}</option>)}
+                  </select>
+                </div>
               </div>
-              <div>
-                <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Số điện thoại</label>
-                <input
-                  className="w-full px-4 py-2.5 rounded-xl border text-sm outline-none disabled:bg-gray-50"
-                  style={{ borderColor: "#E2DFC8", fontFamily: "'Inter', sans-serif" }}
-                  value={form.phone}
-                  disabled={!isEditing}
-                  onChange={(event) => setForm((prev) => prev ? { ...prev, phone: event.target.value } : prev)}
-                />
-              </div>
-              <div>
-                <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Trạng thái tài khoản</label>
-                <input
-                  className="w-full px-4 py-2.5 rounded-xl border text-sm outline-none bg-gray-50"
-                  style={{ borderColor: "#E2DFC8", fontFamily: "'Inter', sans-serif" }}
-                  value={selectedStaff.isActive ? "Đang hoạt động" : "Ngưng hoạt động"}
-                  disabled
-                />
-              </div>
-              <div>
-                <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Vai trò nghiệp vụ</label>
-                <select
-                  className="w-full px-4 py-2.5 rounded-xl border text-sm outline-none disabled:bg-gray-50"
-                  style={{ borderColor: "#E2DFC8", fontFamily: "'Inter', sans-serif" }}
-                  value={form.role}
-                  disabled={!isEditing}
-                  onChange={(event) => setForm((prev) => prev ? { ...prev, role: event.target.value as PartnerStaffRole } : prev)}
-                >
-                  {ROLE_OPTIONS.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Chi nhánh phụ trách</label>
-                <select
-                  className="w-full px-4 py-2.5 rounded-xl border text-sm outline-none disabled:bg-gray-50"
-                  style={{ borderColor: "#E2DFC8", fontFamily: "'Inter', sans-serif" }}
-                  value={form.branchId}
-                  disabled={!isEditing}
-                  onChange={(event) => setForm((prev) => prev ? { ...prev, branchId: event.target.value } : prev)}
-                >
-                  <option value="">Chọn chi nhánh</option>
-                  {activeBranches.map((branch) => <option key={branch.id} value={branch.id}>{branch.branchName}</option>)}
-                </select>
-              </div>
-            </div>
+            )}
 
             <div className="mt-6 flex gap-3">
               <button
@@ -345,7 +370,7 @@ export function StaffManagementPage() {
                   className="flex-1 py-2.5 rounded-xl font-bold text-white"
                   style={{ backgroundColor: C.peach }}
                 >
-                  Cập nhật
+                  Chỉnh sửa
                 </button>
               )}
             </div>
