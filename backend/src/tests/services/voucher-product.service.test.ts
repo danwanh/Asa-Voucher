@@ -11,6 +11,8 @@ const { mockPrisma } = vi.hoisted(() => ({
       update: vi.fn(),
       updateMany: vi.fn(),
       count: vi.fn(),
+      groupBy: vi.fn(),
+      aggregate: vi.fn(),
     },
     voucherProductImage: {
       findMany: vi.fn(),
@@ -28,6 +30,7 @@ const { mockPrisma } = vi.hoisted(() => ({
     partner: {
       findFirst: vi.fn(),
       findUnique: vi.fn(),
+      count: vi.fn(),
     },
     partnerBranch: {
       findUnique: vi.fn(),
@@ -35,6 +38,9 @@ const { mockPrisma } = vi.hoisted(() => ({
     review: {
       findMany: vi.fn(),
       aggregate: vi.fn(),
+    },
+    user: {
+      count: vi.fn(),
     },
     $transaction: vi.fn(),
   },
@@ -105,8 +111,8 @@ describe("Voucher Product Service", () => {
       expect(result.items).toHaveLength(1);
     });
 
-    it("includes approved+active vouchers that are not yet on sale", async () => {
-      mockPrisma.$transaction.mockResolvedValue([[makeVoucher({ sale_start_date: "2099-01-01" })], 1]);
+    it("only returns approved+active vouchers already on sale", async () => {
+      mockPrisma.$transaction.mockResolvedValue([[makeVoucher()], 1]);
 
       const result = await voucherProductService.listVoucherProducts(undefined, { page: 1, limit: 20 });
 
@@ -117,11 +123,11 @@ describe("Voucher Product Service", () => {
             approval_status: "approved",
             status: "active",
             remaining_quantity: { gt: 0 },
+            sale_start_date: expect.objectContaining({ lte: expect.any(Date) }),
+            sale_end_date: expect.objectContaining({ gte: expect.any(Date) }),
           }),
         })
       );
-      const where = vi.mocked(prisma.voucherProduct.findMany).mock.calls[0][0].where as Record<string, unknown>;
-      expect(where.sale_start_date).toBeUndefined();
     });
 
     it("resolves mine scope partner from voucher staff branch", async () => {
@@ -165,9 +171,12 @@ describe("Voucher Product Service", () => {
           }),
         })
       );
-      const where = vi.mocked(prisma.voucherProduct.findMany).mock.calls[0][0].where as Record<string, unknown>;
+      const findManyCall = vi.mocked(prisma.voucherProduct.findMany).mock.calls[0];
+      expect(findManyCall).toBeDefined();
+      const where = findManyCall![0]!.where as Record<string, unknown>;
       expect(where.status).toBeUndefined();
       expect(where.remaining_quantity).toBeUndefined();
+      expect(where.sale_start_date).toBeUndefined();
       expect(where.sale_end_date).toBeUndefined();
     });
 
@@ -197,6 +206,71 @@ describe("Voucher Product Service", () => {
           })
         })
       );
+    });
+  });
+
+  describe("getPublicHomepageSummary", () => {
+    it("returns aggregate counts for public homepage data", async () => {
+      mockPrisma.$transaction.mockResolvedValue([
+        12,
+        4,
+        8,
+        [
+          { category_id: "cat1", _count: { category_id: 7 } },
+          { category_id: "cat2", _count: { category_id: 5 } },
+        ],
+        { _max: { discount_rate: 42.4 } },
+      ]);
+
+      const result = await voucherProductService.getPublicHomepageSummary();
+
+      expect(result).toEqual({
+        vouchers: 12,
+        partners: 4,
+        customers: 8,
+        max_discount: 42,
+        category_counts: [
+          { category_id: "cat1", count: 7 },
+          { category_id: "cat2", count: 5 },
+        ],
+      });
+      expect(prisma.voucherProduct.count).toHaveBeenCalledWith({
+        where: expect.objectContaining({
+          approval_status: "approved",
+          status: "active",
+          remaining_quantity: { gt: 0 },
+          sale_start_date: expect.objectContaining({ lte: expect.any(Date) }),
+          sale_end_date: expect.objectContaining({ gte: expect.any(Date) }),
+        }),
+      });
+      expect(prisma.partner.count).toHaveBeenCalledWith({
+        where: { approval_status: "approved", status: "active" },
+      });
+      expect(prisma.user.count).toHaveBeenCalledWith({
+        where: { role: "buyer", is_active: true },
+      });
+      expect(prisma.voucherProduct.groupBy).toHaveBeenCalledWith({
+        by: ["category_id"],
+        where: expect.objectContaining({
+          approval_status: "approved",
+          status: "active",
+          remaining_quantity: { gt: 0 },
+          sale_start_date: expect.objectContaining({ lte: expect.any(Date) }),
+          sale_end_date: expect.objectContaining({ gte: expect.any(Date) }),
+        }),
+        orderBy: { category_id: "asc" },
+        _count: { category_id: true },
+      });
+      expect(prisma.voucherProduct.aggregate).toHaveBeenCalledWith({
+        where: expect.objectContaining({
+          approval_status: "approved",
+          status: "active",
+          remaining_quantity: { gt: 0 },
+          sale_start_date: expect.objectContaining({ lte: expect.any(Date) }),
+          sale_end_date: expect.objectContaining({ gte: expect.any(Date) }),
+        }),
+        _max: { discount_rate: true },
+      });
     });
   });
 

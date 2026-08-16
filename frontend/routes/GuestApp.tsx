@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { AppIcon } from "@/components/AppIcon"
+import { CategoryGridPage } from "@/components/CategoryGridPage"
 import { toast } from "sonner"
 import { GuestLayout, type GuestPage } from "@/layouts/GuestLayout"
 import { GuestHomePage } from "@/pages/guest/GuestHomePage"
-import { GuestVoucherListPage } from "@/pages/guest/GuestVoucherListPage"
+import { VoucherListPage } from "@/pages/customer/VoucherListPage"
 import { GuestVoucherDetailPage } from "@/pages/guest/GuestVoucherDetailPage"
 import { CartPage } from "@/pages/customer/CartPage"
 import type { Voucher, CartItem } from "@/types"
@@ -48,11 +49,35 @@ interface FullProps {
   initialVoucherId?: string
 }
 
+type VoucherListFilters = {
+  categoryId: string
+  partnerId: string
+  area: string
+  priceRange: string
+  discountRange: string
+  effectiveStatus: string
+}
+
+const DEFAULT_VOUCHER_FILTERS: VoucherListFilters = {
+  categoryId: "all",
+  partnerId: "all",
+  area: "all",
+  priceRange: "all",
+  discountRange: "all",
+  effectiveStatus: "all"
+}
+
 export function GuestApp({ onLogin, onRegister, onCheckout, cartAdd, cartCount, cartCountLoading = false, cart, total, cartRemove, cartUpdate, initialPage, initialVoucherId }: FullProps) {
   const router = useRouter()
   const [page, setPage] = useState<GuestPage>(initialPage ?? "home")
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null)
   const [selectedVoucherDetail, setSelectedVoucherDetail] = useState<VoucherDetailData | null>(null)
+  const [voucherSearch, setVoucherSearch] = useState("")
+  const [voucherFilters, setVoucherFilters] = useState<VoucherListFilters>(DEFAULT_VOUCHER_FILTERS)
+
+  useEffect(() => {
+    setPage(initialPage ?? "home")
+  }, [initialPage])
 
   useEffect(() => {
     if (!initialVoucherId) return
@@ -70,10 +95,21 @@ export function GuestApp({ onLogin, onRegister, onCheckout, cartAdd, cartCount, 
   }
 
   const navigate = (nextPage: GuestPage) => {
-    if (nextPage === "home") router.push("/")
+    setPage(nextPage)
+    if (nextPage === "home") {
+      setVoucherSearch("")
+      setVoucherFilters(DEFAULT_VOUCHER_FILTERS)
+      router.push("/")
+    }
     else if (nextPage === "vouchers") router.push("/vouchers")
     else if (nextPage === "categories") router.push("/categories")
-    else setPage(nextPage)
+    else if (nextPage === "cart") router.push("/cart")
+  }
+
+  const handleVoucherSearchFocus = () => {
+    if (page === "vouchers") return
+    setPage("vouchers")
+    router.push("/vouchers")
   }
 
   const handleAddToCart = async (v: Voucher) => {
@@ -97,10 +133,13 @@ export function GuestApp({ onLogin, onRegister, onCheckout, cartAdd, cartCount, 
        onRegister={onRegister}
       cartCount={cartCount}
       cartCountLoading={cartCountLoading}
+      voucherSearch={voucherSearch}
+      onVoucherSearchChange={setVoucherSearch}
+      onVoucherSearchFocus={handleVoucherSearchFocus}
     >
       {page === "home" && (
         <GuestHomePage
-          onNavigate={(nextPage) => setPage(nextPage as GuestPage)}
+          onNavigate={(nextPage) => navigate(nextPage as GuestPage)}
           onVoucherDetail={goDetail}
           onLogin={onLogin}
           onAddToCart={handleAddToCart}
@@ -108,11 +147,13 @@ export function GuestApp({ onLogin, onRegister, onCheckout, cartAdd, cartCount, 
         />
       )}
       {page === "vouchers" && (
-        <GuestVoucherListPage
+        <VoucherListPage
           onDetail={goDetail}
-          onLogin={onLogin}
           onAddToCart={handleAddToCart}
           onBuyNow={handleBuyNow}
+          searchQuery={voucherSearch}
+          filters={voucherFilters}
+          onFiltersChange={setVoucherFilters}
         />
       )}
       {page === "detail" && !selectedVoucher && <LoadingState label="Đang tải chi tiết voucher..." variant="page" />}
@@ -138,32 +179,12 @@ export function GuestApp({ onLogin, onRegister, onCheckout, cartAdd, cartCount, 
         />
       )}
       {page === "categories" && (
-        <div className="max-w-5xl mx-auto px-4 py-10">
-          <h1 className="text-2xl font-black mb-6" style={{ fontFamily: "'Nunito', sans-serif", color: "#3D405B" }}>Tất cả danh mục</h1>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {[
-               { icon: "gift", name: "Ẩm thực", count: 45, color: "#FDEBD0" },
-               { icon: "heart", name: "Làm đẹp", count: 32, color: "#FCE4EC" },
-               { icon: "location", name: "Du lịch", count: 28, color: "#E3F2FD" },
-               { icon: "ticket", name: "Giải trí", count: 21, color: "#EDE7F6" },
-               { icon: "shield", name: "Thể thao", count: 8, color: "#E8F5E9" },
-               { icon: "document", name: "Giáo dục", count: 5, color: "#FFF8E1" },
-               { icon: "shield", name: "Sức khỏe", count: 14, color: "#E0F7FA" },
-               { icon: "shoppingCart", name: "Mua sắm", count: 19, color: "#F3E5F5" },
-            ].map((cat) => (
-              <button
-                key={cat.name}
-                onClick={() => setPage("vouchers")}
-                className="flex flex-col items-center gap-3 p-6 rounded-2xl hover:shadow-md transition-all"
-                style={{ backgroundColor: cat.color }}
-              >
-                <AppIcon name={cat.icon} className="w-12 h-12" />
-                <div className="font-black text-sm" style={{ color: "#3D405B" }}>{cat.name}</div>
-                <div className="text-xs" style={{ color: "#6B7280" }}>{cat.count} voucher</div>
-              </button>
-            ))}
-          </div>
-        </div>
+        <CategoryGridPage
+          onSelectCategory={(category) => {
+            setVoucherFilters((current) => ({ ...current, categoryId: category.id }))
+            navigate("vouchers")
+          }}
+        />
       )}
       {page === "about" && (
         <div className="max-w-3xl mx-auto px-4 py-16 text-center">

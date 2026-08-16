@@ -3,7 +3,7 @@ import { Search, Star, ChevronRight, Zap, ShieldCheck, Smartphone, TrendingUp, C
 import { C, fmt } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import type { Voucher } from "@/types"
-import { voucherService } from "@/services/voucherService"
+import { voucherService, type HomepageSummary } from "@/services/voucherService"
 import { isVoucherAvailable } from "@/hooks/useCart"
 
 interface Props {
@@ -14,21 +14,21 @@ interface Props {
   onBuyNow: (v: Voucher) => void
 }
 
-const CATEGORIES = [
-  { icon: "gift", name: "Ẩm thực", count: 45, color: "#FDEBD0" },
-  { icon: "heart", name: "Làm đẹp", count: 32, color: "#FCE4EC" },
-  { icon: "location", name: "Du lịch", count: 28, color: "#E3F2FD" },
-  { icon: "ticket", name: "Giải trí", count: 21, color: "#EDE7F6" },
-  { icon: "shield", name: "Thể thao", count: 8, color: "#E8F5E9" },
-  { icon: "document", name: "Giáo dục", count: 5, color: "#FFF8E1" },
-  { icon: "shield", name: "Sức khỏe", count: 14, color: "#E0F7FA" },
-  { icon: "shoppingCart", name: "Mua sắm", count: 19, color: "#F3E5F5" },
-]
+type GuestCategory = {
+  id: string
+  name: string
+  slug: string
+}
 
-const REVIEWS = [
-  { name: "Nguyễn Thị Lan", avatar: "user", rating: 5, text: "Dịch vụ tuyệt vời! Mua voucher rất dễ dàng, tiết kiệm được nhiều tiền.", date: "05/07/2026" },
-  { name: "Trần Văn Hùng", avatar: "user", rating: 5, text: "Nhiều voucher hấp dẫn, giá tốt. Sẽ tiếp tục sử dụng ASA Voucher!", date: "03/07/2026" },
-  { name: "Phạm Minh Châu", avatar: "user", rating: 4, text: "App dễ dùng, tìm voucher nhanh. Chăm sóc khách hàng nhiệt tình.", date: "01/07/2026" },
+const CATEGORY_STYLES = [
+  { icon: "gift", color: "#FDEBD0" },
+  { icon: "heart", color: "#FCE4EC" },
+  { icon: "location", color: "#E3F2FD" },
+  { icon: "ticket", color: "#EDE7F6" },
+  { icon: "shield", color: "#E8F5E9" },
+  { icon: "document", color: "#FFF8E1" },
+  { icon: "shield", color: "#E0F7FA" },
+  { icon: "shoppingCart", color: "#F3E5F5" },
 ]
 
 const FAQ = [
@@ -38,10 +38,23 @@ const FAQ = [
   { q: "Có thể hoàn tiền nếu không dùng được?", a: "ASA Voucher hỗ trợ hoàn tiền trong vòng 7 ngày kể từ ngày mua, với điều kiện voucher chưa được sử dụng." },
 ]
 
+const EMPTY_SUMMARY: HomepageSummary = {
+  vouchers: 0,
+  partners: 0,
+  customers: 0,
+  maxDiscount: 0,
+  categoryCounts: [],
+}
+
+function formatCount(value: number) {
+  return new Intl.NumberFormat("vi-VN").format(value)
+}
+
 export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCart, onBuyNow }: Props) {
-  const [search, setSearch] = useState("")
   const [openFaq, setOpenFaq] = useState<number | null>(null)
   const [vouchers, setVouchers] = useState<Voucher[]>([])
+  const [categories, setCategories] = useState<GuestCategory[]>([])
+  const [homepageSummary, setHomepageSummary] = useState<HomepageSummary>(EMPTY_SUMMARY)
   const [isLoadingVouchers, setIsLoadingVouchers] = useState(true)
 
   useEffect(() => {
@@ -50,12 +63,20 @@ export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCar
     async function loadVouchers() {
       setIsLoadingVouchers(true)
       try {
-        const items = await voucherService.listPublicVouchers({ limit: 100 })
+        const [voucherPage, categoryItems, summary] = await Promise.all([
+          voucherService.listPublicVouchersPage({ limit: 100 }),
+          voucherService.listCategories(),
+          voucherService.getHomepageSummary(),
+        ])
         if (!isMounted) return
-        setVouchers(items)
+        setVouchers(voucherPage.items)
+        setCategories(categoryItems)
+        setHomepageSummary(summary)
       } catch {
         if (!isMounted) return
         setVouchers([])
+        setCategories([])
+        setHomepageSummary(EMPTY_SUMMARY)
       } finally {
         if (isMounted) setIsLoadingVouchers(false)
       }
@@ -67,16 +88,19 @@ export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCar
     }
   }, [])
 
-  const featured = useMemo(() => vouchers.filter((v) => v.status === "active").slice(0, 6), [vouchers])
-  const flashSale = useMemo(() => vouchers.filter((v) => v.discount >= 30).slice(0, 4), [vouchers])
+  const availableVouchers = useMemo(() => vouchers.filter(isVoucherAvailable), [vouchers])
+  const featured = useMemo(() => availableVouchers.slice(0, 6), [availableVouchers])
+  const flashSale = useMemo(() => availableVouchers.filter((v) => v.discount >= 30).slice(0, 4), [availableVouchers])
 
-  const categoryCounts = useMemo(() => {
+  const categoryCountsById = useMemo(() => {
     const counts = new Map<string, number>()
-    for (const voucher of vouchers) {
-      counts.set(voucher.category, (counts.get(voucher.category) ?? 0) + 1)
+    for (const item of homepageSummary.categoryCounts) {
+      counts.set(item.categoryId, item.count)
     }
     return counts
-  }, [vouchers])
+  }, [homepageSummary.categoryCounts])
+
+  const visibleCategories = useMemo(() => categories.slice(0, 8), [categories])
 
   return (
     <div>
@@ -93,43 +117,23 @@ export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCar
 
         <div className="max-w-4xl mx-auto text-center relative z-10">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold mb-5 border border-white/20" style={{ backgroundColor: "rgba(255,255,255,0.1)", color: C.apricot }}>
-            <Zap className="w-3 h-3" /> Hơn 1,000+ voucher ưu đãi mỗi ngày
+            <Zap className="w-3 h-3" /> {homepageSummary.vouchers > 0 ? `Đang có ${formatCount(homepageSummary.vouchers)} voucher ưu đãi` : "Chưa có voucher ưu đãi"}
           </div>
           <h1 className="text-4xl md:text-5xl font-black text-white mb-4 leading-tight" style={{ fontFamily: "'Nunito', sans-serif" }}>
             Tiết kiệm thông minh<br />với <span style={{ color: C.apricot }}>ASA Voucher</span>
           </h1>
           <p className="text-base md:text-lg mb-8 max-w-2xl mx-auto" style={{ color: "rgba(255,255,255,0.75)" }}>
-            Mua voucher điện tử từ hàng trăm thương hiệu uy tín. Giảm giá đến 70%, sử dụng ngay tại cửa hàng.
+            {homepageSummary.vouchers > 0
+              ? `Mua voucher điện tử từ ${formatCount(homepageSummary.partners)} thương hiệu. Ưu đãi cao nhất hiện có ${formatCount(homepageSummary.maxDiscount)}%, sử dụng tại cửa hàng áp dụng.`
+              : "Khám phá voucher điện tử từ các thương hiệu đang hoạt động trên ASA Voucher."}
           </p>
-
-          {/* Search */}
-          <div className="flex gap-2 max-w-xl mx-auto">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "#9CA3AF" }} />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && onNavigate("vouchers")}
-                placeholder="Tìm voucher, thương hiệu..."
-                className="w-full pl-10 pr-4 py-3.5 rounded-xl text-sm outline-none border-2 border-transparent focus:border-opacity-60"
-                style={{ backgroundColor: "white", color: C.indigo, fontFamily: "'Inter', sans-serif" }}
-              />
-            </div>
-            <button
-              onClick={() => onNavigate("vouchers")}
-              className="px-6 py-3.5 rounded-xl font-bold text-sm text-white whitespace-nowrap hover:opacity-90 transition-opacity"
-              style={{ backgroundColor: C.peach }}
-            >
-              Tìm kiếm
-            </button>
-          </div>
 
           {/* Stats */}
           <div className="flex justify-center gap-8 mt-10">
             {[
-              { label: "Voucher", value: "5,000+" },
-              { label: "Thương hiệu", value: "200+" },
-              { label: "Khách hàng", value: "50,000+" },
+              { label: "Voucher", value: formatCount(homepageSummary.vouchers) },
+              { label: "Thương hiệu", value: formatCount(homepageSummary.partners) },
+              { label: "Khách hàng", value: formatCount(homepageSummary.customers) },
             ].map((s) => (
               <div key={s.label} className="text-center">
                 <div className="text-2xl font-black" style={{ color: C.apricot, fontFamily: "'Nunito', sans-serif" }}>{s.value}</div>
@@ -149,20 +153,29 @@ export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCar
               Xem tất cả <ChevronRight className="w-4 h-4" />
             </button>
           </div>
-          <div className="grid grid-cols-4 sm:grid-cols-8 gap-3">
-            {CATEGORIES.map((cat) => (
-              <button
-                key={cat.name}
-                onClick={() => onNavigate("vouchers")}
-                className="flex flex-col items-center gap-2 p-3 rounded-2xl hover:shadow-md transition-all group"
-                style={{ backgroundColor: cat.color }}
-              >
-                <AppIcon name={cat.icon} className="w-8 h-8 group-hover:scale-110 transition-transform" />
-                <div className="text-xs font-bold text-center leading-tight" style={{ color: C.indigo }}>{cat.name}</div>
-                <div className="text-[10px]" style={{ color: "#6B7280" }}>{categoryCounts.get(cat.name.toLowerCase()) ?? cat.count}</div>
-              </button>
-            ))}
-          </div>
+          {isLoadingVouchers ? (
+            <div className="text-sm" style={{ color: "#6B7280" }}>Đang tải danh mục...</div>
+          ) : visibleCategories.length > 0 ? (
+            <div className="grid grid-cols-4 sm:grid-cols-8 gap-3">
+              {visibleCategories.map((cat, index) => {
+                const style = CATEGORY_STYLES[index % CATEGORY_STYLES.length]
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => onNavigate("vouchers")}
+                    className="flex flex-col items-center gap-2 p-3 rounded-2xl hover:shadow-md transition-all group"
+                    style={{ backgroundColor: style.color }}
+                  >
+                    <AppIcon name={style.icon} className="w-8 h-8 group-hover:scale-110 transition-transform" />
+                    <div className="text-xs font-bold text-center leading-tight" style={{ color: C.indigo }}>{cat.name}</div>
+                    <div className="text-[10px]" style={{ color: "#6B7280" }}>{formatCount(categoryCountsById.get(cat.id) ?? 0)}</div>
+                  </button>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="rounded-xl bg-white p-5 text-sm shadow-sm border border-black/5" style={{ color: "#6B7280" }}>Chưa có danh mục nào.</div>
+          )}
         </div>
       </section>
 
@@ -182,6 +195,8 @@ export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCar
           </div>
           {isLoadingVouchers ? (
             <div className="text-sm" style={{ color: "#6B7280" }}>Đang tải voucher flash sale...</div>
+          ) : flashSale.length === 0 ? (
+            <div className="rounded-xl bg-white p-5 text-sm shadow-sm border border-black/5" style={{ color: "#6B7280" }}>Chưa có voucher flash sale.</div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {flashSale.map((v) => (
@@ -203,6 +218,8 @@ export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCar
           </div>
           {isLoadingVouchers ? (
             <div className="text-sm" style={{ color: "#6B7280" }}>Đang tải voucher nổi bật...</div>
+          ) : featured.length === 0 ? (
+            <div className="rounded-xl bg-white p-5 text-sm shadow-sm border border-black/5" style={{ color: "#6B7280" }}>Chưa có voucher nổi bật.</div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {featured.map((v) => (
@@ -237,32 +254,6 @@ export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCar
         </div>
       </section>
 
-      {/* Customer Reviews */}
-      <section className="py-12 px-4">
-        <div className="max-w-5xl mx-auto">
-          <h2 className="text-2xl font-black text-center mb-8" style={{ color: C.indigo, fontFamily: "'Nunito', sans-serif" }}>Khách hàng nói gì?</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {REVIEWS.map((r, i) => (
-              <div key={i} className="bg-white rounded-2xl p-5 shadow-sm border border-black/4">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center"><AppIcon name={r.avatar} className="w-5 h-5" /></div>
-                  <div>
-                    <div className="font-bold text-sm" style={{ color: C.indigo }}>{r.name}</div>
-                    <div className="flex gap-0.5 mt-0.5">
-                      {[...Array(r.rating)].map((_, j) => (
-                        <Star key={j} className="w-3 h-3 fill-current" style={{ color: C.apricot }} />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                <p className="text-sm leading-relaxed" style={{ color: "#4B5563" }}>{r.text}</p>
-                <div className="text-xs mt-3" style={{ color: "#9CA3AF" }}>{r.date}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* FAQ */}
       <section className="py-12 px-4" style={{ backgroundColor: C.muted }}>
         <div className="max-w-3xl mx-auto">
@@ -290,7 +281,7 @@ export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCar
       <section className="py-14 px-4" style={{ background: `linear-gradient(135deg, ${C.peach}, #C96A4C)` }}>
         <div className="max-w-2xl mx-auto text-center">
           <h2 className="text-3xl font-black text-white mb-3" style={{ fontFamily: "'Nunito', sans-serif" }}>Bắt đầu tiết kiệm ngay hôm nay</h2>
-          <p className="text-white/80 mb-6 text-sm">Đăng ký miễn phí và nhận ngay voucher chào mừng trị giá 50,000đ</p>
+          <p className="text-white/80 mb-6 text-sm">Đăng ký miễn phí để lưu voucher yêu thích và theo dõi đơn hàng của bạn</p>
           <div className="flex justify-center gap-3">
             <button onClick={onLogin} className="px-6 py-3 rounded-xl font-bold text-sm bg-white hover:bg-opacity-90 transition-all" style={{ color: C.peach }}>
               Đăng nhập
@@ -311,7 +302,14 @@ function VoucherCard({ voucher: v, onDetail, onAddToCart, onBuyNow }: { voucher:
   return (
     <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-black/5 hover:shadow-md transition-shadow cursor-pointer group" onClick={() => onDetail(v)}>
       <div className="relative h-40 overflow-hidden">
-        <img src={v.image} alt={v.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+        {v.image ? (
+          <img src={v.image} alt={v.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+        ) : (
+          <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-gray-100 text-xs font-semibold" style={{ color: "#8A8DA8" }}>
+            <AppIcon name="gift" className="h-8 w-8" />
+            Chưa có ảnh
+          </div>
+        )}
         <div className="absolute top-2 left-2 px-2 py-0.5 rounded-lg text-white text-xs font-bold" style={{ backgroundColor: C.peach }}>
           -{pct}%
         </div>

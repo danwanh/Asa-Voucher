@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ShoppingCart, Search, Menu, Home, Tag, Package, User, Bell, Grid3x3, Gift, LogOut } from "lucide-react"
+import { AppFooter } from "@/components/AppFooter"
 import { C } from "@/utils/constants"
 import type { AppUser } from "@/types"
-import { customerPagePath } from "@/utils/customerRoutes"
 
 export type CustomerPage =
   | "home" | "vouchers" | "categories" | "detail" | "cart"
@@ -100,11 +100,7 @@ export function CustomerLayout({
             {DESKTOP_NAV.map((n) => (
               <button
                 key={n.pg}
-                onClick={() => {
-                  const path = customerPagePath(n.pg, user.role)
-                  if (path) router.push(path)
-                  else onNavigate(n.pg)
-                }}
+                onClick={() => onNavigate(n.pg)}
                 className="px-3 py-2 rounded-xl text-sm font-semibold flex items-center gap-1.5 transition-colors"
                 style={{
                   color: page === n.pg ? C.apricot : "rgba(244,241,222,0.75)",
@@ -128,7 +124,7 @@ export function CustomerLayout({
             </button>
 
             {/* Cart */}
-            <button onClick={() => router.push("/cart")} className="relative p-2 rounded-xl hover:bg-white/10">
+            <button onClick={() => onNavigate("cart")} className="relative p-2 rounded-xl hover:bg-white/10">
               <ShoppingCart className="w-5 h-5 text-white" />
               {cartCount !== null && cartCount > 0 ? (
                 <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center" style={{ backgroundColor: C.peach, color: "white" }}>
@@ -162,9 +158,7 @@ export function CustomerLayout({
               <button
                 key={n.pg}
                 onClick={() => {
-                  const path = customerPagePath(n.pg, user.role)
-                  if (path) router.push(path)
-                  else onNavigate(n.pg)
+                  onNavigate(n.pg)
                   setMobileOpen(false)
                 }}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold"
@@ -185,44 +179,16 @@ export function CustomerLayout({
       </header>
 
       <main>{children}</main>
-      <footer className="border-t border-black/8 py-12" style={{ backgroundColor: C.indigo }}>
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8">
-            <div>
-              <div className="flex items-center gap-2 font-black text-lg mb-3" style={{ fontFamily: "'Nunito', sans-serif", color: "white" }}>
-                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: C.peach }}>
-                  <Tag className="w-3.5 h-3.5 text-white" />
-                </div>
-                ASA Voucher
-              </div>
-              <p className="text-sm leading-relaxed" style={{ color: "rgba(255,255,255,0.6)" }}>
-                Nền tảng mua bán voucher điện tử hàng đầu Việt Nam. Tiết kiệm thông minh, trải nghiệm đỉnh cao.
-              </p>
-            </div>
-            {[
-              { title: "Sản phẩm", links: ["Ẩm thực", "Làm đẹp", "Du lịch", "Giải trí", "Thể thao"] },
-              { title: "Hỗ trợ", links: ["Trung tâm trợ giúp", "Liên hệ", "Chính sách hoàn tiền", "Điều khoản dịch vụ"] },
-              { title: "Doanh nghiệp", links: ["Đăng ký đối tác", "Bảng giá", "API tích hợp", "Tài liệu"] },
-            ].map((col) => (
-              <div key={col.title}>
-                <div className="font-bold text-sm mb-3" style={{ color: "rgba(255,255,255,0.9)" }}>{col.title}</div>
-                {col.links.map((l) => (
-                  <div key={l} className="text-sm py-0.5 cursor-pointer hover:text-white transition-colors" style={{ color: "rgba(255,255,255,0.5)" }}>{l}</div>
-                ))}
-              </div>
-            ))}
-          </div>
-          <div className="border-t border-white/10 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <p className="text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>© 2026 ASA Voucher. Tất cả quyền được bảo lưu.</p>
-            <div className="flex gap-4 text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>
-              <span className="cursor-pointer hover:text-white">Chính sách</span>
-              <span className="cursor-pointer hover:text-white">Bảo mật</span>
-              <span className="cursor-pointer hover:text-white">Cookie</span>
-            </div>
-          </div>
-        </div>
-      </footer>
-
+      <AppFooter
+        onHome={() => onNavigate("home")}
+        onVouchers={() => onNavigate("vouchers")}
+        onCategories={() => onNavigate("categories")}
+        onSupport={() => window.location.assign("mailto:support@asavoucher.vn")}
+        onRegisterPartner={() => router.push("/signup")}
+        onTerms={() => router.push("/terms")}
+        onPolicy={() => router.push("/policy")}
+        onPrivacy={() => router.push("/privacy")}
+      />
       {/* Mobile bottom navigation */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around h-16 border-t" style={{ backgroundColor: "white", borderColor: "#E2DFC8" }}>
         {MOBILE_NAV.map((n) => {
@@ -233,9 +199,7 @@ export function CustomerLayout({
             <button
               key={n.pg}
               onClick={() => {
-                const path = customerPagePath(n.pg, user.role)
-                if (path) router.push(path)
-                else onNavigate(n.pg)
+                onNavigate(n.pg)
               }}
               className="flex flex-col items-center gap-0.5 px-3 py-2 relative"
               style={{ color: isActive ? C.peach : "#8A8DA8" }}

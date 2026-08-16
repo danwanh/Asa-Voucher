@@ -1,6 +1,7 @@
 import { startTransition, useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { AppIcon } from "@/components/AppIcon"
+import { CategoryGridPage } from "@/components/CategoryGridPage"
 import { toast } from "sonner"
 import { CustomerLayout, type CustomerPage } from "@/layouts/CustomerLayout"
 import { HomePage } from "@/pages/customer/HomePage"
@@ -123,7 +124,7 @@ export function CustomerApp({
   const [myIssuedVouchersLoading, setMyIssuedVouchersLoading] = useState(initialPage === "my-vouchers")
 
   useEffect(() => {
-    if (initialPage) setPage(initialPage)
+    setPage(initialPage ?? "home")
   }, [initialPage])
 
   useEffect(() => {
@@ -172,13 +173,17 @@ export function CustomerApp({
   }, [initialVoucherId, router])
 
   const navigate = (p: CustomerPage) => {
+    setPage(p)
+    if (p === "home") {
+      setVoucherSearch("")
+      setVoucherFilters(DEFAULT_VOUCHER_FILTERS)
+    }
     const path = customerPagePath(p, user.role)
     if (path) {
       onInitialPageConsumed?.()
       startTransition(() => router.push(path))
       return
     }
-    setPage(p)
     onInitialPageConsumed?.()
   }
 
@@ -563,27 +568,13 @@ export function CustomerApp({
         </div>
       )}
       {page === "categories" && (
-        <div className="max-w-4xl mx-auto px-4 py-8">
-          <h1 className="text-2xl font-black mb-6" style={{ color: C.indigo, fontFamily: "'Nunito', sans-serif" }}>Danh mục</h1>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {[
-               { icon: "gift", name: "Ẩm thực", count: 45, color: "#FDEBD0" },
-               { icon: "heart", name: "Làm đẹp", count: 32, color: "#FCE4EC" },
-               { icon: "location", name: "Du lịch", count: 28, color: "#E3F2FD" },
-               { icon: "ticket", name: "Giải trí", count: 21, color: "#EDE7F6" },
-               { icon: "shield", name: "Thể thao", count: 8, color: "#E8F5E9" },
-               { icon: "document", name: "Giáo dục", count: 5, color: "#FFF8E1" },
-               { icon: "shield", name: "Sức khỏe", count: 14, color: "#E0F7FA" },
-               { icon: "shoppingCart", name: "Mua sắm", count: 19, color: "#F3E5F5" },
-            ].map((cat) => (
-              <button key={cat.name} onClick={() => navigate("vouchers")} className="flex flex-col items-center gap-2 p-5 rounded-2xl hover:shadow-md transition-all" style={{ backgroundColor: cat.color }}>
-                <AppIcon name={cat.icon} className="w-10 h-10" />
-                <div className="font-black text-sm" style={{ color: C.indigo }}>{cat.name}</div>
-                <div className="text-xs" style={{ color: "#8A8DA8" }}>{cat.count} voucher</div>
-              </button>
-            ))}
-          </div>
-        </div>
+        <CategoryGridPage
+          title="Danh mục"
+          onSelectCategory={(category) => {
+            setVoucherFilters((current) => ({ ...current, categoryId: category.id }))
+            navigate("vouchers")
+          }}
+        />
       )}
     </CustomerLayout>
   )
