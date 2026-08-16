@@ -15,12 +15,14 @@ import {dashboardRoutes} from "./dashboard.routes.js"
 import { rbacRoutes } from "./rbac.routes.js";
 import { securityRoutes } from "./security.routes.js";
 import { cmsContentRoutes } from "./cms-content.routes.js";
+import { notificationRoutes } from "./notification.routes.js";
 
 export const apiRoutes = Router();
 
 apiRoutes.use(healthRoutes);
 apiRoutes.use(authRoutes);
 apiRoutes.use(userRoutes);
+apiRoutes.use(notificationRoutes);
 apiRoutes.use(partnerRoutes);
 apiRoutes.use(categoryRoutes);
 apiRoutes.use(voucherRoutes);
@@ -31,6 +33,6 @@ apiRoutes.use(complaintRoutes);
 apiRoutes.use(logRoutes);
 apiRoutes.use(reportRoutes);
 apiRoutes.use(dashboardRoutes);
+apiRoutes.use(cmsContentRoutes);
 apiRoutes.use(rbacRoutes);
 apiRoutes.use(securityRoutes);
-apiRoutes.use(cmsContentRoutes);

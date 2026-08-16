@@ -54,19 +54,6 @@ function LeftPanel() {
           Hàng nghìn voucher giảm giá từ các đối tác uy tín — ẩm thực, làm đẹp, du lịch và giải trí.
         </p>
       </div>
-      <div className="relative z-10 grid grid-cols-2 gap-4">
-        {[
-          { label: "Voucher đang bán", value: "8.932+" },
-          { label: "Đối tác",          value: "124" },
-          { label: "Khách hàng",       value: "25.000+" },
-          { label: "Đơn hàng/ngày",    value: "245" },
-        ].map((s) => (
-          <div key={s.label} className="rounded-2xl p-4" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}>
-            <div className="text-2xl font-black text-white">{s.value}</div>
-            <div className="text-sm" style={{ color: "rgba(244,241,222,0.6)" }}>{s.label}</div>
-        </div>
-        ))}
-      </div>
       <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full opacity-10" style={{ backgroundColor: C.peach }} />
       <div className="absolute bottom-32 -right-8 w-32 h-32 rounded-full opacity-10" style={{ backgroundColor: C.apricot }} />
     </div>

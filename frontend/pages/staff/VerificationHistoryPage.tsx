@@ -1,33 +1,67 @@
-import { useState } from "react"
-import { Search, Filter } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import { Search } from "lucide-react"
 import { C } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
+import { voucherUsageService, type VoucherUsageItem } from "@/services/issuedVoucherService"
+import { LoadingSpinner } from "@/components/LoadingState"
 
-const MOCK_HISTORY = [
-  { id: "vh1", voucherCode: "ASA-ABC123", voucherTitle: "Pizza Hut Set 2 người", customerName: "Nguyễn Thị Mai", branchName: "CN Nguyễn Trãi", staffName: "Trần Văn Nam", verifiedAt: "2024-08-01T09:15:00", status: "valid" },
-  { id: "vh2", voucherCode: "ASA-DEF456", voucherTitle: "CGV 2 vé phim", customerName: "Trần Văn Bình", branchName: "CN Nguyễn Trãi", staffName: "Trần Văn Nam", verifiedAt: "2024-08-01T08:30:00", status: "used" },
-  { id: "vh3", voucherCode: "ASA-GHI789", voucherTitle: "Calla Spa Basic", customerName: "Lê Thị Hoa", branchName: "CN Nguyễn Trãi", staffName: "Trần Văn Nam", verifiedAt: "2024-07-31T14:20:00", status: "invalid" },
-  { id: "vh4", voucherCode: "ASA-JKL012", voucherTitle: "Pizza Hut Set 4 người", customerName: "Phạm Tuấn Anh", branchName: "CN Nguyễn Trãi", staffName: "Trần Văn Nam", verifiedAt: "2024-07-31T13:45:00", status: "valid" },
-  { id: "vh5", voucherCode: "ASA-MNO345", voucherTitle: "CGV 1 vé phim", customerName: "Hoàng Minh Đức", branchName: "CN Nguyễn Trãi", staffName: "Lê Thị Hoa", verifiedAt: "2024-07-30T10:00:00", status: "valid" },
-]
-
-const STATUS_MAP = {
+const STATUS_MAP: Record<string, { label: string; bg: string; text: string }> = {
   valid: { label: "Hợp lệ", bg: "#E8F5EE", text: "#2D7A52" },
   used: { label: "Đã dùng", bg: "#E0EEFF", text: "#1A5FAD" },
   invalid: { label: "Không hợp lệ", bg: "#FCEAEA", text: "#C0392B" },
 }
 
 export function VerificationHistoryPage() {
+  const [history, setHistory] = useState<VoucherUsageItem[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
 
-  const filtered = MOCK_HISTORY.filter((h) => {
-    const matchSearch = !search || h.voucherCode.toLowerCase().includes(search.toLowerCase()) || h.customerName.toLowerCase().includes(search.toLowerCase()) || h.voucherTitle.toLowerCase().includes(search.toLowerCase())
-    const matchStatus = statusFilter === "all" || h.status === statusFilter
-    return matchSearch && matchStatus
-  })
+  useEffect(() => {
+    let isMounted = true
+
+    async function load() {
+      setIsLoading(true)
+      setLoadError(null)
+      try {
+        const page = await voucherUsageService.list({ limit: 100 })
+        if (!isMounted) return
+        setHistory(page.items)
+      } catch {
+        if (!isMounted) return
+        setLoadError("Không thể tải lịch sử xác nhận.")
+      } finally {
+        if (isMounted) setIsLoading(false)
+      }
+    }
+
+    load()
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  const filtered = useMemo(() => {
+    const fromMs = dateFrom ? new Date(`${dateFrom}T00:00:00`).getTime() : null
+    const toMs = dateTo ? new Date(`${dateTo}T23:59:59`).getTime() : null
+    const verifiedAtMs = (value: string) => new Date(value).getTime()
+
+    return history.filter((h) => {
+      const matchSearch =
+        !search ||
+        h.voucherCode.toLowerCase().includes(search.toLowerCase()) ||
+        h.customerName.toLowerCase().includes(search.toLowerCase()) ||
+        h.voucherTitle.toLowerCase().includes(search.toLowerCase())
+      const matchStatus = statusFilter === "all" || h.status === statusFilter
+      const matchDate =
+        (fromMs === null || verifiedAtMs(h.verifiedAt) >= fromMs) &&
+        (toMs === null || verifiedAtMs(h.verifiedAt) <= toMs)
+      return matchSearch && matchStatus && matchDate
+    })
+  }, [history, search, statusFilter, dateFrom, dateTo])
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -51,6 +85,16 @@ export function VerificationHistoryPage() {
         </div>
       </div>
 
+      {isLoading && (
+        <div className="mb-4 flex items-center gap-2 rounded-2xl bg-white p-4 text-sm font-semibold shadow-sm" style={{ color: C.indigo }} role="status" aria-live="polite">
+          <LoadingSpinner size="sm" />
+          Đang tải lịch sử xác nhận...
+        </div>
+      )}
+      {loadError && !isLoading && (
+        <div className="mb-4 rounded-2xl bg-red-50 p-4 text-sm font-semibold text-red-600">{loadError}</div>
+      )}
+
       <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -63,7 +107,7 @@ export function VerificationHistoryPage() {
             </thead>
             <tbody>
               {filtered.map((h) => {
-                const sc = STATUS_MAP[h.status as keyof typeof STATUS_MAP]
+                const sc = STATUS_MAP[h.status] ?? STATUS_MAP.used
                 return (
                   <tr key={h.id} className="border-t hover:bg-muted/20" style={{ borderColor: "#F0EDD8" }}>
                     <td className="px-4 py-3"><code className="text-xs font-bold" style={{ fontFamily: "'Inter', monospace", color: C.indigo }}>{h.voucherCode}</code></td>
@@ -83,14 +127,14 @@ export function VerificationHistoryPage() {
             </tbody>
           </table>
         </div>
-        {filtered.length === 0 && (
+        {!isLoading && filtered.length === 0 && (
           <div className="text-center py-12">
             <AppIcon name="document" className="w-8 h-8 mb-2 mx-auto" />
             <div className="font-bold text-sm" style={{ color: C.indigo }}>Không có lịch sử xác nhận</div>
           </div>
         )}
         <div className="px-4 py-3 border-t text-xs" style={{ borderColor: "#F0EDD8", color: "#8A8DA8" }}>
-          Hiển thị {filtered.length}/{MOCK_HISTORY.length} kết quả
+          Hiển thị {filtered.length}/{history.length} kết quả
         </div>
       </div>
     </div>

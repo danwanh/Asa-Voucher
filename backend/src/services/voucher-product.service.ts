@@ -26,6 +26,17 @@ function todayIsoDate() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function getPublicVoucherWhere() {
+  const today = new Date(todayIsoDate());
+  return {
+    approval_status: "approved",
+    status: "active",
+    sale_start_date: { lte: today },
+    sale_end_date: { gte: today },
+    remaining_quantity: { gt: 0 }
+  };
+}
+
 async function getPartnerForUser(userId: string) {
   return prisma.partner.findFirst({ where: { representative_user_id: userId } }) as unknown as Promise<Record<string, unknown> | null>;
 }
@@ -254,13 +265,7 @@ export async function listVoucherProducts(user: CurrentUser | undefined, queryIn
     assertVoucherManager(user);
     where.partner_id = await getRequiredCurrentPartnerId(user);
   } else {
-    const today = new Date(todayIsoDate());
-    Object.assign(where, {
-      approval_status: "approved",
-      status: "active",
-      sale_end_date: { gte: today },
-      remaining_quantity: { gt: 0 }
-    });
+    Object.assign(where, getPublicVoucherWhere());
     if (partnerId) where.partner_id = partnerId;
   }
 
@@ -315,6 +320,40 @@ export async function listVoucherProducts(user: CurrentUser | undefined, queryIn
     prisma.voucherProduct.count({ where })
   ]);
   return { items: (items as unknown as Record<string, unknown>[]).map(withWorkflow), count, page, limit };
+}
+
+export async function getPublicHomepageSummary() {
+  const publicVoucherWhere = getPublicVoucherWhere();
+  const [voucherCount, partnerCount, customerCount, categoryCounts, discountStats] = await prisma.$transaction([
+    prisma.voucherProduct.count({ where: publicVoucherWhere }),
+    prisma.partner.count({ where: { approval_status: "approved", status: "active" } }),
+    prisma.user.count({ where: { role: "buyer", is_active: true } }),
+    prisma.voucherProduct.groupBy({
+      by: ["category_id"] as const,
+      where: publicVoucherWhere,
+      orderBy: { category_id: "asc" },
+      _count: { category_id: true }
+    }),
+    prisma.voucherProduct.aggregate({
+      where: publicVoucherWhere,
+      _max: { discount_rate: true }
+    })
+  ]);
+  const normalizedCategoryCounts = categoryCounts as unknown as Array<{
+    category_id: string;
+    _count: { category_id?: number; _all?: number };
+  }>;
+
+  return {
+    vouchers: voucherCount,
+    partners: partnerCount,
+    customers: customerCount,
+    max_discount: Math.round(Number(discountStats._max.discount_rate ?? 0)),
+    category_counts: normalizedCategoryCounts.map((item) => ({
+      category_id: item.category_id,
+      count: item._count.category_id ?? item._count._all ?? 0
+    }))
+  };
 }
 
 export async function createVoucherProduct(user: CurrentUser, input: Record<string, unknown>) {

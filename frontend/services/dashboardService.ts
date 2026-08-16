@@ -53,6 +53,21 @@ export type ContentDashboardFilters = {
   to_date?: string
 }
 
+/** FC-PAS: Dashboard cho nhân viên cửa hàng */
+export type StaffDashboardStats = {
+  checked_today: number
+  confirmed_today: number
+  invalid_today: number
+  customers_today: number
+  recent_verifications: {
+    code: string
+    name: string
+    customer: string
+    time: string
+    status: string
+  }[]
+}
+
 function extractData<T>(response: { data: ApiEnvelope<T> }): T {
   return response.data.data
 }
@@ -78,6 +93,12 @@ async function fetchContentDashboard(filters?: ContentDashboardFilters): Promise
   return extractData(res)
 }
 
+/** FC-PAS: GET /dashboard/staff */
+async function fetchStaffDashboard(): Promise<StaffDashboardStats> {
+  const res = await api.get<ApiEnvelope<StaffDashboardStats>>("/dashboard/staff")
+  return extractData(res)
+}
+
 export async function getDashboardStats(filters?: DashboardFilters): Promise<DashboardStats> {
   return fetchDashboard(filters)
 }
@@ -85,4 +106,5 @@ export async function getDashboardStats(filters?: DashboardFilters): Promise<Das
 export const dashboardService = {
   getStats: fetchDashboard,
   getContentStats: fetchContentDashboard,
+  getStaffStats: fetchStaffDashboard,
 }

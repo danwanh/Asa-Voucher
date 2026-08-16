@@ -1,27 +1,77 @@
+import { useEffect, useState } from "react"
 import { CheckCircle, XCircle, QrCode, Users } from "lucide-react"
-import { C, fmtDate } from "@/utils/constants"
+import { C } from "@/utils/constants"
+import { dashboardService, type StaffDashboardStats } from "@/services/dashboardService"
+import { LoadingSpinner } from "@/components/LoadingState"
 
-const RECENT: { code: string; name: string; customer: string; time: string; status: "valid" | "invalid" | "used" }[] = [
-  { code: "ASA-ABC123", name: "Pizza Hut Set 2 người", customer: "Nguyễn Thị Mai", time: "2024-08-01T09:15:00", status: "valid" },
-  { code: "ASA-DEF456", name: "CGV 2 vé phim", customer: "Trần Văn Nam", time: "2024-08-01T09:05:00", status: "used" },
-  { code: "ASA-XYZ789", name: "Calla Spa Basic", customer: "Lê Thị Hoa", time: "2024-08-01T08:45:00", status: "invalid" },
-  { code: "ASA-QQQ111", name: "Pizza Hut Set 4 người", customer: "Phạm Tuấn Anh", time: "2024-08-01T08:30:00", status: "valid" },
-]
+const EMPTY: StaffDashboardStats = {
+  checked_today: 0,
+  confirmed_today: 0,
+  invalid_today: 0,
+  customers_today: 0,
+  recent_verifications: [],
+}
 
-const KPI = [
-  { label: "Voucher kiểm tra hôm nay", value: "24", icon: <QrCode className="w-5 h-5" />, color: C.indigo },
-  { label: "Voucher đã xác nhận", value: "18", icon: <CheckCircle className="w-5 h-5" />, color: C.teal },
-  { label: "Voucher không hợp lệ", value: "3", icon: <XCircle className="w-5 h-5" />, color: C.peach },
-  { label: "Lượt khách hôm nay", value: "21", icon: <Users className="w-5 h-5" />, color: "#7C3AED" },
-]
+const STATUS_STYLE: Record<string, { label: string; bg: string; text: string }> = {
+  used: { label: "Đã dùng", bg: "#E0EEFF", text: "#1A5FAD" },
+  valid: { label: "Hợp lệ", bg: "#E8F5EE", text: "#2D7A52" },
+  invalid: { label: "Không hợp lệ", bg: "#FCEAEA", text: "#C0392B" },
+}
 
 export function StaffDashboardPage() {
+  const [stats, setStats] = useState<StaffDashboardStats>(EMPTY)
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function load() {
+      setIsLoading(true)
+      setLoadError(null)
+      try {
+        const data = await dashboardService.getStaffStats()
+        if (!isMounted) return
+        setStats(data)
+      } catch {
+        if (!isMounted) return
+        setLoadError("Không thể tải dữ liệu tổng quan.")
+      } finally {
+        if (isMounted) setIsLoading(false)
+      }
+    }
+
+    load()
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  const KPI = [
+    { label: "Voucher kiểm tra hôm nay", value: isLoading ? "..." : String(stats.checked_today), icon: <QrCode className="w-5 h-5" />, color: C.indigo },
+    { label: "Voucher đã xác nhận", value: isLoading ? "..." : String(stats.confirmed_today), icon: <CheckCircle className="w-5 h-5" />, color: C.teal },
+    { label: "Voucher không hợp lệ", value: isLoading ? "..." : String(stats.invalid_today), icon: <XCircle className="w-5 h-5" />, color: C.peach },
+    { label: "Lượt khách hôm nay", value: isLoading ? "..." : String(stats.customers_today), icon: <Users className="w-5 h-5" />, color: "#7C3AED" },
+  ]
+
+  const recent = stats.recent_verifications
+
   return (
     <div className="p-6 max-w-4xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-black" style={{ color: C.indigo }}>Tổng quan hôm nay</h1>
-        <p className="text-sm mt-1" style={{ color: "#8A8DA8" }}>Chi nhánh Nguyễn Trãi — {new Date().toLocaleDateString("vi-VN", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</p>
+        <p className="text-sm mt-1" style={{ color: "#8A8DA8" }}>Chi nhánh của bạn — {new Date().toLocaleDateString("vi-VN", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</p>
       </div>
+
+      {isLoading && (
+        <div className="mb-5 flex items-center gap-2 rounded-2xl bg-white p-4 text-sm font-semibold shadow-sm" style={{ color: C.indigo }} role="status" aria-live="polite">
+          <LoadingSpinner size="sm" />
+          Đang tải dữ liệu tổng quan...
+        </div>
+      )}
+      {loadError && !isLoading && (
+        <div className="mb-5 rounded-2xl bg-red-50 p-4 text-sm font-semibold text-red-600">{loadError}</div>
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {KPI.map((k) => (
@@ -39,35 +89,41 @@ export function StaffDashboardPage() {
         <div className="px-5 py-4 border-b" style={{ borderColor: "#F0EDD8" }}>
           <h2 className="font-black" style={{ color: C.indigo }}>Xác nhận gần đây</h2>
         </div>
-        <table className="w-full text-sm">
-          <thead>
-            <tr style={{ backgroundColor: C.eggshell }}>
-              {["Mã Voucher", "Tên Voucher", "Khách hàng", "Thời gian", "Kết quả"].map((h) => (
-                <th key={h} className="px-4 py-3 text-left font-bold text-xs" style={{ color: C.indigo }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {RECENT.map((r) => (
-              <tr key={r.code} className="border-t hover:bg-muted/20" style={{ borderColor: "#F0EDD8" }}>
-                <td className="px-4 py-3"><code className="text-xs font-bold" style={{ color: C.indigo, fontFamily: "'Inter', monospace" }}>{r.code}</code></td>
-                <td className="px-4 py-3 text-xs" style={{ color: C.indigo }}>{r.name}</td>
-                <td className="px-4 py-3 text-xs" style={{ color: "#8A8DA8" }}>{r.customer}</td>
-                <td className="px-4 py-3 text-xs" style={{ color: "#8A8DA8" }}>
-                  {new Date(r.time).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
-                </td>
-                <td className="px-4 py-3">
-                  <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{
-                    backgroundColor: r.status === "valid" ? "#E8F5EE" : r.status === "used" ? "#E0EEFF" : "#FCEAEA",
-                    color: r.status === "valid" ? "#2D7A52" : r.status === "used" ? "#1A5FAD" : "#C0392B",
-                  }}>
-                    {r.status === "valid" ? "Hợp lệ" : r.status === "used" ? "Đã dùng" : "Không hợp lệ"}
-                  </span>
-                </td>
+        {recent.length === 0 ? (
+          <div className="px-5 py-10 text-center text-sm" style={{ color: "#8A8DA8" }}>
+            {isLoading ? "Đang tải..." : "Chưa có xác nhận nào hôm nay."}
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr style={{ backgroundColor: C.eggshell }}>
+                {["Mã Voucher", "Tên Voucher", "Khách hàng", "Thời gian", "Kết quả"].map((h) => (
+                  <th key={h} className="px-4 py-3 text-left font-bold text-xs" style={{ color: C.indigo }}>{h}</th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {recent.map((r) => {
+                const sc = STATUS_STYLE[r.status] ?? STATUS_STYLE.used
+                return (
+                  <tr key={`${r.code}-${r.time}`} className="border-t hover:bg-muted/20" style={{ borderColor: "#F0EDD8" }}>
+                    <td className="px-4 py-3"><code className="text-xs font-bold" style={{ color: C.indigo, fontFamily: "'Inter', monospace" }}>{r.code}</code></td>
+                    <td className="px-4 py-3 text-xs" style={{ color: C.indigo }}>{r.name}</td>
+                    <td className="px-4 py-3 text-xs" style={{ color: "#8A8DA8" }}>{r.customer}</td>
+                    <td className="px-4 py-3 text-xs" style={{ color: "#8A8DA8" }}>
+                      {new Date(r.time).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ backgroundColor: sc.bg, color: sc.text }}>
+                        {sc.label}
+                      </span>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   )

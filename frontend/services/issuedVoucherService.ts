@@ -210,3 +210,39 @@ export const issuedVoucherService = {
     return data(response);
   },
 };
+
+export type VoucherUsageItem = {
+  id: string
+  voucherCode: string
+  voucherTitle: string
+  customerName: string
+  branchName: string
+  staffName: string
+  verifiedAt: string
+  status: string
+}
+
+export type VoucherUsagePage = {
+  items: VoucherUsageItem[]
+  page: number
+  limit: number
+  total: number
+  totalPages: number
+}
+
+export const voucherUsageService = {
+  async list(params?: { page?: number; limit?: number }): Promise<VoucherUsagePage> {
+    const response = await api.get<ApiData<{ items: VoucherUsageItem[]; pagination: { page: number; limit: number; total: number; total_pages: number } }>>(
+      "/voucher-usages",
+      { params: { page: params?.page ?? 1, limit: params?.limit ?? 100 } },
+    )
+    const result = data<{ items: VoucherUsageItem[]; pagination: { page: number; limit: number; total: number; total_pages: number } }>(response)
+    return {
+      items: result.items,
+      page: result.pagination.page,
+      limit: result.pagination.limit,
+      total: result.pagination.total,
+      totalPages: result.pagination.total_pages,
+    }
+  },
+};

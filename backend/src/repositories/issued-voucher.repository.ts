@@ -8,6 +8,7 @@ import type {
 function detailInclude(feedbackUserId?: string) {
   return {
   voucher_products: { select: { id: true, name: true, partner_id: true, thumbnail_url: true, remaining_quantity: true, partners: { select: { business_name: true } } } },
+  owners: { select: { id: true, full_name: true } },
   order_items: {
     select: {
       id: true,
@@ -68,7 +69,7 @@ function listInclude(feedbackUserId?: string) {
 
 type IssuedVoucherWithRelations = IssuedVoucherRow & {
   voucher_products: { partner_id: string };
-  order_items: { order_id: string; orders?: { user_id: string; status: string } | null } | null;
+  order_items: { order_id: string; orders?: { user_id: string; status: string } | null };
 };
 
 export async function listIssuedVouchers(

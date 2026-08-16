@@ -62,20 +62,10 @@ export function HomePage({ onAddToCart, onBuyNow, onDetail, onNavigate }: Props)
       <div className="relative overflow-hidden" style={{ background: `linear-gradient(135deg, ${C.indigo} 0%, ${C.indigoLight} 100%)` }}>
         <div className="max-w-6xl mx-auto px-4 py-16 md:py-24 relative z-10">
           <div className="max-w-xl">
-            <div
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold mb-6"
-              style={{ backgroundColor: C.peach + "25", color: C.apricot }}
-            >
-              <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: C.peach }} />
-              Đang có 245 đơn hàng hôm nay
-            </div>
-            <h1 className="text-4xl md:text-5xl font-black text-white leading-tight mb-4">
+            <h1 className="text-4xl md:text-5xl font-black text-white leading-tight mb-8">
               Voucher ưu đãi<br />
               <span style={{ color: C.apricot }}>siêu tiết kiệm</span>
             </h1>
-            <p className="text-lg mb-8" style={{ color: "rgba(244,241,222,0.75)" }}>
-              Hàng nghìn ưu đãi hấp dẫn từ 124 đối tác uy tín trên toàn quốc.
-            </p>
             <button
               onClick={() => onNavigate("vouchers")}
               className="inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl font-bold text-white transition-all hover:opacity-90 active:scale-95"

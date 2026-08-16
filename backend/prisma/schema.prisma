@@ -24,21 +24,23 @@ model User {
   is_active             Boolean             @default(true)
   is_verified           Boolean             @default(false)
   partner_branches_id   String?             @db.Uuid
-  partner_id            String?             @db.Uuid
   created_at            DateTime            @default(now()) @db.Timestamptz(6)
   updated_at            DateTime            @default(now()) @updatedAt @db.Timestamptz(6)
   failed_login_attempts Int                 @default(0)
   locked_until          DateTime?           @db.Timestamptz(6)
   auth_version          Int                 @default(0)
+  partner_id            String?             @db.Uuid
   admin_logs            AdminLog[]          @relation("AdminLogAdmin")
   targeted_admin_logs   AdminLog[]          @relation("AdminLogTargetUser")
   auth_tokens           AuthToken[]
   authentication_logs   AuthenticationLog[]
   carts                 Cart?
+  cms_contents          CmsContent[]        @relation("CmsContentCreator")
   complaint_responses   ComplaintResponse[]
   assigned_complaints   Complaint[]         @relation("ComplaintAssignee")
   complaints            Complaint[]         @relation("ComplaintUser")
   issued_vouchers       IssuedVoucher[]
+  notifications         Notification[]
   order_logs            OrderLog[]
   received_orders       Order[]             @relation("ReceivedOrders")
   orders                Order[]             @relation("CreatedOrders")
@@ -48,16 +50,14 @@ model User {
   refresh_tokens        RefreshToken[]
   review_responses      ReviewResponse[]
   reviews               Review[]
+  reviewed_alerts       SecurityAlert[]     @relation("SecurityAlertReviewer")
+  security_alerts       SecurityAlert[]     @relation("SecurityAlertUser")
   partner_branches      PartnerBranch?      @relation("UserBranch", fields: [partner_branches_id], references: [id], onUpdate: NoAction, map: "users_partner_branch_fk")
   partner               Partner?            @relation("PartnerEmployees", fields: [partner_id], references: [id], onUpdate: NoAction, map: "users_partner_fk")
   approved_vouchers     VoucherProduct[]    @relation("VoucherApprover")
   created_vouchers      VoucherProduct[]    @relation("VoucherCreator")
   submitted_vouchers    VoucherProduct[]    @relation("VoucherSubmitter")
   voucher_usages        VoucherUsage[]      @relation("VoucherUsageRedeemer")
-  security_alerts       SecurityAlert[]     @relation("SecurityAlertUser")
-  reviewed_alerts       SecurityAlert[]     @relation("SecurityAlertReviewer")
-  notifications         Notification[]
-  cms_contents  CmsContent[]  @relation("CmsContentCreator")
 
   @@index([role])
   @@map("users")
@@ -113,12 +113,12 @@ model AdminLog {
   description       String?
   occurred_at       DateTime        @default(now()) @db.Timestamptz(6)
   target_order_id   String?         @db.Uuid
+  content_type      String?         @db.VarChar(50)
   admin             User            @relation("AdminLogAdmin", fields: [admin_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   target_order      Order?          @relation(fields: [target_order_id], references: [id])
   target_partner    Partner?        @relation(fields: [target_partner_id], references: [id], onUpdate: NoAction, map: "admin_logs_target_partner_fk")
   target_user       User?           @relation("AdminLogTargetUser", fields: [target_user_id], references: [id], onUpdate: NoAction)
   target_voucher    VoucherProduct? @relation(fields: [target_voucher_id], references: [id], onUpdate: NoAction, map: "admin_logs_target_voucher_fk")
-  content_type      String?         @db.VarChar(50)
 
   @@map("admin_logs")
 }
@@ -141,9 +141,9 @@ model Partner {
   updated_at             DateTime         @default(now()) @updatedAt @db.Timestamptz(6)
   admin_logs             AdminLog[]
   partner_branches       PartnerBranch[]
-  employees              User[]             @relation("PartnerEmployees")
   approver               User?            @relation("PartnerApprover", fields: [approved_by], references: [id], onUpdate: NoAction)
   representative_user    User             @relation("PartnerRepresentative", fields: [representative_user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  employees              User[]           @relation("PartnerEmployees")
   voucher_products       VoucherProduct[]
 
   @@index([representative_user_id])
@@ -286,13 +286,13 @@ model Order {
   total_amount       Decimal      @db.Decimal(15, 0)
   payment_method     String       @db.VarChar(30)
   status             String       @default("pending") @db.VarChar(20)
-  payment_status     String       @default("pending") @db.VarChar(20)
   note               String?
   created_at         DateTime     @default(now()) @db.Timestamptz(6)
   updated_at         DateTime     @default(now()) @updatedAt @db.Timestamptz(6)
   recipient_id       String       @db.Uuid
   is_gift            Boolean      @default(false)
   payment_expires_at DateTime?    @db.Timestamptz(6)
+  payment_status     String       @default("pending") @db.VarChar(20)
   admin_logs         AdminLog[]
   complaints         Complaint[]
   order_items        OrderItem[]
@@ -334,10 +334,10 @@ model Payment {
   status           String       @default("pending") @db.VarChar(20)
   transaction_ref  String?      @db.VarChar(255)
   gateway_response String?
-  refund_ref       String?      @db.VarChar(255)
-  refunded_at      DateTime?    @db.Timestamptz(6)
   paid_at          DateTime?    @db.Timestamptz(6)
   created_at       DateTime     @default(now()) @db.Timestamptz(6)
+  refund_ref       String?      @db.VarChar(255)
+  refunded_at      DateTime?    @db.Timestamptz(6)
   payment_logs     PaymentLog[]
   orders           Order        @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
@@ -431,9 +431,9 @@ model Review {
   users              User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
   voucher_products   VoucherProduct   @relation(fields: [voucher_product_id], references: [id], onDelete: Cascade)
 
+  @@unique([user_id, issued_voucher_id])
   @@index([voucher_product_id])
   @@index([user_id])
-  @@unique([user_id, issued_voucher_id])
   @@map("reviews")
 }
 
@@ -461,9 +461,9 @@ model Complaint {
   status              String              @default("open") @db.VarChar(20)
   assigned_to         String?             @db.Uuid
   resolution_note     String?
-  resolution_types    Json?              @db.Json
   created_at          DateTime            @default(now()) @db.Timestamptz(6)
   resolved_at         DateTime?           @db.Timestamptz(6)
+  resolution_types    Json?               @db.Json
   complaint_responses ComplaintResponse[]
   assignee            User?               @relation("ComplaintAssignee", fields: [assigned_to], references: [id])
   issued_vouchers     IssuedVoucher?      @relation(fields: [issued_voucher_id], references: [id])
@@ -491,17 +491,17 @@ model ComplaintResponse {
 }
 
 model SecurityAlert {
-  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id        String    @db.Uuid
-  alert_type     String    @db.VarChar(50)
-  detail         String?
-  ip_address     String?   @db.VarChar(50)
-  status         String    @default("open") @db.VarChar(20)
-  reviewed_by    String?   @db.Uuid
-  reviewed_at    DateTime? @db.Timestamptz(6)
-  created_at     DateTime  @default(now()) @db.Timestamptz(6)
-  user           User      @relation("SecurityAlertUser", fields: [user_id], references: [id], onDelete: Cascade)
-  reviewer       User?     @relation("SecurityAlertReviewer", fields: [reviewed_by], references: [id])
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id     String    @db.Uuid
+  alert_type  String    @db.VarChar(50)
+  detail      String?
+  ip_address  String?   @db.VarChar(50)
+  status      String    @default("open") @db.VarChar(20)
+  reviewed_by String?   @db.Uuid
+  reviewed_at DateTime? @db.Timestamptz(6)
+  created_at  DateTime  @default(now()) @db.Timestamptz(6)
+  reviewer    User?     @relation("SecurityAlertReviewer", fields: [reviewed_by], references: [id])
+  user        User      @relation("SecurityAlertUser", fields: [user_id], references: [id], onDelete: Cascade)
 
   @@index([user_id])
   @@index([status])
@@ -509,24 +509,24 @@ model SecurityAlert {
 }
 
 model Role {
-  id          String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  key         String           @unique @db.VarChar(50)
-  name        String           @db.VarChar(100)
-  description String?
-  color       String?          @db.VarChar(20)
-  is_system   Boolean          @default(false)
-  created_at  DateTime         @default(now()) @db.Timestamptz(6)
-  updated_at  DateTime         @default(now()) @updatedAt @db.Timestamptz(6)
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key              String           @unique @db.VarChar(50)
+  name             String           @db.VarChar(100)
+  description      String?
+  color            String?          @db.VarChar(20)
+  is_system        Boolean          @default(false)
+  created_at       DateTime         @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime         @default(now()) @updatedAt @db.Timestamptz(6)
   role_permissions RolePermission[]
 
   @@map("roles")
 }
 
 model Permission {
-  id      String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  key     String           @unique @db.VarChar(100)
-  module  String           @db.VarChar(50)
-  action  String           @db.VarChar(100)
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key              String           @unique @db.VarChar(100)
+  module           String           @db.VarChar(50)
+  action           String           @db.VarChar(100)
   role_permissions RolePermission[]
 
   @@map("permissions")
@@ -536,8 +536,8 @@ model RolePermission {
   id            String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   role_id       String     @db.Uuid
   permission_id String     @db.Uuid
-  role          Role       @relation(fields: [role_id], references: [id], onDelete: Cascade)
   permission    Permission @relation(fields: [permission_id], references: [id], onDelete: Cascade)
+  role          Role       @relation(fields: [role_id], references: [id], onDelete: Cascade)
 
   @@unique([role_id, permission_id])
   @@map("role_permissions")
@@ -547,7 +547,7 @@ model CmsContent {
   id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   content_type String    @db.VarChar(50)
   title        String    @db.VarChar(255)
-  content      String?   @db.Text
+  content      String?
   image_url    String?   @db.VarChar(500)
   display_time DateTime? @db.Timestamptz(6)
   status       String    @default("active") @db.VarChar(20)
@@ -555,8 +555,6 @@ model CmsContent {
   created_by   String?   @db.Uuid
   created_at   DateTime  @default(now()) @db.Timestamptz(6)
   updated_at   DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
-
-  // Thêm dòng này để khớp relation với User:
   creator      User?     @relation("CmsContentCreator", fields: [created_by], references: [id])
 
   @@index([content_type])
@@ -569,13 +567,12 @@ model Notification {
   user_id    String   @db.Uuid
   type       String   @db.VarChar(50)
   title      String   @db.VarChar(255)
-  content    String?  @db.Text
+  content    String?
   ref_type   String?  @db.VarChar(50)
   ref_id     String?  @db.Uuid
   is_read    Boolean  @default(false)
   created_at DateTime @default(now()) @db.Timestamptz(6)
-
-  users User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  users      User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@index([user_id, is_read])
   @@index([user_id, created_at(sort: Desc)])
