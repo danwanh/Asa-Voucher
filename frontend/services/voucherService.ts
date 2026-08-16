@@ -38,10 +38,18 @@ export type BackendVoucherProduct = {
   } | null
 }
 
-type BackendCategory = {
+export type BackendCategory = {
   id: string
   name: string
   slug: string
+}
+
+type BackendHomepageSummary = {
+  vouchers: number
+  partners: number
+  customers: number
+  max_discount: number
+  category_counts: { category_id: string; count: number }[]
 }
 
 type BackendVoucherList = {
@@ -57,6 +65,14 @@ export type VoucherListPage = {
   limit: number
   total: number
   totalPages: number
+}
+
+export type HomepageSummary = {
+  vouchers: number
+  partners: number
+  customers: number
+  maxDiscount: number
+  categoryCounts: { categoryId: string; count: number }[]
 }
 
 type BackendReview = {
@@ -332,6 +348,21 @@ export const voucherService = {
   async listCategories(): Promise<BackendCategory[]> {
     const categoryMap = await getCategoryMap()
     return Array.from(categoryMap.values())
+  },
+
+  async getHomepageSummary(): Promise<HomepageSummary> {
+    const res = await api.get<ApiEnvelope<BackendHomepageSummary>>("/homepage/summary")
+    const summary = extractData(res)
+    return {
+      vouchers: summary.vouchers,
+      partners: summary.partners,
+      customers: summary.customers,
+      maxDiscount: summary.max_discount,
+      categoryCounts: summary.category_counts.map((item) => ({
+        categoryId: item.category_id,
+        count: item.count
+      }))
+    }
   },
 
   async createVoucher(input: VoucherCreateInput): Promise<Voucher> {
