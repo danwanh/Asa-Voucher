@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
-import { AlertTriangle, ArrowLeft, Calendar, Edit2, Loader2, MapPin, Send, Users } from "lucide-react"
+import { ArrowLeft, Calendar, Edit2, Loader2, MapPin, Send, Users } from "lucide-react"
 import { toast } from "sonner"
 import { C, fmt, fmtDate, formatCategoryLabel, STATUS_LABEL, statusColor } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
@@ -75,6 +75,7 @@ export function PartnerVoucherDetailPage({ voucher: initialVoucher, onBack, onEd
     serializeApplicableAreas(parseApplicableAreas(detail?.applicableArea ?? voucher.applicableArea)) || "Toàn quốc"
 
   const displayCategory = detail?.categoryName || formatCategoryLabel(voucher.category)
+  const canEdit = voucher.status !== "rejected"
 
   const detailRows = useMemo(
     () => [
@@ -122,13 +123,15 @@ export function PartnerVoucherDetailPage({ voucher: initialVoucher, onBack, onEd
             <span className="px-3 py-1.5 rounded-xl text-sm font-bold" style={{ backgroundColor: sc.bg, color: sc.text }}>
               {STATUS_LABEL[voucher.status]}
             </span>
-            <button
-              onClick={() => onEdit(voucher)}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold border-2"
-              style={{ borderColor: C.indigo, color: C.indigo }}
-            >
-              <Edit2 className="w-3.5 h-3.5" /> Chỉnh sửa
-            </button>
+            {canEdit && (
+              <button
+                onClick={() => onEdit(voucher)}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold border-2"
+                style={{ borderColor: C.indigo, color: C.indigo }}
+              >
+                <Edit2 className="w-3.5 h-3.5" /> Chỉnh sửa
+              </button>
+            )}
             {canSubmit && (
               <button
                 onClick={() => setShowSubmitDialog(true)}
@@ -253,16 +256,6 @@ export function PartnerVoucherDetailPage({ voucher: initialVoucher, onBack, onEd
                 </ul>
               )}
             </div>
-
-            {voucher.status === "rejected" && (
-              <div className="bg-red-50 rounded-2xl p-4 border border-red-100">
-                <div className="flex items-center gap-2 mb-2">
-                  <AlertTriangle className="w-4 h-4" style={{ color: "#EF4444" }} />
-                  <span className="text-sm font-bold" style={{ color: "#EF4444" }}>Lý do từ chối</span>
-                </div>
-                <p className="text-xs" style={{ color: "#6B7280" }}>Nội dung không đáp ứng tiêu chuẩn. Vui lòng chỉnh sửa và gửi lại.</p>
-              </div>
-            )}
           </div>
         </div>
       </div>
