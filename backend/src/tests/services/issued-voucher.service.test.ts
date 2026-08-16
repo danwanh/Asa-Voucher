@@ -9,6 +9,7 @@ vi.mock("../../repositories/issued-voucher.repository.js", () => ({
   findIssuedVoucherByQrPayload: vi.fn(),
   updateIssuedVoucherStatus: vi.fn(),
   findEligibleBranchIds: vi.fn(),
+  findEligibleBranches: vi.fn(),
 }));
 
 vi.mock("../../repositories/voucher-usage.repository.js", () => ({
@@ -23,6 +24,9 @@ vi.mock("../../config/prisma.js", () => ({
       if (typeof fn === "function") return fn({});
       return fn;
     }),
+    voucherProduct: {
+      findUnique: vi.fn(),
+    },
   },
 }));
 
@@ -32,6 +36,7 @@ import * as issuedVoucherService from "../../services/issued-voucher.service.js"
 
 const BUYER: AuthUser = { id: "u-buyer", email: "b@test.com", role: "buyer" };
 const PARTNER_OWNER: AuthUser = { id: "u-partner", email: "p@test.com", role: "partner_owner", partnerId: "partner-1" };
+const VOUCHER_STAFF: AuthUser = { id: "u-vstaff", email: "vs@test.com", role: "partner_voucher_staff", partnerId: "partner-1" };
 const STORE_STAFF: AuthUser = { id: "u-staff", email: "s@test.com", role: "partner_store_staff", partnerId: "partner-1", branchId: "branch-1" };
 const ADMIN: AuthUser = { id: "u-admin", email: "a@test.com", role: "admin_content" };
 
@@ -47,6 +52,7 @@ function makeIssuedVoucher(overrides: Record<string, unknown> = {}) {
     issued_date: "2026-01-01",
     expired_date: "2026-12-31",
     status: "active" as const,
+    is_test: false,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
     voucher_products: { id: "vp-1", name: "Voucher A", partner_id: "partner-1", thumbnail_url: null },
@@ -169,6 +175,72 @@ describe("Issued Voucher Service", () => {
         issuedVoucherService.checkVoucher(otherPartner, { voucher_code: "VC-001" })
       ).rejects.toThrow(HttpError);
     });
+
+    it("returns is_test true when checking a test record by voucher staff", async () => {
+      const testVoucher = makeIssuedVoucher({
+        id: "iv-test",
+        voucher_code: "VC1754341234567012345",
+        qr_code_payload: "VC1754341234567012345",
+        is_test: true,
+        owner_id: null,
+        order_item_id: null,
+        order_items: null,
+      });
+      vi.mocked(issuedVoucherRepo.findIssuedVoucherByCode).mockResolvedValue(testVoucher);
+      vi.mocked(issuedVoucherRepo.findEligibleBranchIds).mockResolvedValue(["branch-1"]);
+      vi.mocked(issuedVoucherRepo.findEligibleBranches).mockResolvedValue([{ id: "branch-1", branch_name: "Chi nhánh 1" }]);
+
+      const result = await issuedVoucherService.checkVoucher(VOUCHER_STAFF, { voucher_code: "VC1754341234567012345" });
+
+      expect(result.is_test).toBe(true);
+      expect(result.issued_voucher.voucher_code).toBe("VC1754341234567012345");
+      expect(result.eligible_branch_ids).toEqual(["branch-1"]);
+      expect(result.eligible_branches).toEqual([{ id: "branch-1", branch_name: "Chi nhánh 1" }]);
+      expect(issuedVoucherRepo.findIssuedVoucherByCode).toHaveBeenCalled();
+    });
+
+    it("also recognizes a test record via qr_code_payload", async () => {
+      const testVoucher = makeIssuedVoucher({ is_test: true, owner_id: null, order_item_id: null, order_items: null });
+      vi.mocked(issuedVoucherRepo.findIssuedVoucherByQrPayload).mockResolvedValue(testVoucher);
+      vi.mocked(issuedVoucherRepo.findEligibleBranchIds).mockResolvedValue([]);
+      vi.mocked(issuedVoucherRepo.findEligibleBranches).mockResolvedValue([]);
+
+      const result = await issuedVoucherService.checkVoucher(PARTNER_OWNER, { qr_code_payload: "qr-test" });
+
+      expect(result.is_test).toBe(true);
+      expect(issuedVoucherRepo.findIssuedVoucherByCode).not.toHaveBeenCalled();
+    });
+
+    it("treats a test record as an invalid code for store staff", async () => {
+      const testVoucher = makeIssuedVoucher({ is_test: true, owner_id: null, order_item_id: null, order_items: null });
+      vi.mocked(issuedVoucherRepo.findIssuedVoucherByCode).mockResolvedValue(testVoucher);
+
+      await expect(
+        issuedVoucherService.checkVoucher(STORE_STAFF, { voucher_code: "VC1754341234567012345" })
+      ).rejects.toThrow(HttpError);
+
+      expect(issuedVoucherRepo.findIssuedVoucherByCode).toHaveBeenCalledWith("VC1754341234567012345");
+    });
+
+    it("returns no is_test flag for a real voucher", async () => {
+      vi.mocked(issuedVoucherRepo.findIssuedVoucherByCode).mockResolvedValue(makeIssuedVoucher());
+      vi.mocked(issuedVoucherRepo.findEligibleBranchIds).mockResolvedValue(["branch-1"]);
+      vi.mocked(issuedVoucherRepo.findEligibleBranches).mockResolvedValue([]);
+
+      const result = await issuedVoucherService.checkVoucher(STORE_STAFF, { voucher_code: "VC-001" });
+
+      expect(result.is_test).toBeUndefined();
+    });
+
+    it("excludes test records from issued voucher lists", async () => {
+      vi.mocked(issuedVoucherRepo.listIssuedVouchers).mockResolvedValue({ rows: [], total: 0 });
+
+      await issuedVoucherService.listIssuedVouchers(PARTNER_OWNER, { page: 1, limit: 20 });
+
+      expect(issuedVoucherRepo.listIssuedVouchers).toHaveBeenCalledWith(
+        expect.objectContaining({ isTest: false })
+      );
+    });
   });
 
   describe("confirmVoucher", () => {
@@ -238,6 +310,15 @@ describe("Issued Voucher Service", () => {
 
       await expect(
         issuedVoucherService.confirmVoucher(otherPartner, { voucher_code: "VC-001" })
+      ).rejects.toThrow(HttpError);
+    });
+
+    it("rejects confirming a test record", async () => {
+      const testVoucher = makeIssuedVoucher({ is_test: true, owner_id: null, order_item_id: null, order_items: null });
+      vi.mocked(issuedVoucherRepo.findIssuedVoucherByCode).mockResolvedValue(testVoucher);
+
+      await expect(
+        issuedVoucherService.confirmVoucher(STORE_STAFF, { voucher_code: "VC-001" })
       ).rejects.toThrow(HttpError);
     });
   });

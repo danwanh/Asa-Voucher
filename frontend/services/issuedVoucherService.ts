@@ -22,6 +22,7 @@ export interface IssuedVoucherResult {
   redeemable: boolean;
   reason: string | null;
   eligible_branch_ids: string[];
+  is_test?: boolean;
 }
 
 function data<T>(response: { data: ApiData<T> }) {
@@ -199,6 +200,13 @@ export const issuedVoucherService = {
     const response = await api.post<
       ApiData<{ message: string; issued_voucher: any; usage: any }>
     >("/issued-vouchers/confirm", { voucher_code: voucherCode, note });
+    return data(response);
+  },
+
+  async generateTestCode(voucherId: string) {
+    const response = await api.post<ApiData<{ test_code: string; qr_code_payload: string }>>(
+      `/voucher-products/${voucherId}/test-code`,
+    );
     return data(response);
   },
 };

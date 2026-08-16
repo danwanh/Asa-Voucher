@@ -7,7 +7,7 @@ import type {
 
 function detailInclude(feedbackUserId?: string) {
   return {
-  voucher_products: { select: { id: true, name: true, partner_id: true, thumbnail_url: true, partners: { select: { business_name: true } } } },
+  voucher_products: { select: { id: true, name: true, partner_id: true, thumbnail_url: true, remaining_quantity: true, partners: { select: { business_name: true } } } },
   order_items: {
     select: {
       id: true,
@@ -68,7 +68,7 @@ function listInclude(feedbackUserId?: string) {
 
 type IssuedVoucherWithRelations = IssuedVoucherRow & {
   voucher_products: { partner_id: string };
-  order_items: { order_id: string; orders?: { user_id: string; status: string } | null };
+  order_items: { order_id: string; orders?: { user_id: string; status: string } | null } | null;
 };
 
 export async function listIssuedVouchers(
@@ -78,6 +78,8 @@ export async function listIssuedVouchers(
   if (filter.ownerId) where.owner_id = filter.ownerId;
   if (filter.partnerId) where.voucher_products = { partner_id: filter.partnerId };
   if (filter.status) where.status = filter.status;
+  if (filter.isTest !== undefined) where.is_test = filter.isTest;
+  else where.is_test = false;
 
   const skip = (filter.page - 1) * filter.limit;
   const take = filter.limit;
@@ -115,4 +117,19 @@ export async function findEligibleBranchIds(voucherProductId: string): Promise<s
     select: { branch_id: true },
   });
   return rows.map((r: { branch_id: string }) => r.branch_id);
+}
+
+export async function findEligibleBranches(
+  voucherProductId: string,
+): Promise<Array<{ id: string; branch_name: string }>> {
+  const rows = await prisma.voucherProductBranch.findMany({
+    where: { voucher_product_id: voucherProductId },
+    select: {
+      branch_id: true,
+      partner_branches: { select: { id: true, branch_name: true } },
+    },
+  });
+  return rows
+    .map((r) => r.partner_branches)
+    .filter((b): b is { id: string; branch_name: string } => Boolean(b));
 }

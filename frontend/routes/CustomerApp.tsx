@@ -311,6 +311,8 @@ export function CustomerApp({
        const code = apiError.response?.data?.error?.code
        if (code === "RECIPIENT_NOT_FOUND" || code === "RECIPIENT_REQUIRED") {
          toast.error("Không tìm thấy tài khoản người nhận. Vui lòng kiểm tra lại email hoặc số điện thoại.")
+       } else if (code === "RECIPIENT_IS_SELF") {
+         toast.error("Không thể tặng voucher cho chính mình.")
        } else {
           toast.error(code === "PRICE_CHANGED"
             ? "Giá voucher đã thay đổi. Vui lòng kiểm tra lại giỏ hàng."

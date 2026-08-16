@@ -379,17 +379,18 @@ model IssuedVoucher {
   voucher_code       String         @unique @db.VarChar(50)
   qr_code_payload    String         @unique @db.VarChar(255)
   qr_code_image_url  String?
-  order_item_id      String         @db.Uuid
+  order_item_id      String?        @db.Uuid
   voucher_product_id String         @db.Uuid
-  owner_id           String         @db.Uuid
+  owner_id           String?        @db.Uuid
   issued_date        DateTime       @default(dbgenerated("CURRENT_DATE")) @db.Date
   expired_date       DateTime       @db.Date
   status             String         @default("active") @db.VarChar(20)
+  is_test            Boolean        @default(false)
   created_at         DateTime       @default(now()) @db.Timestamptz(6)
   updated_at         DateTime       @default(now()) @updatedAt @db.Timestamptz(6)
   complaints         Complaint[]
-  order_items        OrderItem      @relation(fields: [order_item_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  owners             User           @relation(fields: [owner_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  order_items        OrderItem?     @relation(fields: [order_item_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  owners             User?          @relation(fields: [owner_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   voucher_products   VoucherProduct @relation(fields: [voucher_product_id], references: [id], onUpdate: NoAction)
   reviews            Review[]
   voucher_usages     VoucherUsage[]

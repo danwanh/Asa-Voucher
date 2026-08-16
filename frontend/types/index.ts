@@ -426,10 +426,12 @@ export interface CheckVoucherResult {
       name: string
       partner_id: string
       thumbnail_url: string | null
+      remaining_quantity: number | null
       partners: { business_name: string }
     }
     order_items?: {
       id: string
+      quantity: number | null
       orders?: {
         id: string
         order_code: string | null
@@ -439,11 +441,13 @@ export interface CheckVoucherResult {
         created_at: string
         users: { full_name: string }
       } | null
-    }[]
+    } | null
     reviews?: { id: string; rating: number; comment: string | null; media_urls: string[]; created_at: string }[]
     complaints?: { id: string; reason: string; status: string; created_at: string }[]
   }
   eligible_branch_ids: string[]
+  eligible_branches?: { id: string; branch_name: string }[]
+  is_test?: boolean
 }
 
 // ── FC-ADC-CONTENT: CMS Content type ─────────────────────────────

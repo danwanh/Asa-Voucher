@@ -18,6 +18,7 @@ import {
 } from "./payment-provider.service.js";
 import { env } from "../config/env.js";
 import { buildPaginatedResult } from "../utils/pagination.js";
+import { generateVoucherCode } from "../utils/code.util.js";
 
 type CurrentUser = { id: string; role: UserRole; partnerId?: string };
 type Voucher = Record<string, unknown> & {
@@ -86,10 +87,6 @@ function derivePaymentStatus(payments: PaymentRecord[] | undefined): "pending" |
 
 function orderCode() {
   return `ORD${Date.now()}${crypto.randomInt(1000, 9999)}`;
-}
-
-function voucherCode() {
-  return `VC${Date.now()}${crypto.randomInt(100000, 999999)}`;
 }
 
 async function getOrCreateCart(userId: string) {
@@ -217,6 +214,7 @@ async function resolveRecipient(userId: string, identifier: string | undefined, 
     select: { id: true },
   });
   if (!recipient) throw new HttpError(404, "Recipient account was not found", "RECIPIENT_NOT_FOUND");
+  if (recipient.id === userId) throw new HttpError(422, "Cannot gift voucher to yourself", "RECIPIENT_IS_SELF");
   return recipient.id;
 }
 
@@ -1175,7 +1173,7 @@ async function completePayment(
       if (stockUpdate.count === 0) throw new HttpError(409, "Insufficient voucher quantity", "INSUFFICIENT_STOCK");
 
       const issued = Array.from({ length: Number(item.quantity) }, () => {
-        const code = voucherCode();
+        const code = generateVoucherCode();
         const issuedDate = new Date();
         const expiredDate = new Date(issuedDate);
         expiredDate.setDate(expiredDate.getDate() + Number(voucher.validity_days));

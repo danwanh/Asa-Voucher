@@ -6,6 +6,7 @@ import { CreateVoucherPage } from "@/pages/partner/CreateVoucherPage"
 import { EditVoucherPage } from "@/pages/partner/EditVoucherPage"
 import { PartnerVoucherDetailPage } from "@/pages/partner/PartnerVoucherDetailPage"
 import { PartnerRevenuePage } from "@/pages/partner/PartnerRevenuePage"
+import { StaffCheckVoucherPage } from "@/pages/staff/StaffCheckVoucherPage"
 import { BranchManagementPage } from "@/pages/partner/BranchManagementPage"
 import { StaffManagementPage } from "@/pages/partner/StaffManagementPage"
 import { BusinessProfilePage } from "@/pages/partner/BusinessProfilePage"
@@ -136,6 +137,7 @@ export function PartnerApp({ user, onLogout, initialPage }: Props) {
         <PartnerVoucherDetailPage voucher={selectedVoucher} onBack={() => setPage("vouchers")} onEdit={goEdit} />
       )}
       {page === "revenue" && <PartnerRevenuePage partnerId={user.partnerId} partnerName={partner?.businessName} />}
+      {page === "check-voucher" && <StaffCheckVoucherPage />}
       {page === "branches" && <BranchManagementPage user={user} partner={partner} onPartnerUpdated={setPartner} />}
       {page === "staff" && <StaffManagementPage />}
       {page === "profile" && (

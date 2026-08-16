@@ -105,7 +105,7 @@ export async function countUsedIssuedVouchersByProduct(
 
   const rows = await prisma.issuedVoucher.groupBy({
     by: ["voucher_product_id"],
-    where: { status: "used", voucher_product_id: { in: voucherProductIds } },
+    where: { status: "used", is_test: false, voucher_product_id: { in: voucherProductIds } },
     _count: true,
   });
 
@@ -199,6 +199,7 @@ export async function countUsedByProducts (voucherProductIds: string[],): Promis
     by: ["voucher_product_id"],
     where: {
       status: "used",
+      is_test: false,
       voucher_product_id: {in: voucherProductIds}
     },
     _count: true,

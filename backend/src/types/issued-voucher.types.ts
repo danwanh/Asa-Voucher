@@ -5,12 +5,13 @@ export interface IssuedVoucherRow {
   voucher_code: string;
   qr_code_payload: string;
   qr_code_image_url: string | null;
-  order_item_id: string;
+  order_item_id: string | null;
   voucher_product_id: string;
-  owner_id: string;
+  owner_id: string | null;
   issued_date: string;
   expired_date: string;
   status: IssuedVoucherStatus;
+  is_test?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -30,6 +31,7 @@ export interface IssuedVoucherListFilter {
   feedbackUserId?: string;
   partnerId?: string;
   status?: IssuedVoucherStatus;
+  isTest?: boolean;
   page: number;
   limit: number;
 }

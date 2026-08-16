@@ -53,6 +53,11 @@ export async function updateVoucherStatus(req: Request, res: Response) {
   ok(res, result, "Voucher status updated");
 }
 
+export async function generateVoucherTestCode(req: Request, res: Response) {
+  const result = await voucherProductService.generateVoucherTestCode(req.user!, req.params.id);
+  ok(res, result, "Mã thử đã được tạo");
+}
+
 export async function listVoucherImages(req: Request, res: Response) {
   ok(res, await voucherProductService.listVoucherImages(req.params.id));
 }

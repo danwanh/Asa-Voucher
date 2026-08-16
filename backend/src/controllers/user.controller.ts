@@ -193,6 +193,7 @@ export async function lookupRecipient(req: Request, res: Response) {
   });
 
   if (!user) throw new HttpError(404, "Recipient account was not found", "RECIPIENT_NOT_FOUND");
+  if (user.id === req.user!.id) throw new HttpError(422, "Cannot gift voucher to yourself", "RECIPIENT_IS_SELF");
   ok(res, user);
 }
 

@@ -25,6 +25,10 @@ const { mockPrisma } = vi.hoisted(() => ({
       count: vi.fn(),
       deleteMany: vi.fn(),
     },
+    issuedVoucher: {
+      create: vi.fn(),
+      deleteMany: vi.fn(),
+    },
     partner: {
       findFirst: vi.fn(),
       findUnique: vi.fn(),
@@ -426,6 +430,63 @@ describe("Voucher Product Service", () => {
       vi.mocked(prisma.voucherProduct.findUnique).mockResolvedValue(makeVoucher() as any);
 
       await expect(voucherProductService.updateVoucherStatus(OTHER_PARTNER, "vp1", "paused")).rejects.toThrow(HttpError);
+    });
+  });
+
+  describe("generateVoucherTestCode", () => {
+    it("generates a VC- code using the real voucher code logic and stores a test record", async () => {
+      vi.mocked(prisma.voucherProduct.findUnique).mockResolvedValue(makeVoucher() as any);
+      vi.mocked(prisma.issuedVoucher.create).mockResolvedValue({} as any);
+      vi.mocked(prisma.issuedVoucher.deleteMany).mockResolvedValue({ count: 0 } as any);
+
+      const result = await voucherProductService.generateVoucherTestCode(PARTNER_OWNER, "vp1");
+
+      expect(result.test_code).toMatch(/^VC\d+\d{6}$/);
+      expect(result.qr_code_payload).toBe(result.test_code);
+      expect(result.voucher.id).toBe("vp1");
+      expect(prisma.issuedVoucher.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ voucher_code: result.test_code, qr_code_payload: result.test_code, voucher_product_id: "vp1", status: "active", is_test: true }),
+        })
+      );
+      expect(prisma.voucherProduct.update).not.toHaveBeenCalled();
+      expect(prisma.voucherProduct.create).not.toHaveBeenCalled();
+    });
+
+    it("allows generating a test code for a voucher not yet on sale", async () => {
+      vi.mocked(prisma.voucherProduct.findUnique).mockResolvedValue(makeVoucher({ sale_start_date: "2099-01-01" }) as any);
+      vi.mocked(prisma.issuedVoucher.create).mockResolvedValue({} as any);
+      vi.mocked(prisma.issuedVoucher.deleteMany).mockResolvedValue({ count: 0 } as any);
+
+      const result = await voucherProductService.generateVoucherTestCode(PARTNER_OWNER, "vp1");
+
+      expect(result.test_code).toMatch(/^VC\d+\d{6}$/);
+      expect(prisma.issuedVoucher.create).toHaveBeenCalled();
+    });
+
+    it("rejects generating test code for an unapproved voucher", async () => {
+      vi.mocked(prisma.voucherProduct.findUnique).mockResolvedValue(makeVoucher({ approval_status: "pending" }) as any);
+
+      await expect(voucherProductService.generateVoucherTestCode(PARTNER_OWNER, "vp1")).rejects.toThrow(HttpError);
+      expect(prisma.issuedVoucher.create).not.toHaveBeenCalled();
+    });
+
+    it("rejects generating test code for a paused voucher", async () => {
+      vi.mocked(prisma.voucherProduct.findUnique).mockResolvedValue(makeVoucher({ status: "paused" }) as any);
+
+      await expect(voucherProductService.generateVoucherTestCode(PARTNER_OWNER, "vp1")).rejects.toThrow(HttpError);
+    });
+
+    it("rejects generating test code for an out-of-stock voucher", async () => {
+      vi.mocked(prisma.voucherProduct.findUnique).mockResolvedValue(makeVoucher({ remaining_quantity: 0 }) as any);
+
+      await expect(voucherProductService.generateVoucherTestCode(PARTNER_OWNER, "vp1")).rejects.toThrow(HttpError);
+    });
+
+    it("rejects generating test code by non-owner", async () => {
+      vi.mocked(prisma.voucherProduct.findUnique).mockResolvedValue(makeVoucher() as any);
+
+      await expect(voucherProductService.generateVoucherTestCode(OTHER_PARTNER, "vp1")).rejects.toThrow(HttpError);
     });
   });
 

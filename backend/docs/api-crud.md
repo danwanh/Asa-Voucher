@@ -298,7 +298,7 @@ QR payload được phát hành dưới dạng URL `FRONTEND_URL/voucher/verify?
 - Khi checkout thành công từ giỏ hàng, backend tạo `orders` và `order_items`, sau đó xóa các `cart_items` đã checkout.
 - Khi tạo đơn phải snapshot giá vào `order_items`.
 - `orders.user_id` là người tạo đơn; `orders.recipient_id` là người sở hữu voucher sau thanh toán.
-- `recipient_identifier` phải khớp email hoặc số điện thoại của tài khoản tồn tại trong `users`; nếu không, trả `RECIPIENT_NOT_FOUND`.
+- `recipient_identifier` phải khớp email hoặc số điện thoại của tài khoản tồn tại trong `users`; nếu không, trả `RECIPIENT_NOT_FOUND`. Nhập email/số điện thoại của chính mình sẽ trả `RECIPIENT_IS_SELF`.
 - Mua cho bản thân dùng `recipient_id = user_id`; mua tặng dùng `is_gift = true`.
 - Đơn pending có thời hạn thanh toán 15 phút qua `payment_expires_at`.
 - Tổng tiền đơn hàng tính từ `order_items`, không tin dữ liệu giá từ client.
@@ -324,6 +324,7 @@ QR payload được phát hành dưới dạng URL `FRONTEND_URL/voucher/verify?
 | Hủy đơn chưa thanh toán | `PATCH /orders/{id}/cancel` | Trạng thái `cancelled` |
 | Thanh toán thành công | `PATCH /payments/{id}/simulate-success` | Payment `success`, order `paid`, phát hành đủ voucher code |
 | Người nhận không tồn tại | `POST /orders` với email không có trong `users` | Trả `422 RECIPIENT_NOT_FOUND` |
+| Người nhận là chính người mua | `POST /orders` với email/số điện thoại của chính mình | Trả `422 RECIPIENT_IS_SELF`, không tạo đơn |
 | Hết hạn thanh toán | Tạo payment sau 15 phút | Order `cancelled`, trả `409 ORDER_PAYMENT_EXPIRED` |
 | Thanh toán lại đơn đã paid | Gọi simulate-success lần 2 | Trả `409` hoặc idempotent không phát hành trùng |
 

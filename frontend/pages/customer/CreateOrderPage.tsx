@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from "react"
 import { ArrowLeft, ShoppingBag } from "lucide-react"
 import { C, fmt } from "@/utils/constants"
 import type { CartItem } from "@/types"
-import { orderService } from "@/services/orderService"
+import { orderService, type RecipientLookup } from "@/services/orderService"
 import { LoadingState } from "@/components/LoadingState"
 import { CheckoutProductList } from "@/components/CheckoutProductList"
+import { AppIcon } from "@/components/AppIcon"
 
 export interface RecipientInfo {
   name: string
@@ -29,40 +30,85 @@ export function CreateOrderPage({ cart, total, userName = "", userEmail = "", on
   const [lookupLoading, setLookupLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [candidate, setCandidate] = useState<RecipientLookup | null>(null)
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [selfMatch, setSelfMatch] = useState(false)
   const lookupRequest = useRef(0)
+  const identifierWrapRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const requestId = ++lookupRequest.current
-    if (forSelf || form.identifier.trim().length < 3) {
+    const identifier = form.identifier.trim()
+    if (forSelf || identifier.length < 3) {
       setLookupLoading(false)
+      return
+    }
+    if (identifier.toLowerCase() === userEmail.trim().toLowerCase()) {
+      setLookupLoading(false)
+      setCandidate(null)
+      setSelfMatch(true)
+      setErrors((current) => ({ ...current, identifier: "Không thể tặng voucher cho chính mình" }))
       return
     }
     const timer = window.setTimeout(() => {
       setLookupLoading(true)
-      void orderService.lookupRecipient(form.identifier).then((recipient) => {
+      void orderService.lookupRecipient(identifier).then((recipient) => {
         if (requestId !== lookupRequest.current) return
-        setForm((current) => ({ ...current, name: String(recipient.full_name ?? "") }))
+        setSelfMatch(false)
+        setCandidate(recipient)
+        setDropdownOpen(true)
         setErrors((current) => ({ ...current, identifier: "" }))
-      }).catch(() => {
+      }).catch((error) => {
         if (requestId !== lookupRequest.current) return
-        setForm((current) => ({ ...current, name: "" }))
-        setErrors((current) => ({ ...current, identifier: "Không tìm thấy tài khoản người nhận" }))
+        const code = (error as { response?: { data?: { error?: { code?: string } } } })?.response?.data?.error?.code
+        setCandidate(null)
+        setDropdownOpen(false)
+        if (code === "RECIPIENT_IS_SELF") {
+          setSelfMatch(true)
+          setErrors((current) => ({ ...current, identifier: "Không thể tặng voucher cho chính mình" }))
+        } else {
+          setErrors((current) => ({ ...current, identifier: "Không tìm thấy tài khoản người nhận" }))
+        }
       }).finally(() => {
         if (requestId === lookupRequest.current) setLookupLoading(false)
       })
     }, 400)
     return () => window.clearTimeout(timer)
-  }, [forSelf, form.identifier])
+  }, [forSelf, form.identifier, userEmail])
+
+  useEffect(() => {
+    const handler = (event: MouseEvent) => {
+      if (identifierWrapRef.current && !identifierWrapRef.current.contains(event.target as Node)) {
+        setDropdownOpen(false)
+      }
+    }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [])
 
   const set = (k: string, v: string) => {
     setForm((f) => ({ ...f, [k]: v, ...(k === "identifier" && !forSelf ? { name: "" } : {}) }))
     setErrors((e) => ({ ...e, [k]: "" }))
+    if (k === "identifier") {
+      setCandidate(null)
+      setSelfMatch(false)
+      setDropdownOpen(true)
+    }
+  }
+
+  const selectCandidate = (found: RecipientLookup) => {
+    setForm((f) => ({ ...f, name: found.full_name }))
+    setCandidate(found)
+    setSelfMatch(false)
+    setDropdownOpen(false)
+    setErrors((e) => ({ ...e, identifier: "" }))
   }
 
   const validate = () => {
     const e: Record<string, string> = {}
     if (!form.identifier.trim()) e.identifier = "Vui lòng nhập email hoặc số điện thoại người nhận"
-    if (!forSelf && !form.name.trim()) e.identifier = "Không tìm thấy tài khoản người nhận"
+    if (!forSelf && selfMatch) e.identifier = "Không thể tặng voucher cho chính mình"
+    if (!forSelf && !selfMatch && !form.name.trim()) e.identifier = "Vui lòng chọn người nhận từ danh sách"
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -146,6 +192,9 @@ export function CreateOrderPage({ cart, total, userName = "", userEmail = "", on
                       name: t.val ? userName : "",
                       identifier: t.val ? userEmail : "",
                     }))
+                    setCandidate(null)
+                    setSelfMatch(false)
+                    setDropdownOpen(false)
                     setErrors({})
                   }}
                   className="flex-1 py-2 rounded-xl text-sm font-bold transition-all"
@@ -163,23 +212,50 @@ export function CreateOrderPage({ cart, total, userName = "", userEmail = "", on
              <div className="grid gap-4">
                {!forSelf && (
                  <>
-                   <div>
+                   <div ref={identifierWrapRef} className="relative">
                      <label className="block text-sm font-bold mb-1" style={{ color: C.indigo }}>Email hoặc số điện thoại người nhận *</label>
                      <input
                        type="text"
                        value={form.identifier}
                        onChange={(e) => set("identifier", e.target.value)}
+                       onFocus={() => setDropdownOpen(Boolean(candidate) && !selfMatch)}
                        placeholder="email@example.com hoặc 0912345678"
                        className={inputCls}
                        style={{ borderColor: errors.identifier ? "#EF4444" : "#E5E7EB", fontFamily: "'Inter', sans-serif" }}
                      />
                      {errors.identifier && <p className="text-xs mt-1" style={{ color: "#EF4444" }}>{errors.identifier}</p>}
+
+                     {dropdownOpen && candidate && !lookupLoading && !selfMatch && (
+                       <div
+                         role="listbox"
+                         aria-label="Kết quả tìm kiếm người nhận"
+                         className="absolute left-0 right-0 z-20 mt-1 overflow-hidden rounded-xl border bg-white shadow-lg"
+                         style={{ borderColor: "#E5E7EB" }}
+                       >
+                         <button
+                           type="button"
+                           role="option"
+                           aria-selected
+                           onClick={() => selectCandidate(candidate)}
+                           className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-gray-50"
+                         >
+                           <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: C.eggshell }}>
+                             <AppIcon name="user" className="h-4 w-4" style={{ color: C.indigo }} />
+                           </div>
+                           <div className="min-w-0 flex-1">
+                             <div className="truncate text-sm font-bold" style={{ color: C.indigo }}>{candidate.full_name}</div>
+                             <div className="truncate text-xs" style={{ color: "#8A8DA8" }}>{candidate.email || candidate.phone}</div>
+                           </div>
+                           <AppIcon name="check" className="h-4 w-4 flex-shrink-0" style={{ color: C.teal }} />
+                         </button>
+                       </div>
+                     )}
                    </div>
 
-                   <div className="rounded-xl px-4 py-3" style={{ backgroundColor: C.eggshell }}>
+                   <div className="rounded-xl px-4 py-3 min-h-[72px] flex flex-col justify-center" style={{ backgroundColor: C.eggshell }}>
                      <div className="text-xs" style={{ color: "#8A8DA8" }}>Người được tặng</div>
-                     <div className="font-bold mt-1" style={{ color: C.indigo }}>
-                       {lookupLoading ? "Đang tìm tài khoản..." : form.name || "Chưa xác định"}
+                     <div className="font-bold mt-1 truncate" style={{ color: C.indigo, lineHeight: "1.5rem" }}>
+                       {lookupLoading ? "Đang tìm tài khoản..." : selfMatch ? "Chính bạn" : form.name || "Chưa xác định"}
                      </div>
                    </div>
                  </>

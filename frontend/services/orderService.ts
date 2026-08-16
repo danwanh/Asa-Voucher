@@ -4,6 +4,13 @@ import { useAuthStore } from "@/stores/authStore"
 
 type BackendRecord = Record<string, any>
 
+export interface RecipientLookup {
+  id: string
+  full_name: string
+  email: string
+  phone: string | null
+}
+
 function data<T>(response: { data: { data: T } }) {
   return response.data.data
 }
@@ -188,9 +195,15 @@ const CACHE_TTL_MS = 15_000
 let cacheVersion = 0
 
 export const orderService = {
-  async lookupRecipient(identifier: string) {
+  async lookupRecipient(identifier: string): Promise<RecipientLookup> {
     const response = await api.get("/users/recipient-lookup", { params: { identifier } })
-    return data<BackendRecord>(response)
+    const value = data<BackendRecord>(response)
+    return {
+      id: String(value.id),
+      full_name: String(value.full_name ?? ""),
+      email: String(value.email ?? ""),
+      phone: value.phone ? String(value.phone) : null,
+    }
   },
 
   async createFromCart(input: { cartItemIds?: string[]; items?: Array<{ voucherId: string; quantity: number }>; recipientIdentifier: string; isGift: boolean; note?: string; paymentMethod?: "vnpay" | "paypal"; expectedPrices?: Record<string, number> }) {

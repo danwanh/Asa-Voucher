@@ -48,13 +48,14 @@ function resolveRedeemableState(voucher: NonNullable<IssuedVoucherWithProduct>) 
 }
 
 export async function listIssuedVouchers(user: AuthUser, query: ListIssuedVouchersQuery) {
-  const filter = {
+const filter = {
     status: query.status,
     page: query.page,
     limit: query.limit,
     ownerId: user.role === "buyer" ? user.id : undefined,
     feedbackUserId: user.role === "buyer" ? user.id : undefined,
     partnerId: isPartnerStaff(user.role) ? (user.partnerId ?? undefined) : undefined,
+    isTest: false,
   };
 
   const { rows, total } = await issuedVoucherRepo.listIssuedVouchers(filter);
@@ -122,6 +123,12 @@ export async function checkVoucher(user: AuthUser, input: CheckVoucherInput) {
     throw new HttpError(404, "Mã voucher không hợp lệ");
   }
 
+  // Mã thử (record is_test) chỉ dành cho admin, chủ đối tác và nhân viên tạo voucher.
+  // Nhân viên cửa hàng quét mã thử sẽ bị coi là mã không tồn tại (giữ luồng khách thật).
+  if (voucher.is_test && user.role === "partner_store_staff") {
+    throw new HttpError(404, "Mã voucher không hợp lệ");
+  }
+
   assertPartnerScope(user, voucher);
 
   const state = resolveRedeemableState(voucher);
@@ -138,9 +145,17 @@ export async function checkVoucher(user: AuthUser, input: CheckVoucherInput) {
     }
   }
 
-  const eligibleBranchIds = await issuedVoucherRepo.findEligibleBranchIds(voucher.voucher_product_id);
+  const [eligibleBranchIds, eligibleBranches] = await Promise.all([
+    issuedVoucherRepo.findEligibleBranchIds(voucher.voucher_product_id),
+    issuedVoucherRepo.findEligibleBranches(voucher.voucher_product_id),
+  ]);
 
-  return { issued_voucher: voucher, eligible_branch_ids: eligibleBranchIds };
+  return {
+    issued_voucher: voucher,
+    eligible_branch_ids: eligibleBranchIds,
+    eligible_branches: eligibleBranches,
+    ...(voucher.is_test ? { is_test: true } : {}),
+  };
 }
 
 export async function confirmVoucher(user: AuthUser, input: ConfirmVoucherInput) {
@@ -151,6 +166,10 @@ export async function confirmVoucher(user: AuthUser, input: ConfirmVoucherInput)
   const voucher = await issuedVoucherRepo.findIssuedVoucherByCode(input.voucher_code);
 
   if (!voucher) {
+    throw new HttpError(404, "Mã voucher không hợp lệ");
+  }
+
+  if (voucher.is_test) {
     throw new HttpError(404, "Mã voucher không hợp lệ");
   }
 
@@ -186,21 +205,21 @@ export async function confirmVoucher(user: AuthUser, input: ConfirmVoucherInput)
       },
     });
 
-    const remainingVouchers = await tx.issuedVoucher.count({
+const remainingVouchers = await tx.issuedVoucher.count({
       where: {
-        order_items: { order_id: voucher.order_items.order_id },
+        order_items: { order_id: voucher.order_items!.order_id },
         status: { not: "used" },
       },
     });
     if (remainingVouchers === 0) {
       const completed = await tx.order.updateMany({
-        where: { id: voucher.order_items.order_id, status: { in: ["confirmed", "pending_manual", "used"] } },
+        where: { id: voucher.order_items!.order_id, status: { in: ["confirmed", "pending_manual", "used"] } },
         data: { status: "completed", updated_at: new Date() },
       });
       if (completed.count > 0) {
         await tx.orderLog.create({
           data: {
-            order_id: voucher.order_items.order_id,
+            order_id: voucher.order_items!.order_id,
             user_id: user.id,
             action: "COMPLETE_ORDER",
             description: "All issued vouchers have been used",

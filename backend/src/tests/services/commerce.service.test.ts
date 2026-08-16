@@ -255,6 +255,17 @@ describe("Commerce Service", () => {
       })).rejects.toThrow(HttpError);
     });
 
+    it("rejects gifting a voucher to yourself", async () => {
+      vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: "u-buyer" } as unknown as { id: string });
+
+      await expect(commerceService.createOrder("u-buyer", {
+        items: [{ voucher_product_id: "vp1", quantity: 1 }],
+        payment_method: "vnpay",
+        recipient_identifier: "buyer@example.com",
+        is_gift: true,
+      })).rejects.toMatchObject({ statusCode: 422, code: "RECIPIENT_IS_SELF" });
+    });
+
     it("rejects a stale cart price", async () => {
       vi.mocked(prisma.voucherProduct.findUnique).mockResolvedValue(makeVoucher() as any);
 

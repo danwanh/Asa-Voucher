@@ -5,6 +5,7 @@ import { HttpError } from "../utils/http-error.js";
 import { getAreaMatchCandidates, serializeApplicableAreas } from "../utils/applicable-area.js";
 import { rangeFromPagination } from "../validations/common.validation.js";
 import { notifyVoucherApproved, notifyVoucherRejected } from "./notification.service.js";
+import { generateVoucherCode } from "../utils/code.util.js";
 
 type CurrentUser = { id: string; role: UserRole; partnerId?: string | null; branchId?: string | null };
 type WorkflowStatus = "draft" | "pending_approval" | "rejected" | "approved" | "active" | "paused" | "sold_out" | "expired";
@@ -667,6 +668,47 @@ export async function updateVoucherStatus(user: CurrentUser, id: string, status:
   } catch (error) {
     throwDbError(error, "Voucher product not found");
   }
+}
+
+/**
+ * Tạo mã thử cho voucher đang bán. Không ghi DB, không ảnh hưởng số lượng bán.
+ * Mã thử được nhận diện bởi endpoint check và không thể xác nhận sử dụng.
+ */
+export async function generateVoucherTestCode(user: CurrentUser, id: string) {
+  const voucher = await getVoucher(id);
+  await assertVoucherOwnerOrAdmin(user, voucher);
+
+  if (voucher.approval_status !== "approved" || voucher.status !== "active") {
+    throw new HttpError(400, "Voucher phải được duyệt và đang bán để tạo mã thử", "VOUCHER_NOT_TESTABLE");
+  }
+
+  if (Number(voucher.remaining_quantity) <= 0) {
+    throw new HttpError(400, "Voucher đã hết số lượng phát hành", "VOUCHER_NOT_TESTABLE");
+  }
+
+  // Dọn các mã thử đã hết hạn của voucher này (record test không ảnh hưởng số lượng bán).
+  await prisma.issuedVoucher.deleteMany({
+    where: { is_test: true, voucher_product_id: id, expired_date: { lt: new Date() } },
+  });
+
+  const testCode = generateVoucherCode();
+  const issuedDate = new Date();
+  const expiredDate = new Date(issuedDate);
+  expiredDate.setDate(expiredDate.getDate() + Number(voucher.validity_days || 0));
+
+  await prisma.issuedVoucher.create({
+    data: {
+      voucher_code: testCode,
+      qr_code_payload: testCode,
+      voucher_product_id: id,
+      issued_date: issuedDate,
+      expired_date: expiredDate,
+      status: "active",
+      is_test: true,
+    },
+  });
+
+  return { test_code: testCode, qr_code_payload: testCode, voucher: withWorkflow(voucher) };
 }
 
 export async function listVoucherImages(id: string) {

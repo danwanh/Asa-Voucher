@@ -1,6 +1,6 @@
 import { Router } from "express";
 import type { NextFunction, Request, Response } from "express";
-import { approveVoucherProduct, createVoucherBranch, createVoucherImage, createVoucherProduct, deleteVoucherBranch, deleteVoucherImage, deleteVoucherProduct, getPublicVoucherDetail, getVoucherProduct, listVoucherBranches, listVoucherImages, listVoucherProducts, submitVoucherProduct, updateVoucherImage, updateVoucherProduct, updateVoucherStatus } from "../controllers/voucher-product.controller.js";
+import { approveVoucherProduct, createVoucherBranch, createVoucherImage, createVoucherProduct, deleteVoucherBranch, deleteVoucherImage, deleteVoucherProduct, generateVoucherTestCode, getPublicVoucherDetail, getVoucherProduct, listVoucherBranches, listVoucherImages, listVoucherProducts, submitVoucherProduct, updateVoucherImage, updateVoucherProduct, updateVoucherStatus } from "../controllers/voucher-product.controller.js";
 import { optionalAuth, requireAuth } from "../middlewares/auth.js";
 import { requireRole } from "../middlewares/require-role.js";
 import { validateBody, validateParams, validateQuery } from "../middlewares/validate.js";
@@ -40,6 +40,7 @@ voucherRoutes.delete("/voucher-products/:id", requireAuth, validateParams(idPara
 voucherRoutes.patch("/voucher-products/:id/submit", requireAuth, requireRole("partner_owner", "partner_voucher_staff"), validateParams(idParamSchema), asyncHandler(submitVoucherProduct));
 voucherRoutes.patch("/voucher-products/:id/approval", requireAuth, requireRole("admin_content"), validateParams(idParamSchema), validateBody(approvalSchema), asyncHandler(approveVoucherProduct));
 voucherRoutes.patch("/voucher-products/:id/status", requireAuth, validateParams(idParamSchema), validateBody(voucherStatusSchema), asyncHandler(updateVoucherStatus));
+voucherRoutes.post("/voucher-products/:id/test-code", requireAuth, requireRole("partner_owner", "partner_voucher_staff"), validateParams(idParamSchema), asyncHandler(generateVoucherTestCode));
 voucherRoutes.get("/voucher-products/:id/images", validateParams(idParamSchema), asyncHandler(listVoucherImages));
 voucherRoutes.post("/voucher-products/:id/images", requireAuth, requireRole("partner_owner", "partner_voucher_staff"), validateParams(idParamSchema), validateBody(createVoucherImageSchema), asyncHandler(createVoucherImage));
 voucherRoutes.patch("/voucher-product-images/:imageId", requireAuth, requireRole("partner_owner", "partner_voucher_staff"), validateParams(imageIdParamSchema), validateBody(updateVoucherImageSchema), asyncHandler(updateVoucherImage));
