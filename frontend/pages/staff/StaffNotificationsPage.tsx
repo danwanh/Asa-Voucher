@@ -1,39 +1,68 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Bell, CheckCheck, QrCode, AlertCircle, Info } from "lucide-react"
 import { C, fmtDate } from "@/utils/constants"
+import { notificationService, type AppNotification } from "@/services/notificationService"
+import { LoadingSpinner } from "@/components/LoadingState"
 
-interface Notification {
-  id: string
-  type: "verify" | "system" | "alert"
-  title: string
-  body: string
-  time: string
-  read: boolean
-}
-
-const MOCK_NOTIFS: Notification[] = [
-  { id: "n1", type: "verify", title: "Voucher đã xác nhận", body: "Bạn đã xác nhận voucher ASA-PH-7F3K2 cho khách Nguyễn Thị Mai", time: "2026-07-09T09:30:00", read: false },
-  { id: "n2", type: "alert", title: "Voucher không hợp lệ", body: "Mã ASA-XX-INVALID không tồn tại trong hệ thống", time: "2026-07-09T08:15:00", read: false },
-  { id: "n3", type: "system", title: "Cập nhật hệ thống", body: "Hệ thống sẽ bảo trì lúc 02:00 ngày 10/07/2026", time: "2026-07-08T18:00:00", read: true },
-  { id: "n4", type: "verify", title: "Voucher đã xác nhận", body: "Bạn đã xác nhận voucher ASA-CG-8H5N1 cho khách Trần Văn B", time: "2026-07-08T14:20:00", read: true },
-  { id: "n5", type: "system", title: "Đăng nhập mới", body: "Phiên đăng nhập mới từ thiết bị iPhone 14", time: "2026-07-07T10:00:00", read: true },
-]
-
-const TYPE_CONFIG = {
-  verify: { icon: <QrCode className="w-4 h-4" />, color: "#E8F5EE", text: "#2D7A52" },
-  alert: { icon: <AlertCircle className="w-4 h-4" />, color: "#FCEAEA", text: "#C0392B" },
-  system: { icon: <Info className="w-4 h-4" />, color: "#EEF2FF", text: "#4338CA" },
+function typeConfig(type: string) {
+  if (type === "verify") return { icon: <QrCode className="w-4 h-4" />, color: "#E8F5EE", text: "#2D7A52" }
+  if (type === "verify_failed") return { icon: <AlertCircle className="w-4 h-4" />, color: "#FCEAEA", text: "#C0392B" }
+  return { icon: <Info className="w-4 h-4" />, color: "#EEF2FF", text: "#4338CA" }
 }
 
 export function StaffNotificationsPage() {
-  const [notifs, setNotifs] = useState(MOCK_NOTIFS)
+  const [notifs, setNotifs] = useState<AppNotification[]>([])
+  const [unreadCount, setUnreadCount] = useState(0)
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [tab, setTab] = useState<"all" | "unread">("all")
 
-  const markAllRead = () => setNotifs((n) => n.map((x) => ({ ...x, read: true })))
-  const markRead = (id: string) => setNotifs((n) => n.map((x) => x.id === id ? { ...x, read: true } : x))
-  const unreadCount = notifs.filter((n) => !n.read).length
+  useEffect(() => {
+    let isMounted = true
 
-  const shown = tab === "unread" ? notifs.filter((n) => !n.read) : notifs
+    async function load() {
+      setIsLoading(true)
+      setLoadError(null)
+      try {
+        const page = await notificationService.list()
+        if (!isMounted) return
+        setNotifs(page.rows)
+        setUnreadCount(page.unread_count)
+      } catch {
+        if (!isMounted) return
+        setLoadError("Không thể tải thông báo.")
+      } finally {
+        if (isMounted) setIsLoading(false)
+      }
+    }
+
+    load()
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  const markAllRead = async () => {
+    try {
+      await notificationService.markAllRead()
+      setNotifs((n) => n.map((x) => ({ ...x, is_read: true })))
+      setUnreadCount(0)
+    } catch {
+      // Keep current state if the request fails.
+    }
+  }
+
+  const markRead = async (id: string) => {
+    try {
+      await notificationService.markRead(id)
+      setNotifs((n) => n.map((x) => x.id === id ? { ...x, is_read: true } : x))
+      setUnreadCount((c) => Math.max(0, c - 1))
+    } catch {
+      // Keep current state if the request fails.
+    }
+  }
+
+  const shown = tab === "unread" ? notifs.filter((n) => !n.is_read) : notifs
 
   return (
     <div className="max-w-2xl mx-auto p-6">
@@ -50,6 +79,16 @@ export function StaffNotificationsPage() {
           </button>
         )}
       </div>
+
+      {isLoading && (
+        <div className="mb-4 flex items-center gap-2 rounded-2xl bg-white p-4 text-sm font-semibold shadow-sm" style={{ color: C.indigo }} role="status" aria-live="polite">
+          <LoadingSpinner size="sm" />
+          Đang tải thông báo...
+        </div>
+      )}
+      {loadError && !isLoading && (
+        <div className="mb-4 rounded-2xl bg-red-50 p-4 text-sm font-semibold text-red-600">{loadError}</div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-2 mb-4">
@@ -77,13 +116,13 @@ export function StaffNotificationsPage() {
       ) : (
         <div className="space-y-2">
           {shown.map((n) => {
-            const cfg = TYPE_CONFIG[n.type]
+            const cfg = typeConfig(n.type)
             return (
               <button
                 key={n.id}
                 onClick={() => markRead(n.id)}
                 className="w-full flex items-start gap-4 p-4 rounded-2xl text-left transition-all hover:shadow-sm"
-                style={{ backgroundColor: n.read ? "white" : "#FFFBF0", border: `1px solid ${n.read ? "#F3F4F6" : "#F2CC8F40"}` }}
+                style={{ backgroundColor: n.is_read ? "white" : "#FFFBF0", border: `1px solid ${n.is_read ? "#F3F4F6" : "#F2CC8F40"}` }}
               >
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: cfg.color }}>
                   <span style={{ color: cfg.text }}>{cfg.icon}</span>
@@ -91,10 +130,10 @@ export function StaffNotificationsPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2">
                     <span className="font-bold text-sm" style={{ color: C.indigo }}>{n.title}</span>
-                    {!n.read && <div className="w-2 h-2 rounded-full flex-shrink-0 mt-1.5" style={{ backgroundColor: C.apricot }} />}
+                    {!n.is_read && <div className="w-2 h-2 rounded-full flex-shrink-0 mt-1.5" style={{ backgroundColor: C.apricot }} />}
                   </div>
-                  <p className="text-xs mt-0.5 line-clamp-2" style={{ color: "#4B5563" }}>{n.body}</p>
-                  <p className="text-xs mt-1.5" style={{ color: "#9CA3AF" }}>{fmtDate(n.time)}</p>
+                  <p className="text-xs mt-0.5 line-clamp-2" style={{ color: "#4B5563" }}>{n.content}</p>
+                  <p className="text-xs mt-1.5" style={{ color: "#9CA3AF" }}>{fmtDate(n.created_at)}</p>
                 </div>
               </button>
             )

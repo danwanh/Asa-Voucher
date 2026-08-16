@@ -32,7 +32,24 @@ export async function listUsages(
   const take = filter.limit;
 
   const [rows, total] = await Promise.all([
-    prisma.voucherUsage.findMany({ where, orderBy: { used_at: "desc" }, skip, take }),
+    prisma.voucherUsage.findMany({
+      where,
+      orderBy: { used_at: "desc" },
+      skip,
+      take,
+      include: {
+        issued_vouchers: {
+          select: {
+            id: true,
+            voucher_code: true,
+            owners: { select: { full_name: true } },
+            voucher_products: { select: { name: true } },
+          },
+        },
+        redeemer: { select: { full_name: true } },
+        partner_branches: { select: { branch_name: true } },
+      },
+    }),
     prisma.voucherUsage.count({ where }),
   ]);
 

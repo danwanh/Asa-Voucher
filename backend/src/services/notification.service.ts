@@ -3,7 +3,7 @@ import nodemailer from "nodemailer";
 
 // ─── In-app Notification (Complaint) ────────────────────────────────────────
 
-type NotificationType = "complaint_resolved" | "complaint_assigned" | "complaint_request_info" | "refund_completed" | "reissue_completed" | "partner_penalized";
+type NotificationType = "complaint_resolved" | "complaint_assigned" | "complaint_request_info" | "refund_completed" | "reissue_completed" | "partner_penalized" | "verify" | "verify_failed";
 
 interface CreateNotificationInput {
   userId: string;
@@ -24,6 +24,37 @@ export async function createNotification(input: CreateNotificationInput) {
       ref_type: input.refType ?? null,
       ref_id: input.refId ?? null,
     },
+  });
+}
+
+export async function listNotifications(userId: string, opts: { page: number; limit: number }) {
+  const skip = (opts.page - 1) * opts.limit;
+
+  const [rows, total, unread_count] = await Promise.all([
+    prisma.notification.findMany({
+      where: { user_id: userId },
+      orderBy: { created_at: "desc" },
+      skip,
+      take: opts.limit,
+    }),
+    prisma.notification.count({ where: { user_id: userId } }),
+    prisma.notification.count({ where: { user_id: userId, is_read: false } }),
+  ]);
+
+  return { rows, total, unread_count };
+}
+
+export async function markAllNotificationsRead(userId: string) {
+  return prisma.notification.updateMany({
+    where: { user_id: userId, is_read: false },
+    data: { is_read: true },
+  });
+}
+
+export async function markNotificationRead(userId: string, notificationId: string) {
+  return prisma.notification.updateMany({
+    where: { id: notificationId, user_id: userId },
+    data: { is_read: true },
   });
 }
 

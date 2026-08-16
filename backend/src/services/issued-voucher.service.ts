@@ -3,6 +3,7 @@ import { HttpError } from "../utils/http-error.js";
 import { buildPaginatedResult } from "../utils/pagination.js";
 import * as issuedVoucherRepo from "../repositories/issued-voucher.repository.js";
 import * as voucherUsageRepo from "../repositories/voucher-usage.repository.js";
+import { createNotification } from "./notification.service.js";
 import { isAdminRole, isPartnerStaff, type AuthUser } from "../types/auth.types.js";
 import type { IssuedVoucherStatus } from "../types/issued-voucher.types.js";
 import type { ListIssuedVouchersQuery } from "../validations/issued-voucher.validation.js";
@@ -104,7 +105,42 @@ export async function listUsages(
   };
 
   const { rows, total } = await voucherUsageRepo.listUsages(filter);
-  return buildPaginatedResult(rows, total, query);
+
+  const items = (rows as unknown as Array<Record<string, unknown>>).map((row) => {
+    const issued = (row.issued_vouchers ?? {}) as {
+      voucher_code?: string;
+      owners?: { full_name?: string } | null;
+      voucher_products?: { name?: string } | null;
+    };
+    const redeemer = (row.redeemer ?? {}) as { full_name?: string } | null;
+    const branch = (row.partner_branches ?? {}) as { branch_name?: string } | null;
+
+    return {
+      id: String(row.id),
+      voucherCode: issued.voucher_code ?? "",
+      voucherTitle: issued.voucher_products?.name ?? "Voucher",
+      customerName: issued.owners?.full_name ?? "",
+      branchName: branch?.branch_name ?? "",
+      staffName: redeemer?.full_name ?? user.name,
+      verifiedAt: row.used_at,
+      status: "used",
+    };
+  });
+
+  return buildPaginatedResult(items, total, query);
+}
+
+async function notifyCheckFailure(user: AuthUser, title: string, content: string) {
+  try {
+    await createNotification({
+      userId: user.id,
+      type: "verify_failed",
+      title,
+      content,
+    });
+  } catch {
+    // Notification failure should not break the voucher check flow.
+  }
 }
 
 export async function checkVoucher(user: AuthUser, input: CheckVoucherInput) {
@@ -119,6 +155,8 @@ export async function checkVoucher(user: AuthUser, input: CheckVoucherInput) {
       : null;
 
   if (!voucher) {
+    const code = input.voucher_code ?? input.qr_code_payload ?? "";
+    await notifyCheckFailure(user, "Voucher không hợp lệ", `Mã ${code} không tồn tại trong hệ thống`);
     throw new HttpError(404, "Mã voucher không hợp lệ");
   }
 
@@ -126,6 +164,7 @@ export async function checkVoucher(user: AuthUser, input: CheckVoucherInput) {
 
   const state = resolveRedeemableState(voucher);
   if (!state.redeemable) {
+    await notifyCheckFailure(user, "Voucher không hợp lệ", `Voucher ${voucher.voucher_code}: ${state.reason}`);
     throw new HttpError(400, state.reason!);
   }
 
@@ -151,6 +190,7 @@ export async function confirmVoucher(user: AuthUser, input: ConfirmVoucherInput)
   const voucher = await issuedVoucherRepo.findIssuedVoucherByCode(input.voucher_code);
 
   if (!voucher) {
+    await notifyCheckFailure(user, "Voucher không hợp lệ", `Mã ${input.voucher_code} không tồn tại trong hệ thống`);
     throw new HttpError(404, "Mã voucher không hợp lệ");
   }
 
@@ -163,12 +203,13 @@ export async function confirmVoucher(user: AuthUser, input: ConfirmVoucherInput)
     throw new HttpError(403, "Bạn chỉ được xác nhận sử dụng voucher tại chi nhánh của mình");
   }
 
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const reVoucher = await tx.issuedVoucher.findUnique({
       where: { id: voucher.id },
     });
 
     if (!reVoucher || reVoucher.status !== "active") {
+      await notifyCheckFailure(user, "Voucher không hợp lệ", `Voucher ${voucher.voucher_code} đã được sử dụng hoặc không còn hợp lệ`);
       throw new HttpError(400, "Voucher đã được sử dụng hoặc không còn hợp lệ");
     }
 
@@ -211,4 +252,16 @@ export async function confirmVoucher(user: AuthUser, input: ConfirmVoucherInput)
 
     return { message: "Xác nhận sử dụng voucher thành công", issued_voucher: updatedVoucher, usage };
   });
+
+  const customerName = voucher.owners?.full_name ?? "";
+  await createNotification({
+    userId: user.id,
+    type: "verify",
+    title: "Voucher đã xác nhận",
+    content: `Bạn đã xác nhận voucher ${voucher.voucher_code} cho khách ${customerName || "khách hàng"}`,
+    refType: "issued_voucher",
+    refId: voucher.id,
+  }).catch(() => undefined);
+
+  return result;
 }

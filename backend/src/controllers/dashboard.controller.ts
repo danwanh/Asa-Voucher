@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
-import { getDashboardStats, getContentDashboardStats } from "../services/dashboard.service.js";
+import { getDashboardStats, getContentDashboardStats, getStaffDashboardStats } from "../services/dashboard.service.js";
 import { contentDashboardQuerySchema } from "../validations/dashboard.validation.js";
+import { HttpError } from "../utils/http-error.js";
 
 /**
  * Dashboard cho admin_operations (gốc):
@@ -27,6 +28,25 @@ export const getDashboard = async (
     data,
   });
 };
+
+/**
+ * Dashboard cho partner_store_staff (FC-PAS):
+ * - Thống kê voucher kiểm tra/xác nhận/không hợp lệ và lượt khách hôm nay
+ * - Danh sách xác nhận gần đây trong chi nhánh
+ */
+export async function getStaffDashboard(
+  req: Request,
+  res: Response
+): Promise<void> {
+  if (!req.user) throw new HttpError(401, "Authentication required");
+
+  const data = await getStaffDashboardStats(req.user);
+
+  res.json({
+    success: true,
+    data,
+  });
+}
 
 /**
  * Dashboard cho admin_content (FC-ADC-DASHBOARD):

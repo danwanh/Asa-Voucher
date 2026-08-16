@@ -1,5 +1,6 @@
-import { date } from "zod/v4"
 import { prisma } from "../config/prisma.js"
+import { HttpError } from "../utils/http-error.js"
+import type { AuthUser } from "../types/auth.types.js"
 
 interface DashboardFilter {
   from?: Date
@@ -220,5 +221,66 @@ export async function getContentDashboardStats(filter: {from?: Date, to?: Date} 
   return {
     vouchers: { pending, approved, rejected},
     contents: {banners, articles, popups, policies, categories},
+  };
+}
+
+// Dashboard cho partner_store_staff (FC-PAS):
+// - Số voucher kiểm tra / xác nhận / không hợp lệ / lượt khách hôm nay
+// - Danh sách xác nhận gần đây trong phạm vi chi nhánh
+export async function getStaffDashboardStats(user: AuthUser) {
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+
+  const branchId = user.branchId;
+
+  if (!branchId) {
+    throw new HttpError(403, "Tài khoản nhân viên chưa được gán chi nhánh");
+  }
+
+  const [usagesToday, invalidToday, recentUsagesRaw, customersRaw] = await Promise.all([
+    prisma.voucherUsage.count({
+      where: { branch_id: branchId, used_at: { gte: todayStart } },
+    }),
+    prisma.notification.count({
+      where: { user_id: user.id, type: "verify_failed", created_at: { gte: todayStart } },
+    }),
+    prisma.voucherUsage.findMany({
+      where: { branch_id: branchId },
+      orderBy: { used_at: "desc" },
+      take: 5,
+      include: {
+        issued_vouchers: {
+          select: {
+            voucher_code: true,
+            owners: { select: { full_name: true } },
+            voucher_products: { select: { name: true } },
+          },
+        },
+      },
+    }),
+    prisma.voucherUsage.findMany({
+      where: { branch_id: branchId, used_at: { gte: todayStart } },
+      select: { issued_vouchers: { select: { owner_id: true } } },
+    }),
+  ]);
+
+  const customersToday = new Set(
+    customersRaw.map((c) => c.issued_vouchers?.owner_id).filter(Boolean)
+  ).size;
+
+  const recentVerifications = recentUsagesRaw.map((usage) => ({
+    code: usage.issued_vouchers?.voucher_code ?? "",
+    name: usage.issued_vouchers?.voucher_products?.name ?? "Voucher",
+    customer: usage.issued_vouchers?.owners?.full_name ?? "",
+    time: usage.used_at,
+    status: "used",
+  }));
+
+  return {
+    checked_today: usagesToday + invalidToday,
+    confirmed_today: usagesToday,
+    invalid_today: invalidToday,
+    customers_today: customersToday,
+    recent_verifications: recentVerifications,
   };
 }
