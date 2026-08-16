@@ -106,13 +106,13 @@ export function SubAdminLayout({ user, role, page, navItems, onNavigate, onLogou
 
       {/* Footer actions */}
       <div className="p-3 border-t space-y-1" style={{ borderColor: "rgba(255,255,255,0.07)" }}>
-        <button
+        {/* <button
           onClick={onSwitchRole}
           className="flex items-center gap-2 w-full px-3 py-2.5 rounded-xl text-sm font-semibold hover:bg-white/10 transition-colors"
           style={{ color: "rgba(255,255,255,0.55)" }}
         >
           <ArrowLeft className="w-4 h-4" /> Đổi vai trò
-        </button>
+        </button> */}
         <button
           onClick={onLogout}
           className="flex items-center gap-2 w-full px-3 py-2.5 rounded-xl text-sm font-semibold hover:bg-white/10 transition-colors"

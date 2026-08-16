@@ -469,9 +469,9 @@ export const voucherService = {
 
   async listPendingVouchers(): Promise<BackendVoucherProduct[]> {
     const res = await api.get<ApiEnvelope<BackendVoucherList>>("/voucher-products", {
-      params: { page: 1, limit: 30 }
+      params: { approval_status: "pending", page: 1, limit: 30 }
     })
-    return extractData(res).items.filter((item) => item.workflow_status === "pending_approval")
+    return extractData(res).items
   },
 
   async approveVoucher(voucherId: string) {

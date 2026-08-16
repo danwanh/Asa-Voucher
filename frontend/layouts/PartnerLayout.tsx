@@ -111,7 +111,7 @@ function SidebarContent({ user, partner, page, onNavigate, onLogout, onClose }: 
           style={{ color: "rgba(244,241,222,0.6)" }}
         >
           <LogOut className="w-4 h-4" />
-          <span>{user.name}</span>
+          <span>Đăng xuất</span>
         </button>
       </div>
     </div>

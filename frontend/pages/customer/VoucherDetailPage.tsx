@@ -207,7 +207,7 @@ export function VoucherDetailPage({ voucher: v, detail, onBuy, onBuyNow, onBack,
             </div>
           ) : (
             <div className="w-full py-4 rounded-2xl font-bold text-center" style={{ backgroundColor: C.muted, color: "#8A8DA8" }}>
-              Voucher không khả dụng
+              Voucher không mua được
             </div>
           )}
         </div>

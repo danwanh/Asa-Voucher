@@ -19,7 +19,19 @@ function requireAuthForMineScope(req: Request, res: Response, next: NextFunction
   next();
 }
 
-voucherRoutes.get("/voucher-products", validateQuery(voucherProductQuerySchema), requireAuthForMineScope, asyncHandler(listVoucherProducts));
+function requireAdminForApprovalStatus(req: Request, res: Response, next: NextFunction) {
+  if (req.query.approval_status) {
+    void requireAuth(req, res, (authError) => {
+      if (authError) return next(authError);
+      requireRole("admin_content")(req, res, next);
+    });
+    return;
+  }
+
+  next();
+}
+
+voucherRoutes.get("/voucher-products", validateQuery(voucherProductQuerySchema), requireAuthForMineScope, requireAdminForApprovalStatus, asyncHandler(listVoucherProducts));
 voucherRoutes.post("/voucher-products", requireAuth, requireRole("partner_owner", "partner_voucher_staff"), validateBody(createVoucherProductSchema), asyncHandler(createVoucherProduct));
 voucherRoutes.get("/voucher-products/:id/detail", validateParams(idParamSchema), asyncHandler(getPublicVoucherDetail));
 voucherRoutes.get("/voucher-products/:id", optionalAuth, validateParams(idParamSchema), asyncHandler(getVoucherProduct));

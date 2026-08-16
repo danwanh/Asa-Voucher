@@ -12,6 +12,8 @@ export function VoucherApprovalPage() {
   const [error, setError] = useState<string | null>(null)
   const [toast, setToast] = useState<{ type: "success" | "error"; msg: string } | null>(null)
 
+  const today = new Date().toISOString().slice(0, 10)
+
   const [selectedVoucher, setSelectedVoucher] = useState<BackendVoucherProduct | null>(null)
   const [showRejectModal, setShowRejectModal] = useState<BackendVoucherProduct | null>(null)
   const [rejectReason, setRejectReason] = useState("")
@@ -117,7 +119,9 @@ export function VoucherApprovalPage() {
       {/* Voucher list */}
       {!isLoading && !error && vouchers.length > 0 && (
         <div className="space-y-4">
-          {vouchers.map((v) => (
+          {vouchers.map((v) => {
+            const saleEndExpired = String(v.sale_end_date).slice(0, 10) < today
+            return (
             <div key={v.id} className="bg-white rounded-2xl p-5 shadow-sm border border-black/5 flex gap-5">
               <img
                 src={v.thumbnail_url || FALLBACK}
@@ -157,21 +161,27 @@ export function VoucherApprovalPage() {
 
                 <div className="flex items-center gap-4 mt-2 text-xs" style={{ color: "#9CA3AF" }}>
                   <span>Bán: {fmtDate(v.sale_start_date)} → {fmtDate(v.sale_end_date)}</span>
-                  <span>Sử dụng: {v.validity_days} ngày</span>
+                  <span>Sử dụng: {v.validity_days ?? "—"} ngày</span>
                 </div>
 
                 <p className="text-xs mt-2 line-clamp-1" style={{ color: "#8A8DA8" }}>{v.description || "—"}</p>
 
-                <div className="flex gap-3 mt-4">
-                  <button
-                    onClick={() => handleApprove(v.id)}
-                    disabled={isProcessing === v.id}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white disabled:opacity-40"
-                    style={{ backgroundColor: C.teal }}
-                  >
-                    {isProcessing === v.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                    Duyệt
-                  </button>
+                <div className="flex gap-3 mt-4 items-center">
+                  {saleEndExpired ? (
+                    <span className="px-3 py-2 rounded-xl text-sm font-bold" style={{ backgroundColor: "#F0EDF8", color: "#6B46C1" }}>
+                      Hết thời gian bán
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => handleApprove(v.id)}
+                      disabled={isProcessing === v.id}
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white disabled:opacity-40"
+                      style={{ backgroundColor: C.teal }}
+                    >
+                      {isProcessing === v.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                      Duyệt
+                    </button>
+                  )}
                   <button
                     onClick={() => { setShowRejectModal(v); setRejectReason("") }}
                     disabled={isProcessing === v.id}
@@ -190,7 +200,8 @@ export function VoucherApprovalPage() {
                 </div>
               </div>
             </div>
-          ))}
+            )
+          })}
         </div>
       )}
 

@@ -26,6 +26,11 @@ export function VoucherCard({ voucher: v, onAddToCart, onBuyNow, onClick }: Prop
   const discountLabel =
     v.discountType === "percent" ? `Giảm ${v.discount}%` : `Giảm ${fmt(v.discount)}`
 
+  const today = new Date().toISOString().slice(0, 10)
+  const startsAt = v.validFrom.slice(0, 10)
+  const daysUntilSale = Math.ceil((new Date(startsAt).getTime() - new Date(today).getTime()) / 86400000)
+  const isUpcoming = v.status === "active" && startsAt > today
+
   return (
     <div
       className="bg-card rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-200 cursor-pointer group"
@@ -42,6 +47,11 @@ export function VoucherCard({ voucher: v, onAddToCart, onBuyNow, onClick }: Prop
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
         <AppIcon name={CAT_ICON[v.category] ?? "tag"} className="absolute top-3 left-3 w-5 h-5 text-white" />
+        {isUpcoming && (
+          <div className="absolute top-3 right-3 px-2 py-1 rounded-lg text-[11px] font-bold" style={{ backgroundColor: C.indigo, color: "white" }}>
+            Sắp bán trong {daysUntilSale} ngày
+          </div>
+        )}
         {v.status !== "active" && (
           <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
             <StatusBadge status={v.status} />
@@ -87,6 +97,12 @@ export function VoucherCard({ voucher: v, onAddToCart, onBuyNow, onClick }: Prop
             </span>
           </div>
         </div>
+
+        {isUpcoming && (
+          <div className="rounded-xl px-3 py-2 text-center text-xs font-bold" style={{ backgroundColor: C.apricot + "30", color: "#6B4F00" }}>
+            Sắp được bán trong {daysUntilSale} ngày
+          </div>
+        )}
 
         {isAvailable && (
           <div className="grid grid-cols-2 gap-2">

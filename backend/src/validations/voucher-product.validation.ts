@@ -6,6 +6,7 @@ export const voucherProductQuerySchema = z.object({
   area: z.string().trim().min(1).optional(),
   search: z.string().trim().optional(),
   scope: z.enum(["mine"]).optional(),
+  approval_status: z.enum(["pending"]).optional(),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20)
 });

@@ -105,6 +105,25 @@ describe("Voucher Product Service", () => {
       expect(result.items).toHaveLength(1);
     });
 
+    it("includes approved+active vouchers that are not yet on sale", async () => {
+      mockPrisma.$transaction.mockResolvedValue([[makeVoucher({ sale_start_date: "2099-01-01" })], 1]);
+
+      const result = await voucherProductService.listVoucherProducts(undefined, { page: 1, limit: 20 });
+
+      expect(result.items).toHaveLength(1);
+      expect(prisma.voucherProduct.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            approval_status: "approved",
+            status: "active",
+            remaining_quantity: { gt: 0 },
+          }),
+        })
+      );
+      const where = vi.mocked(prisma.voucherProduct.findMany).mock.calls[0][0].where as Record<string, unknown>;
+      expect(where.sale_start_date).toBeUndefined();
+    });
+
     it("resolves mine scope partner from voucher staff branch", async () => {
       vi.mocked(prisma.partnerBranch.findUnique).mockResolvedValue({ partner_id: "p1" } as any);
       mockPrisma.$transaction.mockResolvedValue([[makeVoucher({ status: "draft", approval_status: "pending" })], 1]);
@@ -115,6 +134,21 @@ describe("Voucher Product Service", () => {
       expect(prisma.partnerBranch.findUnique).toHaveBeenCalledWith({ where: { id: "b1" }, select: { partner_id: true } });
       expect(prisma.voucherProduct.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: expect.objectContaining({ partner_id: "p1" }) })
+      );
+    });
+
+    it("returns only pending approval vouchers for approval_status=pending", async () => {
+      mockPrisma.$transaction.mockResolvedValue([[makeVoucher({ status: "draft", approval_status: "pending", submitted_at: new Date() })], 1]);
+
+      const result = await voucherProductService.listVoucherProducts(ADMIN_CONTENT, { page: 1, limit: 20, approval_status: "pending" });
+
+      expect(result.items).toHaveLength(1);
+      expect(prisma.voucherProduct.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            approval_status: "pending",
+          }),
+        })
       );
     });
 
@@ -336,15 +370,21 @@ describe("Voucher Product Service", () => {
       mockPrisma.voucherProduct.findUnique.mockResolvedValue(
         makeVoucher({ approval_status: "pending" }) as any
       );
+      const update = vi.fn().mockResolvedValue(makeVoucher({ approval_status: "approved", status: "active" }));
       mockPrisma.$transaction.mockImplementation(async (fn: (tx: never) => Promise<unknown>) => {
         return fn({
-          voucherProduct: { update: vi.fn().mockResolvedValue(makeVoucher({ approval_status: "approved" })) },
+          voucherProduct: { update },
           adminLog: { create: vi.fn() },
         } as never);
       });
 
       const result = await voucherProductService.approveVoucherProduct("u-admin", "vp1", { approval_status: "approved" });
       expect(result.approval_status).toBe("approved");
+      expect(update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ approval_status: "approved", status: "active" }),
+        })
+      );
     });
   });
 

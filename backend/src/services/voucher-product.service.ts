@@ -241,11 +241,13 @@ function withWorkflow<T extends Record<string, unknown>>(voucher: T) {
 }
 
 export async function listVoucherProducts(user: CurrentUser | undefined, queryInput: Record<string, string | number>) {
-  const { page, limit, category_id: categoryId, partner_id: partnerId, search, scope, area } = queryInput;
+  const { page, limit, category_id: categoryId, partner_id: partnerId, search, scope, approval_status: approvalStatus, area } = queryInput;
   const { from, to } = rangeFromPagination(Number(page), Number(limit));
 
   const where: Record<string, unknown> = {};
-  if (scope === "mine") {
+  if (approvalStatus === "pending") {
+    where.approval_status = "pending";
+  } else if (scope === "mine") {
     assertVoucherManager(user);
     where.partner_id = await getRequiredCurrentPartnerId(user);
   } else {
@@ -253,7 +255,6 @@ export async function listVoucherProducts(user: CurrentUser | undefined, queryIn
     Object.assign(where, {
       approval_status: "approved",
       status: "active",
-      sale_start_date: { lte: today },
       sale_end_date: { gte: today },
       remaining_quantity: { gt: 0 }
     });
@@ -298,6 +299,7 @@ export async function listVoucherProducts(user: CurrentUser | undefined, queryIn
         remaining_quantity: true,
         sale_start_date: true,
         sale_end_date: true,
+        validity_days: true,
         status: true,
         approval_status: true,
         submitted_at: true,
@@ -606,6 +608,7 @@ export async function approveVoucherProduct(adminId: string, id: string, input: 
       where: { id },
       data: {
         approval_status: input.approval_status,
+        ...(input.approval_status === "approved" ? { status: "active" } : {}),
         approved_by: adminId,
         approved_at: new Date(),
         updated_at: new Date(),
