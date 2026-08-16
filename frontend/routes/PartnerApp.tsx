@@ -74,7 +74,10 @@ export function PartnerApp({ user, onLogout, initialPage }: Props) {
     }
   }, [user.partnerId])
 
-  const goEdit = (v: Voucher) => { setSelectedVoucher(v); setPage("edit") }
+  const goEdit = (v: Voucher) => {
+    setSelectedVoucher(v)
+    setPage(v.status === "rejected" ? "voucher-detail" : "edit")
+  }
   const goDetail = (v: Voucher) => { setSelectedVoucher(v); setPage("voucher-detail") }
 
   const handleSaveDraft = (draft: Voucher) => {

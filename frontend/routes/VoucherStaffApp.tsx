@@ -46,7 +46,10 @@ export function VoucherStaffApp({ user, onLogout, initialPage }: Props) {
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null)
   const [mobileOpen, setMobileOpen] = useState(false)
 
-  const goEdit   = (v: Voucher) => { setSelectedVoucher(v); setPage("edit") }
+  const goEdit = (v: Voucher) => {
+    setSelectedVoucher(v)
+    setPage(v.status === "rejected" ? "voucher-detail" : "edit")
+  }
   const goDetail = (v: Voucher) => { setSelectedVoucher(v); setPage("voucher-detail") }
 
   const ACCENT = "#81B29A"
