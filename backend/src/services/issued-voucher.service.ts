@@ -17,6 +17,10 @@ type IssuedVoucherWithProduct = Awaited<
   ReturnType<typeof issuedVoucherRepo.findIssuedVoucherById>
 >;
 
+function dateToIsoDate(value: Date | string) {
+  return value instanceof Date ? value.toISOString().slice(0, 10) : value;
+}
+
 function assertCanViewIssuedVoucher(user: AuthUser, voucher: NonNullable<IssuedVoucherWithProduct>) {
   if (isAdminRole(user.role)) return;
   if (voucher.owner_id === user.id) return;
@@ -39,7 +43,7 @@ function resolveRedeemableState(voucher: NonNullable<IssuedVoucherWithProduct>) 
 
   if (voucher.status === "used") return { redeemable: false, reason: "Voucher đã được sử dụng" };
   if (voucher.status === "refunded") return { redeemable: false, reason: "Voucher đã hoàn tiền" };
-  if (voucher.status === "expired" || voucher.expired_date < today) {
+  if (voucher.status === "expired" || dateToIsoDate(voucher.expired_date) < today) {
     return { redeemable: false, reason: "Voucher đã hết hạn" };
   }
   if (voucher.status !== "active") {
@@ -169,6 +173,11 @@ export async function checkVoucher(user: AuthUser, input: CheckVoucherInput) {
 
   assertPartnerScope(user, voucher);
 
+  const today = new Date().toISOString().slice(0, 10);
+  if (voucher.status === "active" && dateToIsoDate(voucher.expired_date) < today) {
+    await issuedVoucherRepo.updateIssuedVoucherStatus(voucher.id, "expired");
+  }
+
   const state = resolveRedeemableState(voucher);
   if (!state.redeemable) {
     await notifyCheckFailure(user, "Voucher không hợp lệ", `Voucher ${voucher.voucher_code}: ${state.reason}`);
@@ -214,6 +223,13 @@ export async function confirmVoucher(user: AuthUser, input: ConfirmVoucherInput)
   }
 
   assertPartnerScope(user, voucher);
+
+  const today = new Date().toISOString().slice(0, 10);
+  if (voucher.status === "active" && dateToIsoDate(voucher.expired_date) < today) {
+    await issuedVoucherRepo.updateIssuedVoucherStatus(voucher.id, "expired");
+    await notifyCheckFailure(user, "Voucher không hợp lệ", `Voucher ${voucher.voucher_code}: Voucher đã hết hạn`);
+    throw new HttpError(400, "Voucher đã hết hạn");
+  }
 
   const eligibleBranchIds = await issuedVoucherRepo.findEligibleBranchIds(voucher.voucher_product_id);
   const userBranchId = user.branchId;
@@ -283,4 +299,10 @@ const remainingVouchers = await tx.issuedVoucher.count({
   }).catch(() => undefined);
 
   return result;
+}
+
+export async function expireIssuedVouchers(now = new Date()) {
+  const today = new Date(now.toISOString().slice(0, 10) + "T00:00:00.000Z");
+  const { count } = await issuedVoucherRepo.expireExpiredVouchers(today);
+  return count;
 }

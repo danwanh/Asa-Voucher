@@ -10,21 +10,6 @@ import type {
 
 type ApiData<T> = { data: T };
 
-export interface IssuedVoucherResult {
-  issued_voucher: {
-    id: string;
-    voucher_code: string;
-    qr_code_payload: string;
-    status: string;
-    expired_date: string;
-    voucher_products?: { name?: string; thumbnail_url?: string };
-  };
-  redeemable: boolean;
-  reason: string | null;
-  eligible_branch_ids: string[];
-  is_test?: boolean;
-}
-
 function data<T>(response: { data: ApiData<T> }) {
   return response.data.data;
 }
@@ -151,29 +136,6 @@ export const issuedVoucherService = {
   invalidateMine() {
     mineCacheVersion += 1;
     mineCache.clear();
-  },
-
-  async validate(code: string) {
-    let payload: { voucher_code?: string; qr_code_payload?: string } = {
-      voucher_code: code,
-    };
-    try {
-      const url = new URL(code);
-      const voucherCode = url.searchParams.get("code");
-      payload = voucherCode
-        ? { voucher_code: voucherCode }
-        : { qr_code_payload: code };
-    } catch {
-      // Manual input is a voucher code.
-    }
-    const response = await api.post("/issued-vouchers/check", payload);
-    const result = data<Omit<IssuedVoucherResult, "redeemable" | "reason">>(response);
-    return { ...result, redeemable: true, reason: null };
-  },
-
-  async redeem(voucherCode: string) {
-    const response = await api.post("/issued-vouchers/confirm", { voucher_code: voucherCode });
-    return data(response);
   },
 
   async check(codeOrPayload: string) {

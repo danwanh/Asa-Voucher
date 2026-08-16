@@ -4,11 +4,10 @@ import { Home, QrCode, History, User, LogOut, Menu, ChevronRight, Scan, Bell } f
 import { C } from "@/utils/constants"
 import type { AppUser } from "@/types"
 
-export type StaffPage = "dashboard" | "verify" | "qr-scan" | "history" | "profile" | "notifications"
+export type StaffPage = "dashboard" | "qr-scan" | "history" | "profile" | "notifications"
 
 const NAV_ITEMS = [
   { label: "Tổng quan", pg: "dashboard" as StaffPage, icon: <Home className="w-4 h-4" /> },
-  { label: "Kiểm tra Voucher", pg: "verify" as StaffPage, icon: <QrCode className="w-4 h-4" /> },
   { label: "Quét QR Code", pg: "qr-scan" as StaffPage, icon: <Scan className="w-4 h-4" /> },
   { label: "Lịch sử xác nhận", pg: "history" as StaffPage, icon: <History className="w-4 h-4" /> },
   { label: "Thông báo", pg: "notifications" as StaffPage, icon: <Bell className="w-4 h-4" /> },
@@ -98,7 +97,7 @@ export function StaffLayout({ user, page, onNavigate, onLogout, children }: Prop
             <button onClick={() => setMobileOpen(true)} className="md:hidden p-2 rounded-xl hover:bg-muted">
               <Menu className="w-5 h-5" style={{ color: C.indigo }} />
             </button>
-            <h1 className="font-black" style={{ color: C.indigo }}>{currentLabel}</h1>
+            {/* <h1 className="font-black" style={{ color: C.indigo }}>{currentLabel}</h1> */}
           </div>
           <div className="text-sm font-semibold" style={{ color: "#8A8DA8" }}>{user.name}</div>
         </header>

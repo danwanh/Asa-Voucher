@@ -17,8 +17,9 @@ export interface PartnerScopedOrderItemRow {
 
 function dateRangeFilter(column: string, dateFrom?: string, dateTo?: string) {
   const range: Record<string, Date> = {};
-  if (dateFrom) range.gte = new Date(dateFrom);
-  if (dateTo) range.lte = new Date(dateTo);
+  if (dateFrom) range.gte = new Date(`${dateFrom}T00:00:00.000Z`);
+  // Bao gồm trọn ngày cuối (đến 23:59:59) thay vì nửa đêm UTC.
+  if (dateTo) range.lte = new Date(`${dateTo}T23:59:59.999Z`);
   return Object.keys(range).length ? { [column]: range } : {};
 }
 
@@ -150,15 +151,16 @@ export interface VoucherProductWithCategory {
   created_at: Date;
 }
 
-// Lấy danh sách voucher products do user tạo
-// Có lọc bổ sung: category_id và ngày created_at (lấy theo khoảng)
-export async function listVoucherProductsByCreator(userId: string, categoryId?: string, dateFrom?: string, dateTo?: string): Promise<VoucherProductWithCategory[]> {
-  // Build điều kiện filter lọc theo người tạo
+// Lấy danh sách voucher products đã duyệt của partner
+// Có lọc bổ sung: category_id (không lọc theo ngày tạo sản phẩm;
+// khoảng thời gian được áp dụng cho issued_date/order trong các hàm thống kê)
+export async function listVoucherProductsByPartner(partnerId: string, categoryId?: string): Promise<VoucherProductWithCategory[]> {
+  // Build điều kiện filter lọc theo đối tác và trạng thái đã duyệt
   const items = await prisma.voucherProduct.findMany({
     where: {
-      created_by: userId,
+      partner_id: partnerId,
+      approval_status: "approved",
       ...(categoryId ? {category_id: categoryId}: {}),
-      ...dateRangeFilter("created_at", dateFrom, dateTo),
     },
     select: {
       id: true,
@@ -176,7 +178,7 @@ export async function listVoucherProductsByCreator(userId: string, categoryId?: 
   });
 
   // Map kết quả trả về theo VoucherProductWithCategory
-  return items.map((item: any) => ({
+  return items.map((item) => ({
     id: item.id,
     name: item.name,
     partner_id: item.partner_id,
@@ -187,36 +189,45 @@ export async function listVoucherProductsByCreator(userId: string, categoryId?: 
   }));
 }
 
-// Đếm số lượng vouchers đã dùng theo từng voucher_product_id
-export async function countUsedByProducts (voucherProductIds: string[],): Promise<Record<string,number>> {
+// Đếm số lượng vouchers phát hành (tổng) và đã dùng theo từng voucher_product_id,
+// trong khoảng thời gian phát hành (issued_date).
+export async function countIssuedVouchersByProduct(
+  voucherProductIds: string[],
+  dateFrom?: string,
+  dateTo?: string,
+): Promise<Record<string, { total: number; used: number }>> {
   // Kiểm tra nếu không có nhập mã voucher id
   if (!voucherProductIds || voucherProductIds.length === 0) {
     return {};
   }
 
-  // Nếu không rỗng
+  // Nhóm theo voucher_product_id và status trong khoảng issued_date
   const group = await prisma.issuedVoucher.groupBy({
-    by: ["voucher_product_id"],
+    by: ["voucher_product_id", "status"],
     where: {
-      status: "used",
       is_test: false,
-      voucher_product_id: {in: voucherProductIds}
+      voucher_product_id: { in: voucherProductIds },
+      ...dateRangeFilter("issued_date", dateFrom, dateTo),
     },
     _count: true,
   });
 
-  // Viết trả về dùng vòng lặp
-  const counts: Record<string, number> = {};
+  // Tổng hợp: total = mọi status, used = status "used"
+  const counts: Record<string, { total: number; used: number }> = {};
   for (const row of group) {
-    counts[row.voucher_product_id] = row._count;
+    const entry = counts[row.voucher_product_id] ?? { total: 0, used: 0 };
+    entry.total += row._count;
+    if (row.status === "used") entry.used += row._count;
+    counts[row.voucher_product_id] = entry;
   }
 
   return counts;
 }
 
 // Tính tổng doanh thu theo voucher_product_id
-// Tính order_item thuộc có status 'comfirmed' | 'completed'
-export async function sumRevenueProducts(voucherProductIds: string[],): Promise<Record<string, number>> {
+// Chỉ tính order_item thuộc đơn có status 'confirmed' | 'completed'
+// và đơn được tạo trong khoảng thời gian chỉ định.
+export async function sumRevenueProducts(voucherProductIds: string[], dateFrom?: string, dateTo?: string): Promise<Record<string, number>> {
   // Kiểm tra nếu không có voucher nào thỏa để tính
   if (!voucherProductIds || voucherProductIds.length === 0) {
     return {};
@@ -229,6 +240,7 @@ export async function sumRevenueProducts(voucherProductIds: string[],): Promise<
       voucher_product_id: { in: voucherProductIds},
       orders: {
         status: {in: ["confirmed", "completed"]},
+        ...dateRangeFilter("created_at", dateFrom, dateTo),
       },
     },
     _sum: {

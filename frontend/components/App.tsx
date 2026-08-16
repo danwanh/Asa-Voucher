@@ -182,7 +182,7 @@ export default function App({ initialPage, initialOrderId, initialVoucherId, ini
 
   if (user.role === "partner_owner")         return withLogoutDialog(<PartnerApp user={user} onLogout={handleLogout} initialPage={initialPage === "profile" ? initialPage : undefined} />)
   if (user.role === "partner_voucher_staff") return withLogoutDialog(<VoucherStaffApp user={user} onLogout={handleLogout} initialPage={initialPage === "profile" ? initialPage : undefined} />)
-  if (user.role === "partner_store_staff")   return withLogoutDialog(<StaffApp user={user} onLogout={handleLogout} initialPage={initialStaffCode ? "verify" : initialPage === "profile" ? initialPage : undefined} initialCode={initialStaffCode} />)
+  if (user.role === "partner_store_staff")   return withLogoutDialog(<StaffApp user={user} onLogout={handleLogout} initialPage={initialPage === "profile" ? initialPage : undefined} initialCode={initialStaffCode} />)
   if (user.role === "admin_content" || user.role === "admin_operations" || user.role === "admin_security")
     return withLogoutDialog(<AdminApp user={user} onLogout={handleLogout} initialPage={initialPage === "profile" ? initialPage : undefined} />)
   return null

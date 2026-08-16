@@ -41,5 +41,6 @@ export interface StaffVoucherReportItem {
   used_quantity: number;
   usage_rate: number;
   revenue: number;
+  /** Điểm hiệu quả = doanh thu × tỷ lệ sử dụng (%) / 100 (doanh thu hiệu quả). */
   effectiveness_score: number;
 }

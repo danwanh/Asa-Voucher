@@ -8,6 +8,7 @@ vi.mock("../../repositories/issued-voucher.repository.js", () => ({
   findIssuedVoucherByCode: vi.fn(),
   findIssuedVoucherByQrPayload: vi.fn(),
   updateIssuedVoucherStatus: vi.fn(),
+  expireExpiredVouchers: vi.fn(),
   findEligibleBranchIds: vi.fn(),
   findEligibleBranches: vi.fn(),
 }));
@@ -157,13 +158,26 @@ describe("Issued Voucher Service", () => {
       ).rejects.toThrow(HttpError);
     });
 
-    it("throws 400 for expired voucher", async () => {
+    it("throws 400 for expired voucher and marks it expired", async () => {
       const voucher = makeIssuedVoucher({ expired_date: "2020-01-01" });
       vi.mocked(issuedVoucherRepo.findIssuedVoucherByCode).mockResolvedValue(voucher);
 
       await expect(
         issuedVoucherService.checkVoucher(PARTNER_OWNER, { voucher_code: "VC-001" })
       ).rejects.toThrow(HttpError);
+
+      expect(issuedVoucherRepo.updateIssuedVoucherStatus).toHaveBeenCalledWith("iv-1", "expired");
+    });
+
+    it("does not mutate a voucher already marked expired", async () => {
+      const voucher = makeIssuedVoucher({ status: "expired", expired_date: "2020-01-01" });
+      vi.mocked(issuedVoucherRepo.findIssuedVoucherByCode).mockResolvedValue(voucher);
+
+      await expect(
+        issuedVoucherService.checkVoucher(PARTNER_OWNER, { voucher_code: "VC-001" })
+      ).rejects.toThrow(HttpError);
+
+      expect(issuedVoucherRepo.updateIssuedVoucherStatus).not.toHaveBeenCalled();
     });
 
     it("rejects partner checking voucher from another partner", async () => {
@@ -321,6 +335,18 @@ describe("Issued Voucher Service", () => {
         issuedVoucherService.confirmVoucher(STORE_STAFF, { voucher_code: "VC-001" })
       ).rejects.toThrow(HttpError);
     });
+
+    it("marks an active-but-expired voucher as expired and rejects confirmation", async () => {
+      const voucher = makeIssuedVoucher({ expired_date: "2020-01-01" });
+      vi.mocked(issuedVoucherRepo.findIssuedVoucherByCode).mockResolvedValue(voucher);
+      vi.mocked(issuedVoucherRepo.findEligibleBranchIds).mockResolvedValue(["branch-1"]);
+
+      await expect(
+        issuedVoucherService.confirmVoucher(STORE_STAFF, { voucher_code: "VC-001" })
+      ).rejects.toThrow(HttpError);
+
+      expect(issuedVoucherRepo.updateIssuedVoucherStatus).toHaveBeenCalledWith("iv-1", "expired");
+    });
   });
 
   describe("listVoucherUsages (global)", () => {
@@ -336,6 +362,27 @@ describe("Issued Voucher Service", () => {
       await expect(
         issuedVoucherService.listUsages(BUYER, { page: 1, limit: 20 })
       ).rejects.toThrow(HttpError);
+    });
+  });
+
+  describe("expireIssuedVouchers", () => {
+    it("marks active vouchers past their expiry date as expired", async () => {
+      vi.mocked(issuedVoucherRepo.expireExpiredVouchers).mockResolvedValue({ count: 3 });
+
+      const count = await issuedVoucherService.expireIssuedVouchers(new Date("2026-08-17T12:00:00Z"));
+
+      expect(count).toBe(3);
+      const today = vi.mocked(issuedVoucherRepo.expireExpiredVouchers).mock.calls[0][0];
+      expect(today).toBeInstanceOf(Date);
+      expect(today.toISOString()).toBe("2026-08-17T00:00:00.000Z");
+    });
+
+    it("returns 0 when there is nothing to expire", async () => {
+      vi.mocked(issuedVoucherRepo.expireExpiredVouchers).mockResolvedValue({ count: 0 });
+
+      const count = await issuedVoucherService.expireIssuedVouchers();
+
+      expect(count).toBe(0);
     });
   });
 });

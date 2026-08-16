@@ -142,43 +142,49 @@ export async function getStaffVoucherReport(user: AuthUser, query: ReportQuery,)
   }
 
   // Gọi repositories funcs
-  // Lấy danh sách voucher do user tạo
-  const products = await reportRepo.listVoucherProductsByCreator(user.id, query.category_id, query.date_from, query.date_to);
+  // Lấy danh sách voucher đã duyệt của toàn bộ partner
+  const products = await reportRepo.listVoucherProductsByPartner(user.partnerId, query.category_id);
 
   // Extract ra mảng
   const productIds =  products.map(p => p.id);
 
   // Query 2 cái còn lại
-  const [usedCounts, revenueMap] = await Promise.all([reportRepo.countUsedByProducts(productIds), reportRepo.sumRevenueProducts(productIds),]);
+  const [issuedCounts, revenueMap] = await Promise.all([
+    reportRepo.countIssuedVouchersByProduct(productIds, query.date_from, query.date_to),
+    reportRepo.sumRevenueProducts(productIds, query.date_from, query.date_to),
+  ]);
 
   // Dùng vòng lặp cho giá trị
   const reportItems: StaffVoucherReportItem[] = products.map((product) => {
-    // Tính số lượng bán
-    const soldQuantity = product.total_quantity - product.remaining_quantity;
+    // Số lượng phát hành thực tế trong kỳ (từ issued_vouchers)
+    const issued = issuedCounts[product.id] ?? { total: 0, used: 0 };
 
-    // Tính số lượng đã dùng
-    const usedQuantity = usedCounts[product.id]??0;
+    // Số lượng bán = số voucher phát hành trong kỳ
+    const soldQuantity = issued.total;
 
-    // Tính doanh thu
-    const totalRevenue = Number(revenueMap[product.id])??0;
+    // Số lượng đã dùng trong kỳ
+    const usedQuantity = issued.used;
+
+    // Tính doanh thu trong kỳ
+    const totalRevenue = Number(revenueMap[product.id] ?? 0) || 0;
 
     // Tính tỉ lệ sử dụng (%)
-    const calculatedUsageRate = soldQuantity > 0 ? Math.round((usedQuantity / soldQuantity) * 10000)/100 : 0;
+    const calculatedUsageRate = soldQuantity > 0 ? Math.round((usedQuantity / soldQuantity) * 10000) / 100 : 0;
 
-    // Tính điểm hiệu quả
-    const calcuatedEffectiveness = Math.round(calculatedUsageRate * totalRevenue / 10000);
+    // Điểm hiệu quả = doanh thu × tỷ lệ sử dụng (doanh thu hiệu quả)
+    const calculatedEffectiveness = Math.round(totalRevenue * calculatedUsageRate / 100);
 
     // Trả về đúng cấu trúc
     return {
       voucher_product_id: product.id,
       program_name: product.name,
-      category_name: (product as any).category_name?? "",
+      category_name: product.category_name ?? "",
       total_quantity: product.total_quantity,
       sold_quantity: soldQuantity,
       used_quantity: usedQuantity,
       usage_rate: calculatedUsageRate,
-      revenue:totalRevenue,
-      effectiveness_score: calcuatedEffectiveness,
+      revenue: totalRevenue,
+      effectiveness_score: calculatedEffectiveness,
     };
   });
 

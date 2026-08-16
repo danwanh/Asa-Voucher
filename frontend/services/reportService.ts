@@ -12,6 +12,7 @@ export type ReportFilters = {
   date_to?: string
   branch_id?: string
   voucher_product_id?: string
+  category_id?: string
 }
 
 export type RevenuePoint = {

@@ -113,6 +113,13 @@ export async function updateIssuedVoucherStatus(id: string, status: IssuedVouche
   }) as unknown as Promise<IssuedVoucherRow>;
 }
 
+export async function expireExpiredVouchers(today: Date) {
+  return prisma.issuedVoucher.updateMany({
+    where: { status: "active", expired_date: { lt: today } },
+    data: { status: "expired", updated_at: new Date() },
+  });
+}
+
 export async function findEligibleBranchIds(voucherProductId: string): Promise<string[]> {
   const rows = await prisma.voucherProductBranch.findMany({
     where: { voucher_product_id: voucherProductId },

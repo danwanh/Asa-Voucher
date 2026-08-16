@@ -11,6 +11,9 @@ vi.mock("../../repositories/report.repository.js", () => ({
   countUsedIssuedVouchersByProduct: vi.fn(),
   listPartners: vi.fn(),
   countVoucherProductsByPartner: vi.fn(),
+  listVoucherProductsByPartner: vi.fn(),
+  countIssuedVouchersByProduct: vi.fn(),
+  sumRevenueProducts: vi.fn(),
 }));
 
 import * as reportRepo from "../../repositories/report.repository.js";
@@ -20,8 +23,8 @@ type PartnerItemsResult = Awaited<ReturnType<typeof reportRepo.listOrderItemsFor
 
 const BUYER: AuthUser = { id: "u-buyer", email: "b@test.com", role: "buyer" };
 const PARTNER_OWNER: AuthUser = { id: "u-partner", email: "p@test.com", role: "partner_owner", partnerId: "partner-1" };
+const STAFF: AuthUser = { id: "u-staff", email: "s@test.com", role: "partner_voucher_staff", partnerId: "partner-1" };
 const ADMIN: AuthUser = { id: "u-admin", email: "a@test.com", role: "admin_operations" };
-const ADMIN_SECURITY: AuthUser = { id: "u-sec", email: "sec@test.com", role: "admin_security" };
 
 describe("Report Service", () => {
   beforeEach(() => {
@@ -211,6 +214,96 @@ describe("Report Service", () => {
 
     it("rejects buyer", async () => {
       await expect(reportService.getPartnerReport(BUYER, {})).rejects.toThrow(HttpError);
+    });
+  });
+
+  describe("getStaffVoucherReport", () => {
+    const CREATED_PRODUCTS = [
+      {
+        id: "vp-1",
+        name: "Voucher A",
+        partner_id: "partner-1",
+        total_quantity: 100,
+        remaining_quantity: 0,
+        category_name: "Ăn uống",
+        created_at: new Date("2026-01-01T00:00:00Z"),
+      },
+    ];
+
+    it("returns period-based stats with redefined effectiveness", async () => {
+      vi.mocked(reportRepo.listVoucherProductsByPartner).mockResolvedValue(CREATED_PRODUCTS);
+      vi.mocked(reportRepo.countIssuedVouchersByProduct).mockResolvedValue({ "vp-1": { total: 30, used: 12 } });
+      vi.mocked(reportRepo.sumRevenueProducts).mockResolvedValue({ "vp-1": 300000 });
+
+      const result = await reportService.getStaffVoucherReport(STAFF, {});
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual({
+        voucher_product_id: "vp-1",
+        program_name: "Voucher A",
+        category_name: "Ăn uống",
+        total_quantity: 100,
+        sold_quantity: 30,
+        used_quantity: 12,
+        usage_rate: 40,
+        revenue: 300000,
+        effectiveness_score: 120000,
+      });
+    });
+
+    it("returns zero usage rate and effectiveness when nothing sold", async () => {
+      vi.mocked(reportRepo.listVoucherProductsByPartner).mockResolvedValue(CREATED_PRODUCTS);
+      vi.mocked(reportRepo.countIssuedVouchersByProduct).mockResolvedValue({ "vp-1": { total: 0, used: 0 } });
+      vi.mocked(reportRepo.sumRevenueProducts).mockResolvedValue({ "vp-1": 0 });
+
+      const result = await reportService.getStaffVoucherReport(STAFF, {});
+
+      expect(result[0].sold_quantity).toBe(0);
+      expect(result[0].usage_rate).toBe(0);
+      expect(result[0].effectiveness_score).toBe(0);
+    });
+
+    it("returns 0 revenue/effectiveness (not NaN) when product has no revenue data", async () => {
+      vi.mocked(reportRepo.listVoucherProductsByPartner).mockResolvedValue(CREATED_PRODUCTS);
+      vi.mocked(reportRepo.countIssuedVouchersByProduct).mockResolvedValue({});
+      vi.mocked(reportRepo.sumRevenueProducts).mockResolvedValue({});
+
+      const result = await reportService.getStaffVoucherReport(STAFF, {});
+
+      expect(Number.isNaN(result[0].revenue)).toBe(false);
+      expect(result[0].revenue).toBe(0);
+      expect(Number.isNaN(result[0].effectiveness_score)).toBe(false);
+      expect(result[0].effectiveness_score).toBe(0);
+    });
+
+    it("queries whole partner's approved products and passes date range to period-stat queries", async () => {
+      vi.mocked(reportRepo.listVoucherProductsByPartner).mockResolvedValue(CREATED_PRODUCTS);
+      vi.mocked(reportRepo.countIssuedVouchersByProduct).mockResolvedValue({});
+      vi.mocked(reportRepo.sumRevenueProducts).mockResolvedValue({});
+
+      await reportService.getStaffVoucherReport(STAFF, { date_from: "2026-01-01", date_to: "2026-01-31" });
+
+      expect(reportRepo.listVoucherProductsByPartner).toHaveBeenCalledWith("partner-1", undefined);
+      expect(reportRepo.countIssuedVouchersByProduct).toHaveBeenCalledWith(
+        ["vp-1"], "2026-01-01", "2026-01-31",
+      );
+      expect(reportRepo.sumRevenueProducts).toHaveBeenCalledWith(
+        ["vp-1"], "2026-01-01", "2026-01-31",
+      );
+    });
+
+    it("forwards category filter to partner product query", async () => {
+      vi.mocked(reportRepo.listVoucherProductsByPartner).mockResolvedValue(CREATED_PRODUCTS);
+      vi.mocked(reportRepo.countIssuedVouchersByProduct).mockResolvedValue({});
+      vi.mocked(reportRepo.sumRevenueProducts).mockResolvedValue({});
+
+      await reportService.getStaffVoucherReport(STAFF, { category_id: "cat-1" });
+
+      expect(reportRepo.listVoucherProductsByPartner).toHaveBeenCalledWith("partner-1", "cat-1");
+    });
+
+    it("rejects user without a partner", async () => {
+      await expect(reportService.getStaffVoucherReport(BUYER, {})).rejects.toThrow(HttpError);
     });
   });
 });
