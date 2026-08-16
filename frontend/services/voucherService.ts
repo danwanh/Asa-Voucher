@@ -474,6 +474,13 @@ export const voucherService = {
     return extractData(res).items
   },
 
+  async listApprovedVouchers(): Promise<BackendVoucherProduct[]> {
+    const res = await api.get<ApiEnvelope<BackendVoucherList>>("/voucher-products", {
+      params: { approval_status: "approved", page: 1, limit: 100 }
+    })
+    return extractData(res).items
+  },
+
   async approveVoucher(voucherId: string) {
     const res = await api.patch<ApiEnvelope<BackendVoucherProduct>>(`/voucher-products/${voucherId}/approval`, {
       approval_status: "approved"
@@ -486,6 +493,11 @@ export const voucherService = {
       approval_status: "rejected",
       reject_reason: rejectReason
     })
+    return extractData(res)
+  },
+
+  async updateVoucherStatus(voucherId: string, status: "active" | "paused") {
+    const res = await api.patch<ApiEnvelope<BackendVoucherProduct>>(`/voucher-products/${voucherId}/status`, { status })
     return extractData(res)
   },
 }

@@ -247,6 +247,8 @@ export async function listVoucherProducts(user: CurrentUser | undefined, queryIn
   const where: Record<string, unknown> = {};
   if (approvalStatus === "pending") {
     where.approval_status = "pending";
+  } else if (approvalStatus === "approved") {
+    where.approval_status = "approved";
   } else if (scope === "mine") {
     assertVoucherManager(user);
     where.partner_id = await getRequiredCurrentPartnerId(user);

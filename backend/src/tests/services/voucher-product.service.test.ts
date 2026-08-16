@@ -152,6 +152,25 @@ describe("Voucher Product Service", () => {
       );
     });
 
+    it("returns approved vouchers for approval_status=approved without sellable filters", async () => {
+      mockPrisma.$transaction.mockResolvedValue([[makeVoucher({ status: "active", approval_status: "approved" })], 1]);
+
+      const result = await voucherProductService.listVoucherProducts(ADMIN_CONTENT, { page: 1, limit: 20, approval_status: "approved" });
+
+      expect(result.items).toHaveLength(1);
+      expect(prisma.voucherProduct.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            approval_status: "approved",
+          }),
+        })
+      );
+      const where = vi.mocked(prisma.voucherProduct.findMany).mock.calls[0][0].where as Record<string, unknown>;
+      expect(where.status).toBeUndefined();
+      expect(where.remaining_quantity).toBeUndefined();
+      expect(where.sale_end_date).toBeUndefined();
+    });
+
     it("applies area filter through branch city relation", async () => {
       mockPrisma.$transaction.mockResolvedValue([[makeVoucher()], 1]);
 

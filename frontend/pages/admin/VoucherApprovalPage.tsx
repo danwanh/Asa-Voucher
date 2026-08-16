@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { Check, X, Eye, Loader2, AlertCircle, XCircle } from "lucide-react"
+import { Check, X, Eye, EyeOff, Loader2, AlertCircle, XCircle } from "lucide-react"
 import { C, fmt, fmtDate } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import { voucherService, type BackendVoucherProduct } from "@/services/voucherService"
@@ -11,6 +11,11 @@ export function VoucherApprovalPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [toast, setToast] = useState<{ type: "success" | "error"; msg: string } | null>(null)
+  const [tab, setTab] = useState<"pending" | "approved">("pending")
+  const [approvedVouchers, setApprovedVouchers] = useState<BackendVoucherProduct[]>([])
+  const [approvedLoading, setApprovedLoading] = useState(false)
+  const [approvedError, setApprovedError] = useState<string | null>(null)
+  const [statusUpdating, setStatusUpdating] = useState<string | null>(null)
 
   const today = new Date().toISOString().slice(0, 10)
 
@@ -32,7 +37,20 @@ export function VoucherApprovalPage() {
     }
   }
 
-  useEffect(() => { loadPending() }, [])
+  useEffect(() => { loadPending(); loadApproved() }, [])
+
+  async function loadApproved() {
+    setApprovedLoading(true)
+    setApprovedError(null)
+    try {
+      const items = await voucherService.listApprovedVouchers()
+      setApprovedVouchers(items)
+    } catch {
+      setApprovedError("Không thể tải danh sách voucher đã duyệt")
+    } finally {
+      setApprovedLoading(false)
+    }
+  }
 
   function showToast(type: "success" | "error", msg: string) {
     setToast({ type, msg })
@@ -70,6 +88,21 @@ export function VoucherApprovalPage() {
     }
   }
 
+  async function handleToggleStatus(v: BackendVoucherProduct) {
+    const next = v.workflow_status === "active" ? "paused" : "active"
+    setStatusUpdating(v.id)
+    try {
+      const updated = await voucherService.updateVoucherStatus(v.id, next)
+      setApprovedVouchers((prev) => prev.map((item) => (item.id === v.id ? { ...item, ...updated } : item)))
+      showToast("success", next === "paused" ? "Đã ẩn voucher" : "Đã hiện voucher")
+    } catch (err: any) {
+      const msg = err?.response?.data?.error?.message || "Cập nhật trạng thái thất bại"
+      showToast("error", msg)
+    } finally {
+      setStatusUpdating(null)
+    }
+  }
+
   return (
     <div className="p-6">
       {/* Toast */}
@@ -84,13 +117,38 @@ export function VoucherApprovalPage() {
       {/* Header */}
       <div className="flex items-center gap-3 mb-5">
         <h2 className="font-black text-lg" style={{ color: C.indigo }}>Duyệt voucher</h2>
-        {!isLoading && vouchers.length > 0 && (
+        {tab === "pending" && !isLoading && vouchers.length > 0 && (
           <span className="px-3 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: C.peach + "15", color: C.peach }}>
             {vouchers.length} chờ duyệt
           </span>
         )}
       </div>
 
+      {/* Tabs */}
+      <div className="flex gap-2 mb-5">
+        <button
+          onClick={() => setTab("pending")}
+          className="px-4 py-2 rounded-xl text-sm font-bold transition-all"
+          style={tab === "pending"
+            ? { backgroundColor: C.teal, color: "white" }
+            : { backgroundColor: "white", color: C.indigo, border: "1px solid #E2DFC8" }}
+        >
+          Chờ duyệt{vouchers.length > 0 ? ` (${vouchers.length})` : ""}
+        </button>
+        <button
+          onClick={() => setTab("approved")}
+          className="px-4 py-2 rounded-xl text-sm font-bold transition-all"
+          style={tab === "approved"
+            ? { backgroundColor: C.teal, color: "white" }
+            : { backgroundColor: "white", color: C.indigo, border: "1px solid #E2DFC8" }}
+        >
+          Đã duyệt{approvedVouchers.length > 0 ? ` (${approvedVouchers.length})` : ""}
+        </button>
+      </div>
+
+      {/* Pending tab */}
+      {tab === "pending" && (
+      <>
       {/* Loading */}
       {isLoading && (
         <div className="flex items-center justify-center py-20">
@@ -119,7 +177,7 @@ export function VoucherApprovalPage() {
       {/* Voucher list */}
       {!isLoading && !error && vouchers.length > 0 && (
         <div className="space-y-4">
-          {vouchers.map((v) => {
+{vouchers.map((v) => {
             const saleEndExpired = String(v.sale_end_date).slice(0, 10) < today
             return (
             <div key={v.id} className="bg-white rounded-2xl p-5 shadow-sm border border-black/5 flex gap-5">
@@ -204,6 +262,49 @@ export function VoucherApprovalPage() {
           })}
         </div>
       )}
+      </>
+      )}
+
+      {/* Approved tab */}
+      {tab === "approved" && (
+      <>
+        {approvedLoading && (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-6 h-6 animate-spin" style={{ color: C.teal }} />
+            <span className="ml-2 text-sm" style={{ color: "#8A8DA8" }}>Đang tải voucher...</span>
+          </div>
+        )}
+
+        {approvedError && (
+          <div className="flex items-center gap-3 p-4 rounded-2xl" style={{ backgroundColor: "#FEE2E2" }}>
+            <AlertCircle className="w-5 h-5" style={{ color: "#B91C1C" }} />
+            <span className="text-sm font-bold" style={{ color: "#B91C1C" }}>{approvedError}</span>
+          </div>
+        )}
+
+        {!approvedLoading && !approvedError && approvedVouchers.length === 0 && (
+          <div className="text-center py-20">
+            <AppIcon name="check" className="w-14 h-14 mb-4 mx-auto" />
+            <div className="font-bold text-lg" style={{ color: C.indigo }}>Chưa có voucher nào được duyệt</div>
+            <div className="text-sm mt-2" style={{ color: "#8A8DA8" }}>Vouchers được duyệt sẽ xuất hiện tại đây</div>
+          </div>
+        )}
+
+        {!approvedLoading && !approvedError && approvedVouchers.length > 0 && (
+          <div className="space-y-4">
+            {approvedVouchers.map((v) => (
+              <ApprovedVoucherCard
+                key={v.id}
+                v={v}
+                onDetail={() => setSelectedVoucher(v)}
+                onToggle={() => handleToggleStatus(v)}
+                isToggling={statusUpdating === v.id}
+              />
+            ))}
+          </div>
+        )}
+      </>
+      )}
 
       {/* Detail Modal */}
       {selectedVoucher && (
@@ -278,6 +379,100 @@ function Row({ label, value }: { label: string; value: string }) {
     <div className="flex justify-between">
       <span style={{ color: "#8A8DA8" }}>{label}</span>
       <span className="font-semibold text-right" style={{ color: C.indigo }}>{value}</span>
+    </div>
+  )
+}
+
+const APPROVED_BADGE: Record<string, { bg: string; text: string }> = {
+  active: { bg: "#E8F5EE", text: "#2D7A52" },
+  approved: { bg: "#E0EEFF", text: "#1A5FAD" },
+  paused: { bg: "#FFF3CD", text: "#856404" },
+  sold_out: { bg: "#F3F4F6", text: "#6B7280" },
+  expired: { bg: "#FCEAEA", text: "#C0392B" },
+}
+
+function ApprovedVoucherCard({ v, onDetail, onToggle, isToggling }: {
+  v: BackendVoucherProduct
+  onDetail: () => void
+  onToggle: () => void
+  isToggling: boolean
+}) {
+  const today = new Date().toISOString().slice(0, 10)
+  const saleEndExpired = String(v.sale_end_date).slice(0, 10) < today
+  const badge = APPROVED_BADGE[v.workflow_status ?? ""] || { bg: "#F3F4F6", text: "#6B7280" }
+  return (
+    <div className="bg-white rounded-2xl p-5 shadow-sm border border-black/5 flex gap-5">
+      <img
+        src={v.thumbnail_url || FALLBACK}
+        alt={v.name}
+        className="w-24 h-20 rounded-xl object-cover shrink-0"
+        onError={(e) => { (e.target as HTMLImageElement).src = FALLBACK }}
+      />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="font-bold" style={{ color: C.indigo }}>{v.name}</div>
+            <div className="text-sm mt-0.5" style={{ color: "#8A8DA8" }}>{v.partners?.business_name || "—"}</div>
+          </div>
+          <span className="px-2 py-0.5 rounded-lg text-xs font-bold" style={{ backgroundColor: badge.bg, color: badge.text }}>
+            {v.workflow_label || v.workflow_status || "Đã duyệt"}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-4 gap-3 mt-3 text-xs">
+          <div>
+            <div style={{ color: "#8A8DA8" }}>Giá gốc</div>
+            <div className="font-bold mt-0.5" style={{ color: C.indigo }}>{fmt(Number(v.original_price))}</div>
+          </div>
+          <div>
+            <div style={{ color: "#8A8DA8" }}>Giá bán</div>
+            <div className="font-bold mt-0.5" style={{ color: C.peach }}>{fmt(Number(v.selling_price))}</div>
+          </div>
+          <div>
+            <div style={{ color: "#8A8DA8" }}>Số lượng</div>
+            <div className="font-bold mt-0.5" style={{ color: C.indigo }}>{v.total_quantity}</div>
+          </div>
+          <div>
+            <div style={{ color: "#8A8DA8" }}>Còn lại</div>
+            <div className="font-bold mt-0.5" style={{ color: C.indigo }}>{v.remaining_quantity}</div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-4 mt-2 text-xs" style={{ color: "#9CA3AF" }}>
+          <span>Bán: {fmtDate(v.sale_start_date)} → {fmtDate(v.sale_end_date)}</span>
+          <span>Sử dụng: {v.validity_days ?? "—"} ngày</span>
+          {saleEndExpired && <span style={{ color: "#C0392B" }}>Hết thời gian bán</span>}
+        </div>
+
+        <p className="text-xs mt-2 line-clamp-1" style={{ color: "#8A8DA8" }}>{v.description || "—"}</p>
+
+        <div className="flex gap-3 mt-4 items-center">
+          {(v.workflow_status === "active" || v.workflow_status === "paused") && (
+            <button
+              onClick={onToggle}
+              disabled={isToggling}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold border hover:bg-gray-50 disabled:opacity-40"
+              style={{ borderColor: "#E2DFC8", color: C.indigo }}
+            >
+              {isToggling ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : v.workflow_status === "active" ? (
+                <EyeOff className="w-4 h-4" />
+              ) : (
+                <Eye className="w-4 h-4" />
+              )}
+              {v.workflow_status === "active" ? "Ẩn" : "Hiện"}
+            </button>
+          )}
+          <button
+            onClick={onDetail}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold border hover:bg-gray-50"
+            style={{ borderColor: "#E2DFC8", color: C.indigo }}
+          >
+            <Eye className="w-4 h-4" /> Chi tiết
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
