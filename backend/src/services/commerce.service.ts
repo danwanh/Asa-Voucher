@@ -49,6 +49,8 @@ type PaymentRecord = { status: string };
 
 const ORDER_STATUS_VALUES = ["pending_payment", "payment_failed", "confirmed", "completed", "cancelled", "refunded"] as const;
 type OrderStatus = typeof ORDER_STATUS_VALUES[number];
+const ORDER_PAYMENT_STATUS_VALUES = ["pending", "paid", "failed", "refunded"] as const;
+type OrderPaymentStatus = typeof ORDER_PAYMENT_STATUS_VALUES[number];
 
 type CreateOrderInput = {
   items?: Array<{ voucher_product_id: string; quantity: number }>;
@@ -332,7 +334,7 @@ function assertCanMutateOrder(user: CurrentUser, order: Record<string, unknown>)
   throw new HttpError(403, "Only the buyer who created the order can modify it", "FORBIDDEN");
 }
 
-function buildOrderListWhere(user: CurrentUser, query?: { status?: string; search?: string }) {
+function buildOrderListWhere(user: CurrentUser, query?: { status?: string; payment_status?: string; search?: string }) {
   const and: Record<string, unknown>[] = [];
 
   if (user.role === "buyer") {
@@ -359,6 +361,7 @@ function buildOrderListWhere(user: CurrentUser, query?: { status?: string; searc
 
   const where: Record<string, unknown> = and.length > 0 ? { AND: and } : {};
   if (query?.status) where.status = { in: storedStatuses(query.status) };
+  if (query?.payment_status) where.payment_status = query.payment_status;
   return where;
 }
 
@@ -373,9 +376,20 @@ function buildCountsByStatus(grouped: Array<{ status: string; _count: { _all: nu
   return counts;
 }
 
+function buildCountsByPaymentStatus(grouped: Array<{ payment_status: string; _count: { _all: number } }>) {
+  const counts: Record<string, number> = { all: 0 };
+  for (const status of ORDER_PAYMENT_STATUS_VALUES) counts[status] = 0;
+  for (const row of grouped) {
+    const status = row.payment_status as OrderPaymentStatus;
+    if (ORDER_PAYMENT_STATUS_VALUES.includes(status)) counts[status] += row._count._all;
+    counts.all += row._count._all;
+  }
+  return counts;
+}
+
 export async function listOrders(
   user: CurrentUser,
-  query?: { status?: string; search?: string; page?: number; limit?: number }
+  query?: { status?: string; payment_status?: string; search?: string; page?: number; limit?: number }
 ) {
   const where = buildOrderListWhere(user, query);
   const countsWhere = buildOrderListWhere(user, { search: query?.search });
@@ -383,7 +397,7 @@ export async function listOrders(
   const page = query?.page ?? 1;
   const limit = query?.limit ?? 20;
   const skip = (page - 1) * limit;
-  const [data, total, groupedCounts] = await prisma.$transaction([
+  const [data, total, groupedCounts, groupedPaymentCounts] = await prisma.$transaction([
     prisma.order.findMany({
     where,
     select: {
@@ -396,6 +410,7 @@ export async function listOrders(
       discount_amount: true,
       total_amount: true,
       status: true,
+      payment_status: true,
       payment_method: true,
       payment_expires_at: true,
       created_at: true,
@@ -428,6 +443,7 @@ export async function listOrders(
     , skip, take: limit }),
     prisma.order.count({ where }),
     prisma.order.groupBy({ by: ["status"], where: countsWhere, orderBy: { status: "asc" }, _count: { _all: true } }),
+    prisma.order.groupBy({ by: ["payment_status"], where: countsWhere, orderBy: { payment_status: "asc" }, _count: { _all: true } }),
   ]);
 
   const items = data.map((order) => {
@@ -441,7 +457,7 @@ export async function listOrders(
     return {
       ...summary,
       status: normalizeOrderStatus(order.status),
-      payment_status: derivePaymentStatus((payments ?? []) as PaymentRecord[]),
+      payment_status: order.payment_status ?? derivePaymentStatus((payments ?? []) as PaymentRecord[]),
       total_amount: isPartnerStaff(user.role)
         ? order_items.reduce((sum, item) => sum + Number(item.subtotal), 0)
         : summary.total_amount,
@@ -457,6 +473,7 @@ export async function listOrders(
   return {
     ...buildPaginatedResult(items, total, { page, limit }),
     countsByStatus: buildCountsByStatus(groupedCounts as Array<{ status: string; _count: { _all: number } }>),
+    countsByPaymentStatus: buildCountsByPaymentStatus(groupedPaymentCounts as Array<{ payment_status: string; _count: { _all: number } }>),
   };
 }
 

@@ -150,6 +150,10 @@ export function BranchManagementPage({ user, partner, embedded = false }: Props)
     [branches, search],
   )
 
+  const selectedProvince = provinces.find((item) => item.name === form.city)
+  const hasCurrentCityOption = Boolean(form.city && provinces.length > 0 && !selectedProvince)
+  const hasCurrentDistrictOption = Boolean(form.district && districts.length > 0 && !districts.some((item) => item.name === form.district))
+
   const openCreate = () => {
     setForm(EMPTY_FORM)
     setDistricts([])
@@ -344,36 +348,56 @@ export function BranchManagementPage({ user, partner, embedded = false }: Props)
               ].map((field) => (
                 <div key={field.key}>
                   <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>{field.label}</label>
-                  <input
-                    className="w-full px-4 py-2.5 rounded-xl border text-sm outline-none"
-                    style={{ borderColor: "#E2DFC8", fontFamily: "'Inter', sans-serif" }}
-                    placeholder={field.placeholder}
-                    list={field.key === "city" && !addressLoadError ? "vietnam-provinces" : field.key === "district" && !addressLoadError ? "vietnam-districts" : undefined}
-                    value={form[field.key as keyof FormData] as string}
-                    onChange={(event) => setForm((prev) => ({
-                      ...prev,
-                      [field.key]: event.target.value,
-                      ...(field.key === "city" ? { district: "" } : {}),
-                    }))}
-                    disabled={field.key === "district" && !addressLoadError && !form.city}
-                  />
+                  {field.key === "city" && !addressLoadError ? (
+                    <select
+                      className="w-full px-4 py-2.5 rounded-xl border text-sm outline-none bg-white"
+                      style={{ borderColor: "#E2DFC8", fontFamily: "'Inter', sans-serif" }}
+                      value={form.city}
+                      onChange={(event) => setForm((prev) => ({ ...prev, city: event.target.value, district: "" }))}
+                      disabled={isAddressLoading && provinces.length === 0}
+                    >
+                      <option value="">{isAddressLoading && provinces.length === 0 ? "Đang tải tỉnh/thành..." : "Chọn tỉnh/thành phố"}</option>
+                      {hasCurrentCityOption && <option value={form.city}>{form.city}</option>}
+                      {provinces.map((province) => (
+                        <option key={province.code} value={province.name}>{province.name}</option>
+                      ))}
+                    </select>
+                  ) : field.key === "district" && !addressLoadError ? (
+                    <select
+                      className="w-full px-4 py-2.5 rounded-xl border text-sm outline-none bg-white disabled:bg-gray-50"
+                      style={{ borderColor: "#E2DFC8", fontFamily: "'Inter', sans-serif" }}
+                      value={form.district}
+                      onChange={(event) => setForm((prev) => ({ ...prev, district: event.target.value }))}
+                      disabled={!form.city || (isAddressLoading && districts.length === 0)}
+                    >
+                      <option value="">
+                        {!form.city
+                          ? "Chọn tỉnh/thành phố trước"
+                          : isAddressLoading && districts.length === 0
+                            ? "Đang tải quận/huyện..."
+                            : "Chọn quận/huyện"}
+                      </option>
+                      {hasCurrentDistrictOption && <option value={form.district}>{form.district}</option>}
+                      {districts.map((district) => (
+                        <option key={district.code} value={district.name}>{district.name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      className="w-full px-4 py-2.5 rounded-xl border text-sm outline-none"
+                      style={{ borderColor: "#E2DFC8", fontFamily: "'Inter', sans-serif" }}
+                      placeholder={field.placeholder}
+                      value={form[field.key as keyof FormData] as string}
+                      onChange={(event) => setForm((prev) => ({
+                        ...prev,
+                        [field.key]: event.target.value,
+                        ...(field.key === "city" ? { district: "" } : {}),
+                      }))}
+                      disabled={field.key === "district" && !addressLoadError && !form.city}
+                    />
+                  )}
                 </div>
               ))}
-
-              {!addressLoadError && (
-                <>
-                  <datalist id="vietnam-provinces">
-                    {provinces.map((province) => (
-                      <option key={province.code} value={province.name} />
-                    ))}
-                  </datalist>
-                  <datalist id="vietnam-districts">
-                    {districts.map((district) => (
-                      <option key={district.code} value={district.name} />
-                    ))}
-                  </datalist>
-                </>
-              )}
 
               <label className="flex items-center gap-2 text-sm" style={{ color: C.indigo }}>
                 <input

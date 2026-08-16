@@ -174,9 +174,11 @@ export type OrderListPage = {
   total: number
   totalPages: number
   countsByStatus: OrderStatusCounts
+  countsByPaymentStatus: OrderPaymentStatusCounts
 }
 
 export type OrderStatusCounts = Partial<Record<Order["status"] | "all", number>>
+export type OrderPaymentStatusCounts = Partial<Record<Order["paymentStatus"] | "all", number>>
 
 const orderDetailRequests = new Map<string, Promise<Order>>()
 const orderListRequests = new Map<string, Promise<OrderListPage>>()
@@ -205,7 +207,7 @@ export const orderService = {
     return mapOrder(data<BackendRecord>(response))
   },
 
-  async list(params?: { status?: string; search?: string; page?: number; limit?: number }): Promise<OrderListPage> {
+  async list(params?: { status?: string; payment_status?: string; search?: string; page?: number; limit?: number }): Promise<OrderListPage> {
     const requestParams = { ...params, page: params?.page ?? 1, limit: params?.limit ?? 20 }
     const key = `${useAuthStore.getState().user?.id ?? "anonymous"}:${JSON.stringify(requestParams)}`
     const cached = orderListCache.get(key)
@@ -216,7 +218,12 @@ export const orderService = {
     const requestVersion = cacheVersion
 
     const request = api.get("/orders", { params: requestParams }).then((response) => {
-      const result = data<{ items: BackendRecord[]; pagination: { page: number; limit: number; total: number; total_pages: number }; countsByStatus?: OrderStatusCounts }>(response)
+      const result = data<{
+        items: BackendRecord[]
+        pagination: { page: number; limit: number; total: number; total_pages: number }
+        countsByStatus?: OrderStatusCounts
+        countsByPaymentStatus?: OrderPaymentStatusCounts
+      }>(response)
       const value = {
         items: result.items.map(mapOrderListItem),
         page: result.pagination.page,
@@ -224,6 +231,7 @@ export const orderService = {
         total: result.pagination.total,
         totalPages: result.pagination.total_pages,
         countsByStatus: result.countsByStatus ?? { all: result.pagination.total },
+        countsByPaymentStatus: result.countsByPaymentStatus ?? { all: result.pagination.total },
       }
       if (requestVersion === cacheVersion) orderListCache.set(key, { value, expiresAt: Date.now() + CACHE_TTL_MS })
       return value
@@ -234,7 +242,7 @@ export const orderService = {
     return request
   },
 
-  async listOrders(params?: { status?: string; search?: string }) {
+  async listOrders(params?: { status?: string; payment_status?: string; search?: string }) {
     return this.list(params)
   },
 

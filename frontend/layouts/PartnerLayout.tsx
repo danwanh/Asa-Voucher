@@ -21,9 +21,9 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Quản lý Voucher", pg: "vouchers", icon: <Tag className="w-4 h-4" /> },
   { label: "Chi nhánh", pg: "branches", icon: <GitBranch className="w-4 h-4" /> },
   { label: "Quản lý nhân viên", pg: "staff", icon: <Users className="w-4 h-4" /> },
-  { label: "Thông báo", pg: "notifications", icon: <Bell className="w-4 h-4" /> },
+  // { label: "Thông báo", pg: "notifications", icon: <Bell className="w-4 h-4" /> },
   { label: "Hồ sơ đối tác", pg: "profile", icon: <Building2 className="w-4 h-4" /> },
-  { label: "Cài đặt", pg: "settings", icon: <Settings className="w-4 h-4" /> },
+  // { label: "Cài đặt", pg: "settings", icon: <Settings className="w-4 h-4" /> },
 ]
 
 interface Props {
@@ -150,9 +150,11 @@ export function PartnerLayout({ user, partner, page, onNavigate, onLogout, child
             <h1 className="font-black" style={{ color: C.indigo }}>{currentLabel}</h1>
           </div>
           <div className="flex items-center gap-3">
+            {/*
             <button onClick={() => onNavigate("notifications")} className="p-2 rounded-xl hover:bg-muted relative">
               <Bell className="w-5 h-5" style={{ color: "#8A8DA8" }} />
             </button>
+            */}
             <div className="text-sm font-semibold" style={{ color: "#8A8DA8" }}>{partnerName}</div>
           </div>
         </header>

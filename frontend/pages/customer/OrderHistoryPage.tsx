@@ -3,13 +3,13 @@ import Link from "next/link"
 import { Search, Star, CreditCard, MessageSquare, ChevronLeft, ChevronRight } from "lucide-react"
 import { C, fmt, fmtDate } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
-import type { OrderStatusCounts } from "@/services/orderService"
-import type { OrderListItem, OrderStatus } from "@/types"
+import type { OrderPaymentStatusCounts } from "@/services/orderService"
+import type { OrderListItem, OrderPaymentStatus, OrderStatus } from "@/types"
 import { LoadingState } from "@/components/LoadingState"
 
 interface Props {
   orders: OrderListItem[]
-  countsByStatus?: OrderStatusCounts
+  countsByStatus?: OrderPaymentStatusCounts
   pendingOrderId?: string
   onDetail?: (o: OrderListItem) => void
   onReview?: (o: OrderListItem) => void
@@ -23,13 +23,11 @@ interface Props {
   currentUserId?: string
 }
 
-const ORDER_TABS: { label: string; value: OrderListItem["status"] | "all" }[] = [
+const PAYMENT_TABS: { label: string; value: OrderPaymentStatus | "all" }[] = [
   { label: "Tất cả", value: "all" },
-  { label: "Chờ thanh toán", value: "pending_payment" },
-  { label: "Thanh toán thất bại", value: "payment_failed" },
-  { label: "Đã thanh toán", value: "confirmed" },
-  { label: "Hoàn tất", value: "completed" },
-  { label: "Đã hủy", value: "cancelled" },
+  { label: "Chờ thanh toán", value: "pending" },
+  { label: "Đã thanh toán", value: "paid" },
+  { label: "Thanh toán thất bại", value: "failed" },
   { label: "Đã hoàn tiền", value: "refunded" },
 ]
 
@@ -49,7 +47,7 @@ function itemSummary(order: OrderListItem) {
 }
 
 export function OrderHistoryPage({ orders, countsByStatus, onDetail, onReview, onComplaint, onPayAgain, page = 1, totalPages = 1, onPageChange, onFilterChange, loading = false, currentUserId }: Props) {
-  const [tab, setTab] = useState<OrderListItem["status"] | "all">("all")
+  const [tab, setTab] = useState<OrderPaymentStatus | "all">("all")
   const [search, setSearch] = useState("")
   const searchTimer = useRef<ReturnType<typeof setTimeout>>()
 
@@ -65,12 +63,12 @@ export function OrderHistoryPage({ orders, countsByStatus, onDetail, onReview, o
       </div>
 
       <div className="flex gap-1 overflow-x-auto pb-2 mb-4 scrollbar-hide">
-        {ORDER_TABS.map((tabItem) => {
+        {PAYMENT_TABS.map((tabItem) => {
           const count = countsByStatus
             ? countsByStatus[tabItem.value] ?? 0
             : tabItem.value === "all"
               ? orders.length
-              : orders.filter((order) => order.status === tabItem.value).length
+              : orders.filter((order) => order.paymentStatus === tabItem.value).length
 
           return (
             <button

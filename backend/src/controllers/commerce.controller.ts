@@ -41,7 +41,7 @@ export async function createOrder(req: Request, res: Response) {
 export async function listOrders(req: Request, res: Response) {
   ok(res, await commerceService.listOrders(
     { ...req.user!, partnerId: req.user!.partnerId ?? undefined },
-    req.query as { status?: string; search?: string; page?: number; limit?: number },
+    req.query as { status?: string; payment_status?: string; search?: string; page?: number; limit?: number },
   ));
 }
 

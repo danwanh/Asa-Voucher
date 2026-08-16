@@ -21,7 +21,7 @@ import { CustomerSettingsPage } from "@/pages/customer/CustomerSettingsPage"
 import { C } from "@/utils/constants"
 import { customerPagePath } from "@/utils/customerRoutes"
 import type { AppUser, CartItem, CheckoutDraft, IssuedVoucher, Voucher, Order, OrderListItem, ReviewTarget } from "@/types"
-import { orderService, paymentService, type OrderStatusCounts } from "@/services/orderService"
+import { orderService, paymentService, type OrderPaymentStatusCounts } from "@/services/orderService"
 import { issuedVoucherService } from "@/services/issuedVoucherService"
 import { voucherService, type VoucherDetailData } from "@/services/voucherService"
 import { LoadingState } from "@/components/LoadingState"
@@ -109,10 +109,10 @@ export function CustomerApp({
   const [voucherSearch, setVoucherSearch] = useState("")
   const [voucherFilters, setVoucherFilters] = useState<VoucherListFilters>(DEFAULT_VOUCHER_FILTERS)
   const [myOrders, setMyOrders] = useState<OrderListItem[]>([])
-  const [orderCounts, setOrderCounts] = useState<OrderStatusCounts>({ all: 0 })
+  const [orderCounts, setOrderCounts] = useState<OrderPaymentStatusCounts>({ all: 0 })
   const [ordersPage, setOrdersPage] = useState(1)
   const [ordersTotalPages, setOrdersTotalPages] = useState(1)
-  const [orderStatusFilter, setOrderStatusFilter] = useState<string | undefined>()
+  const [orderPaymentStatusFilter, setOrderPaymentStatusFilter] = useState<string | undefined>()
   const [orderSearch, setOrderSearch] = useState("")
   const [myOrdersLoading, setMyOrdersLoading] = useState(initialPage === "orders" || initialPage === "my-vouchers")
   const ordersRequestIdRef = useRef(0)
@@ -377,10 +377,10 @@ export function CustomerApp({
     if (page !== "orders") return
     setMyOrdersLoading(true)
     const requestId = ++ordersRequestIdRef.current
-    void orderService.list({ page: ordersPage, limit: 20, status: orderStatusFilter, search: orderSearch || undefined }).then((result) => {
+    void orderService.list({ page: ordersPage, limit: 20, payment_status: orderPaymentStatusFilter, search: orderSearch || undefined }).then((result) => {
       if (requestId !== ordersRequestIdRef.current) return
       setMyOrders(result.items)
-      setOrderCounts(result.countsByStatus)
+      setOrderCounts(result.countsByPaymentStatus)
       setOrdersTotalPages(result.totalPages)
     }).catch(() => {
       if (requestId !== ordersRequestIdRef.current) return
@@ -388,7 +388,7 @@ export function CustomerApp({
     }).finally(() => {
       if (requestId === ordersRequestIdRef.current) setMyOrdersLoading(false)
     })
-  }, [page, ordersPage, orderStatusFilter, orderSearch])
+  }, [page, ordersPage, orderPaymentStatusFilter, orderSearch])
 
   useEffect(() => {
     if (page !== "my-vouchers") return
@@ -501,7 +501,7 @@ export function CustomerApp({
            onPageChange={setOrdersPage}
            onFilterChange={(status, search) => {
              setOrdersPage(1)
-             setOrderStatusFilter(status)
+             setOrderPaymentStatusFilter(status)
              setOrderSearch(search ?? "")
            }}
           pendingOrderId={pendingOrder?.id}
