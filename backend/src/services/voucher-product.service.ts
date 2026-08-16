@@ -479,6 +479,9 @@ export async function getPublicVoucherDetail(id: string) {
 export async function updateVoucherProduct(user: CurrentUser, id: string, input: Record<string, unknown>) {
   const voucher = await getVoucher(id);
   await assertVoucherOwnerOrAdmin(user, voucher, false);
+  if (voucher.approval_status === "rejected") {
+    throw new HttpError(403, "Rejected vouchers are view-only", "VOUCHER_REJECTED_VIEW_ONLY");
+  }
 
   // FC-PAV-MANAGE: Field locking — reject edits to locked fields based on current status
   const inputKeys = Object.keys(input).filter((k) => input[k] !== undefined);

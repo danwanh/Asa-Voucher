@@ -208,7 +208,7 @@ export async function notifyVoucherRejected(params: {
           <strong>Lý do từ chối:</strong><br />
           ${rejectReason}
         </div>
-        <p>Vui lòng chỉnh sửa voucher và gửi lại để duyệt.</p>
+        <p>Voucher này đã bị từ chối và không thể chỉnh sửa hoặc gửi duyệt lại.</p>
         <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
         <p style="color: #888; font-size: 12px;">Email này được gửi tự động từ hệ thống Asa-Voucher.</p>
       </div>

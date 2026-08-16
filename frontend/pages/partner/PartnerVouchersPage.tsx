@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
-import { Plus, Edit, Loader2, RefreshCw, Send } from "lucide-react"
+import { Plus, Edit, Eye, Loader2, RefreshCw, Send } from "lucide-react"
 import { toast } from "sonner"
 import { C, fmt, fmtDate } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
@@ -164,7 +164,7 @@ export function PartnerVouchersPage({ partnerId, onCreateNew, onEdit, onDetail, 
           className="flex items-center gap-3 mb-4 px-4 py-3 rounded-xl text-sm font-semibold"
           style={{ backgroundColor: "#FCEAEA", color: "#C0392B" }}
         >
-          <span>{rejectedCount} voucher bị từ chối có thể chỉnh sửa và gửi duyệt lại.</span>
+          <span>{rejectedCount} voucher bị từ chối, chỉ có thể xem chi tiết.</span>
         </div>
       )}
 
@@ -228,6 +228,7 @@ export function PartnerVouchersPage({ partnerId, onCreateNew, onEdit, onDetail, 
               {!isLoading && visibleVouchers.map((v) => {
                 const isDraft = v.status === "draft"
                 const canSubmit = v.status === "draft"
+                const isRejected = v.status === "rejected"
                 return (
                   <tr
                     key={v.id}
@@ -279,6 +280,10 @@ export function PartnerVouchersPage({ partnerId, onCreateNew, onEdit, onDetail, 
                           title="Gửi duyệt"
                         >
                           <Send className="w-3 h-3" /> Gửi duyệt
+                        </button>
+                      ) : isRejected ? (
+                        <button onClick={() => onDetail(v)} className="p-1.5 rounded-lg hover:bg-muted transition-colors" title="Xem chi tiết">
+                          <Eye className="w-3.5 h-3.5" style={{ color: "#8A8DA8" }} />
                         </button>
                       ) : (
                         <button onClick={() => onEdit(v)} className="p-1.5 rounded-lg hover:bg-muted transition-colors" title="Chỉnh sửa">
