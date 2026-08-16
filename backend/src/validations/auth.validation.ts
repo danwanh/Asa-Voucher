@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+const queryBooleanSchema = z.preprocess((value) => {
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return value;
+}, z.boolean());
+
 const registrationFields = z.object({
   email: z.string().trim().email().toLowerCase(),
   phone: z.string().trim().regex(/^(0|\+84)[0-9]{8,9}$/).optional(),
@@ -67,8 +73,11 @@ export const updateUserSchema = z.object({
 
 export const userQuerySchema = z.object({
   role: z.enum(["buyer", "partner_owner", "partner_voucher_staff", "partner_store_staff", "admin_content", "admin_operations", "admin_security"]).optional(),
-  is_active: z.coerce.boolean().optional(),
+  is_active: queryBooleanSchema.optional(),
   search: z.string().trim().max(100).optional(),
+  full_name: z.string().trim().max(100).optional(),
+  email: z.string().trim().max(255).optional(),
+  phone: z.string().trim().max(20).optional(),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(1000).default(20)
 });

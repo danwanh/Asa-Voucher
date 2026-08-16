@@ -87,14 +87,20 @@ function partnerStaffWhere(partnerId: string, staffId?: string) {
 }
 
 export async function listUsers(req: Request, res: Response) {
-  const { page, limit, role, is_active: isActive, search } = req.query as Record<string, string | number | boolean | undefined>;
+  const { page, limit, role, is_active: isActive, search, full_name: fullName, email, phone } = req.query as Record<string, string | number | boolean | undefined>;
   const { from, to } = rangeFromPagination(Number(page), Number(limit));
 
   const searchTerm = typeof search === "string" ? search.trim() : undefined;
+  const fullNameTerm = typeof fullName === "string" ? fullName.trim() : undefined;
+  const emailTerm = typeof email === "string" ? email.trim() : undefined;
+  const phoneTerm = typeof phone === "string" ? phone.trim() : undefined;
 
   const where: Prisma.UserWhereInput = {
     ...(role ? { role: role as Prisma.UserWhereInput["role"] } : {}),
     ...(typeof isActive === "boolean" ? { is_active: isActive } : {}),
+    ...(fullNameTerm ? { full_name: { contains: fullNameTerm, mode: "insensitive" } } : {}),
+    ...(emailTerm ? { email: { contains: emailTerm, mode: "insensitive" } } : {}),
+    ...(phoneTerm ? { phone: { contains: phoneTerm, mode: "insensitive" } } : {}),
     ...(searchTerm
       ? {
           OR: [
