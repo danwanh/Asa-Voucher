@@ -9,8 +9,6 @@ import {
 
 export const notificationRoutes = Router();
 
-notificationRoutes.use(requireAuth);
-
-notificationRoutes.get("/notifications", asyncHandler(getNotifications));
-notificationRoutes.patch("/notifications/read-all", asyncHandler(readAllNotifications));
-notificationRoutes.patch("/notifications/:id/read", asyncHandler(readNotification));
+notificationRoutes.get("/notifications", requireAuth, asyncHandler(getNotifications));
+notificationRoutes.patch("/notifications/read-all", requireAuth, asyncHandler(readAllNotifications));
+notificationRoutes.patch("/notifications/:id/read", requireAuth, asyncHandler(readNotification));

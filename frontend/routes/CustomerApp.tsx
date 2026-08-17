@@ -2,6 +2,7 @@ import { startTransition, useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { AppIcon } from "@/components/AppIcon"
 import { CategoryGridPage } from "@/components/CategoryGridPage"
+import { PopupModal } from "@/components/PopupModal"
 import { toast } from "sonner"
 import { CustomerLayout, type CustomerPage } from "@/layouts/CustomerLayout"
 import { HomePage } from "@/pages/customer/HomePage"
@@ -403,6 +404,7 @@ export function CustomerApp({
   }, [page, issuedPage, issuedStatus])
 
   return (
+    <>
     <CustomerLayout
       user={user}
       page={page}
@@ -414,7 +416,7 @@ export function CustomerApp({
       onNavigate={navigate}
       onLogout={onLogout}
     >
-      {page === "home" && <HomePage onAddToCart={handleAddToCart} onBuyNow={handleBuyNow} onDetail={goDetail} onNavigate={navigate} />}
+      {page === "home" && <HomePage onAddToCart={handleAddToCart} onBuyNow={handleBuyNow} onDetail={goDetail} onNavigate={navigate} onOpenArticle={(id) => router.push(`/news/${id}`)} />}
       {page === "vouchers" && (
         <VoucherListPage
           onAddToCart={handleAddToCart}
@@ -579,5 +581,7 @@ export function CustomerApp({
         />
       )}
     </CustomerLayout>
+    <PopupModal />
+    </>
   )
 }

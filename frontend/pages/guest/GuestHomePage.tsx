@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from "react"
 import { Search, Star, ChevronRight, Zap, ShieldCheck, Smartphone, TrendingUp, ChevronDown } from "lucide-react"
 import { C, fmt } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
+import { BannerCarousel } from "@/components/BannerCarousel"
+import { NewsSection } from "@/components/NewsSection"
+import { SectionHeader } from "@/components/SectionHeader"
 import type { Voucher } from "@/types"
 import { voucherService, type HomepageSummary } from "@/services/voucherService"
 import { isVoucherAvailable } from "@/hooks/useCart"
@@ -12,6 +15,7 @@ interface Props {
   onLogin: () => void
   onAddToCart: (v: Voucher) => void
   onBuyNow: (v: Voucher) => void
+  onOpenArticle: (id: string) => void
 }
 
 type GuestCategory = {
@@ -50,7 +54,7 @@ function formatCount(value: number) {
   return new Intl.NumberFormat("vi-VN").format(value)
 }
 
-export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCart, onBuyNow }: Props) {
+export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCart, onBuyNow, onOpenArticle }: Props) {
   const [openFaq, setOpenFaq] = useState<number | null>(null)
   const [vouchers, setVouchers] = useState<Voucher[]>([])
   const [categories, setCategories] = useState<GuestCategory[]>([])
@@ -144,15 +148,24 @@ export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCar
         </div>
       </section>
 
-      {/* Categories */}
-      <section className="py-12 px-4">
+      {/* Banner carousel */}
+      <section className="px-4 pt-6">
         <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-black" style={{ color: C.indigo, fontFamily: "'Nunito', sans-serif" }}>Danh mục nổi bật</h2>
-            <button onClick={() => onNavigate("categories")} className="flex items-center gap-1 text-sm font-semibold hover:underline" style={{ color: C.peach }}>
-              Xem tất cả <ChevronRight className="w-4 h-4" />
-            </button>
+          <div className="rounded-3xl border border-black/5 bg-white p-2 sm:p-3 shadow-sm">
+            <BannerCarousel />
           </div>
+        </div>
+      </section>
+
+      {/* Categories */}
+      <section className="py-14 px-4" style={{ backgroundColor: C.eggshell }}>
+        <div className="max-w-7xl mx-auto">
+          <SectionHeader
+            eyebrow="Danh mục"
+            title="Danh mục nổi bật"
+            subtitle="Khám phá ưu đãi theo từng nhóm nhu cầu"
+            action={{ label: "Xem tất cả", onClick: () => onNavigate("categories") }}
+          />
           {isLoadingVouchers ? (
             <div className="text-sm" style={{ color: "#6B7280" }}>Đang tải danh mục...</div>
           ) : visibleCategories.length > 0 ? (
@@ -180,14 +193,17 @@ export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCar
       </section>
 
       {/* Flash Sale */}
-      <section className="py-10 px-4" style={{ backgroundColor: "#FFF5F0" }}>
+      <section className="py-14 px-4" style={{ backgroundColor: "#FFF5F0" }}>
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-white text-sm" style={{ backgroundColor: C.peach }}>
                 <Zap className="w-3.5 h-3.5" /> FLASH SALE
               </div>
-              <div className="text-lg font-black" style={{ color: C.indigo, fontFamily: "'Nunito', sans-serif" }}>Ưu đãi sốc hôm nay</div>
+              <div>
+                <div className="text-lg font-black" style={{ color: C.indigo, fontFamily: "'Nunito', sans-serif" }}>Ưu đãi sốc hôm nay</div>
+                <div className="text-xs mt-0.5" style={{ color: "#8A8DA8" }}>Giảm từ 30% trở lên, số lượng có hạn</div>
+              </div>
             </div>
             <button onClick={() => onNavigate("vouchers")} className="flex items-center gap-1 text-sm font-semibold hover:underline" style={{ color: C.peach }}>
               Xem thêm <ChevronRight className="w-4 h-4" />
@@ -208,14 +224,14 @@ export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCar
       </section>
 
       {/* Featured Vouchers */}
-      <section className="py-12 px-4">
+      <section className="py-14 px-4">
         <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-black" style={{ color: C.indigo, fontFamily: "'Nunito', sans-serif" }}>Voucher nổi bật</h2>
-            <button onClick={() => onNavigate("vouchers")} className="flex items-center gap-1 text-sm font-semibold hover:underline" style={{ color: C.peach }}>
-              Xem tất cả <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
+          <SectionHeader
+            eyebrow="Gợi ý cho bạn"
+            title="Voucher nổi bật"
+            subtitle="Chọn lọc những ưu đãi được yêu thích nhất"
+            action={{ label: "Xem tất cả", onClick: () => onNavigate("vouchers") }}
+          />
           {isLoadingVouchers ? (
             <div className="text-sm" style={{ color: "#6B7280" }}>Đang tải voucher nổi bật...</div>
           ) : featured.length === 0 ? (
@@ -230,8 +246,11 @@ export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCar
         </div>
       </section>
 
+      {/* News / Articles */}
+      <NewsSection onOpenArticle={onOpenArticle} />
+
       {/* How it works */}
-      <section className="py-14 px-4" style={{ backgroundColor: C.muted }}>
+      <section className="py-14 px-4" style={{ backgroundColor: "#EAF2EE" }}>
         <div className="max-w-5xl mx-auto text-center">
           <h2 className="text-2xl font-black mb-2" style={{ color: C.indigo, fontFamily: "'Nunito', sans-serif" }}>Quy trình mua voucher</h2>
           <p className="text-sm mb-10" style={{ color: "#6B7280" }}>Đơn giản, nhanh chóng, an toàn</p>
@@ -255,7 +274,7 @@ export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCar
       </section>
 
       {/* FAQ */}
-      <section className="py-12 px-4" style={{ backgroundColor: C.muted }}>
+      <section className="py-14 px-4" style={{ backgroundColor: C.muted }}>
         <div className="max-w-3xl mx-auto">
           <h2 className="text-2xl font-black text-center mb-8" style={{ color: C.indigo, fontFamily: "'Nunito', sans-serif" }}>Câu hỏi thường gặp</h2>
           <div className="flex flex-col gap-3">

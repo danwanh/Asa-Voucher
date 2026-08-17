@@ -1,0 +1,1 @@
+ALTER TABLE "cms_contents" DROP COLUMN "display_time";

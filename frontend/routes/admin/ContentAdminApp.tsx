@@ -1,16 +1,17 @@
 import { useEffect, useState, useCallback } from "react"
-import { LayoutDashboard, FileText, Tag, User } from "lucide-react"
+import { LayoutDashboard, FileText, Tag, User, Layers } from "lucide-react"
 import { SubAdminLayout, type SubAdminRole, type SubAdminNavItem } from "@/layouts/admin/SubAdminLayout"
 import { AdminContentDashboardPage } from "@/pages/admin/AdminContentDashboardPage"
 import { ContentManagementPage } from "@/pages/admin/ContentManagementPage"
+import { CategoryManagementPage } from "@/pages/admin/CategoryManagementPage"
 import { VoucherApprovalPage } from "@/pages/admin/VoucherApprovalPage"
 import { AdminProfilePage } from "@/pages/admin/AdminProfilePage"
 import type { AppUser } from "@/types"
 import { voucherService } from "@/services/voucherService"
 
-type Page = "dashboard" | "content" | "approval" | "profile"
+type Page = "dashboard" | "content" | "categories" | "approval" | "profile"
 
-const VALID_PAGES: Page[] = ["dashboard", "content", "approval", "profile"]
+const VALID_PAGES: Page[] = ["dashboard", "content", "categories", "approval", "profile"]
 
 function getInitialPage(initialPage?: "profile"): Page {
   if (typeof window !== "undefined") {
@@ -73,19 +74,21 @@ export function ContentAdminApp({ user, onLogout, onSwitchRole, initialPage }: P
   }, [])
 
   const NAV: SubAdminNavItem[] = [
-    { label: "Dashboard",         pg: "dashboard", icon: <LayoutDashboard className="w-4 h-4" /> },
-    { label: "Quản lý Nội dung",  pg: "content",   icon: <FileText className="w-4 h-4" /> },
-    { label: "Duyệt Voucher",     pg: "approval",  icon: <Tag className="w-4 h-4" />, badge: pendingCount },
-    { label: "Hồ sơ",             pg: "profile",   icon: <User className="w-4 h-4" /> },
+    { label: "Dashboard",         pg: "dashboard",   icon: <LayoutDashboard className="w-4 h-4" /> },
+    { label: "Quản lý Nội dung",  pg: "content",     icon: <FileText className="w-4 h-4" /> },
+    { label: "Quản lý Danh mục",  pg: "categories",  icon: <Layers className="w-4 h-4" /> },
+    { label: "Duyệt Voucher",     pg: "approval",    icon: <Tag className="w-4 h-4" />, badge: pendingCount },
+    { label: "Hồ sơ",             pg: "profile",     icon: <User className="w-4 h-4" /> },
   ]
 
   return (
     <SubAdminLayout user={user} role={ROLE} page={page} navItems={NAV}
       onNavigate={handleNavigate} onLogout={onLogout} onSwitchRole={onSwitchRole}>
-      {page === "dashboard" && <AdminContentDashboardPage />}
-      {page === "content"   && <ContentManagementPage />}
-      {page === "approval"  && <VoucherApprovalPage />}
-      {page === "profile"   && <AdminProfilePage user={user} onLogout={onLogout} />}
+      {page === "dashboard"   && <AdminContentDashboardPage />}
+      {page === "content"     && <ContentManagementPage />}
+      {page === "categories"  && <CategoryManagementPage />}
+      {page === "approval"    && <VoucherApprovalPage />}
+      {page === "profile"     && <AdminProfilePage user={user} onLogout={onLogout} />}
     </SubAdminLayout>
   )
 }

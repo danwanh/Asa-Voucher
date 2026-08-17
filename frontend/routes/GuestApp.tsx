@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { AppIcon } from "@/components/AppIcon"
 import { CategoryGridPage } from "@/components/CategoryGridPage"
+import { PopupModal } from "@/components/PopupModal"
 import { toast } from "sonner"
 import { GuestLayout, type GuestPage } from "@/layouts/GuestLayout"
 import { GuestHomePage } from "@/pages/guest/GuestHomePage"
@@ -126,6 +127,7 @@ export function GuestApp({ onLogin, onRegister, onCheckout, cartAdd, cartCount, 
   }
 
   return (
+    <>
     <GuestLayout
       page={page}
       onNavigate={navigate}
@@ -144,6 +146,7 @@ export function GuestApp({ onLogin, onRegister, onCheckout, cartAdd, cartCount, 
           onLogin={onLogin}
           onAddToCart={handleAddToCart}
           onBuyNow={handleBuyNow}
+          onOpenArticle={(id) => router.push(`/news/${id}`)}
         />
       )}
       {page === "vouchers" && (
@@ -220,6 +223,8 @@ export function GuestApp({ onLogin, onRegister, onCheckout, cartAdd, cartCount, 
         </div>
       )}
     </GuestLayout>
+    <PopupModal />
+    </>
   )
 }
 

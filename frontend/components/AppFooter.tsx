@@ -1,5 +1,8 @@
+import { useEffect, useState } from "react"
 import { Tag } from "lucide-react"
 import { C } from "@/utils/constants"
+import { cmsContentService } from "@/services/cmsContentService"
+import type { CmsContent } from "@/types"
 
 type FooterAction = "vouchers" | "categories" | "support" | "business" | "terms" | "policy" | "privacy"
 
@@ -53,6 +56,25 @@ export function AppFooter({
   onPolicy,
   onPrivacy,
 }: AppFooterProps) {
+  const [policies, setPolicies] = useState<CmsContent[]>([])
+  const [policiesLoading, setPoliciesLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    setPoliciesLoading(true)
+    cmsContentService.listPublic("policy")
+      .then((items) => {
+        if (!cancelled) setPolicies(items)
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setPoliciesLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const actions: Record<FooterAction, () => void> = {
     vouchers: onVouchers,
     categories: onCategories,
@@ -66,7 +88,7 @@ export function AppFooter({
   return (
     <footer className="border-t border-black/8 py-12" style={{ backgroundColor: C.indigo }}>
       <div className="max-w-7xl mx-auto px-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8 mb-8">
           <div>
             <button
               type="button"
@@ -100,6 +122,34 @@ export function AppFooter({
               ))}
             </div>
           ))}
+
+          <div>
+            <div className="font-bold text-sm mb-3 text-white/90">Chính sách</div>
+            {policiesLoading ? (
+              <div className="space-y-2" aria-busy="true" aria-label="Đang tải chính sách">
+                <div className="h-3 w-3/4 rounded-full animate-pulse" style={{ backgroundColor: "rgba(255,255,255,0.15)" }} />
+                <div className="h-3 w-2/3 rounded-full animate-pulse" style={{ backgroundColor: "rgba(255,255,255,0.15)" }} />
+                <div className="h-3 w-1/2 rounded-full animate-pulse" style={{ backgroundColor: "rgba(255,255,255,0.15)" }} />
+              </div>
+            ) : policies.length > 0 ? policies.map((policy) => (
+              <a
+                key={policy.id}
+                href={`/policy?title=${encodeURIComponent(policy.title)}`}
+                className="block text-sm py-0.5 text-white/50 hover:text-white transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                style={{ outlineColor: C.apricot }}
+              >
+                {policy.title}
+              </a>
+            )) : (
+              <button
+                type="button"
+                onClick={onPolicy}
+                className="block text-left text-sm py-0.5 text-white/50 hover:text-white transition-colors"
+              >
+                Chính sách
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="border-t border-white/10 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">

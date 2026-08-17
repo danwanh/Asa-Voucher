@@ -12,22 +12,23 @@ import {
 
 export const rbacRoutes = Router();
 
-rbacRoutes.use(requireAuth);
-
 rbacRoutes.get(
   "/roles",
+  requireAuth,
   requireRole("admin_security"),
   asyncHandler(rbacController.listRoles),
 );
 
 rbacRoutes.get(
   "/roles/:id",
+  requireAuth,
   requireRole("admin_security"),
   asyncHandler(rbacController.getRole),
 );
 
 rbacRoutes.post(
   "/roles",
+  requireAuth,
   requireRole("admin_security"),
   validateBody(createRoleSchema),
   asyncHandler(rbacController.createRole),
@@ -35,6 +36,7 @@ rbacRoutes.post(
 
 rbacRoutes.patch(
   "/roles/:id",
+  requireAuth,
   requireRole("admin_security"),
   validateBody(updateRoleSchema),
   asyncHandler(rbacController.updateRole),
@@ -42,18 +44,21 @@ rbacRoutes.patch(
 
 rbacRoutes.delete(
   "/roles/:id",
+  requireAuth,
   requireRole("admin_security"),
   asyncHandler(rbacController.deleteRole),
 );
 
 rbacRoutes.get(
   "/permissions",
+  requireAuth,
   requireRole("admin_security"),
   asyncHandler(rbacController.listPermissions),
 );
 
 rbacRoutes.put(
   "/roles/:id/permissions",
+  requireAuth,
   requireRole("admin_security"),
   validateBody(updatePermissionsSchema),
   asyncHandler(rbacController.updateRolePermissions),

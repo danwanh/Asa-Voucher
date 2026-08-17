@@ -14,9 +14,21 @@ export type CmsContentFilters = {
   limit?: number
 }
 
+export type CmsContentType = "banner" | "article" | "popup" | "policy"
+
 export const cmsContentService = {
   async list(filters?: CmsContentFilters) {
     const res = await api.get<ApiData<{ rows: CmsContent[]; total: number }>>("/cms-contents", { params: filters })
+    return data(res)
+  },
+
+  async listPublic(type: CmsContentType) {
+    const res = await api.get<ApiData<CmsContent[]>>("/cms-contents/public", { params: { type } })
+    return data(res)
+  },
+
+  async getById(id: string) {
+    const res = await api.get<ApiData<CmsContent>>(`/cms-contents/${id}`)
     return data(res)
   },
 
@@ -25,7 +37,6 @@ export const cmsContentService = {
     title: string
     content?: string
     image_url?: string
-    display_time?: string
     status?: string
     sort_order?: number
   }) {
@@ -41,5 +52,9 @@ export const cmsContentService = {
   async toggleStatus(id: string) {
     const res = await api.patch<ApiData<CmsContent>>(`/cms-contents/${id}/toggle-status`)
     return data(res)
+  },
+
+  async remove(id: string) {
+    await api.delete(`/cms-contents/${id}`)
   },
 }

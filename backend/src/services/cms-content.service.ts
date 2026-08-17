@@ -1,20 +1,33 @@
 import { prisma } from "../config/prisma.js";
 import { HttpError } from "../utils/http-error.js";
+import { createCloudinarySignature } from "../utils/cloudinary.js";
 import * as cmsContentRepo from "../repositories/cms-content.repository.js"
 import { ListCmsContentQuery, CreateCmsContentInput,  UpdateCmsContentInput} from "../validations/cms-content.validation.js";
 import { AuthUser } from "../types/auth.types.js";
 
-// Hàm để lấy danh sách
 export async function listCmsContents(query: ListCmsContentQuery) {
   return cmsContentRepo.listCmsContents(query);
 }
 
-// Hàm cho phần tạo content và audit log lại
+export async function listPublicCmsContents(contentType: string) {
+  return cmsContentRepo.listActiveCmsContentsByType(contentType);
+}
+
+export async function getPublicCmsContentById(id: string) {
+  const content = await cmsContentRepo.findCmsContentById(id);
+  if (!content || content.status !== "active") throw new HttpError(404, "Nội dung không tồn tại");
+  return content;
+}
+
+export function createMediaSignature() {
+  return createCloudinarySignature("asa-voucher/cms");
+}
+
 export async function createCmsContent(user: AuthUser, input: CreateCmsContentInput) {
   return prisma.$transaction(async (tx) => {
     // 1. Create content
     const content = await tx.cmsContent.create({
-      data: { ...input, display_time: input.display_time ? new Date(input.display_time) : null, created_by: user.id }
+      data: { ...input, created_by: user.id }
     });
 
     // 2. Audit log (RB-12)
@@ -31,7 +44,6 @@ export async function createCmsContent(user: AuthUser, input: CreateCmsContentIn
   });
 }
 
-// Hàm cho update content và audit log lại
 export async function updateCmsContent(user: AuthUser, id: string, input: UpdateCmsContentInput) {
   return prisma.$transaction(async (tx) => {
     // 1. Check exists
@@ -40,7 +52,6 @@ export async function updateCmsContent(user: AuthUser, id: string, input: Update
 
     // 2. Update
     const updateData: Record<string, unknown> = { ...input };
-    if (input.display_time) updateData.display_time = new Date(input.display_time);
     const content = await tx.cmsContent.update({ where: { id }, data: updateData });
 
     // 3. Audit log
@@ -57,7 +68,6 @@ export async function updateCmsContent(user: AuthUser, id: string, input: Update
   });
 }
 
-// Hàm để toggle và audit log
 export async function toggleCmsContentStatus(user: AuthUser, id: string) {
   return prisma.$transaction(async (tx) => {
     const existing = await tx.cmsContent.findUnique({ where: { id } });
@@ -76,5 +86,23 @@ export async function toggleCmsContentStatus(user: AuthUser, id: string) {
     });
 
     return content;
+  });
+}
+
+export async function deleteCmsContent(user: AuthUser, id: string) {
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.cmsContent.findUnique({ where: { id } });
+    if (!existing) throw new HttpError(404, "Nội dung không tồn tại");
+
+    await tx.cmsContent.delete({ where: { id } });
+
+    await tx.adminLog.create({
+      data: {
+        admin_id: user.id,
+        action: "DELETE",
+        content_type: existing.content_type,
+        description: `Deleted ${existing.content_type}: ${existing.title}`,
+      }
+    });
   });
 }

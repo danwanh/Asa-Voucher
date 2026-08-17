@@ -1,7 +1,7 @@
-import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Grid3x3, Home, Info, LogIn, Menu, Search, ShoppingCart, Tag, UserPlus, X } from "lucide-react"
+import { Grid3x3, Home, Info, LogIn, Search, ShoppingCart, Tag } from "lucide-react"
 import { AppFooter } from "@/components/AppFooter"
+import { GuestSiteHeader } from "@/components/GuestSiteHeader"
 import { C } from "@/utils/constants"
 
 export type GuestPage = "home" | "vouchers" | "detail" | "categories" | "about" | "contact" | "cart"
@@ -47,121 +47,23 @@ export function GuestLayout({
   onVoucherSearchFocus,
   children
 }: Props) {
-  const [mobileOpen, setMobileOpen] = useState(false)
   const router = useRouter()
   const activePage = page === "detail" ? "vouchers" : page
 
   return (
     <div className="min-h-screen pb-16 md:pb-0 flex flex-col" style={{ backgroundColor: C.content, fontFamily: "'Nunito', sans-serif" }}>
       {/* Header */}
-      <header className="sticky top-0 z-50 shadow-sm" style={{ backgroundColor: C.indigo }}>
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center gap-4">
-          {/* Logo */}
-          <button
-            onClick={() => onNavigate("home")}
-            className="flex items-center gap-2 flex-shrink-0"
-          >
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center font-black text-sm" style={{ backgroundColor: C.peach, color: "white" }}>
-              A
-            </div>
-            <span className="font-black text-lg text-white hidden sm:block">Asa</span>
-          </button>
-
-          <div className="flex-1 max-w-md">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "#8A8DA8" }} />
-              <input
-                className="w-full pl-9 pr-4 py-2 rounded-xl text-sm outline-none"
-                style={{ backgroundColor: "rgba(255,255,255,0.12)", color: "white", fontFamily: "'Inter', sans-serif" }}
-                placeholder="Tìm voucher..."
-                type="search"
-                name="guest-voucher-search"
-                autoComplete="new-password"
-                value={voucherSearch}
-                onFocus={onVoucherSearchFocus}
-                onChange={(e) => onVoucherSearchChange(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {/* Desktop nav */}
-          <nav className="hidden md:flex items-center gap-0.5">
-            {DESKTOP_NAV.map((n) => (
-              <button
-                key={n.value}
-                onClick={() => onNavigate(n.value)}
-                className="px-3 py-2 rounded-xl text-sm font-semibold flex items-center gap-1.5 transition-colors"
-                style={{
-                  color: activePage === n.value ? C.apricot : "rgba(244,241,222,0.75)",
-                  backgroundColor: activePage === n.value ? "rgba(255,255,255,0.1)" : "transparent",
-                }}
-              >
-                {n.icon}{n.label}
-              </button>
-            ))}
-          </nav>
-
-          {/* Auth buttons + cart */}
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => onNavigate("cart")}
-              className="relative p-2 rounded-xl hover:bg-white/10 transition-colors"
-              aria-label="Giỏ hàng"
-            >
-              <ShoppingCart className="w-5 h-5 text-white" />
-              {cartCount !== null && cartCount > 0 ? (
-                <span
-                  className="absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-xs font-black text-white"
-                  style={{ backgroundColor: C.peach }}
-                >
-                  {cartCount > 9 ? "9+" : cartCount}
-                </span>
-              ) : null}
-            </button>
-            <button
-              onClick={onLogin}
-              className="hidden md:flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold hover:bg-white/10 transition-colors"
-              style={{ color: "rgba(244,241,222,0.8)" }}
-            >
-              <LogIn className="w-4 h-4" />
-              <span className="hidden lg:inline">Đăng nhập</span>
-            </button>
-            <button
-              onClick={onRegister}
-              className="hidden md:flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90"
-              style={{ backgroundColor: C.peach }}
-            >
-              <UserPlus className="w-4 h-4" />
-              Đăng ký
-            </button>
-            <button className="md:hidden p-2 rounded-xl hover:bg-white/10" onClick={() => setMobileOpen(!mobileOpen)}>
-              {mobileOpen ? <X className="w-5 h-5 text-white" /> : <Menu className="w-5 h-5 text-white" />}
-            </button>
-          </div>
-        </div>
-
-        {/* Mobile menu */}
-        {mobileOpen && (
-          <div className="md:hidden border-t px-4 py-3 flex flex-wrap gap-2" style={{ borderColor: "rgba(255,255,255,0.1)", backgroundColor: C.indigo }}>
-            {DESKTOP_NAV.map((n) => (
-              <button
-                key={n.value}
-                onClick={() => { onNavigate(n.value); setMobileOpen(false) }}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold"
-                style={{ backgroundColor: activePage === n.value ? C.peach : "rgba(255,255,255,0.1)", color: "white" }}
-              >
-                {n.icon}{n.label}
-              </button>
-            ))}
-            <button onClick={() => { onLogin(); setMobileOpen(false) }} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold" style={{ backgroundColor: "rgba(255,255,255,0.1)", color: "white" }}>
-              <LogIn className="w-4 h-4" /> Đăng nhập
-            </button>
-            <button onClick={() => { onRegister(); setMobileOpen(false) }} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold text-white" style={{ backgroundColor: C.peach }}>
-              <UserPlus className="w-4 h-4" /> Đăng ký
-            </button>
-          </div>
-        )}
-      </header>
+      <GuestSiteHeader
+        active={activePage}
+        navItems={DESKTOP_NAV.map((n) => ({ label: n.label, id: n.value, onClick: () => onNavigate(n.value) }))}
+        cartCount={cartCount}
+        cartOnClick={() => onNavigate("cart")}
+        loginOnClick={onLogin}
+        registerOnClick={onRegister}
+        searchValue={voucherSearch}
+        onSearchChange={onVoucherSearchChange}
+        onSearchFocus={onVoucherSearchFocus}
+      />
 
       {/* Content */}
       <main className="flex-1" style={{ backgroundColor: C.content }}>{children}</main>

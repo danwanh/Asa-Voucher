@@ -22,9 +22,16 @@ export async function findCmsContentById(id: string) {
   return prisma.cmsContent.findUnique({ where: { id } });
 }
 
+export async function listActiveCmsContentsByType(contentType: string) {
+  return prisma.cmsContent.findMany({
+    where: { content_type: contentType, status: "active" },
+    orderBy: [{ sort_order: "asc" }, { created_at: "desc" }],
+  });
+}
+
 export async function createCmsContent(data: {
   content_type: string; title: string; content?: string | null;
-  image_url?: string | null; display_time?: Date | null;
+  image_url?: string | null;
   status: string; sort_order: number; created_by?: string | null;
 }) {
   return prisma.cmsContent.create({ data });
@@ -38,11 +45,6 @@ export async function toggleCmsContentStatus(id: string, newStatus: string) {
   return prisma.cmsContent.update({ where: { id }, data: { status: newStatus, updated_at: new Date() } });
 }
 
-export async function createAdminLog(tx: any, input: {
-  admin_id: string;
-  action: string;
-  description?: string;
-  content_type?: string;
-}) {
-  return tx.adminLog.create({ data: input });
+export async function deleteCmsContent(id: string) {
+  return prisma.cmsContent.delete({ where: { id } });
 }

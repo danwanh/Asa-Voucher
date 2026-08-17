@@ -549,7 +549,6 @@ model CmsContent {
   title        String    @db.VarChar(255)
   content      String?
   image_url    String?   @db.VarChar(500)
-  display_time DateTime? @db.Timestamptz(6)
   status       String    @default("active") @db.VarChar(20)
   sort_order   Int       @default(0)
   created_by   String?   @db.Uuid

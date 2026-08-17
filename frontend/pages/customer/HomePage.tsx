@@ -2,6 +2,9 @@ import { useEffect, useState } from "react"
 import { ChevronRight } from "lucide-react"
 import { C, formatCategoryLabel } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
+import { BannerCarousel } from "@/components/BannerCarousel"
+import { NewsSection } from "@/components/NewsSection"
+import { SectionHeader } from "@/components/SectionHeader"
 import { VoucherCard } from "@/components/VoucherCard"
 import type { Voucher } from "@/types"
 import type { CustomerPage } from "@/layouts/CustomerLayout"
@@ -13,9 +16,10 @@ interface Props {
   onBuyNow: (v: Voucher) => void
   onDetail: (v: Voucher) => void
   onNavigate: (p: CustomerPage) => void
+  onOpenArticle: (id: string) => void
 }
 
-export function HomePage({ onAddToCart, onBuyNow, onDetail, onNavigate }: Props) {
+export function HomePage({ onAddToCart, onBuyNow, onDetail, onNavigate, onOpenArticle }: Props) {
   const [activeCat, setActiveCat] = useState("all")
   const [vouchers, setVouchers] = useState<Voucher[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -79,6 +83,13 @@ export function HomePage({ onAddToCart, onBuyNow, onDetail, onNavigate }: Props)
         <div className="absolute top-8 right-32 w-32 h-32 rounded-full opacity-10" style={{ backgroundColor: C.teal }} />
       </div>
 
+      {/* Banner carousel */}
+      <div className="max-w-6xl mx-auto px-4 pt-6">
+        <div className="rounded-3xl border border-black/5 bg-white p-2 sm:p-3 shadow-sm">
+          <BannerCarousel />
+        </div>
+      </div>
+
       {/* Category pills */}
       <div className="max-w-6xl mx-auto px-4 -mt-5 relative z-10">
         <div className="bg-card rounded-3xl p-5 shadow-lg flex flex-wrap gap-2 justify-center">
@@ -99,53 +110,56 @@ export function HomePage({ onAddToCart, onBuyNow, onDetail, onNavigate }: Props)
       </div>
 
       {/* Featured vouchers */}
-      <div className="max-w-6xl mx-auto px-4 py-10">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-black" style={{ color: C.indigo }}>Voucher nổi bật</h2>
-          <button
-            onClick={() => onNavigate("vouchers")}
-            className="flex items-center gap-1 text-sm font-semibold hover:underline"
-            style={{ color: C.peach }}
-          >
-            Xem tất cả <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
+      <div className="bg-card py-12" style={{ backgroundColor: C.eggshell }}>
+        <div className="max-w-6xl mx-auto px-4">
+          <SectionHeader
+            eyebrow="Gợi ý cho bạn"
+            title="Voucher nổi bật"
+            action={{ label: "Xem tất cả", onClick: () => onNavigate("vouchers") }}
+          />
 
-        {isLoading ? (
-          <LoadingState label="Đang tải voucher..." variant="section" size="sm" />
-        ) : featured.length === 0 ? (
-          <div className="text-center py-16">
-            <AppIcon name="search" className="w-10 h-10 mb-3 mx-auto" />
-            <div className="font-bold" style={{ color: C.indigo }}>Không có voucher trong danh mục này</div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {featured.map((v) => (
-              <VoucherCard key={v.id} voucher={v} onAddToCart={() => onAddToCart(v)} onBuyNow={() => onBuyNow(v)} onClick={() => onDetail(v)} />
-            ))}
-          </div>
-        )}
+          {isLoading ? (
+            <LoadingState label="Đang tải voucher..." variant="section" size="sm" />
+          ) : featured.length === 0 ? (
+            <div className="text-center py-16">
+              <AppIcon name="search" className="w-10 h-10 mb-3 mx-auto" />
+              <div className="font-bold" style={{ color: C.indigo }}>Không có voucher trong danh mục này</div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {featured.map((v) => (
+                <VoucherCard key={v.id} voucher={v} onAddToCart={() => onAddToCart(v)} onBuyNow={() => onBuyNow(v)} onClick={() => onDetail(v)} />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Trust banners */}
-      <div className="max-w-6xl mx-auto px-4 pb-12">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {[
-            { icon: "shield", title: "Cam kết hoàn tiền", desc: "Hoàn tiền 100% nếu không sử dụng được" },
-            { icon: "zap", title: "Giao mã tức thì", desc: "Nhận mã voucher ngay sau khi thanh toán" },
-            { icon: "shield", title: "Đối tác uy tín", desc: "124 đối tác được xác thực chất lượng" },
-          ].map((b) => (
-            <div key={b.title} className="bg-card rounded-2xl p-5 flex items-start gap-4 shadow-sm">
-              <AppIcon name={b.icon} className="w-8 h-8" />
-              <div>
-                <div className="font-bold text-sm" style={{ color: C.indigo }}>{b.title}</div>
-                <div className="text-xs mt-0.5" style={{ color: "#8A8DA8" }}>{b.desc}</div>
+      <div className="py-12">
+        <div className="max-w-6xl mx-auto px-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {[
+              { icon: "shield", title: "Cam kết hoàn tiền", desc: "Hoàn tiền 100% nếu không sử dụng được" },
+              { icon: "zap", title: "Giao mã tức thì", desc: "Nhận mã voucher ngay sau khi thanh toán" },
+              { icon: "shield", title: "Đối tác uy tín", desc: "124 đối tác được xác thực chất lượng" },
+            ].map((b) => (
+              <div key={b.title} className="bg-card rounded-2xl p-5 flex items-start gap-4 shadow-sm">
+                <AppIcon name={b.icon} className="w-8 h-8" />
+                <div>
+                  <div className="font-bold text-sm" style={{ color: C.indigo }}>{b.title}</div>
+                  <div className="text-xs mt-0.5" style={{ color: "#8A8DA8" }}>{b.desc}</div>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
-      
+
+      {/* News / Articles */}
+      <div>
+        <NewsSection onOpenArticle={onOpenArticle} background="#EAF2EE" />
+      </div>
     </div>
   )
 }

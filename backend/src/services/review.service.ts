@@ -1,6 +1,5 @@
 import { HttpError } from "../utils/http-error.js";
-import { env } from "../config/env.js";
-import { v2 as cloudinary } from "cloudinary";
+import { createCloudinarySignature } from "../utils/cloudinary.js";
 import { buildPaginatedResult } from "../utils/pagination.js";
 import * as reviewRepo from "../repositories/review.repository.js";
 import * as reviewResponseRepo from "../repositories/review-response.repository.js";
@@ -26,15 +25,7 @@ export async function listPublicReviews(
 }
 
 export async function createMediaSignature() {
-  if (!env.CLOUDINARY_CLOUD_NAME || !env.CLOUDINARY_API_KEY || !env.CLOUDINARY_API_SECRET) {
-    throw new HttpError(503, "Upload ảnh hiện chưa được cấu hình");
-  }
-
-  const timestamp = Math.floor(Date.now() / 1000);
-  const folder = "asa-voucher/feedback";
-  cloudinary.config({ cloud_name: env.CLOUDINARY_CLOUD_NAME, api_key: env.CLOUDINARY_API_KEY, api_secret: env.CLOUDINARY_API_SECRET });
-  const signature = cloudinary.utils.api_sign_request({ folder, timestamp }, env.CLOUDINARY_API_SECRET);
-  return { cloud_name: env.CLOUDINARY_CLOUD_NAME, api_key: env.CLOUDINARY_API_KEY, timestamp, folder, signature };
+  return createCloudinarySignature("asa-voucher/feedback");
 }
 
 export async function getReviewById(user: AuthUser | undefined, id: string) {

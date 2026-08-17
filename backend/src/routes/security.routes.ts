@@ -6,12 +6,9 @@ import * as securityAlertController from "../controllers/security-alert.controll
 
 export const securityRoutes = Router();
 
-securityRoutes.use(requireAuth);
-securityRoutes.use(requireRole("admin_security"));
-
-securityRoutes.get("/security-alerts", asyncHandler(securityAlertController.listAlerts));
-securityRoutes.get("/security-alerts/:id", asyncHandler(securityAlertController.getAlert));
-securityRoutes.patch("/security-alerts/:id/review", asyncHandler(securityAlertController.reviewAlert));
-securityRoutes.post("/security-alerts/:id/lock", asyncHandler(securityAlertController.lockAccount));
-securityRoutes.post("/security-alerts/:id/unlock", asyncHandler(securityAlertController.unlockAccount));
-securityRoutes.post("/security-alerts/detect", asyncHandler(securityAlertController.detectAnomalies));
+securityRoutes.get("/security-alerts", requireAuth, requireRole("admin_security"), asyncHandler(securityAlertController.listAlerts));
+securityRoutes.get("/security-alerts/:id", requireAuth, requireRole("admin_security"), asyncHandler(securityAlertController.getAlert));
+securityRoutes.patch("/security-alerts/:id/review", requireAuth, requireRole("admin_security"), asyncHandler(securityAlertController.reviewAlert));
+securityRoutes.post("/security-alerts/:id/lock", requireAuth, requireRole("admin_security"), asyncHandler(securityAlertController.lockAccount));
+securityRoutes.post("/security-alerts/:id/unlock", requireAuth, requireRole("admin_security"), asyncHandler(securityAlertController.unlockAccount));
+securityRoutes.post("/security-alerts/detect", requireAuth, requireRole("admin_security"), asyncHandler(securityAlertController.detectAnomalies));

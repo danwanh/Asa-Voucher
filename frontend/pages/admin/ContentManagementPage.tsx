@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react"
-import { Plus, Edit2, Eye, EyeOff, Image, FileText, Megaphone, ChevronDown, Loader2, X, AlertCircle } from "lucide-react"
-import { C, fmtDate, STATUS_LABEL } from "@/utils/constants"
+import { Plus, Edit2, Trash2, Eye, EyeOff, Image, FileText, Megaphone, Loader2, X, AlertCircle } from "lucide-react"
+import { C, fmtDate } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
+import { VoucherImageUpload } from "@/components/VoucherImageUpload"
+import { mediaUploadService } from "@/services/mediaUploadService"
 import { cmsContentService, type CmsContentFilters } from "@/services/cmsContentService"
 import type { CmsContent } from "@/types"
 
-type ContentType = "category" | "banner" | "article" | "popup" | "policy"
+type ContentType = "banner" | "article" | "popup" | "policy"
 
 const TYPE_CONFIG: Record<ContentType, { label: string; icon: React.ReactNode; color: string; bg: string }> = {
-  category: { label: "Danh mục",  icon: <AppIcon name="tag" className="w-3.5 h-3.5" />,       color: "#4338CA", bg: "#EEF2FF" },
   banner:   { label: "Banner",    icon: <Image className="w-3.5 h-3.5" />,                     color: "#B45309", bg: "#FEF3C7" },
   article:  { label: "Bài viết",  icon: <FileText className="w-3.5 h-3.5" />,                  color: "#0F766E", bg: "#CCFBF1" },
   popup:    { label: "Popup",     icon: <Megaphone className="w-3.5 h-3.5" />,                 color: "#7C3AED", bg: "#EDE9FE" },
@@ -30,14 +31,16 @@ export function ContentManagementPage() {
   const [showModal, setShowModal] = useState(false)
   const [editItem, setEditItem] = useState<CmsContent | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [toast, setToast] = useState<{ type: "success" | "error"; msg: string } | null>(null)
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null)
 
   const [form, setForm] = useState({
     content_type: "banner" as ContentType,
     title: "",
     content: "",
     image_url: "",
-    display_time: "",
     status: "active",
     sort_order: 0,
   })
@@ -65,18 +68,19 @@ export function ContentManagementPage() {
 
   function openCreate() {
     setEditItem(null)
-    setForm({ content_type: "banner", title: "", content: "", image_url: "", display_time: "", status: "active", sort_order: items.length + 1 })
+    setSelectedImageFile(null)
+    setForm({ content_type: "banner", title: "", content: "", image_url: "", status: "active", sort_order: items.length + 1 })
     setShowModal(true)
   }
 
   function openEdit(item: CmsContent) {
     setEditItem(item)
+    setSelectedImageFile(null)
     setForm({
       content_type: item.content_type as ContentType,
       title: item.title,
       content: item.content || "",
       image_url: item.image_url || "",
-      display_time: item.display_time ? item.display_time.slice(0, 16) : "",
       status: item.status,
       sort_order: item.sort_order,
     })
@@ -87,12 +91,15 @@ export function ContentManagementPage() {
     if (!form.title.trim()) return
     setIsSaving(true)
     try {
+      let imageUrl = form.image_url || undefined
+      if (selectedImageFile) {
+        imageUrl = await mediaUploadService.uploadImage(selectedImageFile)
+      }
       const payload = {
         content_type: form.content_type,
         title: form.title,
         content: form.content || undefined,
-        image_url: form.image_url || undefined,
-        display_time: form.display_time || undefined,
+        image_url: imageUrl,
         status: form.status,
         sort_order: form.sort_order,
       }
@@ -110,6 +117,23 @@ export function ContentManagementPage() {
       showToast("error", msg)
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (!deleteId) return
+    setIsDeleting(true)
+    try {
+      await cmsContentService.remove(deleteId)
+      setDeleteId(null)
+      showToast("success", "Xóa nội dung thành công")
+      loadContents()
+    } catch (err: any) {
+      const msg = err?.response?.data?.error?.message || "Xóa nội dung thất bại"
+      setDeleteId(null)
+      showToast("error", msg)
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -146,7 +170,7 @@ export function ContentManagementPage() {
 
       {/* Type tabs */}
       <div className="flex flex-wrap gap-2 mb-4">
-        {(["category", "banner", "article", "popup", "policy"] as ContentType[]).map((t) => {
+        {(["banner", "article", "popup", "policy"] as ContentType[]).map((t) => {
           const tc = TYPE_CONFIG[t]
           const active = filters.content_type === t
           return (
@@ -213,7 +237,6 @@ export function ContentManagementPage() {
                     <p className="text-xs line-clamp-1" style={{ color: "#6B7280" }}>{item.content || "—"}</p>
                     <div className="flex items-center gap-3 mt-1.5 text-xs" style={{ color: "#9CA3AF" }}>
                       <span>Tạo {fmtDate(item.created_at)}</span>
-                      {item.display_time && <span>Hiển thị: {fmtDate(item.display_time)}</span>}
                     </div>
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
@@ -222,6 +245,9 @@ export function ContentManagementPage() {
                     </button>
                     <button onClick={() => openEdit(item)} className="p-2 rounded-xl hover:bg-gray-100 transition-colors" title="Chỉnh sửa">
                       <Edit2 className="w-4 h-4" style={{ color: "#6B7280" }} />
+                    </button>
+                    <button onClick={() => setDeleteId(item.id)} className="p-2 rounded-xl hover:bg-gray-100 transition-colors" title="Xóa">
+                      <Trash2 className="w-4 h-4" style={{ color: "#DC2626" }} />
                     </button>
                   </div>
                 </div>
@@ -253,8 +279,8 @@ export function ContentManagementPage() {
               {/* Type */}
               <div>
                 <label className="block text-sm font-bold mb-2" style={{ color: "#6B7280" }}>Loại nội dung</label>
-                <div className="grid grid-cols-5 gap-2">
-                  {(["category", "banner", "article", "popup", "policy"] as ContentType[]).map((t) => {
+<div className="grid grid-cols-4 gap-2">
+                  {(["banner", "article", "popup", "policy"] as ContentType[]).map((t) => {
                     const tc = TYPE_CONFIG[t]
                     return (
                       <button key={t} onClick={() => setForm({ ...form, content_type: t })}
@@ -282,11 +308,23 @@ export function ContentManagementPage() {
                   className="w-full px-4 py-2.5 rounded-xl border-2 text-sm outline-none resize-none" style={{ borderColor: "#E5E7EB" }} />
               </div>
 
-              {/* Image URL */}
+              {/* Image */}
               <div>
-                <label className="block text-sm font-bold mb-1.5" style={{ color: "#6B7280" }}>URL ảnh</label>
-                <input value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })} placeholder="https://..."
-                  className="w-full px-4 py-2.5 rounded-xl border-2 text-sm outline-none" style={{ borderColor: "#E5E7EB" }} />
+                <label className="block text-sm font-bold mb-1.5" style={{ color: "#6B7280" }}>Hình ảnh</label>
+                <VoucherImageUpload
+                  imageUrl={form.image_url}
+                  selectedFile={selectedImageFile}
+                  onFileChange={(file) => {
+                    setSelectedImageFile(file)
+                    if (file) setForm((f) => ({ ...f, image_url: "" }))
+                  }}
+                  onError={(msg) => showToast("error", msg)}
+                />
+                <div className="mt-2">
+                  <input value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })}
+                    placeholder="Hoặc dán URL ảnh: https://..."
+                    className="w-full px-4 py-2.5 rounded-xl border-2 text-sm outline-none" style={{ borderColor: "#E5E7EB" }} />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -306,19 +344,28 @@ export function ContentManagementPage() {
                     className="w-full px-3 py-2.5 rounded-xl border-2 text-sm outline-none" style={{ borderColor: "#E5E7EB" }} />
                 </div>
               </div>
-
-              {/* Display time */}
-              <div>
-                <label className="block text-sm font-bold mb-1.5" style={{ color: "#6B7280" }}>Thời gian hiển thị</label>
-                <input type="datetime-local" value={form.display_time} onChange={(e) => setForm({ ...form, display_time: e.target.value })}
-                  className="w-full px-3 py-2.5 rounded-xl border-2 text-sm outline-none" style={{ borderColor: "#E5E7EB" }} />
-              </div>
             </div>
             <div className="flex gap-3 px-6 pb-5 pt-3 border-t" style={{ borderColor: "#F3F4F6" }}>
               <button onClick={() => setShowModal(false)} className="flex-1 py-2.5 rounded-xl font-bold text-sm border-2" style={{ borderColor: "#E5E7EB", color: C.indigo }}>Hủy</button>
               <button onClick={handleSave} disabled={isSaving || !form.title.trim()} className="flex-1 py-2.5 rounded-xl font-bold text-sm text-white disabled:opacity-40" style={{ backgroundColor: C.teal }}>
                 {isSaving ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : editItem ? "Lưu thay đổi" : "Tạo nội dung"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirm */}
+      {deleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: "rgba(0,0,0,0.45)" }}>
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <h3 className="font-black text-lg" style={{ color: C.indigo, fontFamily: "'Nunito', sans-serif" }}>Xóa nội dung?</h3>
+            <p className="text-sm mt-2 mb-6" style={{ color: "#6B7280" }}>Hành động này không thể hoàn tác. Nội dung sẽ bị xóa khỏi hệ thống.</p>
+            <div className="flex gap-3">
+              <button onClick={handleDelete} disabled={isDeleting} className="flex-1 py-2.5 rounded-xl font-bold text-sm text-white disabled:opacity-40" style={{ backgroundColor: "#DC2626" }}>
+                {isDeleting ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Xóa"}
+              </button>
+              <button onClick={() => setDeleteId(null)} className="flex-1 py-2.5 rounded-xl font-bold text-sm border-2" style={{ borderColor: "#E5E7EB", color: C.indigo }}>Hủy</button>
             </div>
           </div>
         </div>

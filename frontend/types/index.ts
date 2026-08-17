@@ -457,7 +457,6 @@ export interface CmsContent {
   title: string
   content: string | null
   image_url: string | null
-  display_time: string | null
   status: string
   sort_order: number
   created_by: string | null
