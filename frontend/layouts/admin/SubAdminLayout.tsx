@@ -81,7 +81,11 @@ export function SubAdminLayout({ user, role, page, navItems, onNavigate, onLogou
           return (
             <button
               key={n.pg}
-              onClick={() => { n.pg === "profile" ? router.push(`/${user.role}/profile`) : onNavigate(n.pg); setMobileOpen(false) }}
+              onClick={() => {
+                onNavigate(n.pg)
+                if (n.pg === "profile") router.push(`/${user.role}/profile`)
+                setMobileOpen(false)
+              }}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-left transition-all"
               style={{
                 backgroundColor: active ? role.accent : "transparent",

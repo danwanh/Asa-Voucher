@@ -43,7 +43,10 @@ export type UserQuery = {
   page?: number
   limit?: number
   search?: string
-  role?: string
+  full_name?: string
+  email?: string
+  phone?: string
+  role?: Role
   is_active?: boolean
 }
 

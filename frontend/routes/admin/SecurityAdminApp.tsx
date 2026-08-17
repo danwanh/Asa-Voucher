@@ -43,10 +43,15 @@ export function SecurityAdminApp({ user, onLogout, onSwitchRole, initialPage }: 
 
   const handleNavigate = useCallback((pg: string) => {
     setPage(pg as Page)
+    if (pg === "profile") return
     const url = new URL(window.location.href)
     url.searchParams.set("tab", pg)
     window.history.replaceState({}, "", url.toString())
   }, [])
+
+  useEffect(() => {
+    if (initialPage === "profile") setPage("profile")
+  }, [initialPage])
 
   useEffect(() => {
     function onPopState() {
