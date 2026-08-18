@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import { C, fmt, fmtDate, STATUS_DESCRIPTION } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import { StatusBadge } from "@/components/StatusBadge"
-import { orderService } from "@/services/orderService"
+import { orderService, type OrderStatusCounts } from "@/services/orderService"
 import type { Order, OrderListItem } from "@/types"
 
 type Action = "cancel" | "cancel_refund_prompt" | "refund"
@@ -26,8 +26,13 @@ export function AdminOrdersPage() {
   const [cancelledSubFilter, setCancelledSubFilter] = useState<"all" | "no_refund" | "pending_refund">("all")
   const [search, setSearch] = useState("")
   const [orders, setOrders] = useState<OrderListItem[]>([])
+  const [counts, setCounts] = useState<OrderStatusCounts>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [total, setTotal] = useState(0)
+  const PAGE_SIZE = 20
 
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
@@ -54,20 +59,28 @@ export function AdminOrdersPage() {
     setLoading(true)
     setError(null)
     try {
-      const params: { status?: string; search?: string } = {}
+      const params: { status?: string; search?: string; page?: number; limit?: number } = { page, limit: PAGE_SIZE }
       if (filter !== "all") params.status = filter
       if (search.trim()) params.search = search.trim()
       const result = await orderService.listOrders(params)
       setOrders(result.items)
+      setCounts(result.countsByStatus)
+      setTotalPages(result.totalPages)
+      setTotal(result.total)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Không thể tải danh sách đơn hàng"
       setError(message)
     } finally {
       setLoading(false)
     }
-  }, [filter, search])
+  }, [filter, search, page])
 
   const isFirstRender = useRef(true)
+
+  useEffect(() => {
+    if (isFirstRender.current) return
+    setPage(1)
+  }, [filter, search])
 
   useEffect(() => {
     if (isFirstRender.current) {
@@ -198,7 +211,7 @@ export function AdminOrdersPage() {
             className="text-sm font-semibold px-3 py-1 rounded-full"
             style={{ backgroundColor: C.eggshell, color: C.indigo }}
           >
-            {loading ? "Đang tải..." : `${filteredOrders.length} đơn`}
+            {loading ? "Đang tải..." : `${orders.length}/${total} đơn`}
           </span>
         </div>
 
@@ -216,6 +229,15 @@ export function AdminOrdersPage() {
                   }}
                 >
                   {l}
+                  <span
+                    className="ml-1.5 px-1.5 py-0.5 rounded-full text-xs"
+                    style={{
+                      backgroundColor: filter === v ? "rgba(255,255,255,0.25)" : C.eggshell,
+                      color: filter === v ? "white" : C.indigo,
+                    }}
+                  >
+                    {counts[v as keyof OrderStatusCounts] ?? 0}
+                  </span>
                 </button>
                 {desc && (
                   <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 px-3 py-1.5 rounded-lg text-xs whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-10 shadow-lg" style={{ backgroundColor: "#333", color: "white" }}>
@@ -353,6 +375,32 @@ export function AdminOrdersPage() {
           </table>
         </div>
       </div>
+
+      {!loading && totalPages > 1 && (
+        <div className="flex items-center justify-between mt-4 px-1">
+          <span className="text-xs" style={{ color: "#8A8DA8" }}>
+            Trang {page}/{totalPages} · {total} đơn
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold border disabled:opacity-40"
+              style={{ borderColor: "#E2DFC8", color: C.indigo }}
+            >
+              ← Trước
+            </button>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold border disabled:opacity-40"
+              style={{ borderColor: "#E2DFC8", color: C.indigo }}
+            >
+              Sau →
+            </button>
+          </div>
+        </div>
+      )}
 
       {showPanel && (
         <div className="fixed inset-0 z-50 flex justify-end" onClick={() => setShowPanel(false)}>

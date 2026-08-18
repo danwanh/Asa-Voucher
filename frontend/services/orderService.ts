@@ -255,7 +255,7 @@ export const orderService = {
     return request
   },
 
-  async listOrders(params?: { status?: string; payment_status?: string; search?: string }) {
+  async listOrders(params?: { status?: string; payment_status?: string; search?: string; page?: number; limit?: number }) {
     return this.list(params)
   },
 
