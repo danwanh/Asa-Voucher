@@ -15,12 +15,13 @@ export const getDashboardStats = async ({
   from,
   to,
 }: DashboardFilter = {}) => {
+  const toForFilter = to ? endOfUtcDay(to) : undefined
   const createdAtFilter =
     from || to
       ? {
           created_at: {
             ...(from ? { gte: from } : {}),
-            ...(to ? { lte: to } : {}),
+            ...(toForFilter ? { lte: toForFilter } : {}),
           },
         }
       : {}
@@ -30,18 +31,18 @@ export const getDashboardStats = async ({
   const startDate = new Date(now.getFullYear(), now.getMonth() - monthsBack + 1, 1)
 
   const chartFrom = from && new Date(from) > startDate ? new Date(from) : startDate
-  const chartTo = to ? new Date(to) : now
+  const chartTo = toForFilter ?? now
 
   const [users, partners, orders, revenue, paidPayments, recentPartners, recentOrdersRaw] = await Promise.all([
-    prisma.user.count({ where: createdAtFilter }),
-    prisma.partner.count({ where: createdAtFilter }),
+    prisma.user.count({ where: { role: "buyer", ...createdAtFilter } }),
+    prisma.partner.count({ where: { approval_status: "approved", status: "active", ...createdAtFilter } }),
     prisma.order.count({ where: createdAtFilter }),
     prisma.payment.aggregate({
       _sum: { amount: true },
       where: {
         status: "success",
         ...(from || to
-          ? { paid_at: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } }
+          ? { paid_at: { ...(from ? { gte: from } : {}), ...(toForFilter ? { lte: toForFilter } : {}) } }
           : {}),
       },
     }),
@@ -54,6 +55,7 @@ export const getDashboardStats = async ({
       select: { created_at: true },
     }),
     prisma.order.findMany({
+      where: createdAtFilter,
       orderBy: { created_at: "desc" },
       take: 5,
       include: {
@@ -141,20 +143,28 @@ export const getDashboardStats = async ({
 }
 
 // Hàm query voucher theo stats
-export async function getContentDashboardStats(filter: {from?: Date, to?: Date} = {}) {
+function endOfUtcDay(date: Date) {
+  const end = new Date(date);
+  end.setUTCHours(23, 59, 59, 999);
+  return end;
+}
+
+export async function getContentDashboardStats(filter: {from?: Date, to?: Date, allTime?: boolean} = {}) {
   // Nếu không chọn filter thì lấy 30 ngày gần nhất
   const now = new Date();
   const defaultFrom = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   const from = filter.from ?? defaultFrom;
-  const to = filter.to ?? now;
+  const to = filter.to ? endOfUtcDay(filter.to) : now;
 
   // Date filter chung dùng cho kết quả trả về
-  const dateFilter = {
-    created_at: {
-      gte: from,
-      lte: to,
-    },
-  };
+  const dateFilter = filter.allTime
+    ? {}
+    : {
+        created_at: {
+          gte: from,
+          lte: to,
+        },
+      };
 
   // Query voucher stats (theo approval_status)
   const [pending, approved, rejected] = await Promise.all([
@@ -208,13 +218,7 @@ export async function getContentDashboardStats(filter: {from?: Date, to?: Date} 
         ...dateFilter,
       }
     }),
-    prisma.cmsContent.count({
-      where: {
-        content_type: "category",
-        status: "active",
-        ...dateFilter,
-      }
-    }),
+    prisma.category.count(),
   ]);
 
   // Trả về các giá trị đã query

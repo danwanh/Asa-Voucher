@@ -33,14 +33,45 @@ function toDateKey(value: Date | string): string {
   return value.slice(0, 10);
 }
 
+function toDateOnly(value: Date | string): string {
+  return toDateKey(value);
+}
+
+function percent(numerator: number, denominator: number): number {
+  if (denominator === 0) return 0;
+  return Math.round((numerator / denominator) * 10000) / 100;
+}
+
+function isSellingVoucher(product: {
+  status: string;
+  remaining_quantity: number;
+  sale_start_date: Date | string;
+  sale_end_date: Date | string;
+}): boolean {
+  const today = toDateKey(new Date());
+  return (
+    product.status === "active" &&
+    product.remaining_quantity > 0 &&
+    toDateOnly(product.sale_start_date) <= today &&
+    today <= toDateOnly(product.sale_end_date)
+  );
+}
+
 export async function getRevenueReport(user: AuthUser, query: ReportQuery): Promise<RevenuePoint[]> {
   const partnerId = resolvePartnerScope(user, query);
   const buckets = new Map<string, { revenue: number; orderIds: Set<string> }>();
 
   if (partnerId) {
-    const items = await reportRepo.listOrderItemsForPartner(partnerId, query.date_from, query.date_to);
+    const items = await reportRepo.listOrderItemsForPartner(
+      partnerId,
+      query.date_from,
+      query.date_to,
+      query.branch_id,
+      query.voucher_product_id,
+    );
     for (const item of items) {
       if (!item.orders || !["confirmed", "completed"].includes(item.orders.status)) continue;
+      if (item.orders.payment_status && item.orders.payment_status !== "paid") continue;
       const key = toDateKey(item.orders.created_at);
       const bucket = buckets.get(key) ?? { revenue: 0, orderIds: new Set<string>() };
       bucket.revenue += Number(item.subtotal);
@@ -68,7 +99,13 @@ export async function getOrderReport(user: AuthUser, query: ReportQuery): Promis
   const counts = new Map<string, number>();
 
   if (partnerId) {
-    const items = await reportRepo.listAllOrderItemsForPartner(partnerId, query.date_from, query.date_to);
+    const items = await reportRepo.listAllOrderItemsForPartner(
+      partnerId,
+      query.date_from,
+      query.date_to,
+      query.branch_id,
+      query.voucher_product_id,
+    );
     const seenOrderIds = new Set<string>();
     for (const item of items) {
       if (!item.orders || seenOrderIds.has(item.order_id)) continue;
@@ -87,17 +124,38 @@ export async function getOrderReport(user: AuthUser, query: ReportQuery): Promis
 
 export async function getVoucherReport(user: AuthUser, query: ReportQuery): Promise<VoucherReportItem[]> {
   const partnerId = resolvePartnerScope(user, query);
-  const products = await reportRepo.listVoucherProductStats(partnerId);
-  const usedCounts = await reportRepo.countUsedIssuedVouchersByProduct(products.map((p) => p.id));
+  const products = await reportRepo.listVoucherProductStats(partnerId, query.branch_id, query.voucher_product_id);
+  const productIds = products.map((p) => p.id);
+  const [issuedCounts, soldCounts, usedCounts, revenueMap] = await Promise.all([
+    reportRepo.countPaidIssuedVouchersByProduct(productIds, query.date_from, query.date_to),
+    reportRepo.sumPaidSoldQuantityByProduct(productIds, query.date_from, query.date_to),
+    reportRepo.countUsedIssuedVouchersByProduct(productIds, query.date_from, query.date_to, query.branch_id),
+    reportRepo.sumRevenueProducts(productIds, query.date_from, query.date_to),
+  ]);
 
-  return products.map((product) => ({
-    voucher_product_id: product.id,
-    name: product.name,
-    total_quantity: product.total_quantity,
-    remaining_quantity: product.remaining_quantity,
-    sold_quantity: product.total_quantity - product.remaining_quantity,
-    used_quantity: usedCounts[product.id] ?? 0,
-  }));
+  return products.map((product) => {
+    const issued = issuedCounts[product.id] ?? { total: 0, expired: 0 };
+    const soldQuantity = soldCounts[product.id] ?? 0;
+    const usedQuantity = usedCounts[product.id] ?? 0;
+
+    return {
+      voucher_product_id: product.id,
+      name: product.name,
+      status: product.status,
+      sale_start_date: toDateOnly(product.sale_start_date),
+      sale_end_date: toDateOnly(product.sale_end_date),
+      selling_price: Number(product.selling_price),
+      total_quantity: product.total_quantity,
+      remaining_quantity: product.remaining_quantity,
+      issued_quantity: issued.total,
+      sold_quantity: soldQuantity,
+      used_quantity: usedQuantity,
+      expired_quantity: issued.expired,
+      usage_rate: percent(usedQuantity, soldQuantity),
+      revenue: Number(revenueMap[product.id] ?? 0),
+      is_selling: isSellingVoucher(product),
+    };
+  });
 }
 
 export async function getPartnerReport(user: AuthUser, query: ReportQuery): Promise<PartnerReportItem[]> {
@@ -117,6 +175,7 @@ export async function getPartnerReport(user: AuthUser, query: ReportQuery): Prom
     const paidOrderIds = new Set<string>();
     for (const item of items) {
       if (!item.orders || !["confirmed", "completed"].includes(item.orders.status)) continue;
+      if (item.orders.payment_status && item.orders.payment_status !== "paid") continue;
       revenue += Number(item.subtotal);
       paidOrderIds.add(item.order_id);
     }
@@ -143,7 +202,8 @@ export async function getStaffVoucherReport(user: AuthUser, query: ReportQuery,)
 
   // Gọi repositories funcs
   // Lấy danh sách voucher đã duyệt của toàn bộ partner
-  const products = await reportRepo.listVoucherProductsByPartner(user.partnerId, query.category_id);
+  const staffUserId = user.role === "partner_voucher_staff" ? user.id : undefined;
+  const products = await reportRepo.listVoucherProductsByPartner(user.partnerId, query.category_id, staffUserId);
 
   // Extract ra mảng
   const productIds =  products.map(p => p.id);
@@ -157,7 +217,7 @@ export async function getStaffVoucherReport(user: AuthUser, query: ReportQuery,)
   // Dùng vòng lặp cho giá trị
   const reportItems: StaffVoucherReportItem[] = products.map((product) => {
     // Số lượng phát hành thực tế trong kỳ (từ issued_vouchers)
-    const issued = issuedCounts[product.id] ?? { total: 0, used: 0 };
+    const issued = issuedCounts[product.id] ?? { total: 0, used: 0, expired: 0 };
 
     // Số lượng bán = số voucher phát hành trong kỳ
     const soldQuantity = issued.total;

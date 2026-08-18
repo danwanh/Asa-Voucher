@@ -12,11 +12,13 @@ import { dashboardService, type ContentDashboardStats } from "@/services/dashboa
  */
 
 type LoadingState = "idle" | "loading" | "success" | "error"
+type RangeMode = "recent" | "all" | "custom"
 
 export function AdminContentDashboardPage() {
   const uid = useId().replace(/:/g, "")
   const [stats, setStats] = useState<ContentDashboardStats | null>(null)
   const [loadingState, setLoadingState] = useState<LoadingState>("idle")
+  const [rangeMode, setRangeMode] = useState<RangeMode>("recent")
   const [fromDate, setFromDate] = useState("")
   const [toDate, setToDate] = useState("")
 
@@ -24,15 +26,16 @@ export function AdminContentDashboardPage() {
     setLoadingState("loading")
     try {
       const data = await dashboardService.getContentStats({
-        from_date: fromDate || undefined,
-        to_date: toDate || undefined,
+        all_time: rangeMode === "all" || undefined,
+        from_date: rangeMode === "custom" ? fromDate || undefined : undefined,
+        to_date: rangeMode === "custom" ? toDate || undefined : undefined,
       })
       setStats(data)
       setLoadingState("success")
     } catch {
       setLoadingState("error")
     }
-  }, [fromDate, toDate])
+  }, [fromDate, rangeMode, toDate])
 
   useEffect(() => {
     fetchStats()
@@ -44,10 +47,20 @@ export function AdminContentDashboardPage() {
   const totalContents = stats
     ? stats.contents.banners + stats.contents.articles + stats.contents.popups + stats.contents.policies + stats.contents.categories
     : 0
+  const dateRangeHint = rangeMode === "all"
+    ? "Đang xem: tất cả thời gian"
+    : rangeMode === "custom" && (fromDate || toDate)
+      ? "Đang lọc theo khoảng ngày đã chọn"
+      : "30 ngày gần nhất"
+  const rangeOptions: { mode: RangeMode; label: string }[] = [
+    { mode: "recent", label: "30 ngày" },
+    { mode: "all", label: "Tất cả" },
+    { mode: "custom", label: "Tùy chỉnh" },
+  ]
 
   const kpis = [
     { label: "Voucher chờ duyệt", value: pending, icon: <Clock className="w-5 h-5" />, color: C.apricot, delta: "Cần xử lý" },
-    { label: "Voucher đã duyệt", value: approved, icon: <CheckCircle2 className="w-5 h-5" />, color: C.teal, delta: "Đang hiển thị" },
+    { label: "Voucher đã duyệt", value: approved, icon: <CheckCircle2 className="w-5 h-5" />, color: C.teal, delta: "Đã qua kiểm duyệt" },
     { label: "Voucher từ chối", value: rejected, icon: <XCircle className="w-5 h-5" />, color: C.peach, delta: "Đã phản hồi" },
     { label: "Nội dung active", value: totalContents, icon: <FileText className="w-5 h-5" />, color: C.indigo, delta: "Banner + bài viết" },
   ]
@@ -71,36 +84,59 @@ export function AdminContentDashboardPage() {
         </div>
 
         {/* Bộ lọc thời gian */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-1.5 bg-white rounded-xl px-3 py-2 shadow-sm border border-gray-100">
-            <Calendar className="w-4 h-4" style={{ color: C.indigo }} />
-            <input
-              type="date"
-              value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-              className="text-xs outline-none bg-transparent"
-              style={{ color: C.indigo }}
-            />
+        <div className="flex flex-col items-start sm:items-end gap-1.5">
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex rounded-xl bg-white p-1 shadow-sm border border-gray-100">
+              {rangeOptions.map((option) => {
+                const active = rangeMode === option.mode
+                return (
+                  <button
+                    key={option.mode}
+                    type="button"
+                    onClick={() => setRangeMode(option.mode)}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+                    style={active ? { backgroundColor: C.teal, color: "white" } : { color: "#8A8DA8" }}
+                  >
+                    {option.label}
+                  </button>
+                )
+              })}
+            </div>
+            <button
+              onClick={fetchStats}
+              disabled={loadingState === "loading"}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-white disabled:opacity-50"
+              style={{ backgroundColor: C.teal }}
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loadingState === "loading" ? "animate-spin" : ""}`} />
+              Tải lại
+            </button>
           </div>
-          <span className="text-xs" style={{ color: "#8A8DA8" }}>đến</span>
-          <div className="flex items-center gap-1.5 bg-white rounded-xl px-3 py-2 shadow-sm border border-gray-100">
-            <input
-              type="date"
-              value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
-              className="text-xs outline-none bg-transparent"
-              style={{ color: C.indigo }}
-            />
-          </div>
-          <button
-            onClick={fetchStats}
-            disabled={loadingState === "loading"}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-white disabled:opacity-50"
-            style={{ backgroundColor: C.teal }}
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loadingState === "loading" ? "animate-spin" : ""}`} />
-            Tải lại
-          </button>
+          {rangeMode === "custom" && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5 bg-white rounded-xl px-3 py-2 shadow-sm border border-gray-100">
+                <Calendar className="w-4 h-4" style={{ color: C.indigo }} />
+                <input
+                  type="date"
+                  value={fromDate}
+                  onChange={(e) => setFromDate(e.target.value)}
+                  className="text-xs outline-none bg-transparent"
+                  style={{ color: C.indigo }}
+                />
+              </div>
+              <span className="text-xs" style={{ color: "#8A8DA8" }}>đến</span>
+              <div className="flex items-center gap-1.5 bg-white rounded-xl px-3 py-2 shadow-sm border border-gray-100">
+                <input
+                  type="date"
+                  value={toDate}
+                  onChange={(e) => setToDate(e.target.value)}
+                  className="text-xs outline-none bg-transparent"
+                  style={{ color: C.indigo }}
+                />
+              </div>
+            </div>
+          )}
+          <p className="text-xs" style={{ color: "#8A8DA8" }}>{dateRangeHint}</p>
         </div>
       </div>
 

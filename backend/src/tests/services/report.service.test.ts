@@ -13,6 +13,8 @@ vi.mock("../../repositories/report.repository.js", () => ({
   countVoucherProductsByPartner: vi.fn(),
   listVoucherProductsByPartner: vi.fn(),
   countIssuedVouchersByProduct: vi.fn(),
+  countPaidIssuedVouchersByProduct: vi.fn(),
+  sumPaidSoldQuantityByProduct: vi.fn(),
   sumRevenueProducts: vi.fn(),
 }));
 
@@ -154,13 +156,27 @@ describe("Report Service", () => {
   describe("getVoucherReport", () => {
     it("returns voucher stats for partner", async () => {
       vi.mocked(reportRepo.listVoucherProductStats).mockResolvedValue([
-        { id: "vp-1", name: "Voucher A", partner_id: "partner-1", total_quantity: 100, remaining_quantity: 50 },
+        {
+          id: "vp-1",
+          name: "Voucher A",
+          partner_id: "partner-1",
+          total_quantity: 100,
+          remaining_quantity: 50,
+          selling_price: 10000,
+          status: "active",
+          sale_start_date: new Date("2026-01-01T00:00:00Z"),
+          sale_end_date: new Date("2026-12-31T00:00:00Z"),
+        },
       ]);
+      vi.mocked(reportRepo.countPaidIssuedVouchersByProduct).mockResolvedValue({ "vp-1": { total: 30, expired: 0 } });
+      vi.mocked(reportRepo.sumPaidSoldQuantityByProduct).mockResolvedValue({ "vp-1": 25 });
       vi.mocked(reportRepo.countUsedIssuedVouchersByProduct).mockResolvedValue({ "vp-1": 30 });
+      vi.mocked(reportRepo.sumRevenueProducts).mockResolvedValue({ "vp-1": 250000 });
 
       const result = await reportService.getVoucherReport(PARTNER_OWNER, {});
       expect(result).toHaveLength(1);
-      expect(result[0].sold_quantity).toBe(50);
+      expect(result[0].issued_quantity).toBe(30);
+      expect(result[0].sold_quantity).toBe(25);
       expect(result[0].used_quantity).toBe(30);
     });
 
@@ -174,7 +190,7 @@ describe("Report Service", () => {
 
       await reportService.getVoucherReport(PARTNER_OWNER, { partner_id: "partner-other" });
 
-      expect(reportRepo.listVoucherProductStats).toHaveBeenCalledWith("partner-1");
+      expect(reportRepo.listVoucherProductStats).toHaveBeenCalledWith("partner-1", undefined, undefined);
     });
 
     it("uses query partner_id for admin scope", async () => {
@@ -183,7 +199,7 @@ describe("Report Service", () => {
 
       await reportService.getVoucherReport(ADMIN, { partner_id: "partner-2" });
 
-      expect(reportRepo.listVoucherProductStats).toHaveBeenCalledWith("partner-2");
+      expect(reportRepo.listVoucherProductStats).toHaveBeenCalledWith("partner-2", undefined, undefined);
     });
   });
 
@@ -232,7 +248,7 @@ describe("Report Service", () => {
 
     it("returns period-based stats with redefined effectiveness", async () => {
       vi.mocked(reportRepo.listVoucherProductsByPartner).mockResolvedValue(CREATED_PRODUCTS);
-      vi.mocked(reportRepo.countIssuedVouchersByProduct).mockResolvedValue({ "vp-1": { total: 30, used: 12 } });
+      vi.mocked(reportRepo.countIssuedVouchersByProduct).mockResolvedValue({ "vp-1": { total: 30, used: 12, expired: 0 } });
       vi.mocked(reportRepo.sumRevenueProducts).mockResolvedValue({ "vp-1": 300000 });
 
       const result = await reportService.getStaffVoucherReport(STAFF, {});
@@ -253,7 +269,7 @@ describe("Report Service", () => {
 
     it("returns zero usage rate and effectiveness when nothing sold", async () => {
       vi.mocked(reportRepo.listVoucherProductsByPartner).mockResolvedValue(CREATED_PRODUCTS);
-      vi.mocked(reportRepo.countIssuedVouchersByProduct).mockResolvedValue({ "vp-1": { total: 0, used: 0 } });
+      vi.mocked(reportRepo.countIssuedVouchersByProduct).mockResolvedValue({ "vp-1": { total: 0, used: 0, expired: 0 } });
       vi.mocked(reportRepo.sumRevenueProducts).mockResolvedValue({ "vp-1": 0 });
 
       const result = await reportService.getStaffVoucherReport(STAFF, {});
@@ -283,7 +299,7 @@ describe("Report Service", () => {
 
       await reportService.getStaffVoucherReport(STAFF, { date_from: "2026-01-01", date_to: "2026-01-31" });
 
-      expect(reportRepo.listVoucherProductsByPartner).toHaveBeenCalledWith("partner-1", undefined);
+      expect(reportRepo.listVoucherProductsByPartner).toHaveBeenCalledWith("partner-1", undefined, "u-staff");
       expect(reportRepo.countIssuedVouchersByProduct).toHaveBeenCalledWith(
         ["vp-1"], "2026-01-01", "2026-01-31",
       );
@@ -299,7 +315,17 @@ describe("Report Service", () => {
 
       await reportService.getStaffVoucherReport(STAFF, { category_id: "cat-1" });
 
-      expect(reportRepo.listVoucherProductsByPartner).toHaveBeenCalledWith("partner-1", "cat-1");
+      expect(reportRepo.listVoucherProductsByPartner).toHaveBeenCalledWith("partner-1", "cat-1", "u-staff");
+    });
+
+    it("does not apply staff creator scope for partner owner", async () => {
+      vi.mocked(reportRepo.listVoucherProductsByPartner).mockResolvedValue(CREATED_PRODUCTS);
+      vi.mocked(reportRepo.countIssuedVouchersByProduct).mockResolvedValue({});
+      vi.mocked(reportRepo.sumRevenueProducts).mockResolvedValue({});
+
+      await reportService.getStaffVoucherReport(PARTNER_OWNER, {});
+
+      expect(reportRepo.listVoucherProductsByPartner).toHaveBeenCalledWith("partner-1", undefined, undefined);
     });
 
     it("rejects user without a partner", async () => {

@@ -18,10 +18,19 @@ export interface OrderStatusBreakdown {
 export interface VoucherReportItem {
   voucher_product_id: string;
   name: string;
+  status: string;
+  sale_start_date: string;
+  sale_end_date: string;
+  selling_price: number;
   total_quantity: number;
   remaining_quantity: number;
+  issued_quantity: number;
   sold_quantity: number;
   used_quantity: number;
+  expired_quantity: number;
+  usage_rate: number;
+  revenue: number;
+  is_selling: boolean;
 }
 
 export interface PartnerReportItem {

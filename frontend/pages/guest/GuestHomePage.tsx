@@ -257,7 +257,7 @@ export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCar
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
             {[
               { icon: <Search className="w-6 h-6" />, title: "Tìm voucher", desc: "Tìm kiếm và chọn voucher phù hợp với nhu cầu" },
-              { icon: <Smartphone className="w-6 h-6" />, title: "Thanh toán", desc: "Thanh toán an toàn qua VNPay, MoMo, ZaloPay" },
+              { icon: <Smartphone className="w-6 h-6" />, title: "Thanh toán", desc: "Thanh toán an toàn qua VNPay, PayPal" },
               { icon: <ShieldCheck className="w-6 h-6" />, title: "Nhận voucher", desc: "Voucher được gửi ngay sau khi thanh toán thành công" },
               { icon: <TrendingUp className="w-6 h-6" />, title: "Sử dụng", desc: "Xuất trình QR code tại cửa hàng và tận hưởng ưu đãi" },
             ].map((step, i) => (
