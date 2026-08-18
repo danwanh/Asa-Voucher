@@ -3,7 +3,6 @@ import { HttpError } from "../utils/http-error.js";
 import { buildPaginatedResult } from "../utils/pagination.js";
 import * as issuedVoucherRepo from "../repositories/issued-voucher.repository.js";
 import * as voucherUsageRepo from "../repositories/voucher-usage.repository.js";
-import { createNotification } from "./notification.service.js";
 import { isAdminRole, isPartnerStaff, type AuthUser } from "../types/auth.types.js";
 import type { IssuedVoucherStatus } from "../types/issued-voucher.types.js";
 import type { ListIssuedVouchersQuery } from "../validations/issued-voucher.validation.js";
@@ -135,16 +134,13 @@ export async function listUsages(
   return buildPaginatedResult(items, total, query);
 }
 
-async function notifyCheckFailure(user: AuthUser, title: string, content: string) {
+async function logVoucherCheck(user: AuthUser, voucherCode: string | null, status: "success" | "failed", reason?: string) {
   try {
-    await createNotification({
-      userId: user.id,
-      type: "verify_failed",
-      title,
-      content,
+    await prisma.voucherCheckLog.create({
+      data: { user_id: user.id, voucher_code: voucherCode, status, reason },
     });
   } catch {
-    // Notification failure should not break the voucher check flow.
+    // Log failure should not break the voucher check flow.
   }
 }
 
@@ -161,7 +157,7 @@ export async function checkVoucher(user: AuthUser, input: CheckVoucherInput) {
 
   if (!voucher) {
     const code = input.voucher_code ?? input.qr_code_payload ?? "";
-    await notifyCheckFailure(user, "Voucher không hợp lệ", `Mã ${code} không tồn tại trong hệ thống`);
+    await logVoucherCheck(user, code, "failed", "Mã không tồn tại");
     throw new HttpError(404, "Mã voucher không hợp lệ");
   }
 
@@ -180,7 +176,7 @@ export async function checkVoucher(user: AuthUser, input: CheckVoucherInput) {
 
   const state = resolveRedeemableState(voucher);
   if (!state.redeemable) {
-    await notifyCheckFailure(user, "Voucher không hợp lệ", `Voucher ${voucher.voucher_code}: ${state.reason}`);
+    await logVoucherCheck(user, voucher.voucher_code, "failed", state.reason!);
     throw new HttpError(400, state.reason!);
   }
 
@@ -214,7 +210,7 @@ export async function confirmVoucher(user: AuthUser, input: ConfirmVoucherInput)
   const voucher = await issuedVoucherRepo.findIssuedVoucherByCode(input.voucher_code);
 
   if (!voucher) {
-    await notifyCheckFailure(user, "Voucher không hợp lệ", `Mã ${input.voucher_code} không tồn tại trong hệ thống`);
+    await logVoucherCheck(user, input.voucher_code, "failed", "Mã không tồn tại");
     throw new HttpError(404, "Mã voucher không hợp lệ");
   }
 
@@ -227,7 +223,7 @@ export async function confirmVoucher(user: AuthUser, input: ConfirmVoucherInput)
   const today = new Date().toISOString().slice(0, 10);
   if (voucher.status === "active" && dateToIsoDate(voucher.expired_date) < today) {
     await issuedVoucherRepo.updateIssuedVoucherStatus(voucher.id, "expired");
-    await notifyCheckFailure(user, "Voucher không hợp lệ", `Voucher ${voucher.voucher_code}: Voucher đã hết hạn`);
+    await logVoucherCheck(user, voucher.voucher_code, "failed", "Voucher đã hết hạn");
     throw new HttpError(400, "Voucher đã hết hạn");
   }
 
@@ -244,7 +240,7 @@ export async function confirmVoucher(user: AuthUser, input: ConfirmVoucherInput)
     });
 
     if (!reVoucher || reVoucher.status !== "active") {
-      await notifyCheckFailure(user, "Voucher không hợp lệ", `Voucher ${voucher.voucher_code} đã được sử dụng hoặc không còn hợp lệ`);
+      await logVoucherCheck(user, voucher.voucher_code, "failed", "Voucher đã được sử dụng hoặc không còn hợp lệ");
       throw new HttpError(400, "Voucher đã được sử dụng hoặc không còn hợp lệ");
     }
 
@@ -288,15 +284,7 @@ const remainingVouchers = await tx.issuedVoucher.count({
     return { message: "Xác nhận sử dụng voucher thành công", issued_voucher: updatedVoucher, usage };
   });
 
-  const customerName = voucher.owners?.full_name ?? "";
-  await createNotification({
-    userId: user.id,
-    type: "verify",
-    title: "Voucher đã xác nhận",
-    content: `Bạn đã xác nhận voucher ${voucher.voucher_code} cho khách ${customerName || "khách hàng"}`,
-    refType: "issued_voucher",
-    refId: voucher.id,
-  }).catch(() => undefined);
+  await logVoucherCheck(user, voucher.voucher_code, "success");
 
   return result;
 }

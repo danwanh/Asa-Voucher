@@ -14,14 +14,12 @@ import { reportRoutes } from "./report.routes.js";
 import {dashboardRoutes} from "./dashboard.routes.js"
 import { securityRoutes } from "./security.routes.js";
 import { cmsContentRoutes } from "./cms-content.routes.js";
-import { notificationRoutes } from "./notification.routes.js";
 
 export const apiRoutes = Router();
 
 apiRoutes.use(healthRoutes);
 apiRoutes.use(authRoutes);
 apiRoutes.use(userRoutes);
-apiRoutes.use(notificationRoutes);
 apiRoutes.use(partnerRoutes);
 apiRoutes.use(categoryRoutes);
 apiRoutes.use(voucherRoutes);

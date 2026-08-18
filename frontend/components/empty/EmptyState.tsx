@@ -37,10 +37,6 @@ export function EmptyOrders() {
   return <EmptyState icon="package" title="Chưa có đơn hàng" description="Bạn chưa đặt mua voucher nào. Hãy bắt đầu mua sắm!" />
 }
 
-export function EmptyNotifications() {
-  return <EmptyState icon="bell" title="Không có thông báo" description="Tất cả thông báo của bạn sẽ hiển thị ở đây." />
-}
-
 export function EmptySearchResults({ query }: { query?: string }) {
   return <EmptyState icon="search" title="Không tìm thấy kết quả" description={query ? `Không có kết quả cho "${query}". Thử từ khóa khác.` : "Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm."} />
 }

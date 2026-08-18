@@ -4,7 +4,7 @@ import { Home, QrCode, History, User, LogOut, Menu, ChevronRight, Scan } from "l
 import { C } from "@/utils/constants"
 import type { AppUser } from "@/types"
 
-export type StaffPage = "dashboard" | "qr-scan" | "history" | "profile" | "notifications"
+export type StaffPage = "dashboard" | "qr-scan" | "history" | "profile"
 
 const NAV_ITEMS = [
   { label: "Tổng quan", pg: "dashboard" as StaffPage, icon: <Home className="w-4 h-4" /> },

@@ -40,7 +40,6 @@ model User {
   assigned_complaints   Complaint[]         @relation("ComplaintAssignee")
   complaints            Complaint[]         @relation("ComplaintUser")
   issued_vouchers       IssuedVoucher[]
-  notifications         Notification[]
   order_logs            OrderLog[]
   received_orders       Order[]             @relation("ReceivedOrders")
   orders                Order[]             @relation("CreatedOrders")
@@ -58,6 +57,7 @@ model User {
   created_vouchers      VoucherProduct[]    @relation("VoucherCreator")
   submitted_vouchers    VoucherProduct[]    @relation("VoucherSubmitter")
   voucher_usages        VoucherUsage[]      @relation("VoucherUsageRedeemer")
+  voucher_check_logs    VoucherCheckLog[]
 
   @@index([role])
   @@map("users")
@@ -509,6 +509,20 @@ model SecurityAlert {
   @@map("security_alerts")
 }
 
+model VoucherCheckLog {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id       String   @db.Uuid
+  voucher_code  String?  @db.VarChar(50)
+  status        String   @db.VarChar(20)
+  reason        String?
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+  user          User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, created_at])
+  @@index([status])
+  @@map("voucher_check_logs")
+}
+
 model CmsContent {
   id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   content_type String    @db.VarChar(50)
@@ -525,21 +539,4 @@ model CmsContent {
   @@index([content_type])
   @@index([status])
   @@map("cms_contents")
-}
-
-model Notification {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id    String   @db.Uuid
-  type       String   @db.VarChar(50)
-  title      String   @db.VarChar(255)
-  content    String?
-  ref_type   String?  @db.VarChar(50)
-  ref_id     String?  @db.Uuid
-  is_read    Boolean  @default(false)
-  created_at DateTime @default(now()) @db.Timestamptz(6)
-  users      User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
-
-  @@index([user_id, is_read])
-  @@index([user_id, created_at(sort: Desc)])
-  @@map("notifications")
 }

@@ -1,12 +1,9 @@
 import { useState } from "react"
-import { Bell, Globe, Palette, LogOut } from "lucide-react"
+import { Globe, Palette, LogOut } from "lucide-react"
 import { C } from "@/utils/constants"
 
 export function PartnerSettingsPage({ onLogout }: { onLogout: () => void }) {
-  const [notifs, setNotifs] = useState({ order: true, voucher: true, report: false, system: true })
   const [lang, setLang] = useState("vi")
-
-  const toggle = (k: keyof typeof notifs) => setNotifs((p) => ({ ...p, [k]: !p[k] }))
 
   const Toggle = ({ checked, onChange }: { checked: boolean; onChange: () => void }) => (
     <button
@@ -21,30 +18,6 @@ export function PartnerSettingsPage({ onLogout }: { onLogout: () => void }) {
   return (
     <div className="p-6 max-w-xl mx-auto space-y-6">
       <h1 className="text-2xl font-black" style={{ color: C.indigo }}>Cài đặt</h1>
-
-      {/* Notifications */}
-      <div className="bg-white rounded-2xl p-5 shadow-sm">
-        <div className="flex items-center gap-2 mb-4">
-          <Bell className="w-5 h-5" style={{ color: C.indigo }} />
-          <h2 className="font-black" style={{ color: C.indigo }}>Thông báo</h2>
-        </div>
-        <div className="space-y-3">
-          {[
-            { key: "order", label: "Đơn hàng mới", desc: "Nhận thông báo khi có đơn hàng" },
-            { key: "voucher", label: "Trạng thái Voucher", desc: "Duyệt, từ chối, hết hạn" },
-            { key: "report", label: "Báo cáo", desc: "Báo cáo hàng tuần" },
-            { key: "system", label: "Hệ thống", desc: "Thông báo từ Asa" },
-          ].map((n) => (
-            <div key={n.key} className="flex items-center justify-between py-2 border-b last:border-0" style={{ borderColor: "#F0EDD8" }}>
-              <div>
-                <div className="text-sm font-bold" style={{ color: C.indigo }}>{n.label}</div>
-                <div className="text-xs" style={{ color: "#8A8DA8" }}>{n.desc}</div>
-              </div>
-              <Toggle checked={notifs[n.key as keyof typeof notifs]} onChange={() => toggle(n.key as keyof typeof notifs)} />
-            </div>
-          ))}
-        </div>
-      </div>
 
       {/* Language */}
       <div className="bg-white rounded-2xl p-5 shadow-sm">

@@ -8,7 +8,6 @@ const CUSTOMER_ROUTE_PATHS: Partial<Record<CustomerPage, string>> = {
   cart: "/cart",
   orders: "/orders",
   "my-vouchers": "/my-vouchers",
-  notifications: "/notifications",
   settings: "/settings",
   favorites: "/favorites",
 }

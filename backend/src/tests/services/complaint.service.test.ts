@@ -21,11 +21,6 @@ vi.mock("../../repositories/issued-voucher.repository.js", () => ({
   findIssuedVoucherById: vi.fn(),
 }));
 
-vi.mock("../../services/notification.service.js", () => ({
-  createComplaintNotifications: vi.fn(),
-  createAssignmentNotification: vi.fn(),
-}));
-
 import * as complaintRepo from "../../repositories/complaint.repository.js";
 import * as complaintResponseRepo from "../../repositories/complaint-response.repository.js";
 import * as issuedVoucherRepo from "../../repositories/issued-voucher.repository.js";

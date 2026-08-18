@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { ShoppingCart, Search, Menu, Home, Tag, Package, User, Bell, Grid3x3, Gift, LogOut } from "lucide-react"
+import { ShoppingCart, Search, Menu, Home, Tag, Package, User, Grid3x3, Gift, LogOut } from "lucide-react"
 import { AppFooter } from "@/components/AppFooter"
 import { C } from "@/utils/constants"
 import type { AppUser } from "@/types"
@@ -9,14 +9,13 @@ export type CustomerPage =
   | "home" | "vouchers" | "categories" | "detail" | "cart"
   | "checkout" | "create-order" | "payment" | "success"
   | "my-vouchers" | "orders" | "order-detail"
-  | "review" | "complaint" | "profile" | "notifications" | "favorites" | "settings"
+  | "review" | "complaint" | "profile" | "favorites" | "settings"
 
 interface Props {
   user: AppUser
   page: CustomerPage
   cartCount: number | null
   cartCountLoading?: boolean
-  notifCount?: number
   voucherSearch: string
   onVoucherSearchChange: (value: string) => void
   onVoucherSearchFocus: () => void
@@ -38,7 +37,6 @@ const MOBILE_NAV: { label: string; pg: CustomerPage; icon: React.ReactNode }[] =
   { label: "Trang chủ", pg: "home", icon: <Home className="w-5 h-5" /> },
   { label: "Tìm kiếm", pg: "vouchers", icon: <Search className="w-5 h-5" /> },
   { label: "Giỏ hàng", pg: "cart", icon: <ShoppingCart className="w-5 h-5" /> },
-  { label: "Thông báo", pg: "notifications", icon: <Bell className="w-5 h-5" /> },
   { label: "Tài khoản", pg: "profile", icon: <User className="w-5 h-5" /> },
 ]
 
@@ -47,7 +45,6 @@ export function CustomerLayout({
   page,
   cartCount,
   cartCountLoading = false,
-  notifCount = 0,
   voucherSearch,
   onVoucherSearchChange,
   onVoucherSearchFocus,
@@ -113,16 +110,6 @@ export function CustomerLayout({
           </nav>
 
           <div className="flex items-center gap-1">
-            {/* Notifications */}
-            <button onClick={() => onNavigate("notifications")} className="relative p-2 rounded-xl hover:bg-white/10 hidden sm:block">
-              <Bell className="w-5 h-5 text-white" />
-              {notifCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full text-xs font-bold flex items-center justify-center" style={{ backgroundColor: C.peach, color: "white" }}>
-                  {notifCount}
-                </span>
-              )}
-            </button>
-
             {/* Cart */}
             <button onClick={() => onNavigate("cart")} className="relative p-2 rounded-xl hover:bg-white/10">
               <ShoppingCart className="w-5 h-5 text-white" />
@@ -194,7 +181,6 @@ export function CustomerLayout({
         {MOBILE_NAV.map((n) => {
           const isActive = page === n.pg || (n.pg === "vouchers" && page === "detail")
           const showBadge = n.pg === "cart" && cartCount !== null && cartCount > 0
-          const showNotifBadge = n.pg === "notifications" && notifCount > 0
           return (
             <button
               key={n.pg}
@@ -206,9 +192,9 @@ export function CustomerLayout({
             >
               <div className="relative">
                 {n.icon}
-                {(showBadge || showNotifBadge) && (
+                {showBadge && (
                   <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full text-xs font-bold flex items-center justify-center" style={{ backgroundColor: C.peach, color: "white", fontSize: "10px" }}>
-                    {showBadge ? cartCount : notifCount}
+                    {cartCount}
                   </span>
                 )}
               </div>
