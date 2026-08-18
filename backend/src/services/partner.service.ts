@@ -108,14 +108,89 @@ export async function listBranches(user: CurrentUser, partnerId: string) {
   return prisma.partnerBranch.findMany({ where: { partner_id: partnerId }, orderBy: { created_at: "desc" } });
 }
 
-export async function createBranch(user: CurrentUser, partnerId: string, input: Record<string, unknown>) {
+export async function createBranch(
+  user: CurrentUser,
+  partnerId: string,
+  input: Record<string, unknown>
+) {
   const partner = await getPartner(partnerId);
   assertPartnerOwnerOrAdmin(user, partner);
+
   try {
-    return await prisma.partnerBranch.create({ data: { ...input, partner_id: partnerId } as never });
+    const address = String(input.address);
+    const city = String(input.city);
+    const district = input.district
+      ? String(input.district)
+      : undefined;
+
+    const { latitude, longitude } = await geocodeAddress(
+      address,
+      district,
+      city,
+    );
+
+    return await prisma.partnerBranch.create({
+      data: {
+        ...input,
+        latitude,
+        longitude,
+        partner_id: partnerId,
+      } as never,
+    });
   } catch (error) {
+    if (error instanceof HttpError) {
+      throw error;
+    }
+
     throwDbError(error);
   }
+}
+
+async function geocodeAddress(
+  address: string,
+  district: string | undefined,
+  city: string,
+): Promise<{ latitude: number; longitude: number }> {
+  const fullAddress = [address, district, city]
+    .filter(Boolean)
+    .join(", ");
+
+  const url = new URL("https://nominatim.openstreetmap.org/search");
+  url.searchParams.set("q", fullAddress);
+  url.searchParams.set("format", "json");
+  url.searchParams.set("limit", "1");
+
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent": "Asa-Voucher/1.0",
+    },
+  });
+
+  if (!response.ok) {
+    throw new HttpError(
+      502,
+      "Không thể xác định tọa độ từ địa chỉ",
+      "GEOCODING_FAILED",
+    );
+  }
+
+  const results = (await response.json()) as Array<{
+    lat: string;
+    lon: string;
+  }>;
+
+  if (results.length === 0) {
+    throw new HttpError(
+      400,
+      "Không tìm thấy tọa độ cho địa chỉ đã nhập",
+      "ADDRESS_NOT_FOUND",
+    );
+  }
+
+  return {
+    latitude: Number(results[0].lat),
+    longitude: Number(results[0].lon),
+  };
 }
 
 async function getBranch(id: string) {
