@@ -5,12 +5,7 @@ const nextConfig = {
     if (!isServer) {
       config.watchOptions = {
         ...config.watchOptions,
-        ignored: [
-          '**/node_modules/**',
-          '**/.git/**',
-          '**/D:\\System Volume Information/**',
-          '**/System Volume Information/**'
-        ]
+        ignored: /(node_modules|\.git|System Volume Information)/,
       }
     }
     return config
