@@ -509,11 +509,19 @@ export function PartnerManagementPage() {
             <div key={p.id} className="bg-card rounded-2xl p-5 shadow-sm">
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">
-                  <div
-                    className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl"
+                  <div 
+                    className="w-12 h-12 rounded-2xl flex items-center justify-center overflow-hidden shrink-0"
                     style={{ backgroundColor: C.eggshell }}
                   >
-                    {p.logoUrl}
+                    {p.logoUrl ? (
+                      <img
+                        src={p.logoUrl}
+                        alt={p.businessName}
+                        className="w-full h-full object-contain"
+                      />
+                    ) : (
+                      <span className="text-2xl"> </span>
+                    )}
                   </div>
                   <div>
                     <div className="font-bold text-sm" style={{ color: C.indigo }}>
@@ -524,7 +532,6 @@ export function PartnerManagementPage() {
                     </div>
                   </div>
                 </div>
-
                 <div className="flex flex-col items-end gap-2">
                   <StatusBadge status={p.approvalStatus} />
                   {p.approvalStatus === "approved" && <StatusBadge status={p.status} />}
