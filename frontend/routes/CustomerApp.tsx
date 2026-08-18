@@ -18,7 +18,6 @@ import { OrderDetailPage } from "@/pages/customer/OrderDetailPage"
 import { ReviewPage } from "@/pages/customer/ReviewPage"
 import { ComplaintPage } from "@/pages/customer/ComplaintPage"
 import { ProfilePage } from "@/pages/customer/ProfilePage"
-import { NotificationsPage } from "@/pages/customer/NotificationsPage"
 import { CustomerSettingsPage } from "@/pages/customer/CustomerSettingsPage"
 import { C } from "@/utils/constants"
 import { customerPagePath } from "@/utils/customerRoutes"
@@ -559,7 +558,6 @@ export function CustomerApp({
          />
        )}
       {page === "profile" && <ProfilePage user={user} onLogout={onLogout} />}
-      {page === "notifications" && <NotificationsPage />}
       {page === "settings" && <CustomerSettingsPage onLogout={onLogout} />}
       {page === "favorites" && (
         <div className="max-w-4xl mx-auto px-4 py-8">

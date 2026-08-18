@@ -13,7 +13,6 @@ import type {
 } from "../validations/complaint.validation.js";
 import { prisma } from "../config/prisma.js";
 import { refundVnpayPayment, refundPayPalPayment, formatVnpayDate, safeParseJson, extractPaypalCaptureId } from "./payment-provider.service.js";
-import { createComplaintNotifications, createAssignmentNotification } from "./notification.service.js";
 
 type ComplaintWithRelations = NonNullable<Awaited<ReturnType<typeof complaintRepo.findComplaintById>>>;
 
@@ -127,8 +126,6 @@ export async function assignComplaint(user: AuthUser, id: string, input: AssignC
     status: complaint.status === "open" ? "under_review" : complaint.status,
   });
 
-  await createAssignmentNotification(id, input.assigned_to, user.id);
-
   return updated;
 }
 
@@ -153,16 +150,6 @@ export async function resolveComplaint(user: AuthUser, id: string, input: Resolv
     resolution_types: input.resolution_types,
     resolved_at: new Date().toISOString(),
   });
-
-  const partnerId = complaint.issued_vouchers?.voucher_products?.partner_id ?? null;
-  await createComplaintNotifications(
-    id,
-    complaint.user_id,
-    partnerId,
-    complaint.assigned_to,
-    input.resolution_types,
-    input.resolution_note
-  );
 
   return updated;
 }

@@ -4,7 +4,6 @@ import { requireData, throwDbError } from "../utils/db.js";
 import { HttpError } from "../utils/http-error.js";
 import { getAreaMatchCandidates, serializeApplicableAreas } from "../utils/applicable-area.js";
 import { rangeFromPagination } from "../validations/common.validation.js";
-import { notifyVoucherApproved, notifyVoucherRejected } from "./notification.service.js";
 import { generateVoucherCode } from "../utils/code.util.js";
 
 type CurrentUser = { id: string; role: UserRole; partnerId?: string | null; branchId?: string | null };
@@ -674,26 +673,6 @@ export async function approveVoucherProduct(adminId: string, id: string, input: 
 
     return withWorkflow(updated as Record<string, unknown>);
   });
-
-  // Gửi email notification cho partner (fire-and-forget)
-  const partner = voucher.partners as { business_name: string; representative_user: { email: string; full_name: string } } | null;
-  if (partner?.representative_user?.email) {
-    const emailParams = {
-      partnerEmail: partner.representative_user.email,
-      partnerName: partner.representative_user.full_name || partner.business_name,
-      voucherName: voucher.name as string,
-    };
-
-    if (input.approval_status === "approved") {
-      notifyVoucherApproved(emailParams).catch((err) =>
-        console.error("[Notification] Failed to send approval email:", err)
-      );
-    } else {
-      notifyVoucherRejected({ ...emailParams, rejectReason: input.reject_reason! }).catch((err) =>
-        console.error("[Notification] Failed to send rejection email:", err)
-      );
-    }
-  }
 
   return result;
 }

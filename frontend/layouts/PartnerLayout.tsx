@@ -8,7 +8,7 @@ import type { PartnerProfile } from "@/services/partnerService"
 
 export type PartnerPage =
   | "vouchers" | "create" | "edit" | "voucher-detail" | "revenue"
-  | "branches" | "staff" | "check-voucher" | "profile" | "notifications" | "settings"
+  | "branches" | "staff" | "check-voucher" | "profile" | "settings"
 
 interface NavItem {
   label: string

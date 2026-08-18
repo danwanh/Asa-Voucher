@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Bell, Globe, Moon, Shield, Sun, Trash2, LogOut, ChevronRight, Settings } from "lucide-react"
+import { Globe, Moon, Shield, Sun, Trash2, LogOut, ChevronRight, Settings } from "lucide-react"
 import { C } from "@/utils/constants"
 
 interface Props {
@@ -7,7 +7,6 @@ interface Props {
 }
 
 export function CustomerSettingsPage({ onLogout }: Props) {
-  const [notifs, setNotifs] = useState({ promo: true, order: true, system: false, email: true })
   const [language, setLanguage] = useState("vi")
   const [theme, setTheme] = useState("light")
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -15,27 +14,6 @@ export function CustomerSettingsPage({ onLogout }: Props) {
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-black mb-6" style={{ color: C.indigo, fontFamily: "'Nunito', sans-serif" }}>Cài đặt</h1>
-
-      {/* Notifications */}
-      <Section title="Thông báo" icon={<Bell className="w-4 h-4" />}>
-        {[
-          { key: "promo", label: "Khuyến mãi & Ưu đãi", desc: "Nhận thông báo voucher mới, flash sale" },
-          { key: "order", label: "Đơn hàng", desc: "Cập nhật trạng thái đơn hàng" },
-          { key: "system", label: "Hệ thống", desc: "Thông báo bảo trì, cập nhật hệ thống" },
-          { key: "email", label: "Email", desc: "Nhận thông báo qua email" },
-        ].map((n) => (
-          <div key={n.key} className="flex items-center justify-between py-3 border-b last:border-0" style={{ borderColor: "#F3F4F6" }}>
-            <div>
-              <div className="text-sm font-semibold" style={{ color: C.indigo }}>{n.label}</div>
-              <div className="text-xs" style={{ color: "#9CA3AF" }}>{n.desc}</div>
-            </div>
-            <ToggleSwitch
-              checked={notifs[n.key as keyof typeof notifs]}
-              onChange={(v) => setNotifs({ ...notifs, [n.key]: v })}
-            />
-          </div>
-        ))}
-      </Section>
 
       {/* Language */}
       <Section title="Ngôn ngữ" icon={<Globe className="w-4 h-4" />}>

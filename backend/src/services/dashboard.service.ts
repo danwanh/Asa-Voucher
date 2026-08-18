@@ -245,8 +245,8 @@ export async function getStaffDashboardStats(user: AuthUser) {
     prisma.voucherUsage.count({
       where: { branch_id: branchId, used_at: { gte: todayStart } },
     }),
-    prisma.notification.count({
-      where: { user_id: user.id, type: "verify_failed", created_at: { gte: todayStart } },
+    prisma.voucherCheckLog.count({
+      where: { user_id: user.id, status: "failed", created_at: { gte: todayStart } },
     }),
     prisma.voucherUsage.findMany({
       where: { branch_id: branchId },

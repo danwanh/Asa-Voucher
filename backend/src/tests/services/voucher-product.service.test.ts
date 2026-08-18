@@ -52,11 +52,6 @@ const { mockPrisma } = vi.hoisted(() => ({
 
 vi.mock("../../config/prisma.js", () => ({ prisma: mockPrisma }));
 
-vi.mock("../../services/notification.service.js", () => ({
-  notifyVoucherApproved: vi.fn().mockResolvedValue(undefined),
-  notifyVoucherRejected: vi.fn().mockResolvedValue(undefined),
-}));
-
 import { prisma } from "../../config/prisma.js";
 import * as voucherProductService from "../../services/voucher-product.service.js";
 import type { UserRole } from "../../types/auth.types.js";
