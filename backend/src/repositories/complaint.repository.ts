@@ -62,10 +62,20 @@ export async function listComplaints(
 }
 
 export async function findComplaintById(id: string) {
-  return prisma.complaint.findUnique({ where: { id }, include: INCLUDE }) as unknown as Promise<
+  return prisma.complaint.findUnique({
+    where: { id },
+    include: {
+      ...INCLUDE,
+      complaint_responses: {
+        include: { responder: { select: { id: true, full_name: true, email: true } } },
+        orderBy: { created_at: "asc" },
+      },
+    },
+  }) as unknown as Promise<
     | (ComplaintRow & {
         issued_vouchers: { voucher_products: { partner_id: string } } | null;
         orders: { user_id: string } | null;
+        complaint_responses?: unknown[];
       })
     | null
   >;

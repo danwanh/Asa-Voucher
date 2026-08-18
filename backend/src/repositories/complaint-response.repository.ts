@@ -2,10 +2,12 @@ import { prisma } from "../config/prisma.js";
 import type { ComplaintResponderRole, ComplaintResponseRow } from "../types/complaint.types.js";
 
 export async function listResponsesByComplaint(complaintId: string): Promise<ComplaintResponseRow[]> {
-  return prisma.complaintResponse.findMany({
+  const rows = await prisma.complaintResponse.findMany({
     where: { complaint_id: complaintId },
+    include: { responder: { select: { id: true, full_name: true, email: true } } },
     orderBy: { created_at: "asc" },
-  }) as Promise<ComplaintResponseRow[]>;
+  });
+  return rows as unknown as ComplaintResponseRow[];
 }
 
 export async function createComplaintResponse(
@@ -21,5 +23,5 @@ export async function createComplaintResponse(
       responder_role: responderRole,
       content,
     },
-  }) as Promise<ComplaintResponseRow>;
+  }) as unknown as Promise<ComplaintResponseRow>;
 }

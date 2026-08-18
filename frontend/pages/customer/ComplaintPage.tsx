@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react"
 import { ArrowLeft, CheckCircle2, MessageSquare, X } from "lucide-react"
 import { toast } from "sonner"
-import { C, fmt } from "@/utils/constants"
+import { C, fmt, fmtDate } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import { ImageLightbox } from "@/components/ImageLightbox"
 import type { ComplaintStatus, IssuedVoucher, Order } from "@/types"
+import type { ComplaintResponse } from "@/services/feedbackService"
 import { feedbackService } from "@/services/feedbackService"
 
 interface Props {
@@ -33,6 +34,8 @@ export function ComplaintPage({ order, issuedVoucher, onBack, onSubmit }: Props)
   const complaint = issuedVoucher?.complaint ?? order.complaints?.[0]
   const [reason, setReason] = useState(complaint?.reason ?? "")
   const [description, setDescription] = useState(complaint?.description ?? "")
+  const [responses, setResponses] = useState<ComplaintResponse[]>([])
+  const [responsesLoading, setResponsesLoading] = useState(false)
   const [files, setFiles] = useState<File[]>([])
   const [error, setError] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -42,6 +45,27 @@ export function ComplaintPage({ order, issuedVoucher, onBack, onSubmit }: Props)
   const orderItem = issuedVoucher ? order.items?.find((item) => item.issuedVouchers?.some((voucher) => voucher.id === issuedVoucher.id)) : undefined
   const voucherTitle = orderItem?.voucherTitle ?? order.voucherTitle
   const partnerName = orderItem?.partnerName ?? order.partnerName
+
+  useEffect(() => {
+    if (!complaint?.id) return
+    let isMounted = true
+    setResponsesLoading(true)
+    feedbackService
+      .getComplaintDetail(complaint.id)
+      .then((detail) => {
+        if (!isMounted) return
+        setResponses(Array.isArray(detail.responses) ? detail.responses : [])
+      })
+      .catch(() => {
+        // Keep the inline complaint info if the detail fetch fails.
+      })
+      .finally(() => {
+        if (isMounted) setResponsesLoading(false)
+      })
+    return () => {
+      isMounted = false
+    }
+  }, [complaint?.id])
 
   useEffect(() => {
     const urls = files.map((file) => URL.createObjectURL(file))
@@ -99,6 +123,33 @@ export function ComplaintPage({ order, issuedVoucher, onBack, onSubmit }: Props)
         {!complaint && <><label className="block border-2 border-dashed rounded-xl p-4 text-center cursor-pointer mb-3" style={{ borderColor: "#D1D5DB" }}><input type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" onChange={(event) => { handleFiles(event.target.files); event.target.value = "" }} /><MessageSquare className="w-6 h-6 mb-1 mx-auto" style={{ color: C.indigo }} /><div className="text-xs" style={{ color: "#9CA3AF" }}>{files.length ? `${files.length}/3 ảnh đã chọn` : "Thêm ảnh bằng chứng, tối đa 3 ảnh"}</div></label>{previews.length > 0 && <div className="grid grid-cols-3 gap-2 mb-5">{previews.map((url, index) => <div key={url} className="relative"><button type="button" onClick={() => setLightbox({ images: previews, index })} className="block w-full"><img src={url} alt={`Ảnh bằng chứng ${index + 1}`} className="aspect-square w-full object-cover rounded-xl" /></button><button type="button" onClick={() => setFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))} className="absolute top-1 right-1 rounded-full bg-black/60 p-1 text-white" aria-label="Xóa ảnh"><X className="w-3 h-3" /></button></div>)}</div>}</>}
         {complaint?.evidenceUrls.length ? <div className="grid grid-cols-3 gap-2 mb-5">{complaint.evidenceUrls.map((url, index) => <button type="button" key={url} onClick={() => setLightbox({ images: complaint.evidenceUrls, index })}><img src={url} alt={`Ảnh bằng chứng ${index + 1}`} className="aspect-square w-full object-cover rounded-xl" /></button>)}</div> : null}
         {complaint?.resolutionNote && <div className="rounded-xl p-4 text-sm mb-4" style={{ backgroundColor: "#F3F4F6", color: "#4B5563" }}><strong>Kết quả xử lý:</strong> {complaint.resolutionNote}</div>}
+        {complaint && (
+          <div className="border-t pt-5 mt-2" style={{ borderColor: "#F0EDD8" }}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold" style={{ color: C.indigo }}>Phản hồi ({responses.length})</h3>
+              {responsesLoading && <span className="text-xs" style={{ color: "#9CA3AF" }}>Đang tải...</span>}
+            </div>
+            {!responsesLoading && responses.length === 0 ? (
+              <div className="text-sm py-6 text-center rounded-xl" style={{ backgroundColor: "#F9FAFB", color: "#9CA3AF" }}>
+                Chưa có phản hồi từ hệ thống. Khiếu nại của bạn đang được xử lý.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {responses.map((r) => (
+                  <div key={r.id} className="rounded-xl p-3.5 border" style={{ borderColor: r.responderRole === "user" ? "#E2DFC8" : "#D1E0FF", backgroundColor: r.responderRole === "user" ? "#FFFFFF" : "#EEF3FF" }}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs font-bold" style={{ color: C.indigo }}>
+                        {r.responderRole === "admin" ? "Hệ thống / Quản trị viên" : r.responderRole === "partner" ? "Đối tác" : "Bạn"}
+                      </span>
+                      <span className="text-[10px]" style={{ color: "#8A8DA8" }}>{fmtDate(r.createdAt)}</span>
+                    </div>
+                    <p className="text-sm whitespace-pre-wrap" style={{ color: C.indigo }}>{r.content}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         {complaint ? <div className="flex items-center gap-2 text-xs" style={{ color: "#9CA3AF" }}><CheckCircle2 className="w-4 h-4" /> Khiếu nại đã gửi và không thể chỉnh sửa.</div> : <button disabled={isSubmitting} onClick={handleSubmit} className="w-full py-3.5 rounded-2xl font-black text-white disabled:opacity-60" style={{ backgroundColor: C.peach }}>{isSubmitting ? "Đang gửi..." : "Gửi khiếu nại"}</button>}
       </div>
       <ImageLightbox images={lightbox?.images ?? []} initialIndex={lightbox?.index ?? 0} open={Boolean(lightbox)} onClose={() => setLightbox(null)} />
