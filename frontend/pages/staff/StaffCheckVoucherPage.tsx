@@ -12,7 +12,7 @@ const FALLBACK = "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w
 type CheckState = "idle" | "loading" | "success" | "error"
 type ConfirmState = "idle" | "loading" | "success" | "error"
 
-export function StaffCheckVoucherPage() {
+export function StaffCheckVoucherPage({ branchId = "" }: { branchId?: string }) {
   const [state, setState] = useState<CheckState>("idle")
   const [result, setResult] = useState<CheckVoucherResult | null>(null)
   const [errorMsg, setErrorMsg] = useState("")
@@ -107,6 +107,7 @@ export function StaffCheckVoucherPage() {
   const branchNames = result?.eligible_branches?.length
     ? result.eligible_branches.map((b) => b.branch_name).join(", ")
     : "Tất cả chi nhánh"
+  const branchEligible = Boolean(branchId) && Boolean(result?.eligible_branch_ids?.includes(branchId))
 
   return (
     <div className="p-6 space-y-6 max-w-5xl mx-auto">
@@ -243,11 +244,12 @@ export function StaffCheckVoucherPage() {
           {!isTest && iv.status === "active" && confirmState === "idle" && (
             <button
               onClick={handleConfirm}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-white transition-all"
+              disabled={!branchEligible}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-40"
               style={{ backgroundColor: C.teal }}
             >
               <ShieldCheck className="w-4 h-4" />
-              Xác nhận sử dụng Voucher
+              {!branchId ? "Chưa có chi nhánh" : !branchEligible ? "Không thuộc chi nhánh này" : "Xác nhận sử dụng Voucher"}
             </button>
           )}
 

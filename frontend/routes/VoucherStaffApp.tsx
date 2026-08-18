@@ -168,7 +168,7 @@ export function VoucherStaffApp({ user, onLogout, initialPage }: Props) {
           )}
           {page === "reports" && <PartnerRevenuePage />}
           {page === "staff-reports" && <StaffVoucherReportPage/>}
-          {page === "check-voucher" && <StaffCheckVoucherPage/>}
+          {page === "check-voucher" && <StaffCheckVoucherPage branchId={user.branchId} />}
           {page === "profile" && <StaffProfilePage user={user} onLogout={onLogout} />}
         </main>
       </div>

@@ -15,6 +15,7 @@ import {
 } from "recharts";
 import { reportService } from "@/services/reportService";
 import { voucherService, type BackendCategory } from "@/services/voucherService";
+import { useAuthStore } from "@/stores/authStore";
 import type { StaffVoucherReportItem } from "@/types";
 import { C, fmt } from "@/utils/constants";
 import { LoadingState } from "@/components/LoadingState";
@@ -44,6 +45,7 @@ function toYMD(date: Date): string {
 }
 
 export function StaffVoucherReportPage() {
+  const user = useAuthStore((s) => s.user);
   const today = new Date();
   const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
   const [filters, setFilters] = useState<Filters>({
@@ -100,6 +102,7 @@ export function StaffVoucherReportPage() {
           date_from: filters.date_from || undefined,
           date_to: filters.date_to || undefined,
           category_id: filters.category_id || undefined,
+          branch_id: user?.branchId || undefined,
         }
         const result = await reportService.getStaffVoucherReport(params);
         if (isMounted) setData(result);

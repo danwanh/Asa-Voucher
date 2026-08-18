@@ -193,10 +193,10 @@ export type VoucherUsagePage = {
 }
 
 export const voucherUsageService = {
-  async list(params?: { page?: number; limit?: number }): Promise<VoucherUsagePage> {
+  async list(params?: { page?: number; limit?: number; branch_id?: string }): Promise<VoucherUsagePage> {
     const response = await api.get<ApiData<{ items: VoucherUsageItem[]; pagination: { page: number; limit: number; total: number; total_pages: number } }>>(
       "/voucher-usages",
-      { params: { page: params?.page ?? 1, limit: params?.limit ?? 100 } },
+      { params: { page: params?.page ?? 1, limit: params?.limit ?? 100, branch_id: params?.branch_id } },
     )
     const result = data<{ items: VoucherUsageItem[]; pagination: { page: number; limit: number; total: number; total_pages: number } }>(response)
     return {

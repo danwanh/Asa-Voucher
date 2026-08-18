@@ -3,6 +3,7 @@ import { Search } from "lucide-react"
 import { C } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import { voucherUsageService, type VoucherUsageItem } from "@/services/issuedVoucherService"
+import { useAuthStore } from "@/stores/authStore"
 import { LoadingSpinner } from "@/components/LoadingState"
 
 const STATUS_MAP: Record<string, { label: string; bg: string; text: string }> = {
@@ -12,6 +13,7 @@ const STATUS_MAP: Record<string, { label: string; bg: string; text: string }> = 
 }
 
 export function VerificationHistoryPage() {
+  const user = useAuthStore((s) => s.user)
   const [history, setHistory] = useState<VoucherUsageItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -27,7 +29,7 @@ export function VerificationHistoryPage() {
       setIsLoading(true)
       setLoadError(null)
       try {
-        const page = await voucherUsageService.list({ limit: 100 })
+        const page = await voucherUsageService.list({ limit: 100, branch_id: user?.branchId })
         if (!isMounted) return
         setHistory(page.items)
       } catch {
