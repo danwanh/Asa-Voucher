@@ -70,11 +70,12 @@ export const getContentDashboard = async (
     return;
   }
 
-  const { from_date, to_date } = parsed.data;
+  const { from_date, to_date, all_time } = parsed.data;
 
   const data = await getContentDashboardStats({
     from: from_date ? new Date(from_date) : undefined,
     to: to_date ? new Date(to_date) : undefined,
+    allTime: all_time,
   });
 
   res.json({

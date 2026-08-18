@@ -51,6 +51,7 @@ export type DashboardFilters = {
 export type ContentDashboardFilters = {
   from_date?: string
   to_date?: string
+  all_time?: boolean
 }
 
 /** FC-PAS: Dashboard cho nhân viên cửa hàng */
@@ -88,6 +89,7 @@ async function fetchContentDashboard(filters?: ContentDashboardFilters): Promise
     params: {
       from_date: filters?.from_date,
       to_date: filters?.to_date,
+      all_time: filters?.all_time,
     },
   })
   return extractData(res)

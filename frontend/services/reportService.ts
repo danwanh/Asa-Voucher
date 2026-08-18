@@ -40,6 +40,7 @@ export type VoucherReportItem = {
   expired_quantity: number
   usage_rate: number
   revenue: number
+  is_selling: boolean
 }
 
 function extractData<T>(response: { data: ApiEnvelope<T> }): T {

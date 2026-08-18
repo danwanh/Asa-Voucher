@@ -1,4 +1,5 @@
 import { prisma } from "../config/prisma.js";
+import type { Prisma } from "@prisma/client";
 
 export interface PaidOrderRow {
   id: string;
@@ -10,8 +11,9 @@ export interface PaidOrderRow {
 export interface PartnerScopedOrderItemRow {
   order_id: string;
   subtotal: number;
+  quantity?: number;
   created_at: string;
-  orders: { status: string; created_at: string } | null;
+  orders: { status: string; payment_status?: string; created_at: string } | null;
   voucher_products: { partner_id: string } | null;
 }
 
@@ -23,10 +25,35 @@ function dateRangeFilter(column: string, dateFrom?: string, dateTo?: string) {
   return Object.keys(range).length ? { [column]: range } : {};
 }
 
+type PartnerReportScope = {
+  partnerId?: string;
+  branchId?: string;
+  voucherProductId?: string;
+  categoryId?: string;
+};
+
+function voucherProductScopeFilter(scope: PartnerReportScope): Prisma.VoucherProductWhereInput {
+  return {
+    approval_status: "approved",
+    ...(scope.partnerId ? { partner_id: scope.partnerId } : {}),
+    ...(scope.voucherProductId ? { id: scope.voucherProductId } : {}),
+    ...(scope.categoryId ? { category_id: scope.categoryId } : {}),
+    ...(scope.branchId ? { voucher_product_branches: { some: { branch_id: scope.branchId } } } : {}),
+  };
+}
+
+function paidOrderScope(dateFrom?: string, dateTo?: string): Prisma.OrderWhereInput {
+  return {
+    status: { in: ["confirmed", "completed"] },
+    payment_status: "paid",
+    ...dateRangeFilter("created_at", dateFrom, dateTo),
+  };
+}
+
 /** Toàn bộ đơn đã thanh toán thành công trong khoảng thời gian (dùng khi không lọc theo partner). */
 export async function listPaidOrders(dateFrom?: string, dateTo?: string): Promise<PaidOrderRow[]> {
   return prisma.order.findMany({
-    where: { status: { in: ["confirmed", "completed"] }, ...dateRangeFilter("created_at", dateFrom, dateTo) },
+    where: paidOrderScope(dateFrom, dateTo),
     select: { id: true, total_amount: true, status: true, created_at: true },
   }) as unknown as Promise<PaidOrderRow[]>;
 }
@@ -36,17 +63,21 @@ export async function listOrderItemsForPartner(
   partnerId: string,
   dateFrom?: string,
   dateTo?: string,
+  branchId?: string,
+  voucherProductId?: string,
 ): Promise<PartnerScopedOrderItemRow[]> {
   return prisma.orderItem.findMany({
     where: {
-      voucher_products: { partner_id: partnerId },
-      orders: { ...dateRangeFilter("created_at", dateFrom, dateTo) },
+      ...(voucherProductId ? { voucher_product_id: voucherProductId } : {}),
+      voucher_products: voucherProductScopeFilter({ partnerId, branchId, voucherProductId }),
+      orders: paidOrderScope(dateFrom, dateTo),
     },
     select: {
       order_id: true,
       subtotal: true,
+      quantity: true,
       created_at: true,
-      orders: { select: { status: true, created_at: true } },
+      orders: { select: { status: true, payment_status: true, created_at: true } },
       voucher_products: { select: { partner_id: true } },
     },
   }) as unknown as Promise<PartnerScopedOrderItemRow[]>;
@@ -65,17 +96,21 @@ export async function listAllOrderItemsForPartner(
   partnerId: string,
   dateFrom?: string,
   dateTo?: string,
+  branchId?: string,
+  voucherProductId?: string,
 ): Promise<PartnerScopedOrderItemRow[]> {
   return prisma.orderItem.findMany({
     where: {
-      voucher_products: { partner_id: partnerId },
+      ...(voucherProductId ? { voucher_product_id: voucherProductId } : {}),
+      voucher_products: voucherProductScopeFilter({ partnerId, branchId, voucherProductId }),
       orders: { ...dateRangeFilter("created_at", dateFrom, dateTo) },
     },
     select: {
       order_id: true,
       subtotal: true,
+      quantity: true,
       created_at: true,
-      orders: { select: { status: true, created_at: true } },
+      orders: { select: { status: true, payment_status: true, created_at: true } },
       voucher_products: { select: { partner_id: true } },
     },
   }) as unknown as Promise<PartnerScopedOrderItemRow[]>;
@@ -87,26 +122,53 @@ export interface VoucherProductStatsRow {
   partner_id: string;
   total_quantity: number;
   remaining_quantity: number;
+  selling_price: number;
+  status: string;
+  sale_start_date: Date;
+  sale_end_date: Date;
 }
 
-export async function listVoucherProductStats(partnerId?: string): Promise<VoucherProductStatsRow[]> {
+export async function listVoucherProductStats(
+  partnerId?: string,
+  branchId?: string,
+  voucherProductId?: string,
+): Promise<VoucherProductStatsRow[]> {
   return prisma.voucherProduct.findMany({
-    where: {
-      approval_status: "approved",
-      ...(partnerId ? { partner_id: partnerId } : {}),
+    where: voucherProductScopeFilter({ partnerId, branchId, voucherProductId }),
+    select: {
+      id: true,
+      name: true,
+      partner_id: true,
+      total_quantity: true,
+      remaining_quantity: true,
+      selling_price: true,
+      status: true,
+      sale_start_date: true,
+      sale_end_date: true,
     },
-    select: { id: true, name: true, partner_id: true, total_quantity: true, remaining_quantity: true },
   }) as unknown as Promise<VoucherProductStatsRow[]>;
 }
 
 export async function countUsedIssuedVouchersByProduct(
   voucherProductIds: string[],
+  dateFrom?: string,
+  dateTo?: string,
+  branchId?: string,
 ): Promise<Record<string, number>> {
   if (voucherProductIds.length === 0) return {};
+  const usageFilter = {
+    ...(branchId ? { branch_id: branchId } : {}),
+    ...dateRangeFilter("used_at", dateFrom, dateTo),
+  };
 
   const rows = await prisma.issuedVoucher.groupBy({
     by: ["voucher_product_id"],
-    where: { status: "used", is_test: false, voucher_product_id: { in: voucherProductIds } },
+    where: {
+      status: "used",
+      is_test: false,
+      voucher_product_id: { in: voucherProductIds },
+      ...(Object.keys(usageFilter).length ? { voucher_usages: { some: usageFilter } } : {}),
+    },
     _count: true,
   });
 
@@ -154,13 +216,18 @@ export interface VoucherProductWithCategory {
 // Lấy danh sách voucher products đã duyệt của partner
 // Có lọc bổ sung: category_id (không lọc theo ngày tạo sản phẩm;
 // khoảng thời gian được áp dụng cho issued_date/order trong các hàm thống kê)
-export async function listVoucherProductsByPartner(partnerId: string, categoryId?: string): Promise<VoucherProductWithCategory[]> {
+export async function listVoucherProductsByPartner(
+  partnerId: string,
+  categoryId?: string,
+  staffUserId?: string,
+): Promise<VoucherProductWithCategory[]> {
   // Build điều kiện filter lọc theo đối tác và trạng thái đã duyệt
   const items = await prisma.voucherProduct.findMany({
     where: {
       partner_id: partnerId,
       approval_status: "approved",
       ...(categoryId ? {category_id: categoryId}: {}),
+      ...(staffUserId ? { OR: [{ created_by: staffUserId }, { submitted_by: staffUserId }] } : {}),
     },
     select: {
       id: true,
@@ -195,7 +262,7 @@ export async function countIssuedVouchersByProduct(
   voucherProductIds: string[],
   dateFrom?: string,
   dateTo?: string,
-): Promise<Record<string, { total: number; used: number }>> {
+): Promise<Record<string, { total: number; used: number; expired: number }>> {
   // Kiểm tra nếu không có nhập mã voucher id
   if (!voucherProductIds || voucherProductIds.length === 0) {
     return {};
@@ -213,15 +280,75 @@ export async function countIssuedVouchersByProduct(
   });
 
   // Tổng hợp: total = mọi status, used = status "used"
-  const counts: Record<string, { total: number; used: number }> = {};
+  const counts: Record<string, { total: number; used: number; expired: number }> = {};
   for (const row of group) {
-    const entry = counts[row.voucher_product_id] ?? { total: 0, used: 0 };
+    const entry = counts[row.voucher_product_id] ?? { total: 0, used: 0, expired: 0 };
     entry.total += row._count;
     if (row.status === "used") entry.used += row._count;
+    if (row.status === "expired") entry.expired += row._count;
     counts[row.voucher_product_id] = entry;
   }
 
   return counts;
+}
+
+export async function countPaidIssuedVouchersByProduct(
+  voucherProductIds: string[],
+  dateFrom?: string,
+  dateTo?: string,
+): Promise<Record<string, { total: number; expired: number }>> {
+  if (!voucherProductIds || voucherProductIds.length === 0) {
+    return {};
+  }
+
+  const group = await prisma.issuedVoucher.groupBy({
+    by: ["voucher_product_id", "status"],
+    where: {
+      is_test: false,
+      voucher_product_id: { in: voucherProductIds },
+      order_items: {
+        orders: paidOrderScope(dateFrom, dateTo),
+      },
+    },
+    _count: true,
+  });
+
+  const counts: Record<string, { total: number; expired: number }> = {};
+  for (const row of group) {
+    const entry = counts[row.voucher_product_id] ?? { total: 0, expired: 0 };
+    entry.total += row._count;
+    if (row.status === "expired") entry.expired += row._count;
+    counts[row.voucher_product_id] = entry;
+  }
+
+  return counts;
+}
+
+export async function sumPaidSoldQuantityByProduct(
+  voucherProductIds: string[],
+  dateFrom?: string,
+  dateTo?: string,
+): Promise<Record<string, number>> {
+  if (!voucherProductIds || voucherProductIds.length === 0) {
+    return {};
+  }
+
+  const group = await prisma.orderItem.groupBy({
+    by: ["voucher_product_id"],
+    where: {
+      voucher_product_id: { in: voucherProductIds },
+      orders: paidOrderScope(dateFrom, dateTo),
+    },
+    _sum: {
+      quantity: true,
+    },
+  });
+
+  const quantityMap: Record<string, number> = {};
+  for (const row of group) {
+    quantityMap[row.voucher_product_id] = Number(row._sum.quantity ?? 0);
+  }
+  return quantityMap;
 }
 
 // Tính tổng doanh thu theo voucher_product_id
@@ -239,8 +366,7 @@ export async function sumRevenueProducts(voucherProductIds: string[], dateFrom?:
     where: {
       voucher_product_id: { in: voucherProductIds},
       orders: {
-        status: {in: ["confirmed", "completed"]},
-        ...dateRangeFilter("created_at", dateFrom, dateTo),
+        ...paidOrderScope(dateFrom, dateTo),
       },
     },
     _sum: {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
-import { Filter, Loader2, RefreshCcw } from "lucide-react"
+import { Filter, RefreshCcw } from "lucide-react"
 import {
   Bar,
   BarChart,
@@ -30,10 +30,11 @@ function fromMonthInput(value: string) {
   return value ? `${value}-01` : undefined
 }
 
-function fmtDate(date: string) {
-  const value = new Date(date)
-  if (Number.isNaN(value.getTime())) return date
-  return value.toLocaleDateString("vi-VN")
+function toMonthEndInput(value: string) {
+  if (!value) return undefined
+  const [year, month] = value.split("-").map(Number)
+  if (!year || !month) return undefined
+  return new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10)
 }
 
 function voucherUsageRate(item: VoucherReportItem) {
@@ -43,12 +44,12 @@ function voucherUsageRate(item: VoucherReportItem) {
 
 function buildUsageSummary(revenueRows: RevenuePoint[], voucherRows: VoucherReportItem[]) {
   const revenue = revenueRows.reduce((sum, item) => sum + item.revenue, 0)
-  const issued = voucherRows.reduce((sum, item) => sum + item.total_quantity, 0)
+  const issued = voucherRows.reduce((sum, item) => sum + item.issued_quantity, 0)
   const remaining = voucherRows.reduce((sum, item) => sum + item.remaining_quantity, 0)
   const sold = voucherRows.reduce((sum, item) => sum + item.sold_quantity, 0)
   const used = voucherRows.reduce((sum, item) => sum + item.used_quantity, 0)
   const usageRate = sold === 0 ? 0 : Number(((used / sold) * 100).toFixed(2))
-  const activeVouchers = voucherRows.filter((item) => item.remaining_quantity > 0).length
+  const activeVouchers = voucherRows.filter((item) => item.is_selling).length
   const totalVouchers = voucherRows.length
 
   return { revenue, issued, remaining, sold, used, usageRate, activeVouchers, totalVouchers }
@@ -100,6 +101,11 @@ export function PartnerRevenuePage({ partnerId, partnerName }: Props) {
     return ""
   }, [fromMonth, toMonth])
 
+  const dateRangeHint = useMemo(() => {
+    if (!fromMonth && !toMonth) return "Đang xem: tất cả thời gian"
+    return "Đang lọc theo khoảng tháng đã chọn"
+  }, [fromMonth, toMonth])
+
   const loadReport = async () => {
     if (!partnerId) {
       setRevenue([])
@@ -120,14 +126,14 @@ export function PartnerRevenuePage({ partnerId, partnerName }: Props) {
     try {
       const filters = {
         date_from: fromMonthInput(fromMonth),
-        date_to: fromMonthInput(toMonth),
+        date_to: toMonthEndInput(toMonth),
         branch_id: branchId || undefined,
         voucher_product_id: voucherId || undefined,
       }
 
       const optionFilters = {
         date_from: fromMonthInput(fromMonth),
-        date_to: fromMonthInput(toMonth),
+        date_to: toMonthEndInput(toMonth),
         branch_id: branchId || undefined,
       }
 
@@ -229,6 +235,10 @@ export function PartnerRevenuePage({ partnerId, partnerName }: Props) {
               ))}
             </select>
           </div>
+        </div>
+
+        <div className="mt-3 text-right text-sm" style={{ color: "#8A8DA8" }}>
+          {dateRangeHint}
         </div>
 
         {dateError && (
@@ -341,7 +351,7 @@ export function PartnerRevenuePage({ partnerId, partnerName }: Props) {
                   {voucherStats.map((item) => (
                     <tr key={item.voucher_product_id} className="border-t" style={{ borderColor: "#F0EDD8" }}>
                       <td className="px-4 py-3 font-semibold" style={{ color: C.indigo }}>{item.name}</td>
-                      <td className="px-4 py-3">{item.total_quantity}</td>
+                      <td className="px-4 py-3">{item.issued_quantity}</td>
                       <td className="px-4 py-3">{item.remaining_quantity}</td>
                       <td className="px-4 py-3">{item.sold_quantity}</td>
                       <td className="px-4 py-3">{item.used_quantity}</td>

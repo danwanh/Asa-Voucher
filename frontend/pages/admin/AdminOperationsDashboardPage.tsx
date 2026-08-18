@@ -87,14 +87,14 @@ export function AdminOperationsDashboardPage() {
     {
       label: "Tổng khách hàng",
       value: loading ? "..." : stats.users.toLocaleString("vi-VN"),
-      delta: loading ? "Đang tải dữ liệu" : "Tổng số người dùng",
+      delta: loading ? "Đang tải dữ liệu" : "Tổng số khách hàng",
       icon: <Users className="w-5 h-5" />,
       color: C.teal,
     },
     {
       label: "Đối tác hoạt động",
       value: loading ? "..." : stats.partners.toLocaleString("vi-VN"),
-      delta: loading ? "Đang tải dữ liệu" : "Tổng số đối tác",
+      delta: loading ? "Đang tải dữ liệu" : "Đã duyệt và đang hoạt động",
       icon: <Store className="w-5 h-5" />,
       color: C.indigo,
     },
