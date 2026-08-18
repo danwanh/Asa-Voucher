@@ -46,6 +46,7 @@ type BackendBranch = {
   address: string;
   city: string;
   district: string | null;
+  ward: string | null;
   phone: string | null;
   latitude: number | null;
   longitude: number | null;
@@ -103,6 +104,7 @@ export type PartnerBranch = {
   address: string;
   city: string;
   district: string;
+  ward: string;
   phone: string;
   isActive: boolean;
   createdAt: string;
@@ -148,9 +150,8 @@ export type BranchInput = {
   address: string;
   city: string;
   district?: string;
+  ward?: string;
   phone?: string;
-  latitude?: number;
-  longitude?: number;
   is_active?: boolean;
 };
 
@@ -184,6 +185,7 @@ function mapBranch(branch: BackendBranch): PartnerBranch {
     address: branch.address,
     city: branch.city,
     district: branch.district ?? "",
+    ward: branch.ward ?? "",
     phone: branch.phone ?? "",
     isActive: branch.is_active,
     createdAt: branch.created_at,

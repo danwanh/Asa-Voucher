@@ -123,6 +123,24 @@ export async function createBranch(
       ? String(input.district)
       : undefined;
 
+    const existingBranch = await prisma.partnerBranch.findFirst({
+      where: {
+        partner_id: partnerId,
+        branch_name: {
+          equals: String(input.branch_name).trim(),
+          mode: "insensitive",
+        },
+      },
+    });
+
+    if (existingBranch) {
+      throw new HttpError(
+        409,
+        "Tên chi nhánh đã tồn tại. Vui lòng chọn tên khác.",
+        "BRANCH_NAME_EXISTS"
+      );
+    }
+
     const { latitude, longitude } = await geocodeAddress(
       address,
       district,
@@ -146,6 +164,14 @@ export async function createBranch(
   }
 }
 
+function normalize(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
 async function geocodeAddress(
   address: string,
   district: string | undefined,
@@ -158,7 +184,9 @@ async function geocodeAddress(
   const url = new URL("https://nominatim.openstreetmap.org/search");
   url.searchParams.set("q", fullAddress);
   url.searchParams.set("format", "json");
-  url.searchParams.set("limit", "1");
+  url.searchParams.set("addressdetails", "1");
+  url.searchParams.set("limit", "5");
+  url.searchParams.set("countrycodes", "vn");
 
   const response = await fetch(url, {
     headers: {
@@ -169,7 +197,7 @@ async function geocodeAddress(
   if (!response.ok) {
     throw new HttpError(
       502,
-      "Không thể xác định tọa độ từ địa chỉ",
+      "Không thể xác định địa chỉ",
       "GEOCODING_FAILED",
     );
   }
@@ -177,19 +205,69 @@ async function geocodeAddress(
   const results = (await response.json()) as Array<{
     lat: string;
     lon: string;
+    display_name?: string;
+    type?: string;
+    address?: {
+      house_number?: string;
+      road?: string;
+      neighbourhood?: string;
+      suburb?: string;
+      city?: string;
+      town?: string;
+      village?: string;
+      state?: string;
+      country?: string;
+    };
   }>;
 
   if (results.length === 0) {
     throw new HttpError(
       400,
-      "Không tìm thấy tọa độ cho địa chỉ đã nhập",
+      "Địa chỉ không tồn tại hoặc không tìm thấy. Vui lòng kiểm tra lại.",
       "ADDRESS_NOT_FOUND",
     );
   }
 
+  const validResult = results.find((result) => {
+    if (!result.address?.road) return false;
+
+    const resultCity = normalize(
+      result.address.city ||
+        result.address.town ||
+        result.address.village ||
+        result.address.state ||
+        "",
+    );
+    const inputCity = normalize(city);
+
+    return (
+      resultCity.length > 0 &&
+      (resultCity.includes(inputCity) || inputCity.includes(resultCity))
+    );
+  });
+
+  if (!validResult) {
+    throw new HttpError(
+      400,
+      "Địa chỉ không tồn tại hoặc không đủ cụ thể. Vui lòng nhập địa chỉ chính xác.",
+      "INVALID_ADDRESS",
+    );
+  }
+
+  const latitude = Number(validResult.lat);
+  const longitude = Number(validResult.lon);
+
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    throw new HttpError(
+      400,
+      "Không thể xác định tọa độ từ địa chỉ này.",
+      "INVALID_COORDINATES",
+    );
+  }
+
   return {
-    latitude: Number(results[0].lat),
-    longitude: Number(results[0].lon),
+    latitude,
+    longitude,
   };
 }
 

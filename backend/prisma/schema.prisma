@@ -154,9 +154,10 @@ model PartnerBranch {
   id                       String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   partner_id               String                 @db.Uuid
   branch_name              String                 @db.VarChar(255)
-  address                  String
   city                     String                 @db.VarChar(100)
   district                 String?                @db.VarChar(100)
+  ward                     String?                @db.VarChar(100)
+  address                  String
   phone                    String?                @db.VarChar(20)
   latitude                 Float?
   longitude                Float?

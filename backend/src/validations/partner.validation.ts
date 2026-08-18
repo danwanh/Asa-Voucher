@@ -28,9 +28,10 @@ export const partnerStatusSchema = z.object({ status: z.enum(["active", "suspend
 
 export const createBranchSchema = z.object({
   branch_name: z.string().trim().min(1),
-  address: z.string().trim().min(1),
   city: z.string().trim().min(1),
   district: z.string().trim().optional(),
+  ward: z.string().optional(),
+  address: z.string().trim().min(1),
   phone: z.string().trim().optional(),
   latitude: z.number().optional(),
   longitude: z.number().optional(),

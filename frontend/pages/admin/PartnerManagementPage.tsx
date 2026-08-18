@@ -18,6 +18,12 @@ import {
   type PartnerProfile,
   type PartnerBranch,
 } from "@/services/partnerService";
+import {
+  fetchProvinces,
+  fetchWardsByProvince,
+  type Province,
+  type Ward,
+} from "@/utils/vietnamProvinces";
 
 function PartnerDetail({
   partner,
@@ -40,9 +46,40 @@ function PartnerDetail({
     branch_name: "",
     address: "",
     city: "",
-    district: "",
+    ward: "",
     phone: "",
   });
+
+  const [branchError, setBranchError] = useState("");
+
+  const [provinces, setProvinces] = useState<Province[]>([]);
+  const [wards, setWards] = useState<Ward[]>([]);
+  const [loadingWards, setLoadingWards] = useState(false);
+
+  useEffect(() => {
+    fetchProvinces()
+      .then(setProvinces)
+      .catch((err) => console.error("Không thể tải danh sách tỉnh/thành:", err));
+  }, []);
+
+  async function loadWardsForProvince(provinceCode: string) {
+    try {
+      setLoadingWards(true);
+      const result = await fetchWardsByProvince(provinceCode);
+      setWards(result);
+    } catch (err) {
+      console.error("Không thể tải danh sách phường/xã:", err);
+    } finally {
+      setLoadingWards(false);
+    }
+  }
+
+  function handleProvinceChange(provinceCode: string) {
+    const province = provinces.find((p) => p.code === provinceCode);
+    setBranchForm({ ...branchForm, city: province?.name ?? "", ward: "" });
+    setWards([]);
+    if (province) loadWardsForProvince(province.code);
+  }
 
   function openCreateBranch() {
     setEditingBranch(null);
@@ -50,9 +87,10 @@ function PartnerDetail({
       branch_name: "",
       address: "",
       city: "",
-      district: "",
+      ward: "",
       phone: "",
     });
+    setWards([]);
     setShowBranchForm(true);
   }
 
@@ -62,10 +100,13 @@ function PartnerDetail({
       branch_name: branch.branchName,
       address: branch.address,
       city: branch.city,
-      district: branch.district,
+      ward: branch.ward,
       phone: branch.phone,
     });
     setShowBranchForm(true);
+
+    const province = provinces.find((p) => p.name === branch.city);
+    if (province) loadWardsForProvince(province.code);
   }
 
   async function handleSaveBranch() {
@@ -73,12 +114,19 @@ function PartnerDetail({
       setSavingBranch(true);
 
       const input = {
-        branch_name: branchForm.branch_name,
-        address: branchForm.address,
-        city: branchForm.city,
-        district: branchForm.district || undefined,
-        phone: branchForm.phone || undefined,
+        branch_name: branchForm.branch_name.trim(),
+        address: branchForm.address.trim(),
+        city: branchForm.city.trim().normalize("NFC"),
+        ward: branchForm.ward.trim().normalize("NFC") || undefined,
+        phone: branchForm.phone.trim() || undefined,
       };
+
+      if (!input.branch_name || !input.address || !input.city || !input.ward) {
+        setBranchError(
+          "Vui lòng nhập đầy đủ tên chi nhánh, địa chỉ, tỉnh/thành và phường/xã."
+        );
+        return;
+      }
 
       if (editingBranch) {
         await partnerService.updateBranch(editingBranch.id, input);
@@ -88,10 +136,19 @@ function PartnerDetail({
 
       setShowBranchForm(false);
       setEditingBranch(null);
+      setBranchError("");
       onReloadBranches();
-    } catch (error) {
-      console.error("Không thể lưu chi nhánh:", error);
-    } finally {
+    } catch (error: any) {
+        console.error("Không thể lưu chi nhánh:", error);
+        console.error("Response:", error?.response);
+        console.error("Response data:", error?.response?.data);
+
+        setBranchError(
+          error?.response?.data?.error?.message ||
+            error?.message ||
+            "Không thể lưu chi nhánh. Vui lòng kiểm tra lại thông tin."
+        );
+      } finally {
       setSavingBranch(false);
     }
   }
@@ -102,7 +159,7 @@ function PartnerDetail({
         branch_name: branch.branchName,
         address: branch.address,
         city: branch.city,
-        district: branch.district || undefined,
+        ward: branch.ward || undefined,
         phone: branch.phone || undefined,
         is_active: !branch.isActive,
       });
@@ -116,7 +173,7 @@ function PartnerDetail({
   const branchesContent = (() => {
     if (loadingBranches) {
       return (
-        <div className="text-sm" style={{ color: "#8A8DA8" }}>
+        <div className="text-sm pl-4" style={{ color: "#8A8DA8" }}>
           Đang tải...
         </div>
       );
@@ -246,6 +303,12 @@ function PartnerDetail({
               </button>
             </div>
 
+            {branchError && (
+              <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+                {branchError}
+              </div>
+            )}
+
             <div className="space-y-3">
               <input
                 value={branchForm.branch_name}
@@ -266,23 +329,35 @@ function PartnerDetail({
               />
 
               <div className="grid grid-cols-2 gap-3">
-                <input
-                  value={branchForm.city}
-                  onChange={(e) =>
-                    setBranchForm({ ...branchForm, city: e.target.value })
-                  }
-                  placeholder="Thành phố"
+                <select
+                  value={provinces.find((p) => p.name === branchForm.city)?.code ?? ""}
+                  onChange={(e) => handleProvinceChange(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-xl text-sm border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500"
-                />
+                >
+                  <option value="">Chọn tỉnh/thành</option>
+                  {provinces.map((p) => (
+                    <option key={p.code} value={p.code}>
+                      {p.type} {p.name}
+                    </option>
+                  ))}
+                </select>
 
-                <input
-                  value={branchForm.district}
-                  onChange={(e) =>
-                    setBranchForm({ ...branchForm, district: e.target.value })
-                  }
-                  placeholder="Quận/Huyện"
+                <select
+                  value={wards.find((w) => w.name === branchForm.ward)?.code ?? ""}
+                  onChange={(e) => {
+                    const ward = wards.find((w) => w.code === e.target.value);
+                    setBranchForm({ ...branchForm, ward: ward?.name ?? "" });
+                  }}
+                  disabled={!branchForm.city || loadingWards}
                   className="w-full px-3 py-2.5 rounded-xl text-sm border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500"
-                />
+                >
+                  <option value="">{loadingWards ? "Đang tải..." : "Chọn phường/xã"}</option>
+                  {wards.map((w) => (
+                    <option key={w.code} value={w.code}>
+                      {w.type} {w.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <input
