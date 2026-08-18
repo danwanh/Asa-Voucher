@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { X } from "lucide-react"
 import { C } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
@@ -185,8 +185,11 @@ export function SystemLogsPage() {
   const [dateTo, setDateTo] = useState("")
   const [actionFilter, setActionFilter] = useState("")
   const [actorFilter, setActorFilter] = useState("")
+  const [actorSearch, setActorSearch] = useState("")
+  const [showActorDropdown, setShowActorDropdown] = useState(false)
   const [adminList, setAdminList] = useState<AdminOption[]>([])
   const [detailLog, setDetailLog] = useState<UnifiedLog | null>(null)
+  const actorRef = useRef<HTMLDivElement>(null)
 
   const dateError = dateFrom && dateTo && dateTo < dateFrom
     ? "Khoảng thời gian không hợp lệ"
@@ -203,6 +206,23 @@ export function SystemLogsPage() {
       })
       .catch(() => {})
   }, [])
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (actorRef.current && !actorRef.current.contains(e.target as Node)) {
+        setShowActorDropdown(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
+
+  const filteredActors = actorSearch.trim()
+    ? adminList.filter((a) => {
+        const q = actorSearch.toLowerCase()
+        return (a.full_name || "").toLowerCase().includes(q) || a.email.toLowerCase().includes(q)
+      }).slice(0, 8)
+    : []
 
   const fetchLogs = useCallback(async () => {
     if (dateError) { setLoading(false); return }
@@ -315,17 +335,52 @@ export function SystemLogsPage() {
           ))}
         </select>
 
-        <select
-          value={actorFilter}
-          onChange={(e) => setActorFilter(e.target.value)}
-          className="px-3 py-2 rounded-xl text-xs border bg-white"
-          style={{ borderColor: "#E5E7EB", color: C.indigo, minWidth: 160 }}
-        >
-          <option value="">Tất cả tác nhân</option>
-          {adminList.map((a) => (
-            <option key={a.id} value={a.id}>{a.full_name || a.email}</option>
-          ))}
-        </select>
+        <div className="relative" ref={actorRef}>
+          <input
+            type="text"
+            value={actorFilter ? actorSearch : actorSearch}
+            onChange={(e) => {
+              setActorSearch(e.target.value)
+              setShowActorDropdown(true)
+              if (!e.target.value) {
+                setActorFilter("")
+              }
+            }}
+            onFocus={() => setShowActorDropdown(true)}
+            placeholder="Tìm tác nhân..."
+            className="px-3 py-2 rounded-xl text-xs border bg-white"
+            style={{ borderColor: "#E5E7EB", color: C.indigo, minWidth: 180 }}
+          />
+          {actorFilter && (
+            <button
+              type="button"
+              onClick={() => { setActorFilter(""); setActorSearch(""); setShowActorDropdown(false) }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          )}
+          {showActorDropdown && actorSearch.trim() && filteredActors.length > 0 && (
+            <div className="absolute z-50 mt-1 w-full bg-white border rounded-xl shadow-lg max-h-60 overflow-y-auto" style={{ borderColor: "#E5E7EB" }}>
+              {filteredActors.map((a) => (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => {
+                    setActorFilter(a.id)
+                    setActorSearch(a.full_name || a.email)
+                    setShowActorDropdown(false)
+                  }}
+                  className="w-full px-3 py-2 text-left text-xs hover:bg-gray-50 flex flex-col"
+                  style={{ color: C.indigo }}
+                >
+                  <span className="font-semibold">{a.full_name || "—"}</span>
+                  <span style={{ color: "#8A8DA8" }}>{a.email}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
         <div className="flex items-center gap-2 ml-auto">
           <input
