@@ -49,11 +49,12 @@ export const changePasswordSchema = z.object({
 
 export const createUserSchema = z.object({
   email: z.string().trim().email().toLowerCase(),
-  password: z.string().min(8).max(64).regex(/[A-Z]/).regex(/[a-z]/).regex(/[0-9]/).regex(/[^A-Za-z0-9]/),
+  password: z.string().min(1, "Password is required"),
   full_name: z.string().trim().min(1).max(100),
   role: z.enum(["buyer", "partner_owner", "partner_voucher_staff", "partner_store_staff", "admin_content", "admin_operations", "admin_security"]),
   phone: z.string().trim().regex(/^(0|\+84)[0-9]{8,9}$/).optional(),
-  partner_branches_id: z.string().uuid().optional()
+  partner_id: z.string().uuid().optional(),
+  partner_branches_id: z.string().uuid().optional(),
 });
 
 export const updateUserSchema = z.object({
@@ -68,6 +69,7 @@ export const updateUserSchema = z.object({
   role: z.enum(["buyer", "partner_owner", "partner_voucher_staff", "partner_store_staff", "admin_content", "admin_operations", "admin_security"]).optional(),
   is_active: z.boolean().optional(),
   is_verified: z.boolean().optional(),
+  partner_id: z.string().uuid().nullable().optional(),
   partner_branches_id: z.string().uuid().nullable().optional()
 });
 

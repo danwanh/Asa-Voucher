@@ -35,6 +35,8 @@ export interface AdminUser {
   role: Role
   is_active: boolean
   is_verified: boolean
+  partner_id: string | null
+  partner_branches_id: string | null
   created_at: string
   updated_at: string
 }
@@ -56,6 +58,8 @@ export type CreateUserData = {
   full_name: string
   phone?: string
   role: string
+  partner_id?: string
+  partner_branches_id?: string
 }
 
 export type UpdateUserData = {
@@ -64,6 +68,8 @@ export type UpdateUserData = {
   phone?: string
   role?: string
   is_active?: boolean
+  partner_id?: string | null
+  partner_branches_id?: string | null
 }
 
 export interface AppUser {
