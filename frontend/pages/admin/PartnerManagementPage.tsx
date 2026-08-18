@@ -42,8 +42,6 @@ function PartnerDetail({
     city: "",
     district: "",
     phone: "",
-    latitude: "",
-    longitude: "",
   });
 
   function openCreateBranch() {
@@ -54,8 +52,6 @@ function PartnerDetail({
       city: "",
       district: "",
       phone: "",
-      latitude: "",
-      longitude: "",
     });
     setShowBranchForm(true);
   }
@@ -68,14 +64,6 @@ function PartnerDetail({
       city: branch.city,
       district: branch.district,
       phone: branch.phone,
-      latitude:
-        branch.latitude !== undefined && branch.latitude !== null
-          ? String(branch.latitude)
-          : "",
-      longitude:
-        branch.longitude !== undefined && branch.longitude !== null
-          ? String(branch.longitude)
-          : "",
     });
     setShowBranchForm(true);
   }
@@ -90,8 +78,6 @@ function PartnerDetail({
         city: branchForm.city,
         district: branchForm.district || undefined,
         phone: branchForm.phone || undefined,
-        latitude: branchForm.latitude ? Number(branchForm.latitude) : undefined,
-        longitude: branchForm.longitude ? Number(branchForm.longitude) : undefined,
       };
 
       if (editingBranch) {
@@ -118,8 +104,6 @@ function PartnerDetail({
         city: branch.city,
         district: branch.district || undefined,
         phone: branch.phone || undefined,
-        latitude: branch.latitude ?? undefined,
-        longitude: branch.longitude ?? undefined,
         is_active: !branch.isActive,
       });
 
@@ -309,26 +293,6 @@ function PartnerDetail({
                 placeholder="Số điện thoại"
                 className="w-full px-3 py-2.5 rounded-xl text-sm border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500"
               />
-
-              <div className="grid grid-cols-2 gap-3">
-                <input
-                  value={branchForm.latitude}
-                  onChange={(e) =>
-                    setBranchForm({ ...branchForm, latitude: e.target.value })
-                  }
-                  placeholder="Latitude"
-                  className="w-full px-3 py-2.5 rounded-xl text-sm border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500"
-                />
-
-                <input
-                  value={branchForm.longitude}
-                  onChange={(e) =>
-                    setBranchForm({ ...branchForm, longitude: e.target.value })
-                  }
-                  placeholder="Longitude"
-                  className="w-full px-3 py-2.5 rounded-xl text-sm border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500"
-                />
-              </div>
             </div>
 
             <div className="flex gap-2 mt-5">
