@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react"
-import { Search, MoreVertical, X } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import { Search, MoreVertical, X, Pencil, Eye, EyeOff, Lock, Unlock } from "lucide-react"
+import { toast } from "sonner"
 import { C, fmtDate } from "@/utils/constants"
 import { StatusBadge } from "@/components/StatusBadge"
 import { getUsers, getUser, createUser, updateUser } from "@/services/userService"
+import { partnerService, type PartnerProfile, type PartnerBranch } from "@/services/partnerService"
 import type { AdminUser, Role, UserQuery } from "@/types"
 import { useAuthStore } from "@/stores/authStore"
 
@@ -33,6 +35,19 @@ const ROLE_OPTIONS: Array<{ value: Role; label: string }> = [
   { value: "admin_operations", label: "Quản trị vận hành" },
   { value: "admin_security", label: "Quản trị bảo mật" },
 ]
+
+const PARTNER_ROLES: Role[] = ["partner_owner", "partner_voucher_staff", "partner_store_staff"]
+const ADMIN_ROLES: Role[] = ["admin_content", "admin_operations", "admin_security"]
+
+function getEditableRoles(currentRole: Role): Array<{ value: Role; label: string }> {
+  if (PARTNER_ROLES.includes(currentRole)) {
+    return ROLE_OPTIONS.filter((r) => PARTNER_ROLES.includes(r.value))
+  }
+  if (ADMIN_ROLES.includes(currentRole)) {
+    return ROLE_OPTIONS.filter((r) => ADMIN_ROLES.includes(r.value))
+  }
+  return []
+}
 
 function buildUserQuery(page: number, limit: number, filters: UserFilters): UserQuery {
   const fullName = filters.full_name.trim()
@@ -71,7 +86,19 @@ export function UserManagementPage() {
     full_name: "",
     phone: "",
     role: "buyer" as AdminUser["role"],
+    partner_id: "",
+    partner_branches_id: "",
   })
+  const [showPassword, setShowPassword] = useState(false)
+  const [createFormError, setCreateFormError] = useState("")
+  const createFormErrorRef = useRef<HTMLDivElement>(null)
+  const [partners, setPartners] = useState<PartnerProfile[]>([])
+  const [branches, setBranches] = useState<PartnerBranch[]>([])
+  const [loadingBranches, setLoadingBranches] = useState(false)
+  const [editRoleUser, setEditRoleUser] = useState<AdminUser | null>(null)
+  const [editRoleValue, setEditRoleValue] = useState<Role>("buyer")
+  const [editRoleLoading, setEditRoleLoading] = useState(false)
+  const [editRoleError, setEditRoleError] = useState("")
   const currentUser = useAuthStore((state) => state.user)
   const limit = 10
   const totalPages = Math.max(1, Math.ceil(total / limit))
@@ -84,6 +111,44 @@ export function UserManagementPage() {
     filters.role ||
     filters.status !== "all"
   )
+
+  useEffect(() => {
+    let mounted = true
+    async function loadPartners() {
+      try {
+        const result = await partnerService.listPartners({ limit: 100 })
+        if (mounted) setPartners(result.items)
+      } catch {
+        console.error("Failed to load partners")
+      }
+    }
+    if (showCreate || selectedUser) loadPartners()
+    return () => { mounted = false }
+  }, [showCreate, selectedUser])
+
+  useEffect(() => {
+    let mounted = true
+    async function loadBranches() {
+      const partnerId = createForm.role === "partner_store_staff" && createForm.partner_id
+        ? createForm.partner_id
+        : selectedUser?.partner_id
+      if (!partnerId) {
+        setBranches([])
+        return
+      }
+      try {
+        setLoadingBranches(true)
+        const result = await partnerService.listBranches(partnerId)
+        if (mounted) setBranches(result)
+      } catch {
+        console.error("Failed to load branches")
+      } finally {
+        if (mounted) setLoadingBranches(false)
+      }
+    }
+    loadBranches()
+    return () => { mounted = false }
+  }, [createForm.partner_id, createForm.role, selectedUser?.partner_id])
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -149,33 +214,49 @@ export function UserManagementPage() {
 
     try {
       setCreateLoading(true)
-      setError("")
+      setCreateFormError("")
 
-      await createUser({
+      const payload: Record<string, unknown> = {
         email: createForm.email,
         password: createForm.password,
         full_name: createForm.full_name,
         phone: createForm.phone || undefined,
         role: createForm.role,
-      })
+      }
 
+      if (createForm.role === "partner_owner") {
+        payload.partner_id = createForm.partner_id || undefined
+      } else if (createForm.role === "partner_voucher_staff" || createForm.role === "partner_store_staff") {
+        payload.partner_id = createForm.partner_id || undefined
+        payload.partner_branches_id = createForm.partner_branches_id || undefined
+      }
+
+      await createUser(payload as any)
+
+      toast.success("Tạo người dùng thành công")
       setShowCreate(false)
-
+      setCreateFormError("")
       setCreateForm({
         email: "",
         password: "",
         full_name: "",
         phone: "",
         role: "buyer",
+        partner_id: "",
+        partner_branches_id: "",
       })
+      setShowPassword(false)
 
       const result = await getUsers(buildUserQuery(page, limit, appliedFilters))
-
       setUsers(result.data.items)
       setTotal(result.data.count)
-    } catch (error) {
-      console.error("Failed to create user:", error)
-      setError("Không thể tạo người dùng")
+    } catch (error: any) {
+      const msg = error?.response?.data?.error?.message || "Không thể tạo người dùng"
+      setCreateFormError(msg)
+      toast.error(msg)
+      setTimeout(() => {
+        createFormErrorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })
+      }, 100)
     } finally {
       setCreateLoading(false)
     }
@@ -192,16 +273,19 @@ export function UserManagementPage() {
         is_active: false
       })
 
+      toast.success("Đã vô hiệu hóa người dùng")
       setDeactivateUser(null)
 
       const result = await getUsers(buildUserQuery(page, limit, appliedFilters))
 
       setUsers(result.data.items)
       setTotal(result.data.count)
-    } catch (error) {
+    } catch (error: any) {
+      const msg = error?.response?.data?.error?.message || "Không thể vô hiệu hóa người dùng"
       console.error("Failed to deactivate user:", error)
       setDeactivateUser(null)
-      setError("Không thể vô hiệu hóa người dùng")
+      setError(msg)
+      toast.error(msg)
     } finally {
       setDeactivateLoading(false)
     }
@@ -215,13 +299,36 @@ export function UserManagementPage() {
         is_active: true,
       })
 
+      toast.success("Đã kích hoạt lại người dùng")
       const result = await getUsers(buildUserQuery(page, limit, appliedFilters))
 
       setUsers(result.data.items)
       setTotal(result.data.count)
-    } catch (error) {
+    } catch (error: any) {
+      const msg = error?.response?.data?.error?.message || "Không thể kích hoạt lại người dùng"
       console.error("Failed to activate user:", error)
-      setError("Không thể kích hoạt lại người dùng")
+      setError(msg)
+      toast.error(msg)
+    }
+  }
+
+  async function handleEditRole() {
+    if (!editRoleUser) return
+    try {
+      setEditRoleLoading(true)
+      setEditRoleError("")
+      await updateUser(editRoleUser.id, { role: editRoleValue })
+      toast.success("Đã thay đổi vai trò thành công")
+      setEditRoleUser(null)
+      const result = await getUsers(buildUserQuery(page, limit, appliedFilters))
+      setUsers(result.data.items)
+      setTotal(result.data.count)
+    } catch (error: any) {
+      const msg = error?.response?.data?.error?.message || "Không thể thay đổi vai trò"
+      setEditRoleError(msg)
+      toast.error(msg)
+    } finally {
+      setEditRoleLoading(false)
     }
   }
 
@@ -402,16 +509,32 @@ export function UserManagementPage() {
                         </button>
 
                         {openMenuId === u.id && (
-                          <div className="absolute right-0 top-9 z-20 w-40 rounded-xl border bg-white shadow-lg overflow-hidden">
+                          <div className="absolute right-0 top-9 z-20 w-44 rounded-xl border bg-white shadow-lg overflow-hidden">
                             <button
                               onClick={() => {
                                 setOpenMenuId(null)
                                 handleViewUser(u.id)
                               }}
-                              className="w-full px-4 py-2.5 text-left text-xs hover:bg-gray-50"
+                              className="w-full px-4 py-2.5 text-left text-xs hover:bg-gray-50 flex items-center gap-2"
                             >
+                              <Eye className="w-3.5 h-3.5" style={{ color: "#8A8DA8" }} />
                               Xem chi tiết
                             </button>
+
+                            {u.role !== "buyer" && (
+                              <button
+                                onClick={() => {
+                                  setOpenMenuId(null)
+                                  setEditRoleUser(u)
+                                  setEditRoleValue(u.role)
+                                  setEditRoleError("")
+                                }}
+                                className="w-full px-4 py-2.5 text-left text-xs hover:bg-gray-50 flex items-center gap-2"
+                              >
+                                <Pencil className="w-3.5 h-3.5" style={{ color: C.indigo }} />
+                                Chỉnh sửa vai trò
+                              </button>
+                            )}
 
                             {u.is_active ? (
                               u.id !== currentUser?.id && (
@@ -420,8 +543,9 @@ export function UserManagementPage() {
                                     setOpenMenuId(null)
                                     setDeactivateUser(u)
                                   }}
-                                  className="w-full px-4 py-2.5 text-left text-xs text-red-500 hover:bg-red-50"
+                                  className="w-full px-4 py-2.5 text-left text-xs text-red-500 hover:bg-red-50 flex items-center gap-2"
                                 >
+                                  <Lock className="w-3.5 h-3.5" />
                                   Vô hiệu hóa
                                 </button>
                               )
@@ -432,8 +556,9 @@ export function UserManagementPage() {
                                     setOpenMenuId(null)
                                     handleActivateUser(u)
                                   }}
-                                  className="w-full px-4 py-2.5 text-left text-xs text-green-600 hover:bg-green-50"
+                                  className="w-full px-4 py-2.5 text-left text-xs text-green-600 hover:bg-green-50 flex items-center gap-2"
                                 >
+                                  <Unlock className="w-3.5 h-3.5" />
                                   Kích hoạt lại
                                 </button>
                               )
@@ -509,6 +634,20 @@ export function UserManagementPage() {
                       {getRoleLabel(selectedUser.role)}
                     </div>
 
+                    {selectedUser.partner_id && (
+                      <div>
+                        <span className="font-semibold">Đối tác: </span>
+                        {partners.find((p) => p.id === selectedUser.partner_id)?.businessName || selectedUser.partner_id}
+                      </div>
+                    )}
+
+                    {selectedUser.partner_branches_id && (
+                      <div>
+                        <span className="font-semibold">Chi nhánh: </span>
+                        {branches.find((b) => b.id === selectedUser.partner_branches_id)?.branchName || selectedUser.partner_branches_id}
+                      </div>
+                    )}
+
                     <div>
                       <span className="font-semibold">Trạng thái: </span>
                       {selectedUser.is_active ? "Đang hoạt động" : "Đã khóa"}
@@ -525,8 +664,8 @@ export function UserManagementPage() {
           )}
 
           {showCreate && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-              <form onSubmit={handleCreateUser} className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+              <form onSubmit={handleCreateUser} className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
                 <div className="flex items-center justify-between mb-5">
                   <h3 className="font-black text-lg" style={{ color: C.indigo }}>
                     Thêm người dùng
@@ -538,6 +677,12 @@ export function UserManagementPage() {
                 </div>
 
                 <div className="space-y-4">
+                  {createFormError && (
+                    <div ref={createFormErrorRef} className="rounded-xl p-3 text-sm" style={{ backgroundColor: "#FEE2E2", color: "#B91C1C" }}>
+                      {createFormError}
+                    </div>
+                  )}
+
                   <div>
                     <label className="block text-xs font-bold mb-1">Họ tên</label>
 
@@ -566,14 +711,30 @@ export function UserManagementPage() {
                   <div>
                     <label className="block text-xs font-bold mb-1">Mật khẩu</label>
 
-                    <input
-                      required
-                      type="password"
-                      value={createForm.password}
-                      onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
-                      className="w-full px-3 py-2.5 rounded-xl border text-sm outline-none"
-                      placeholder="Mật khẩu"
-                    />
+                    <div className="relative">
+                      <input
+                        required
+                        type={showPassword ? "text" : "password"}
+                        value={createForm.password}
+                        onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
+                        className="w-full px-3 py-2.5 pr-10 rounded-xl border text-sm outline-none"
+                        placeholder="Mật khẩu"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5"
+                      >
+                        {showPassword ? (
+                          <EyeOff className="w-4 h-4" style={{ color: "#8A8DA8" }} />
+                        ) : (
+                          <Eye className="w-4 h-4" style={{ color: "#8A8DA8" }} />
+                        )}
+                      </button>
+                    </div>
+                    <div className="mt-1.5 text-xs" style={{ color: "#8A8DA8" }}>
+                      <span className="font-semibold">Quy cách:</span> 8-64 ký tự, có chữ hoa, chữ thường, số và ký tự đặc biệt
+                    </div>
                   </div>
 
                   <div>
@@ -592,7 +753,10 @@ export function UserManagementPage() {
 
                     <select
                       value={createForm.role}
-                      onChange={(e) => setCreateForm({ ...createForm, role: e.target.value as AdminUser["role"] })}
+                      onChange={(e) => {
+                        const role = e.target.value as AdminUser["role"]
+                        setCreateForm({ ...createForm, role, partner_id: "", partner_branches_id: "" })
+                      }}
                       className="w-full px-3 py-2.5 rounded-xl border text-sm outline-none"
                     >
                       <option value="buyer">Khách hàng</option>
@@ -604,6 +768,58 @@ export function UserManagementPage() {
                       <option value="admin_security">Quản trị bảo mật</option>
                     </select>
                   </div>
+
+                  {createForm.role === "partner_owner" && (
+                    <div>
+                      <label className="block text-xs font-bold mb-1">Chọn đối tác</label>
+                      <select
+                        required
+                        value={createForm.partner_id}
+                        onChange={(e) => setCreateForm({ ...createForm, partner_id: e.target.value, partner_branches_id: "" })}
+                        className="w-full px-3 py-2.5 rounded-xl border text-sm outline-none"
+                      >
+                        <option value="">Chọn đối tác</option>
+                        {partners.map((p) => (
+                          <option key={p.id} value={p.id}>{p.businessName}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {(createForm.role === "partner_voucher_staff" || createForm.role === "partner_store_staff") && (
+                    <div>
+                      <label className="block text-xs font-bold mb-1">Đối tác</label>
+                      <select
+                        required
+                        value={createForm.partner_id}
+                        onChange={(e) => setCreateForm({ ...createForm, partner_id: e.target.value, partner_branches_id: "" })}
+                        className="w-full px-3 py-2.5 rounded-xl border text-sm outline-none"
+                      >
+                        <option value="">Chọn đối tác</option>
+                        {partners.map((p) => (
+                          <option key={p.id} value={p.id}>{p.businessName}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {createForm.role === "partner_store_staff" && createForm.partner_id && (
+                    <div>
+                      <label className="block text-xs font-bold mb-1">Chi nhánh</label>
+                      <select
+                        required
+                        value={createForm.partner_branches_id}
+                        onChange={(e) => setCreateForm({ ...createForm, partner_branches_id: e.target.value })}
+                        className="w-full px-3 py-2.5 rounded-xl border text-sm outline-none"
+                        disabled={loadingBranches}
+                      >
+                        <option value="">{loadingBranches ? "Đang tải..." : "Chọn chi nhánh"}</option>
+                        {branches.filter((b) => b.isActive).map((b) => (
+                          <option key={b.id} value={b.id}>{b.branchName}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex justify-end gap-2 mt-6">
@@ -646,6 +862,62 @@ export function UserManagementPage() {
 
                   <button type="button" onClick={handleDeactivateUser} disabled={deactivateLoading} className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-red-500 disabled:opacity-50">
                     {deactivateLoading ? "Đang xử lý..." : "Vô hiệu hóa"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {editRoleUser && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+              <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+                <div className="flex items-center justify-between mb-5">
+                  <h3 className="font-black text-lg" style={{ color: C.indigo }}>
+                    Chỉnh sửa vai trò
+                  </h3>
+                  <button onClick={() => setEditRoleUser(null)} className="text-sm text-gray-500 hover:text-gray-800">✕</button>
+                </div>
+
+                <div className="mb-4">
+                  <div className="text-sm font-semibold mb-1">{editRoleUser.full_name}</div>
+                  <div className="text-xs text-gray-500">{editRoleUser.email}</div>
+                  <div className="text-xs mt-1">
+                    <span className="font-semibold">Vai trò hiện tại: </span>
+                    {getRoleLabel(editRoleUser.role)}
+                  </div>
+                </div>
+
+                <div className="mb-5">
+                  <label className="block text-xs font-bold mb-1">Vai trò mới</label>
+                  <select
+                    value={editRoleValue}
+                    onChange={(e) => setEditRoleValue(e.target.value as Role)}
+                    className="w-full px-3 py-2.5 rounded-xl border text-sm outline-none"
+                  >
+                    {getEditableRoles(editRoleUser.role).map((r) => (
+                      <option key={r.value} value={r.value}>{r.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {editRoleError && (
+                  <div className="mb-4 p-3 rounded-xl text-sm font-medium" style={{ backgroundColor: "#FEE2E2", color: "#991B1B" }}>
+                    {editRoleError}
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-2">
+                  <button type="button" onClick={() => setEditRoleUser(null)} className="px-4 py-2 rounded-xl border text-sm">
+                    Hủy
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleEditRole}
+                    disabled={editRoleLoading || editRoleValue === editRoleUser.role}
+                    className="px-4 py-2 rounded-xl text-sm font-bold text-white disabled:opacity-50"
+                    style={{ backgroundColor: C.indigo }}
+                  >
+                    {editRoleLoading ? "Đang lưu..." : "Lưu"}
                   </button>
                 </div>
               </div>

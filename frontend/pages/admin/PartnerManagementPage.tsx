@@ -25,6 +25,14 @@ import {
   type Ward,
 } from "@/utils/vietnamProvinces";
 
+const BUSINESS_TYPE_LABELS: Record<string, string> = {
+  restaurant: "Nhà hàng",
+  spa: "Spa",
+  entertainment: "Giải trí",
+  hotel: "Khách sạn",
+  other: "Khác",
+};
+
 function PartnerDetail({
   partner,
   branches,
@@ -273,7 +281,7 @@ function PartnerDetail({
           MST: {partner.taxNumber || "—"}
         </div>
         <div className="text-sm" style={{ color: "#8A8DA8" }}>
-          Loại hình: {partner.businessType}
+          Loại hình: {partner.businessType ? BUSINESS_TYPE_LABELS[partner.businessType] || partner.businessType : "—"}
         </div>
       </div>
 
@@ -544,33 +552,36 @@ export function PartnerManagementPage() {
               p.taxNumber?.toLowerCase().includes(keyword)
             );
           })
-          .map((p) => (
-            <div key={p.id} className="bg-card rounded-2xl p-5 shadow-sm">
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <div 
-                    className="w-12 h-12 rounded-2xl flex items-center justify-center overflow-hidden shrink-0"
-                    style={{ backgroundColor: C.eggshell }}
-                  >
-                    {p.logoUrl ? (
-                      <img
-                        src={p.logoUrl}
-                        alt={p.businessName}
-                        className="w-full h-full object-contain"
-                      />
-                    ) : (
-                      <span className="text-2xl"> </span>
-                    )}
-                  </div>
-                  <div>
-                    <div className="font-bold text-sm" style={{ color: C.indigo }}>
-                      {p.businessName}
+          .map((p) => {
+            const partnerBusinessType = p.businessType ?? "other";
+
+            return (
+              <div key={p.id} className="bg-card rounded-2xl p-5 shadow-sm">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div 
+                      className="w-12 h-12 rounded-2xl flex items-center justify-center overflow-hidden shrink-0"
+                      style={{ backgroundColor: C.eggshell }}
+                    >
+                      {p.logoUrl ? (
+                        <img
+                          src={p.logoUrl}
+                          alt={p.businessName}
+                          className="w-full h-full object-contain"
+                        />
+                      ) : (
+                        <span className="text-2xl"> </span>
+                      )}
                     </div>
-                    <div className="text-xs" style={{ color: "#8A8DA8" }}>
-                      {p.businessType}
+                    <div>
+                      <div className="font-bold text-sm" style={{ color: C.indigo }}>
+                        {p.businessName}
+                      </div>
+                      <div className="text-xs" style={{ color: "#8A8DA8" }}>
+                        {BUSINESS_TYPE_LABELS[partnerBusinessType] || partnerBusinessType}
+                      </div>
                     </div>
                   </div>
-                </div>
                 <div className="flex flex-col items-end gap-2">
                   <StatusBadge status={p.approvalStatus} />
                   {p.approvalStatus === "approved" && <StatusBadge status={p.status} />}
@@ -654,7 +665,8 @@ export function PartnerManagementPage() {
                 </div>
               )}
             </div>
-          ))}
+          );
+        })}
       </div>
     </div>
   );

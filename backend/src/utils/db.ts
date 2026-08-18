@@ -1,13 +1,20 @@
 import { Prisma } from "@prisma/client";
 import { HttpError } from "./http-error.js";
 
-export function throwDbError(error: unknown, fallback = "Database error"): never {
+export function throwDbError(error: unknown, fallback = "Lỗi hệ thống"): never {
   if (!error) {
     throw new HttpError(500, fallback, "DATABASE_ERROR");
   }
 
   if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-    throw new HttpError(409, "Email, số điện thoại hoặc dữ liệu định danh đã tồn tại", "CONFLICT");
+    const target = (error.meta?.target as string[]) || [];
+    if (target.includes("email")) {
+      throw new HttpError(409, "Email đã tồn tại trong hệ thống", "CONFLICT");
+    }
+    if (target.includes("phone")) {
+      throw new HttpError(409, "Số điện thoại đã tồn tại trong hệ thống", "CONFLICT");
+    }
+    throw new HttpError(409, `Dữ liệu trùng lặp: ${target.join(", ") || "không xác định"}`, "CONFLICT");
   }
 
   if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
