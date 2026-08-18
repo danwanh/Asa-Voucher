@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Home, QrCode, History, User, LogOut, Menu, ChevronRight, Scan, Bell } from "lucide-react"
+import { Home, QrCode, History, User, LogOut, Menu, ChevronRight, Scan } from "lucide-react"
 import { C } from "@/utils/constants"
 import type { AppUser } from "@/types"
 
@@ -10,7 +10,7 @@ const NAV_ITEMS = [
   { label: "Tổng quan", pg: "dashboard" as StaffPage, icon: <Home className="w-4 h-4" /> },
   { label: "Quét QR Code", pg: "qr-scan" as StaffPage, icon: <Scan className="w-4 h-4" /> },
   { label: "Lịch sử xác nhận", pg: "history" as StaffPage, icon: <History className="w-4 h-4" /> },
-  { label: "Thông báo", pg: "notifications" as StaffPage, icon: <Bell className="w-4 h-4" /> },
+  // { label: "Thông báo", pg: "notifications" as StaffPage, icon: <Bell className="w-4 h-4" /> },
   { label: "Hồ sơ cá nhân", pg: "profile" as StaffPage, icon: <User className="w-4 h-4" /> },
 ]
 
