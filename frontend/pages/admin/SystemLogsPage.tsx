@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react"
-import { X } from "lucide-react"
+import { X, Download } from "lucide-react"
 import { C } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import { securityService } from "@/services/securityService"
@@ -300,6 +300,25 @@ export function SystemLogsPage() {
         return true
       })
 
+  function handleExportCSV() {
+    const BOM = "\uFEFF"
+    const header = "Thời gian,Loại,Hành động,Mức độ,Tác nhân,Mô tả"
+    const rows = filtered.map((log) => {
+      const time = new Date(log.time).toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
+      const escape = (s: string) => `"${(s || "").replace(/"/g, '""')}"`
+      return [time, log.type, log.action || "", log.level, log.actor || "", log.message].map(escape).join(",")
+    })
+    const csv = BOM + header + "\n" + rows.join("\n")
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    const today = new Date().toISOString().slice(0, 10)
+    a.download = `nhat-ky-he-thong-${today}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="p-6">
       <h2 className="font-black text-lg mb-5" style={{ color: C.indigo }}>Nhật ký hệ thống</h2>
@@ -409,6 +428,16 @@ export function SystemLogsPage() {
             </button>
           )}
         </div>
+
+        <button
+          onClick={handleExportCSV}
+          disabled={filtered.length === 0}
+          className="ml-auto px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          style={{ backgroundColor: C.indigo, color: "white" }}
+        >
+          <Download className="w-3.5 h-3.5" />
+          Xuất file
+        </button>
       </div>
 
       {/* Log list */}
