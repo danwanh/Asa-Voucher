@@ -5,7 +5,7 @@ import { C } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import type { AppUser } from "@/types"
 import { partnerService, type PartnerBranch, type PartnerProfile } from "@/services/partnerService"
-import { vietnamAddressService, type VietnamDistrict, type VietnamProvince } from "@/services/vietnamAddressService"
+import { fetchProvinces, fetchWardsByProvince, type Province, type Ward } from "@/utils/vietnamProvinces"
 import { LoadingState } from "@/components/LoadingState"
 
 type Props = {
@@ -19,7 +19,7 @@ type FormData = {
   branchName: string
   address: string
   city: string
-  district: string
+  ward: string
   phone: string
   isActive: boolean
 }
@@ -28,7 +28,7 @@ const EMPTY_FORM: FormData = {
   branchName: "",
   address: "",
   city: "",
-  district: "",
+  ward: "",
   phone: "",
   isActive: true,
 }
@@ -43,8 +43,8 @@ export function BranchManagementPage({ user, partner, embedded = false }: Props)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  const [provinces, setProvinces] = useState<VietnamProvince[]>([])
-  const [districts, setDistricts] = useState<VietnamDistrict[]>([])
+  const [provinces, setProvinces] = useState<Province[]>([])
+  const [wards, setWards] = useState<Ward[]>([])
   const [isAddressLoading, setIsAddressLoading] = useState(false)
   const [addressLoadError, setAddressLoadError] = useState(false)
 
@@ -86,7 +86,7 @@ export function BranchManagementPage({ user, partner, embedded = false }: Props)
 
       setIsAddressLoading(true)
       try {
-        const items = await vietnamAddressService.listProvinces()
+        const items = await fetchProvinces()
         if (!isMounted) return
         setProvinces(items)
       } catch {
@@ -107,34 +107,34 @@ export function BranchManagementPage({ user, partner, embedded = false }: Props)
   useEffect(() => {
     let isMounted = true
 
-    async function loadDistricts() {
+    async function loadWards() {
       if (!showForm || !form.city || provinces.length === 0 || addressLoadError) {
-        setDistricts([])
+        setWards([])
         return
       }
 
       const province = provinces.find((item) => item.name === form.city)
       if (!province) {
-        setDistricts([])
+        setWards([])
         return
       }
 
       setIsAddressLoading(true)
       try {
-        const items = await vietnamAddressService.listDistricts(province.code)
+        const items = await fetchWardsByProvince(province.code)
         if (!isMounted) return
-        setDistricts(items)
+        setWards(items)
       } catch {
         if (!isMounted) return
         setAddressLoadError(true)
-        setDistricts([])
+        setWards([])
       } finally {
         if (!isMounted) return
         setIsAddressLoading(false)
       }
     }
 
-    void loadDistricts()
+    void loadWards()
     return () => {
       isMounted = false
     }
@@ -152,11 +152,12 @@ export function BranchManagementPage({ user, partner, embedded = false }: Props)
 
   const selectedProvince = provinces.find((item) => item.name === form.city)
   const hasCurrentCityOption = Boolean(form.city && provinces.length > 0 && !selectedProvince)
-  const hasCurrentDistrictOption = Boolean(form.district && districts.length > 0 && !districts.some((item) => item.name === form.district))
+  const selectedWard = wards.find((item) => item.name === form.ward)
+  const hasCurrentWardOption = Boolean(form.ward && wards.length > 0 && !selectedWard)
 
   const openCreate = () => {
     setForm(EMPTY_FORM)
-    setDistricts([])
+    setWards([])
     setEditId(null)
     setShowForm(true)
   }
@@ -166,7 +167,7 @@ export function BranchManagementPage({ user, partner, embedded = false }: Props)
       branchName: branch.branchName,
       address: branch.address,
       city: branch.city,
-      district: branch.district,
+      ward: branch.ward || branch.district,
       phone: branch.phone,
       isActive: branch.isActive,
     })
@@ -186,8 +187,8 @@ export function BranchManagementPage({ user, partner, embedded = false }: Props)
       return
     }
 
-    if (!form.branchName.trim() || !form.address.trim() || !form.city.trim()) {
-      toast.error("Vui lòng nhập đầy đủ tên chi nhánh, địa chỉ và thành phố")
+    if (!form.branchName.trim() || !form.address.trim() || !form.city.trim() || !form.ward.trim()) {
+      toast.error("Vui lòng nhập đầy đủ tên chi nhánh, địa chỉ, tỉnh/thành và phường/xã")
       return
     }
 
@@ -198,7 +199,7 @@ export function BranchManagementPage({ user, partner, embedded = false }: Props)
           branch_name: form.branchName,
           address: form.address,
           city: form.city,
-          district: form.district || undefined,
+          ward: form.ward || undefined,
           phone: form.phone || undefined,
           is_active: form.isActive,
         })
@@ -208,7 +209,7 @@ export function BranchManagementPage({ user, partner, embedded = false }: Props)
           branch_name: form.branchName,
           address: form.address,
           city: form.city,
-          district: form.district || undefined,
+          ward: form.ward || undefined,
           phone: form.phone || undefined,
           is_active: form.isActive,
         })
@@ -314,7 +315,7 @@ export function BranchManagementPage({ user, partner, embedded = false }: Props)
                   </div>
                 </div>
                 <div className="space-y-1.5 text-xs" style={{ color: "#8A8DA8" }}>
-                  <div className="flex items-center gap-2"><MapPin className="w-3.5 h-3.5" />{branch.address}, {branch.city}</div>
+                  <div className="flex items-center gap-2"><MapPin className="w-3.5 h-3.5" />{branch.address}{branch.ward || branch.district ? `, ${branch.ward || branch.district}` : ""}, {branch.city}</div>
                   {branch.phone && <div className="flex items-center gap-2"><Phone className="w-3.5 h-3.5" />{branch.phone}</div>}
                 </div>
               </div>
@@ -343,7 +344,7 @@ export function BranchManagementPage({ user, partner, embedded = false }: Props)
                 { key: "branchName", label: "Tên chi nhánh *", placeholder: "Nhập tên chi nhánh" },
                 { key: "address", label: "Địa chỉ *", placeholder: "Nhập địa chỉ" },
                 { key: "city", label: "Tỉnh/Thành phố *", placeholder: "VD: TP. Hồ Chí Minh" },
-                { key: "district", label: "Quận/Huyện", placeholder: "VD: Quận 1" },
+                { key: "ward", label: "Phường/Xã *", placeholder: "VD: Phường Sài Gòn" },
                 { key: "phone", label: "Điện thoại", placeholder: "VD: 028 1234 5678" },
               ].map((field) => (
                 <div key={field.key}>
@@ -352,34 +353,40 @@ export function BranchManagementPage({ user, partner, embedded = false }: Props)
                     <select
                       className="w-full px-4 py-2.5 rounded-xl border text-sm outline-none bg-white"
                       style={{ borderColor: "#E2DFC8", fontFamily: "'Inter', sans-serif" }}
-                      value={form.city}
-                      onChange={(event) => setForm((prev) => ({ ...prev, city: event.target.value, district: "" }))}
+                      value={selectedProvince?.code ?? form.city}
+                      onChange={(event) => {
+                        const province = provinces.find((item) => item.code === event.target.value)
+                        setForm((prev) => ({ ...prev, city: province?.name ?? "", ward: "" }))
+                      }}
                       disabled={isAddressLoading && provinces.length === 0}
                     >
                       <option value="">{isAddressLoading && provinces.length === 0 ? "Đang tải tỉnh/thành..." : "Chọn tỉnh/thành phố"}</option>
                       {hasCurrentCityOption && <option value={form.city}>{form.city}</option>}
                       {provinces.map((province) => (
-                        <option key={province.code} value={province.name}>{province.name}</option>
+                        <option key={province.code} value={province.code}>{province.type} {province.name}</option>
                       ))}
                     </select>
-                  ) : field.key === "district" && !addressLoadError ? (
+                  ) : field.key === "ward" && !addressLoadError ? (
                     <select
                       className="w-full px-4 py-2.5 rounded-xl border text-sm outline-none bg-white disabled:bg-gray-50"
                       style={{ borderColor: "#E2DFC8", fontFamily: "'Inter', sans-serif" }}
-                      value={form.district}
-                      onChange={(event) => setForm((prev) => ({ ...prev, district: event.target.value }))}
-                      disabled={!form.city || (isAddressLoading && districts.length === 0)}
+                      value={selectedWard?.code ?? form.ward}
+                      onChange={(event) => {
+                        const ward = wards.find((item) => item.code === event.target.value)
+                        setForm((prev) => ({ ...prev, ward: ward?.name ?? "" }))
+                      }}
+                      disabled={!form.city || (isAddressLoading && wards.length === 0)}
                     >
                       <option value="">
                         {!form.city
                           ? "Chọn tỉnh/thành phố trước"
-                          : isAddressLoading && districts.length === 0
-                            ? "Đang tải quận/huyện..."
-                            : "Chọn quận/huyện"}
+                          : isAddressLoading && wards.length === 0
+                            ? "Đang tải phường/xã..."
+                            : "Chọn phường/xã"}
                       </option>
-                      {hasCurrentDistrictOption && <option value={form.district}>{form.district}</option>}
-                      {districts.map((district) => (
-                        <option key={district.code} value={district.name}>{district.name}</option>
+                      {hasCurrentWardOption && <option value={form.ward}>{form.ward}</option>}
+                      {wards.map((ward) => (
+                        <option key={ward.code} value={ward.code}>{ward.type} {ward.name}</option>
                       ))}
                     </select>
                   ) : (
@@ -391,9 +398,9 @@ export function BranchManagementPage({ user, partner, embedded = false }: Props)
                       onChange={(event) => setForm((prev) => ({
                         ...prev,
                         [field.key]: event.target.value,
-                        ...(field.key === "city" ? { district: "" } : {}),
+                        ...(field.key === "city" ? { ward: "" } : {}),
                       }))}
-                      disabled={field.key === "district" && !addressLoadError && !form.city}
+                      disabled={field.key === "ward" && !addressLoadError && !form.city}
                     />
                   )}
                 </div>

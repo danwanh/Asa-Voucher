@@ -119,8 +119,10 @@ export async function createBranch(
   try {
     const address = String(input.address);
     const city = String(input.city);
-    const district = input.district
-      ? String(input.district)
+    const locality = input.ward
+      ? String(input.ward)
+      : input.district
+        ? String(input.district)
       : undefined;
 
     const existingBranch = await prisma.partnerBranch.findFirst({
@@ -143,7 +145,7 @@ export async function createBranch(
 
     const { latitude, longitude } = await geocodeAddress(
       address,
-      district,
+      locality,
       city,
     );
 
