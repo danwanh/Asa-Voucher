@@ -50,6 +50,10 @@ export async function listComplaints(
     where.issued_vouchers = { voucher_products: { partner_id: filter.partnerId } };
   }
 
+  if (filter.orderId) {
+    where.order_id = filter.orderId;
+  }
+
   const skip = (filter.page - 1) * filter.limit;
   const take = filter.limit;
 

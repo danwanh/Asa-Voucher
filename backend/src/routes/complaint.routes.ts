@@ -7,6 +7,7 @@ import * as complaintController from "../controllers/complaint.controller.js";
 export const complaintRoutes = Router();
 
 complaintRoutes.get("/complaints/admins/search", requireAuth, asyncHandler(complaintController.searchAdmins));
+complaintRoutes.get("/complaints/partners/search", requireAuth, asyncHandler(complaintController.searchPartners));
 
 complaintRoutes.get("/complaints", requireAuth, asyncHandler(complaintController.listComplaints));
 complaintRoutes.post(

@@ -27,13 +27,14 @@ function assertCanView(user: AuthUser, complaint: ComplaintWithRelations) {
   throw new HttpError(403, "Bạn không có quyền xem khiếu nại này");
 }
 
-export async function listComplaints(user: AuthUser, query: { status?: string; page?: number; limit?: number }) {
-  const { status, page = 1, limit = 20 } = query;
+export async function listComplaints(user: AuthUser, query: { status?: string; order_id?: string; page?: number; limit?: number }) {
+  const { status, order_id: orderId, page = 1, limit = 20 } = query;
   const partnerId = isPartnerStaff(user.role) ? (user.partnerId ?? undefined) : undefined;
   const result = await complaintRepo.listComplaints({
     status: status as ComplaintStatus | undefined,
     userId: user.role === "buyer" ? user.id : undefined,
     partnerId,
+    orderId,
     page,
     limit,
   });
@@ -106,11 +107,11 @@ export async function closeComplaint(user: AuthUser, id: string) {
   const isAdmin = isAdminRole(user.role);
   if (!isOwner && !isAdmin) throw new HttpError(403, "Bạn không có quyền đóng khiếu nại này");
 
-  if (isOwner && !isAdmin && complaint.status !== "open") {
-    throw new HttpError(422, "Chỉ được đóng khiếu nại khi đang ở trạng thái open");
+  if (complaint.status === "resolved") {
+    throw new HttpError(422, "Khiếu nại đã được xử lý trước đó");
   }
 
-  return complaintRepo.updateComplaint(id, { status: "closed" });
+  return complaintRepo.updateComplaint(id, { status: "resolved" });
 }
 
 export async function assignComplaint(user: AuthUser, id: string, input: AssignComplaintInput) {
@@ -123,7 +124,6 @@ export async function assignComplaint(user: AuthUser, id: string, input: AssignC
 
   const updated = await complaintRepo.updateComplaint(id, {
     assigned_to: input.assigned_to,
-    status: complaint.status === "open" ? "under_review" : complaint.status,
   });
 
   return updated;
@@ -136,8 +136,8 @@ export async function resolveComplaint(user: AuthUser, id: string, input: Resolv
 
   const complaint = await complaintRepo.findComplaintById(id);
   if (!complaint) throw new HttpError(404, "Không tìm thấy khiếu nại");
-  if (complaint.status === "resolved" || complaint.status === "closed") {
-    throw new HttpError(409, "Khiếu nại đã được xử lý hoặc đóng trước đó");
+  if (complaint.status === "resolved") {
+    throw new HttpError(409, "Khiếu nại đã được xử lý trước đó");
   }
 
   if (input.resolution_types.includes("refund") && complaint.order_id) {

@@ -19,7 +19,7 @@ export type VoucherStatus =
   | "locked"
   | "cancelled"
   | "used"
-export type OrderStatus = "pending_payment" | "payment_failed" | "confirmed" | "completed" | "cancelled" | "refunded"
+export type OrderStatus = "pending_payment" | "payment_failed" | "confirmed" | "completed" | "cancelled" | "refunded" | "complaining"
 export type OrderPaymentStatus = "pending" | "paid" | "failed" | "refunded"
 
 // Kept for pages that still reference the old admin sub-role concept;
@@ -252,7 +252,7 @@ export interface ReviewTarget {
   review?: Review
 }
 
-export type ComplaintStatus = "open" | "under_review" | "resolved" | "closed"
+export type ComplaintStatus = "open" | "resolved"
 
 export interface Complaint {
   id: string

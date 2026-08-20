@@ -358,7 +358,13 @@ function buildOrderListWhere(user: CurrentUser, query?: { status?: string; payme
   }
 
   const where: Record<string, unknown> = and.length > 0 ? { AND: and } : {};
-  if (query?.status) where.status = { in: storedStatuses(query.status) };
+  if (query?.status) {
+    if (query.status === "complaining") {
+      where.complaints = { some: { status: "open" } };
+    } else {
+      where.status = { in: storedStatuses(query.status) };
+    }
+  }
   if (query?.payment_status) where.payment_status = query.payment_status;
   return where;
 }
@@ -395,7 +401,7 @@ export async function listOrders(
   const page = query?.page ?? 1;
   const limit = query?.limit ?? 20;
   const skip = (page - 1) * limit;
-  const [data, total, groupedCounts, groupedPaymentCounts] = await prisma.$transaction([
+  const [data, total, groupedCounts, groupedPaymentCounts, complainingCount] = await prisma.$transaction([
     prisma.order.findMany({
     where,
     select: {
@@ -414,7 +420,7 @@ export async function listOrders(
       created_at: true,
       users: { select: { full_name: true } },
       complaints: {
-        where: user.role === "buyer" ? { user_id: user.id, issued_voucher_id: null } : { issued_voucher_id: null },
+        where: user.role === "buyer" ? { user_id: user.id } : {},
         select: { id: true },
         take: 1,
       },
@@ -442,6 +448,12 @@ export async function listOrders(
     prisma.order.count({ where }),
     prisma.order.groupBy({ by: ["status"], where: countsWhere, orderBy: { status: "asc" }, _count: { _all: true } }),
     prisma.order.groupBy({ by: ["payment_status"], where: countsWhere, orderBy: { payment_status: "asc" }, _count: { _all: true } }),
+    prisma.order.count({
+      where: {
+        ...countsWhere,
+        complaints: { some: { status: "open" } },
+      },
+    }),
   ]);
 
   const items = data.map((order) => {
@@ -470,7 +482,10 @@ export async function listOrders(
 
   return {
     ...buildPaginatedResult(items, total, { page, limit }),
-    countsByStatus: buildCountsByStatus(groupedCounts as Array<{ status: string; _count: { _all: number } }>),
+    countsByStatus: {
+      ...buildCountsByStatus(groupedCounts as Array<{ status: string; _count: { _all: number } }>),
+      complaining: complainingCount as number,
+    },
     countsByPaymentStatus: buildCountsByPaymentStatus(groupedPaymentCounts as Array<{ payment_status: string; _count: { _all: number } }>),
   };
 }

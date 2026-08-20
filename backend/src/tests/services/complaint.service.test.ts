@@ -229,7 +229,7 @@ describe("Complaint Service", () => {
     });
 
     it("admin can update any complaint", async () => {
-      vi.mocked(complaintRepo.findComplaintById).mockResolvedValue(makeComplaint({ status: "under_review" }));
+      vi.mocked(complaintRepo.findComplaintById).mockResolvedValue(makeComplaint({ status: "open" }));
       vi.mocked(complaintRepo.updateComplaint).mockResolvedValue(makeComplaint());
 
       await complaintService.updateComplaint(ADMIN, "comp-1", { description: "Admin update" });
@@ -240,20 +240,20 @@ describe("Complaint Service", () => {
   describe("closeComplaint", () => {
     it("owner can close open complaint", async () => {
       vi.mocked(complaintRepo.findComplaintById).mockResolvedValue(makeComplaint());
-      vi.mocked(complaintRepo.updateComplaint).mockResolvedValue(makeComplaint({ status: "closed" }));
+      vi.mocked(complaintRepo.updateComplaint).mockResolvedValue(makeComplaint({ status: "resolved" }));
 
       const result = await complaintService.closeComplaint(BUYER, "comp-1");
-      expect(result.status).toBe("closed");
+      expect(result.status).toBe("resolved");
     });
 
-    it("owner cannot close non-open complaint", async () => {
+    it("owner cannot close already-resolved complaint", async () => {
       vi.mocked(complaintRepo.findComplaintById).mockResolvedValue(makeComplaint({ status: "resolved" }));
       await expect(complaintService.closeComplaint(BUYER, "comp-1")).rejects.toThrow(HttpError);
     });
 
-    it("admin can close any complaint", async () => {
-      vi.mocked(complaintRepo.findComplaintById).mockResolvedValue(makeComplaint({ status: "resolved" }));
-      vi.mocked(complaintRepo.updateComplaint).mockResolvedValue(makeComplaint({ status: "closed" }));
+    it("admin can close open complaint", async () => {
+      vi.mocked(complaintRepo.findComplaintById).mockResolvedValue(makeComplaint());
+      vi.mocked(complaintRepo.updateComplaint).mockResolvedValue(makeComplaint({ status: "resolved" }));
       await complaintService.closeComplaint(ADMIN, "comp-1");
       expect(complaintRepo.updateComplaint).toHaveBeenCalled();
     });
@@ -262,7 +262,7 @@ describe("Complaint Service", () => {
   describe("assignComplaint", () => {
     it("admin can assign complaint", async () => {
       vi.mocked(complaintRepo.findComplaintById).mockResolvedValue(makeComplaint());
-      vi.mocked(complaintRepo.updateComplaint).mockResolvedValue(makeComplaint({ assigned_to: "u-admin", status: "under_review" }));
+      vi.mocked(complaintRepo.updateComplaint).mockResolvedValue(makeComplaint({ assigned_to: "u-admin" }));
 
       const result = await complaintService.assignComplaint(ADMIN, "comp-1", { assigned_to: "u-admin" });
       expect(result.assigned_to).toBe("u-admin");
