@@ -7,6 +7,7 @@ export const orderStatusSchema = z.enum([
   "completed",
   "cancelled",
   "refunded",
+  "complaining",
 ]);
 
 export const orderPaymentStatusSchema = z.enum([

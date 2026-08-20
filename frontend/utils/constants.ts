@@ -36,6 +36,7 @@ export const STATUS_LABEL: Record<string, string> = {
   payment_failed: "Thanh toán thất bại",
   paid: "Đã thanh toán",
   completed: "Hoàn thành",
+  complaining: "Đang khiếu nại",
   banned: "Bị khóa",
   inactive: "Không hoạt động",
 };
@@ -47,6 +48,7 @@ export const STATUS_DESCRIPTION: Record<string, string> = {
   completed: "Hoàn thành, voucher đã sử dụng",
   cancelled: "Đã hủy",
   refunded: "Đã hoàn tiền (tự động hoặc từ khiếu nại)",
+  complaining: "Đơn hàng đang có khiếu nại cần xử lý",
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -85,6 +87,7 @@ export function statusColor(s: string): { bg: string; text: string } {
     return { bg: "#FFF3CD", text: "#856404" };
   if (s === "used" || s === "confirmed") return { bg: "#E0EEFF", text: "#1A5FAD" };
   if (s === "refunded") return { bg: "#E8F5EE", text: "#2D7A52" };
+  if (s === "complaining") return { bg: "#FFF3CD", text: "#856404" };
   if (s === "suspended") {
     return { bg: "#FFF3CD", text: "#856404" };
   }

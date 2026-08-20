@@ -99,3 +99,25 @@ export async function searchAdmins(req: Request, res: Response) {
   });
   sendSuccess(res, users);
 }
+
+export async function searchPartners(req: Request, res: Response) {
+  const { q } = req.query as { q?: string };
+  const where: Record<string, unknown> = {};
+  if (q && q.trim()) {
+    where.OR = [
+      { business_name: { contains: q.trim(), mode: "insensitive" } },
+      { representative_user: { full_name: { contains: q.trim(), mode: "insensitive" } } },
+    ];
+  }
+  const partners = await prisma.partner.findMany({
+    where,
+    select: {
+      id: true,
+      business_name: true,
+      representative_user: { select: { full_name: true, email: true, phone: true } },
+    },
+    take: 20,
+    orderBy: { business_name: "asc" },
+  });
+  sendSuccess(res, partners);
+}

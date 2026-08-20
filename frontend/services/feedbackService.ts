@@ -89,7 +89,7 @@ export const feedbackService = {
     return unwrap(await api.get<Envelope<Complaint>>(`/complaints/${id}`))
   },
 
-  async listComplaints(params?: { status?: string; page?: number; limit?: number }) {
+  async listComplaints(params?: { status?: string; order_id?: string; page?: number; limit?: number }) {
     const response = await api.get<Envelope<{ items: any[]; total: number; page: number; limit: number }>>("/complaints", { params })
     const data = unwrap(response)
     return {
@@ -212,6 +212,17 @@ export const feedbackService = {
       fullName: u.full_name,
       email: u.email,
       role: u.role,
+    }))
+  },
+
+  async searchPartners(query?: string) {
+    const response = await api.get<Envelope<any[]>>("/complaints/partners/search", { params: { q: query } })
+    return unwrap(response).map((p: any) => ({
+      id: String(p.id),
+      businessName: p.business_name,
+      representativeName: p.representative_user?.full_name,
+      representativeEmail: p.representative_user?.email,
+      representativePhone: p.representative_user?.phone,
     }))
   },
 }

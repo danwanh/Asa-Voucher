@@ -5,8 +5,8 @@ export type ComplaintReason =
   | "wrong_value"
   | "other";
 
-export type ComplaintStatus = "open" | "under_review" | "resolved" | "closed";
-export type ComplaintResolutionType = "refund" | "reissue" | "no_action" | "partner_penalized";
+export type ComplaintStatus = "open" | "resolved";
+export type ComplaintResolutionType = "refund" | "reissue" | "no_action";
 export type ComplaintResponderRole = "admin" | "partner" | "user";
 
 export interface ComplaintRow {
@@ -37,6 +37,7 @@ export interface ComplaintResponseRow {
 export interface ComplaintListFilter {
   userId?: string;
   partnerId?: string;
+  orderId?: string;
   status?: ComplaintStatus;
   page: number;
   limit: number;
