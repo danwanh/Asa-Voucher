@@ -455,7 +455,7 @@ export function AdminOrdersPage() {
                       </span>
                     </td>
                     <td className="px-5 py-3.5">
-                      <StatusBadge status={o.status} />
+                      <StatusBadge status={o.hasComplaint ? "complaining" : o.status} />
                     </td>
                     <td className="px-5 py-3.5 text-right">
                       <span className="text-xs font-bold" style={{ color: C.peach }}>
