@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { HttpError } from "../utils/http-error.js";
 import * as complaintRepo from "../repositories/complaint.repository.js";
 import * as complaintResponseRepo from "../repositories/complaint-response.repository.js";
@@ -13,6 +14,7 @@ import type {
 } from "../validations/complaint.validation.js";
 import { prisma } from "../config/prisma.js";
 import { refundVnpayPayment, refundPayPalPayment, formatVnpayDate, safeParseJson, extractPaypalCaptureId } from "./payment-provider.service.js";
+import { generateVoucherCode } from "../utils/code.util.js";
 
 type ComplaintWithRelations = NonNullable<Awaited<ReturnType<typeof complaintRepo.findComplaintById>>>;
 
@@ -140,8 +142,14 @@ export async function resolveComplaint(user: AuthUser, id: string, input: Resolv
     throw new HttpError(409, "Khiếu nại đã được xử lý trước đó");
   }
 
-  if (input.resolution_types.includes("refund") && complaint.order_id) {
-    await processRefundForComplaint(complaint.order_id, user.id, complaint.id, input.resolution_note);
+  const issuedVoucherId = complaint.issued_voucher_id;
+
+  if (input.resolution_types.includes("refund") && complaint.order_id && issuedVoucherId) {
+    await processRefundVoucher(complaint.order_id, user.id, complaint.id, issuedVoucherId, input.resolution_note);
+  }
+
+  if (input.resolution_types.includes("reissue") && issuedVoucherId) {
+    await processReissueVoucher(user.id, complaint.id, issuedVoucherId, input.resolution_note);
   }
 
   const updated = await complaintRepo.updateComplaint(id, {
@@ -154,35 +162,44 @@ export async function resolveComplaint(user: AuthUser, id: string, input: Resolv
   return updated;
 }
 
-async function processRefundForComplaint(
+async function processRefundVoucher(
   orderId: string,
   adminId: string,
   complaintId: string,
-  note?: string
+  issuedVoucherId: string,
+  note?: string,
 ) {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    include: { payments: true, order_items: { include: { issued_vouchers: true } } },
+    include: { payments: true, order_items: { include: { issued_vouchers: true, voucher_products: true } } },
   });
   if (!order) throw new HttpError(404, "Không tìm thấy đơn hàng để hoàn tiền");
 
   const payments = (order.payments as Array<Record<string, unknown>>) ?? [];
-  if (payments.some((payment) => payment.status === "refunded")) return;
-  const successPayment = payments.find(
-    (p) => p.status === "success"
-  );
+  const successPayment = payments.find((p) => p.status === "success");
   if (!successPayment) throw new HttpError(409, "Đơn hàng chưa thanh toán, không thể hoàn tiền");
+
+  const targetVoucher = order.order_items
+    .flatMap((item) => item.issued_vouchers)
+    .find((v) => v.id === issuedVoucherId);
+  if (!targetVoucher) throw new HttpError(404, "Không tìm thấy voucher trong đơn hàng");
+  if (targetVoucher.status === "refunded") return;
+
+  const targetItem = order.order_items.find((item) =>
+    item.issued_vouchers.some((v) => v.id === issuedVoucherId),
+  );
+  if (!targetItem) throw new HttpError(404, "Không tìm thấy order item chứa voucher");
+  const refundAmount = Number(targetItem.unit_price);
 
   const provider = String(successPayment.method);
   const transactionRef = String(successPayment.transaction_ref || "");
 
   let refundResult: { refundId: string; gatewayResponse: unknown };
 
-  // Simulated payment → simulate refund
   if (transactionRef.startsWith("SIM-")) {
     refundResult = {
       refundId: `SIM-REFUND-${Date.now()}`,
-      gatewayResponse: { provider, mode: "simulated-refund", transactionRef },
+      gatewayResponse: { provider, mode: "simulated-refund", transactionRef, amount: refundAmount },
     };
   } else if (provider === "paypal" && transactionRef) {
     const rawGatewayData = safeParseJson(successPayment.gateway_response);
@@ -192,9 +209,9 @@ async function processRefundForComplaint(
     const realCaptureId = extractPaypalCaptureId(gatewayData) ?? transactionRef;
     refundResult = await refundPayPalPayment({
       captureId: realCaptureId,
-      amountVnd: Number(order.total_amount),
+      amountVnd: refundAmount,
       orderCode: String(order.order_code),
-      note: note || `Refund for complaint ${complaintId}`,
+      note: note || `Refund voucher from complaint ${complaintId}`,
     });
   } else if (provider === "vnpay" && transactionRef) {
     const rawGatewayData = safeParseJson(successPayment.gateway_response);
@@ -212,20 +229,31 @@ async function processRefundForComplaint(
       transactionRef,
       transactionNo,
       transactionDate,
-      amountVnd: Number(order.total_amount),
+      amountVnd: refundAmount,
       orderCode: String(order.order_code),
       createdBy: adminId,
-      reason: note || `Refund từ khiếu nại ${complaintId}`,
+      reason: note || `Refund voucher từ khiếu nại ${complaintId}`,
     });
   } else {
     throw new HttpError(422, `Không hỗ trợ hoàn tiền cho phương thức ${provider}`, "UNSUPPORTED_REFUND_PROVIDER");
   }
 
+  const allVouchers = order.order_items.flatMap((item) => item.issued_vouchers);
+
   await prisma.$transaction(async (tx) => {
+    await tx.issuedVoucher.update({
+      where: { id: issuedVoucherId },
+      data: { status: "refunded", updated_at: new Date() },
+    });
+
+    await tx.voucherProduct.update({
+      where: { id: targetItem.voucher_product_id },
+      data: { remaining_quantity: { increment: 1 } },
+    });
+
     await tx.payment.update({
       where: { id: successPayment.id as string },
       data: {
-        status: "refunded",
         refund_ref: refundResult.refundId,
         refunded_at: new Date(),
         gateway_response: JSON.stringify(refundResult.gatewayResponse),
@@ -239,25 +267,25 @@ async function processRefundForComplaint(
         user_id: adminId,
         action: "REFUND",
         status: "refunded",
-        amount: order.total_amount as never,
+        amount: refundAmount as never,
       },
     });
 
-    await tx.order.update({
-      where: { id: orderId },
-      data: { status: "refunded", payment_status: "refunded", updated_at: new Date() },
-    });
+    const updatedAllVouchers = allVouchers.map((v) =>
+      v.id === issuedVoucherId ? { ...v, status: "refunded" as const } : v,
+    );
+    const allRefunded = updatedAllVouchers.every(
+      (v) => v.status === "refunded" || v.status === "cancelled",
+    );
 
-    for (const item of order.order_items) {
-      const activeVoucherCount = item.issued_vouchers.filter((voucher) => voucher.status === "active").length;
-      if (activeVoucherCount === 0) continue;
-      await tx.issuedVoucher.updateMany({
-        where: { order_item_id: item.id, status: "active" },
-        data: { status: "refunded", updated_at: new Date() },
+    if (allRefunded) {
+      await tx.order.update({
+        where: { id: orderId },
+        data: { status: "refunded", payment_status: "refunded", updated_at: new Date() },
       });
-      await tx.voucherProduct.update({
-        where: { id: item.voucher_product_id },
-        data: { remaining_quantity: { increment: activeVoucherCount } },
+      await tx.payment.update({
+        where: { id: successPayment.id as string },
+        data: { status: "refunded" },
       });
     }
 
@@ -265,8 +293,8 @@ async function processRefundForComplaint(
       data: {
         order_id: orderId,
         user_id: adminId,
-        action: "REFUND_ORDER",
-        description: `Hoàn tiền từ khiếu nại ${complaintId} (gateway ref: ${refundResult.refundId}): ${note || "Không có ghi chú"}`,
+        action: "REFUND_VOUCHER",
+        description: `Hoàn tiền voucher ${targetVoucher.voucher_code} từ khiếu nại ${complaintId} (gateway ref: ${refundResult.refundId}, amount: ${refundAmount}): ${note || "Không có ghi chú"}`,
       },
     });
 
@@ -274,10 +302,86 @@ async function processRefundForComplaint(
       data: {
         admin_id: adminId,
         target_order_id: orderId,
-        action: "complaint.refund",
-        description: `Hoàn tiền từ khiếu nại ${complaintId} (${refundResult.refundId})`,
+        action: "complaint.refund_voucher",
+        description: `Hoàn tiền voucher ${targetVoucher.voucher_code} từ khiếu nại ${complaintId} (${refundResult.refundId}, ${refundAmount}đ)`,
       },
     });
+  });
+}
+
+async function processReissueVoucher(
+  adminId: string,
+  complaintId: string,
+  issuedVoucherId: string,
+  note?: string,
+) {
+  const oldVoucher = await prisma.issuedVoucher.findUnique({
+    where: { id: issuedVoucherId },
+    include: {
+      voucher_products: { select: { id: true, validity_days: true } },
+      order_items: { select: { order_id: true } },
+    },
+  });
+  if (!oldVoucher) throw new HttpError(404, "Không tìm thấy voucher cần cấp lại");
+
+  const validityDays = oldVoucher.voucher_products.validity_days;
+  const newExpiredDate = new Date(Date.now() + validityDays * 86400000);
+  const newCode = generateVoucherCode();
+  const newQrPayload = crypto.randomUUID();
+
+  const isActive = oldVoucher.status === "active";
+  const orderId = oldVoucher.order_items?.order_id ?? "";
+
+  await prisma.$transaction(async (tx) => {
+    if (isActive) {
+      await tx.issuedVoucher.update({
+        where: { id: issuedVoucherId },
+        data: { status: "cancelled", updated_at: new Date() },
+      });
+      await tx.voucherProduct.update({
+        where: { id: oldVoucher.voucher_product_id },
+        data: { remaining_quantity: { increment: 1 } },
+      });
+    }
+
+    await tx.issuedVoucher.create({
+      data: {
+        voucher_code: newCode,
+        qr_code_payload: newQrPayload,
+        voucher_product_id: oldVoucher.voucher_product_id,
+        owner_id: oldVoucher.owner_id,
+        issued_date: new Date(),
+        expired_date: newExpiredDate,
+        status: "active",
+      },
+    });
+
+    if (!isActive) {
+      await tx.voucherProduct.update({
+        where: { id: oldVoucher.voucher_product_id },
+        data: { remaining_quantity: { decrement: 1 } },
+      });
+    }
+
+    if (orderId) {
+      await tx.orderLog.create({
+        data: {
+          order_id: orderId,
+          user_id: adminId,
+          action: "REISSUE_VOUCHER",
+          description: `Cấp lại voucher ${oldVoucher.voucher_code} → ${newCode} từ khiếu nại ${complaintId}. Voucher cũ status: ${oldVoucher.status}: ${note || "Không có ghi chú"}`,
+        },
+      });
+
+      await tx.adminLog.create({
+        data: {
+          admin_id: adminId,
+          target_order_id: orderId,
+          action: "complaint.reissue_voucher",
+          description: `Cấp lại voucher ${oldVoucher.voucher_code} → ${newCode} từ khiếu nại ${complaintId} (voucher cũ: ${oldVoucher.status})`,
+        },
+      });
+    }
   });
 }
 
