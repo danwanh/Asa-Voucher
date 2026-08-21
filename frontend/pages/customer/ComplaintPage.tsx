@@ -37,6 +37,7 @@ export function ComplaintPage({ order, issuedVoucher, onBack, onSubmit }: Props)
   const [responses, setResponses] = useState<ComplaintResponse[]>([])
   const [responsesLoading, setResponsesLoading] = useState(false)
   const [files, setFiles] = useState<File[]>([])
+  const [customReason, setCustomReason] = useState(complaint?.reason === "other" ? (complaint.description.split("\n\n")[0]?.replace("Lý do: ", "") ?? "") : "")
   const [error, setError] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [previews, setPreviews] = useState<string[]>([])
@@ -90,12 +91,14 @@ export function ComplaintPage({ order, issuedVoucher, onBack, onSubmit }: Props)
 
   const handleSubmit = async () => {
     if (!reason) return setError("Vui lòng chọn lý do khiếu nại")
-    if (description.trim().length < 10) return setError("Nội dung khiếu nại tối thiểu 10 ký tự")
+    if (reason === "other" && !customReason.trim()) return setError("Vui lòng nhập lý do khác")
+    const fullDescription = reason === "other" ? `Lý do: ${customReason.trim()}\n\n${description.trim()}` : description.trim()
+    if (fullDescription.length < 10) return setError("Nội dung khiếu nại tối thiểu 10 ký tự")
     setIsSubmitting(true)
     setError("")
     try {
       const evidenceUrls = await feedbackService.uploadImages(files)
-      await feedbackService.createComplaint({ issuedVoucherId: issuedVoucher?.id, orderId: order.id, reason, description: description.trim(), evidenceUrls })
+      await feedbackService.createComplaint({ issuedVoucherId: issuedVoucher?.id, orderId: order.id, reason, description: fullDescription, evidenceUrls })
       toast.success("Khiếu nại đã được gửi thành công")
       onSubmit()
     } catch (errorResponse) {
@@ -117,9 +120,10 @@ export function ComplaintPage({ order, issuedVoucher, onBack, onSubmit }: Props)
         {status && <div className="mb-5 flex items-center justify-between rounded-xl px-4 py-3" style={{ backgroundColor: status.background }}><span className="text-sm font-bold" style={{ color: status.color }}>Trạng thái xử lý</span><span className="text-sm font-black" style={{ color: status.color }}>{status.label}</span></div>}
         <label className="block text-sm font-bold mb-1.5" style={{ color: C.indigo }}>Lý do khiếu nại</label>
         {complaint ? <p className="w-full px-4 py-3 rounded-xl border text-sm mb-4" style={{ borderColor: "#E5E7EB", color: "#4B5563" }}>{REASONS.find(([value]) => value === reason)?.[1] ?? reason}</p> : <select value={reason} onChange={(event) => { setReason(event.target.value); setError("") }} className="w-full px-4 py-3 rounded-xl border-2 text-sm outline-none mb-4" style={{ borderColor: "#E5E7EB" }}><option value="">Chọn lý do</option>{REASONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>}
+        {!complaint && reason === "other" && <input type="text" value={customReason} onChange={(event) => { setCustomReason(event.target.value); setError("") }} className="w-full px-4 py-3 rounded-xl border-2 text-sm outline-none mb-4" style={{ borderColor: error && !customReason.trim() ? "#EF4444" : "#E5E7EB" }} placeholder="Nhập lý do khác..." />}
         <label className="block text-sm font-bold mb-1.5" style={{ color: C.indigo }}>Mô tả chi tiết</label>
         {complaint ? <p className="min-h-36 w-full px-4 py-3 rounded-xl border text-sm whitespace-pre-wrap" style={{ borderColor: "#E5E7EB", color: "#4B5563" }}>{description}</p> : <textarea rows={6} value={description} onChange={(event) => { setDescription(event.target.value); setError("") }} className="w-full px-4 py-3 rounded-xl border-2 text-sm outline-none resize-none" style={{ borderColor: error ? "#EF4444" : "#E5E7EB" }} placeholder="Mô tả vấn đề bạn gặp phải..." />}
-        <div className="flex justify-between text-xs mt-1 mb-4"><span style={{ color: "#EF4444" }}>{error}</span><span style={{ color: "#9CA3AF" }}>{description.length}/2000</span></div>
+        <div className="flex justify-between text-xs mt-1 mb-4"><span style={{ color: "#EF4444" }}>{error}</span><span style={{ color: "#9CA3AF" }}>{(reason === "other" ? `Lý do: ${customReason}\n\n${description}` : description).length}/2000</span></div>
         {!complaint && <><label className="block border-2 border-dashed rounded-xl p-4 text-center cursor-pointer mb-3" style={{ borderColor: "#D1D5DB" }}><input type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" onChange={(event) => { handleFiles(event.target.files); event.target.value = "" }} /><MessageSquare className="w-6 h-6 mb-1 mx-auto" style={{ color: C.indigo }} /><div className="text-xs" style={{ color: "#9CA3AF" }}>{files.length ? `${files.length}/3 ảnh đã chọn` : "Thêm ảnh bằng chứng, tối đa 3 ảnh"}</div></label>{previews.length > 0 && <div className="grid grid-cols-3 gap-2 mb-5">{previews.map((url, index) => <div key={url} className="relative"><button type="button" onClick={() => setLightbox({ images: previews, index })} className="block w-full"><img src={url} alt={`Ảnh bằng chứng ${index + 1}`} className="aspect-square w-full object-cover rounded-xl" /></button><button type="button" onClick={() => setFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))} className="absolute top-1 right-1 rounded-full bg-black/60 p-1 text-white" aria-label="Xóa ảnh"><X className="w-3 h-3" /></button></div>)}</div>}</>}
         {complaint?.evidenceUrls.length ? <div className="grid grid-cols-3 gap-2 mb-5">{complaint.evidenceUrls.map((url, index) => <button type="button" key={url} onClick={() => setLightbox({ images: complaint.evidenceUrls, index })}><img src={url} alt={`Ảnh bằng chứng ${index + 1}`} className="aspect-square w-full object-cover rounded-xl" /></button>)}</div> : null}
         {complaint?.resolutionNote && <div className="rounded-xl p-4 text-sm mb-4" style={{ backgroundColor: "#F3F4F6", color: "#4B5563" }}><strong>Kết quả xử lý:</strong> {complaint.resolutionNote}</div>}
