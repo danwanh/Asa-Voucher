@@ -457,18 +457,7 @@ export function AdminOrdersPage() {
                       </span>
                     </td>
                     <td className="px-5 py-3.5">
-                      <div className="flex items-center gap-1.5">
-                        <StatusBadge status={o.status} />
-                        {o.hasComplaint && (
-                          <span
-                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold"
-                            style={{ backgroundColor: "#FEF3C7", color: "#856404" }}
-                          >
-                            <AppIcon name="alert" className="w-2.5 h-2.5" />
-                            KN
-                          </span>
-                        )}
-                      </div>
+                      <StatusBadge status={o.status} />
                     </td>
                     <td className="px-5 py-3.5 text-right">
                       <span className="text-xs font-bold" style={{ color: C.peach }}>
