@@ -421,7 +421,7 @@ export async function listOrders(
       created_at: true,
       users: { select: { full_name: true } },
       complaints: {
-        where: user.role === "buyer" ? { user_id: user.id } : {},
+        where: user.role === "buyer" ? { user_id: user.id, status: "open" } : { status: "open" },
         select: { id: true },
         take: 1,
       },
