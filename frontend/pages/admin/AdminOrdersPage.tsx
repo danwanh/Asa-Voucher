@@ -681,11 +681,23 @@ export function AdminOrdersPage() {
                   </div>
                 )}
 
-                <div className="bg-gray-50 rounded-xl p-4 mb-5">
+                <div className="bg-gray-50 rounded-xl p-4 mb-5 space-y-2">
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-bold" style={{ color: C.indigo }}>Tổng cộng</span>
                     <span className="text-lg font-black" style={{ color: C.peach }}>{fmt(selectedOrder.amount)}</span>
                   </div>
+                  {selectedOrder.refundAmount && selectedOrder.refundAmount > 0 && (
+                    <>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-semibold" style={{ color: "#DC2626" }}>Đã hoàn tiền</span>
+                        <span className="text-sm font-bold" style={{ color: "#DC2626" }}>-{fmt(selectedOrder.refundAmount)}</span>
+                      </div>
+                      <div className="flex justify-between items-center pt-2 border-t border-gray-200">
+                        <span className="text-sm font-bold" style={{ color: C.indigo }}>Còn lại</span>
+                        <span className="text-lg font-black" style={{ color: C.peach }}>{fmt(selectedOrder.amount - selectedOrder.refundAmount)}</span>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {((selectedOrder.status === "cancelled" && selectedOrder.paymentStatus === "paid") || selectedOrder.status === "refunded") && (

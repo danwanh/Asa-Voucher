@@ -395,8 +395,11 @@ describe("Complaint Service", () => {
         }),
       });
 
-      // Only 1 voucher refunded, so order stays "confirmed"
-      expect(mockTx.order.update).not.toHaveBeenCalled();
+      // Only 1 voucher refunded: refund_amount incremented, but order stays "confirmed"
+      expect(mockTx.order.update).toHaveBeenCalledWith({
+        where: { id: "order-1" },
+        data: { refund_amount: { increment: 50000 }, updated_at: expect.any(Date) },
+      });
     });
 
     it("per-voucher refund: all vouchers refunded → order status updated", async () => {

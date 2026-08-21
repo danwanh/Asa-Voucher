@@ -271,6 +271,11 @@ async function processRefundVoucher(
       },
     });
 
+    await tx.order.update({
+      where: { id: orderId },
+      data: { refund_amount: { increment: refundAmount }, updated_at: new Date() },
+    });
+
     const updatedAllVouchers = allVouchers.map((v) =>
       v.id === issuedVoucherId ? { ...v, status: "refunded" as const } : v,
     );
