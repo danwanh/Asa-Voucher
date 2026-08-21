@@ -190,6 +190,7 @@ export interface OrderListItem {
   voucherTitle: string
   partnerName: string
   amount: number
+  refundAmount?: number
   status: OrderStatus
   paymentStatus: OrderPaymentStatus
   paymentMethod: string
@@ -207,6 +208,7 @@ export interface OrderListProduct {
   voucherTitle: string
   partnerName: string
   issuedCount: number
+  invalidatedCount?: number
   hasReview: boolean
 }
 

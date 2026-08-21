@@ -135,8 +135,10 @@ export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAga
 
               <div className="mt-4 space-y-3">
                 {order.status !== "cancelled" && item.issuedVouchers && item.issuedVouchers.length > 0 ? (
-                  item.issuedVouchers.map((voucher) => (
-                    <div key={voucher.id} className="rounded-2xl border p-4" style={{ borderColor: voucher.status === "used" ? C.teal + "60" : "#E2DFC8" }}>
+                  item.issuedVouchers.map((voucher) => {
+                    const isInvalidated = voucher.status === "refunded" || voucher.status === "cancelled"
+                    return (
+                    <div key={voucher.id} className="rounded-2xl border p-4" style={{ borderColor: voucher.status === "used" ? C.teal + "60" : isInvalidated ? "#FCA5A5" : "#E2DFC8", opacity: isInvalidated ? 0.7 : 1 }}>
                       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                         <div className="min-w-0">
                           <div className="text-xs font-semibold" style={{ color: "#6B7280" }}>Voucher code</div>
@@ -158,11 +160,12 @@ export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAga
                         </div>
 
                         <div className="flex items-center gap-3">
-                          <MockQR code={voucher.qrPayload || voucher.code} size={120} />
+                          <MockQR code={voucher.qrPayload || voucher.code} size={120} disabled={isInvalidated} />
                         </div>
                       </div>
                     </div>
-                  ))
+                    )
+                  })
                 ) : (
                   <div className="text-sm font-semibold" style={{ color: "#8A8DA8" }}>
                     {isGiftSender ? "Mã voucher được bảo mật và đã gửi cho người nhận." : hasPaid ? "Mã voucher đang được phát hành." : "Chưa phát hành mã voucher vì đơn chưa thanh toán."}

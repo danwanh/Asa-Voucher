@@ -461,6 +461,11 @@ export function AdminOrdersPage() {
                       <span className="text-xs font-bold" style={{ color: C.peach }}>
                         {fmt(o.amount)}
                       </span>
+                      {o.refundAmount && o.refundAmount > 0 && (
+                        <div className="text-xs font-semibold" style={{ color: "#DC2626" }}>
+                          Đã hoàn: -{fmt(o.refundAmount)}
+                        </div>
+                      )}
                     </td>
                     <td className="px-5 py-3.5">
                       <span className="text-xs" style={{ color: "#8A8DA8" }}>{o.paymentMethod}</span>

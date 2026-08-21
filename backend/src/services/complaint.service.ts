@@ -355,6 +355,7 @@ async function processReissueVoucher(
         qr_code_payload: newQrPayload,
         voucher_product_id: oldVoucher.voucher_product_id,
         owner_id: oldVoucher.owner_id,
+        order_item_id: oldVoucher.order_item_id,
         issued_date: new Date(),
         expired_date: newExpiredDate,
         status: "active",
