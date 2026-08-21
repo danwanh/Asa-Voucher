@@ -414,6 +414,7 @@ export async function listOrders(
       subtotal: true,
       discount_amount: true,
       total_amount: true,
+      refund_amount: true,
       status: true,
       payment_status: true,
       payment_method: true,
@@ -436,6 +437,7 @@ export async function listOrders(
           _count: { select: { issued_vouchers: true } },
           issued_vouchers: {
             select: {
+              status: true,
               reviews: user.role === "buyer"
                 ? { where: { user_id: user.id }, select: { id: true } }
                 : { select: { id: true } },
@@ -476,6 +478,7 @@ export async function listOrders(
       order_items: order_items.map(({ issued_vouchers, _count, subtotal: _subtotal, ...item }) => ({
         ...item,
         issued_voucher_count: _count.issued_vouchers,
+        invalidated_voucher_count: (issued_vouchers ?? []).filter((v) => v.status === "refunded").length,
         has_review: (issued_vouchers ?? []).some((voucher) => (voucher.reviews ?? []).length > 0),
       })),
     };

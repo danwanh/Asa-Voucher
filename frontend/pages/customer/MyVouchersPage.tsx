@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Search, QrCode, Gift, Star, MessageSquare, ChevronLeft, ChevronRight } from "lucide-react"
+import { Search, QrCode, Gift, Star, MessageSquare, ChevronLeft, ChevronRight, Lock } from "lucide-react"
 import { C, fmt, fmtDate } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import { StatusBadge } from "@/components/StatusBadge"
@@ -111,10 +111,11 @@ export function MyVouchersPage({ orders, ownerId, loading = false, onReview, onC
             const partner = item.partnerName ?? order.partnerName
             const canAct = order.status === "confirmed" || order.status === "completed" || issuedVoucher.status === "used"
             const complaintStatus = issuedVoucher.complaint ? COMPLAINT_STATUS[issuedVoucher.complaint.status] : null
+            const isInvalidated = issuedVoucher.status === "refunded" || issuedVoucher.status === "cancelled"
             return (
-              <div key={issuedVoucher.id} className="bg-card rounded-3xl overflow-hidden shadow-sm" style={{ opacity: issuedVoucher.status === "expired" || issuedVoucher.status === "refunded" || issuedVoucher.status === "cancelled" ? 0.7 : 1 }}>
+              <div key={issuedVoucher.id} className="bg-card rounded-3xl overflow-hidden shadow-sm" style={{ opacity: isInvalidated ? 0.7 : 1, borderColor: isInvalidated ? "#FCA5A5" : undefined, borderWidth: isInvalidated ? 1 : 0, borderStyle: "solid" }}>
                 <div className="p-5 flex items-start gap-4">
-                  <div className="flex-shrink-0"><MockQR code={issuedVoucher.qrPayload || issuedVoucher.code} /></div>
+                  <div className="flex-shrink-0"><MockQR code={issuedVoucher.qrPayload || issuedVoucher.code} disabled={isInvalidated} /></div>
                   <div className="flex-1 min-w-0">
                     <StatusBadge status={issuedVoucher.status} />
                     <p className="font-bold text-sm mt-2 leading-snug" style={{ color: C.indigo }}>{title}</p>
@@ -130,7 +131,11 @@ export function MyVouchersPage({ orders, ownerId, loading = false, onReview, onC
                   </div>
                   {complaintStatus && <div className="flex items-center justify-between"><span className="text-xs font-semibold" style={{ color: "#6B7280" }}>Trạng thái khiếu nại</span><span className="px-2 py-1 rounded-lg text-xs font-bold" style={{ backgroundColor: complaintStatus.background, color: complaintStatus.color }}>{complaintStatus.label}</span></div>}
                   <div className="flex items-center gap-2 flex-wrap">
-                    <button onClick={() => setQrOpen(issuedVoucher.id)} className="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg" style={{ backgroundColor: C.indigo + "10", color: C.indigo }}><QrCode className="w-3 h-3" /> Xem QR</button>
+                    {isInvalidated ? (
+                      <span className="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg" style={{ backgroundColor: "#FEE2E2", color: "#DC2626" }}><Lock className="w-3 h-3" /> Đã khóa</span>
+                    ) : (
+                      <button onClick={() => setQrOpen(issuedVoucher.id)} className="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg" style={{ backgroundColor: C.indigo + "10", color: C.indigo }}><QrCode className="w-3 h-3" /> Xem QR</button>
+                    )}
                     {onReview && (issuedVoucher.review || canAct) && (issuedVoucher.review ? <button onClick={() => onReview(order, issuedVoucher)} className="flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-lg" style={{ backgroundColor: C.teal + "15", color: C.teal }}><Star className="w-3 h-3" /> Xem đánh giá</button> : <button onClick={() => onReview(order, issuedVoucher)} className="flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-lg" style={{ backgroundColor: C.apricot + "25", color: "#B66A00" }}><Star className="w-3 h-3" /> Đánh giá</button>)}
                     {onComplaint && (issuedVoucher.complaint || canAct) && (issuedVoucher.complaint ? <button onClick={() => onComplaint(order, issuedVoucher)} className="flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-lg" style={{ backgroundColor: "#DBEAFE", color: "#2563EB" }}><MessageSquare className="w-3 h-3" /> Xem khiếu nại</button> : <button onClick={() => onComplaint(order, issuedVoucher)} className="flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-lg" style={{ backgroundColor: "#EFF6FF", color: "#2563EB" }}><MessageSquare className="w-3 h-3" /> Khiếu nại</button>)}
                   </div>
@@ -154,10 +159,13 @@ export function MyVouchersPage({ orders, ownerId, loading = false, onReview, onC
           <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center" onClick={(e) => e.stopPropagation()}>
             <div className="font-black text-lg mb-1" style={{ color: C.indigo }}>{openEntry.item.voucherTitle ?? openEntry.order.voucherTitle}</div>
             <div className="text-sm mb-4" style={{ color: "#8A8DA8" }}>{openEntry.item.partnerName ?? openEntry.order.partnerName}</div>
-            <div className="flex justify-center mb-4"><MockQR code={openEntry.issuedVoucher.qrPayload || openEntry.issuedVoucher.code} size={120} /></div>
+            <div className="flex justify-center mb-4"><MockQR code={openEntry.issuedVoucher.qrPayload || openEntry.issuedVoucher.code} size={120} disabled={openEntry.issuedVoucher.status === "refunded" || openEntry.issuedVoucher.status === "cancelled"} /></div>
             <code className="text-lg font-black tracking-widest block mb-4" style={{ color: C.indigo, fontFamily: "'Inter', monospace" }}>{openEntry.issuedVoucher.code}</code>
             <div className="text-xs mb-1" style={{ color: "#8A8DA8" }}>Trạng thái</div>
             <StatusBadge status={openEntry.issuedVoucher.status} />
+            {(openEntry.issuedVoucher.status === "refunded" || openEntry.issuedVoucher.status === "cancelled") && (
+              <div className="text-xs font-semibold mt-3" style={{ color: "#DC2626" }}>Voucher đã bị vô hiệu hóa</div>
+            )}
             <button className="mt-6 px-5 py-2.5 rounded-xl font-bold text-sm border" style={{ borderColor: "#E2DFC8", color: C.indigo }} onClick={() => setQrOpen(null)}>Đóng</button>
           </div>
         </div>

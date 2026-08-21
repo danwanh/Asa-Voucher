@@ -148,6 +148,7 @@ function mapOrderListItem(value: BackendRecord): OrderListItem {
     voucherTitle: String(item.voucher_products?.name ?? "Voucher"),
     partnerName: String(item.voucher_products?.partners?.business_name ?? ""),
     issuedCount: num(item.issued_voucher_count ?? item._count?.issued_vouchers),
+    invalidatedCount: num(item.invalidated_voucher_count) || undefined,
     hasReview: Boolean(item.has_review),
   }))
   const first = items[0]
@@ -163,6 +164,7 @@ function mapOrderListItem(value: BackendRecord): OrderListItem {
     voucherTitle: first?.voucherTitle ?? "Đơn hàng voucher",
     partnerName: partnerNames.join(", "),
     amount: num(value.total_amount),
+    refundAmount: num(value.refund_amount) || undefined,
     status: value.status,
     paymentStatus: value.payment_status ?? "pending",
     paymentMethod: String(value.payment_method ?? ""),

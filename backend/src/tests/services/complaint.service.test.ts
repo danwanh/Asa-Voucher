@@ -466,6 +466,7 @@ describe("Complaint Service", () => {
         voucher_code: "VC-001",
         voucher_product_id: "vp-1",
         owner_id: "u-buyer",
+        order_item_id: "oi-1",
         status: "active",
         voucher_products: { id: "vp-1", validity_days: 30 },
         order_items: { order_id: "order-1" },
@@ -492,11 +493,12 @@ describe("Complaint Service", () => {
         data: { status: "cancelled", updated_at: expect.any(Date) },
       });
 
-      // New voucher created
+      // New voucher created with order_item_id
       expect(mockTx.issuedVoucher.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           voucher_product_id: "vp-1",
           owner_id: "u-buyer",
+          order_item_id: "oi-1",
           status: "active",
           voucher_code: expect.stringMatching(/^VC/),
         }),
@@ -520,6 +522,7 @@ describe("Complaint Service", () => {
         voucher_code: "VC-001",
         voucher_product_id: "vp-1",
         owner_id: "u-buyer",
+        order_item_id: "oi-1",
         status: "used",
         voucher_products: { id: "vp-1", validity_days: 30 },
         order_items: { order_id: "order-1" },
@@ -547,6 +550,7 @@ describe("Complaint Service", () => {
         data: expect.objectContaining({
           voucher_product_id: "vp-1",
           owner_id: "u-buyer",
+          order_item_id: "oi-1",
           status: "active",
           voucher_code: expect.stringMatching(/^VC/),
         }),

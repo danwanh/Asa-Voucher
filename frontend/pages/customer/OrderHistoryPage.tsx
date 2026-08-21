@@ -122,6 +122,7 @@ export function OrderHistoryPage({ orders, countsByStatus, onDetail, onReview, o
         ) : orders.map((order) => {
           const totalQuantity = order.items.reduce((sum, item) => sum + item.quantity, 0) || 1
           const issuedCount = order.items.reduce((sum, item) => sum + item.issuedCount, 0)
+          const invalidatedCount = order.items.reduce((sum, item) => sum + (item.invalidatedCount ?? 0), 0)
           const hasIssuedCodes = issuedCount > 0
           const isRefunded = order.status === "refunded"
           const isCreator = order.userId === currentUserId
@@ -160,10 +161,10 @@ export function OrderHistoryPage({ orders, countsByStatus, onDetail, onReview, o
                   </div>
                   <p className="text-xs mt-1 font-semibold" style={{ color: "#8A8DA8" }}>{totalQuantity} voucher</p>
                   {order.isGift && <p className="mt-1 text-xs font-bold" style={{ color: C.teal }}>Đơn quà tặng đã gửi</p>}
-                  <div className="mt-2 text-xs font-semibold" style={{ color: hasIssuedCodes ? (isRefunded ? "#DC2626" : C.teal) : "#8A8DA8" }}>
+                  <div className="mt-2 text-xs font-semibold" style={{ color: hasIssuedCodes ? (isRefunded ? "#DC2626" : invalidatedCount > 0 ? "#D97706" : C.teal) : "#8A8DA8" }}>
                     {hasIssuedCodes
-                      ? isRefunded
-                        ? `Đã phát hành ${issuedCount} mã voucher nhưng đã vô hiệu do hoàn tiền`
+                      ? invalidatedCount > 0
+                        ? `Đã phát hành ${issuedCount} mã voucher nhưng vô hiệu hóa ${invalidatedCount} voucher`
                         : `Đã phát hành ${issuedCount} mã voucher`
                       : "Chưa phát hành mã voucher"}
                   </div>
@@ -171,6 +172,9 @@ export function OrderHistoryPage({ orders, countsByStatus, onDetail, onReview, o
 
                 <div className="flex flex-col items-end gap-1 shrink-0">
                   <span className="font-black text-sm" style={{ color: C.peach }}>{fmt(order.amount)}</span>
+                  {order.refundAmount && order.refundAmount > 0 && (
+                    <span className="text-xs font-semibold" style={{ color: "#DC2626" }}>Đã hoàn: -{fmt(order.refundAmount)}</span>
+                  )}
                   <span className="text-xs" style={{ color: "#8A8DA8" }}>{order.paymentMethod}</span>
                 </div>
               </div>

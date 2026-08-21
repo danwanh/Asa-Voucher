@@ -292,7 +292,7 @@ describe("Commerce Service", () => {
             subtotal: 200000,
             voucher_products: { name: "Spa voucher", partners: { business_name: "Partner One" } },
             _count: { issued_vouchers: 2 },
-            issued_vouchers: [{ reviews: [{ id: "review-1" }] }],
+            issued_vouchers: [{ status: "active", reviews: [{ id: "review-1" }] }],
           }],
           complaints: [{ id: "complaint-1" }],
         },
@@ -307,6 +307,7 @@ describe("Commerce Service", () => {
       expect(result.items[0]).toMatchObject({ status: "pending_payment", payment_status: "paid" });
       expect(result.items[0]).not.toHaveProperty("payments");
       expect(result.items[0].order_items[0].issued_voucher_count).toBe(2);
+      expect(result.items[0].order_items[0].invalidated_voucher_count).toBe(0);
       expect(result.items[0].order_items[0].has_review).toBe(true);
       expect(result.items[0].has_complaint).toBe(true);
       expect(result.countsByStatus.all).toBe(1);
@@ -335,7 +336,7 @@ describe("Commerce Service", () => {
       expect(select.payments).toEqual({ select: { status: true } });
       expect(select).not.toHaveProperty("updated_at");
       expect(select.order_items.select.issued_vouchers).toEqual({
-        select: { reviews: { where: { user_id: "u-buyer" }, select: { id: true } } },
+        select: { status: true, reviews: { where: { user_id: "u-buyer" }, select: { id: true } } },
       });
       expect(select.order_items.select._count).toEqual({ select: { issued_vouchers: true } });
       expect(select.order_items.select).not.toHaveProperty("unit_price");
