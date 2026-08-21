@@ -139,7 +139,7 @@ export function ComplaintPage({ order, issuedVoucher, onBack, onSubmit }: Props)
               </div>
             ) : (
               <div className="space-y-3">
-                {responses.map((r) => (
+                {responses.slice().reverse().map((r) => (
                   <div key={r.id} className="rounded-xl p-3.5 border" style={{ borderColor: r.responderRole === "user" ? "#E2DFC8" : "#D1E0FF", backgroundColor: r.responderRole === "user" ? "#FFFFFF" : "#EEF3FF" }}>
                     <div className="flex items-center justify-between mb-1.5">
                       <span className="text-xs font-bold" style={{ color: C.indigo }}>

@@ -702,7 +702,7 @@ export function AdminComplaintManagementPage() {
                       Phản hồi ({responses.length})
                     </h4>
                     <div className="space-y-3">
-                      {responses.map((r) => (
+                      {responses.slice().reverse().map((r) => (
                         <div key={r.id} className="bg-gray-50 rounded-xl p-3.5">
                           <div className="flex items-center justify-between mb-1.5">
                             <span className="text-xs font-bold" style={{ color: C.indigo }}>
