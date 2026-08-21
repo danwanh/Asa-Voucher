@@ -112,7 +112,7 @@ export function MyVouchersPage({ orders, ownerId, loading = false, onReview, onC
             const canAct = order.status === "confirmed" || order.status === "completed" || issuedVoucher.status === "used"
             const complaintStatus = issuedVoucher.complaint ? COMPLAINT_STATUS[issuedVoucher.complaint.status] : null
             return (
-              <div key={issuedVoucher.id} className="bg-card rounded-3xl overflow-hidden shadow-sm" style={{ opacity: issuedVoucher.status === "expired" || issuedVoucher.status === "refunded" ? 0.7 : 1 }}>
+              <div key={issuedVoucher.id} className="bg-card rounded-3xl overflow-hidden shadow-sm" style={{ opacity: issuedVoucher.status === "expired" || issuedVoucher.status === "refunded" || issuedVoucher.status === "cancelled" ? 0.7 : 1 }}>
                 <div className="p-5 flex items-start gap-4">
                   <div className="flex-shrink-0"><MockQR code={issuedVoucher.qrPayload || issuedVoucher.code} /></div>
                   <div className="flex-1 min-w-0">

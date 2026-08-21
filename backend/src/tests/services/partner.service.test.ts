@@ -14,6 +14,7 @@ const { mockPrisma, mockTx } = vi.hoisted(() => ({
     partnerBranch: {
       findMany: vi.fn(),
       findUnique: vi.fn(),
+      findFirst: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
     },
@@ -200,9 +201,22 @@ describe("Partner Service", () => {
       vi.mocked(prisma.partner.findUnique).mockResolvedValue({
         id: "p1", representative_user_id: "u-owner",
       } as any);
+      vi.mocked(prisma.partnerBranch.findFirst).mockResolvedValue(null);
       vi.mocked(prisma.partnerBranch.create).mockResolvedValue({ id: "b2", partner_id: "p1" } as any);
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => [{
+          lat: "10.762622",
+          lon: "106.660172",
+          address: { road: "Test Street", city: "HCM" },
+        }],
+      }));
 
-      const result = await partnerService.createBranch(PARTNER_OWNER, "p1", { name: "Branch 2" });
+      const result = await partnerService.createBranch(PARTNER_OWNER, "p1", {
+        branch_name: "Branch 2",
+        address: "123 Test Street",
+        city: "HCM",
+      });
       expect(result.partner_id).toBe("p1");
     });
 
@@ -211,7 +225,7 @@ describe("Partner Service", () => {
         id: "p1", representative_user_id: "u-other",
       } as any);
 
-      await expect(partnerService.createBranch(BUYER, "p1", { name: "X" })).rejects.toThrow(HttpError);
+      await expect(partnerService.createBranch(BUYER, "p1", { branch_name: "X", address: "123 Test", city: "HCM" })).rejects.toThrow(HttpError);
     });
   });
 

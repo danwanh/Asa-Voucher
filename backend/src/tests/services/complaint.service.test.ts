@@ -2,6 +2,37 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { HttpError } from "../../utils/http-error.js";
 import type { AuthUser } from "../../types/auth.types.js";
 
+const { mockPrisma } = vi.hoisted(() => ({
+  mockPrisma: {
+    order: {
+      findUnique: vi.fn(),
+    },
+    issuedVoucher: {
+      findUnique: vi.fn(),
+      update: vi.fn(),
+      create: vi.fn(),
+    },
+    voucherProduct: {
+      update: vi.fn(),
+    },
+    payment: {
+      update: vi.fn(),
+    },
+    paymentLog: {
+      create: vi.fn(),
+    },
+    orderLog: {
+      create: vi.fn(),
+    },
+    adminLog: {
+      create: vi.fn(),
+    },
+    $transaction: vi.fn(),
+  },
+}));
+
+vi.mock("../../config/prisma.js", () => ({ prisma: mockPrisma }));
+
 vi.mock("../../repositories/complaint.repository.js", () => ({
   listComplaints: vi.fn(),
   findComplaintById: vi.fn(),
@@ -25,6 +56,7 @@ import * as complaintRepo from "../../repositories/complaint.repository.js";
 import * as complaintResponseRepo from "../../repositories/complaint-response.repository.js";
 import * as issuedVoucherRepo from "../../repositories/issued-voucher.repository.js";
 import * as complaintService from "../../services/complaint.service.js";
+import { prisma } from "../../config/prisma.js";
 
 const BUYER: AuthUser = { id: "u-buyer", email: "b@test.com", role: "buyer" };
 const OTHER_BUYER: AuthUser = { id: "u-other", email: "o@test.com", role: "buyer" };
@@ -307,6 +339,221 @@ describe("Complaint Service", () => {
           resolution_types: ["refund"],
         })
       ).rejects.toThrow(HttpError);
+    });
+
+    it("per-voucher refund: refund amount = unit_price, only 1 voucher updated", async () => {
+      vi.mocked(complaintRepo.findComplaintById).mockResolvedValue(makeComplaint({ issued_voucher_id: "iv-1" }));
+      vi.mocked(complaintRepo.updateComplaint).mockResolvedValue(makeComplaint({
+        status: "resolved", resolution_types: ["refund"],
+      }));
+
+      const mockOrder = {
+        id: "order-1",
+        order_code: "ORD-001",
+        payments: [{ id: "pay-1", status: "success", method: "simulated", transaction_ref: "SIM-123" }],
+        order_items: [
+          {
+            unit_price: 50000,
+            voucher_product_id: "vp-1",
+            issued_vouchers: [
+              { id: "iv-1", voucher_code: "VC-001", status: "active" },
+              { id: "iv-2", voucher_code: "VC-002", status: "active" },
+            ],
+          },
+        ],
+      };
+
+      vi.mocked(prisma.order.findUnique).mockResolvedValue(mockOrder as any);
+
+      const mockTx: Record<string, unknown> = {
+        issuedVoucher: { update: vi.fn().mockResolvedValue({}), create: vi.fn().mockResolvedValue({}) },
+        voucherProduct: { update: vi.fn().mockResolvedValue({}) },
+        payment: { update: vi.fn().mockResolvedValue({}) },
+        paymentLog: { create: vi.fn().mockResolvedValue({}) },
+        order: { update: vi.fn().mockResolvedValue({}) },
+        orderLog: { create: vi.fn().mockResolvedValue({}) },
+        adminLog: { create: vi.fn().mockResolvedValue({}) },
+      };
+      vi.mocked(prisma.$transaction).mockImplementation(async (fn: any) => fn(mockTx));
+
+      await complaintService.resolveComplaint(ADMIN, "comp-1", {
+        resolution_note: "Refund voucher iv-1",
+        resolution_types: ["refund"],
+      });
+
+      expect(mockTx.issuedVoucher.update).toHaveBeenCalledWith({
+        where: { id: "iv-1" },
+        data: { status: "refunded", updated_at: expect.any(Date) },
+      });
+
+      expect(mockTx.paymentLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          payment_id: "pay-1",
+          action: "REFUND",
+          status: "refunded",
+          amount: 50000,
+        }),
+      });
+
+      // Only 1 voucher refunded, so order stays "confirmed"
+      expect(mockTx.order.update).not.toHaveBeenCalled();
+    });
+
+    it("per-voucher refund: all vouchers refunded → order status updated", async () => {
+      vi.mocked(complaintRepo.findComplaintById).mockResolvedValue(makeComplaint({ issued_voucher_id: "iv-1" }));
+      vi.mocked(complaintRepo.updateComplaint).mockResolvedValue(makeComplaint({
+        status: "resolved", resolution_types: ["refund"],
+      }));
+
+      const mockOrder = {
+        id: "order-1",
+        order_code: "ORD-001",
+        payments: [{ id: "pay-1", status: "success", method: "simulated", transaction_ref: "SIM-123" }],
+        order_items: [
+          {
+            unit_price: 50000,
+            voucher_product_id: "vp-1",
+            issued_vouchers: [
+              { id: "iv-1", voucher_code: "VC-001", status: "active" },
+            ],
+          },
+        ],
+      };
+
+      vi.mocked(prisma.order.findUnique).mockResolvedValue(mockOrder as any);
+
+      const mockTx: Record<string, unknown> = {
+        issuedVoucher: { update: vi.fn().mockResolvedValue({}) },
+        voucherProduct: { update: vi.fn().mockResolvedValue({}) },
+        payment: { update: vi.fn().mockResolvedValue({}) },
+        paymentLog: { create: vi.fn().mockResolvedValue({}) },
+        order: { update: vi.fn().mockResolvedValue({}) },
+        orderLog: { create: vi.fn().mockResolvedValue({}) },
+        adminLog: { create: vi.fn().mockResolvedValue({}) },
+      };
+      vi.mocked(prisma.$transaction).mockImplementation(async (fn: any) => fn(mockTx));
+
+      await complaintService.resolveComplaint(ADMIN, "comp-1", {
+        resolution_note: "Refund voucher iv-1",
+        resolution_types: ["refund"],
+      });
+
+      // Only voucher in order refunded → all vouchers refunded → order status updated
+      expect(mockTx.order.update).toHaveBeenCalledWith({
+        where: { id: "order-1" },
+        data: { status: "refunded", payment_status: "refunded", updated_at: expect.any(Date) },
+      });
+
+      expect(mockTx.payment.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: "pay-1" },
+          data: { status: "refunded" },
+        }),
+      );
+    });
+
+    it("per-voucher reissue (active): old voucher → cancelled, create new voucher", async () => {
+      vi.mocked(complaintRepo.findComplaintById).mockResolvedValue(makeComplaint({ issued_voucher_id: "iv-1" }));
+      vi.mocked(complaintRepo.updateComplaint).mockResolvedValue(makeComplaint({
+        status: "resolved", resolution_types: ["reissue"],
+      }));
+
+      const mockOldVoucher = {
+        id: "iv-1",
+        voucher_code: "VC-001",
+        voucher_product_id: "vp-1",
+        owner_id: "u-buyer",
+        status: "active",
+        voucher_products: { id: "vp-1", validity_days: 30 },
+        order_items: { order_id: "order-1" },
+      };
+
+      vi.mocked(prisma.issuedVoucher.findUnique).mockResolvedValue(mockOldVoucher as any);
+
+      const mockTx: Record<string, unknown> = {
+        issuedVoucher: { update: vi.fn().mockResolvedValue({}), create: vi.fn().mockResolvedValue({}) },
+        voucherProduct: { update: vi.fn().mockResolvedValue({}) },
+        orderLog: { create: vi.fn().mockResolvedValue({}) },
+        adminLog: { create: vi.fn().mockResolvedValue({}) },
+      };
+      vi.mocked(prisma.$transaction).mockImplementation(async (fn: any) => fn(mockTx));
+
+      await complaintService.resolveComplaint(ADMIN, "comp-1", {
+        resolution_note: "Reissue voucher iv-1",
+        resolution_types: ["reissue"],
+      });
+
+      // Old active voucher → cancelled
+      expect(mockTx.issuedVoucher.update).toHaveBeenCalledWith({
+        where: { id: "iv-1" },
+        data: { status: "cancelled", updated_at: expect.any(Date) },
+      });
+
+      // New voucher created
+      expect(mockTx.issuedVoucher.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          voucher_product_id: "vp-1",
+          owner_id: "u-buyer",
+          status: "active",
+          voucher_code: expect.stringMatching(/^VC/),
+        }),
+      });
+
+      // Active reissue: +1 for cancel
+      expect(mockTx.voucherProduct.update).toHaveBeenCalledWith({
+        where: { id: "vp-1" },
+        data: { remaining_quantity: { increment: 1 } },
+      });
+    });
+
+    it("per-voucher reissue (used/expired): old voucher unchanged, create new from stock", async () => {
+      vi.mocked(complaintRepo.findComplaintById).mockResolvedValue(makeComplaint({ issued_voucher_id: "iv-1" }));
+      vi.mocked(complaintRepo.updateComplaint).mockResolvedValue(makeComplaint({
+        status: "resolved", resolution_types: ["reissue"],
+      }));
+
+      const mockOldVoucher = {
+        id: "iv-1",
+        voucher_code: "VC-001",
+        voucher_product_id: "vp-1",
+        owner_id: "u-buyer",
+        status: "used",
+        voucher_products: { id: "vp-1", validity_days: 30 },
+        order_items: { order_id: "order-1" },
+      };
+
+      vi.mocked(prisma.issuedVoucher.findUnique).mockResolvedValue(mockOldVoucher as any);
+
+      const mockTx: Record<string, unknown> = {
+        issuedVoucher: { update: vi.fn().mockResolvedValue({}), create: vi.fn().mockResolvedValue({}) },
+        voucherProduct: { update: vi.fn().mockResolvedValue({}) },
+        orderLog: { create: vi.fn().mockResolvedValue({}) },
+        adminLog: { create: vi.fn().mockResolvedValue({}) },
+      };
+      vi.mocked(prisma.$transaction).mockImplementation(async (fn: any) => fn(mockTx));
+
+      await complaintService.resolveComplaint(ADMIN, "comp-1", {
+        resolution_note: "Reissue used voucher",
+        resolution_types: ["reissue"],
+      });
+
+      // Used voucher: old voucher NOT changed, only new created
+      expect(mockTx.issuedVoucher.update).not.toHaveBeenCalled();
+
+      expect(mockTx.issuedVoucher.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          voucher_product_id: "vp-1",
+          owner_id: "u-buyer",
+          status: "active",
+          voucher_code: expect.stringMatching(/^VC/),
+        }),
+      });
+
+      // Used reissue: -1 from stock
+      expect(mockTx.voucherProduct.update).toHaveBeenCalledWith({
+        where: { id: "vp-1" },
+        data: { remaining_quantity: { decrement: 1 } },
+      });
     });
   });
 

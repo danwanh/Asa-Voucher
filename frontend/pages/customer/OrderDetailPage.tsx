@@ -26,6 +26,7 @@ function orderStatusLabel(status: OrderStatus) {
 
 function issuedVoucherStatusLabel(status: string) {
   if (status === "refunded") return "Đã vô hiệu do hoàn tiền"
+  if (status === "cancelled") return "Đã vô hiệu do cấp lại"
   if (status === "used") return "Đã sử dụng"
   if (status === "expired") return "Hết hạn"
   return "Đang hoạt động"
