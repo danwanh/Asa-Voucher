@@ -266,6 +266,7 @@ export async function lookupRecipient(req: Request, res: Response) {
         { phone: normalizedPhone },
         { phone }
       ],
+      role: "buyer",
       is_active: true
     },
     select: { id: true, full_name: true, email: true, phone: true }

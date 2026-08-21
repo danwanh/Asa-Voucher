@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { C, fmt, fmtDate, STATUS_DESCRIPTION } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
+import { ImageLightbox } from "@/components/ImageLightbox"
 import { StatusBadge } from "@/components/StatusBadge"
 import { orderService, type OrderStatusCounts } from "@/services/orderService"
 import { feedbackService, type ComplaintListItem } from "@/services/feedbackService"
@@ -59,6 +60,7 @@ export function AdminOrdersPage() {
   const [orderComplaints, setOrderComplaints] = useState<ComplaintListItem[]>([])
   const [complaintDialogAction, setComplaintDialogAction] = useState<ComplaintAction | null>(null)
   const [complaintDialogComplaint, setComplaintDialogComplaint] = useState<ComplaintListItem | null>(null)
+  const [lightbox, setLightbox] = useState<{ images: string[]; index: number } | null>(null)
   const [complaintResolutionNote, setComplaintResolutionNote] = useState("")
   const [partnerSearch, setPartnerSearch] = useState("")
   const [partnerResults, setPartnerResults] = useState<any[]>([])
@@ -628,9 +630,26 @@ export function AdminOrdersPage() {
                           </div>
                           <p className="text-xs mb-1" style={{ color: "#8A8DA8" }}>
                             {REASON_LABELS[c.reason as keyof typeof REASON_LABELS] ?? c.reason}
-                          </p>
-                          <p className="text-xs mb-2 leading-relaxed" style={{ color: C.indigo }}>{c.description}</p>
-                          {c.resolutionNote && (
+                           </p>
+                           <p className="text-xs mb-2 leading-relaxed" style={{ color: C.indigo }}>{c.description}</p>
+                           {c.evidenceUrls.length > 0 && (
+                             <div className="mb-2">
+                               <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "#8A8DA8" }}>Ảnh bằng chứng</p>
+                               <div className="grid grid-cols-4 gap-1.5 max-h-28 overflow-y-auto rounded-lg pr-1">
+                                  {c.evidenceUrls.map((url, index) => (
+                                    <button key={`${url}-${index}`} type="button" onClick={() => setLightbox({ images: c.evidenceUrls, index })} className="block w-full">
+                                      <img
+                                        src={url}
+                                        alt={`Ảnh bằng chứng ${index + 1}`}
+                                        className="aspect-square w-full rounded-lg border object-cover"
+                                        style={{ borderColor: "#E2DFC8" }}
+                                      />
+                                    </button>
+                                  ))}
+                               </div>
+                             </div>
+                           )}
+                           {c.resolutionNote && (
                             <p className="text-xs italic mb-2" style={{ color: "#2D7A52" }}>
                               {c.resolutionNote}
                             </p>
@@ -911,7 +930,7 @@ export function AdminOrdersPage() {
         </div>
       )}
 
-      {complaintDialogAction && complaintDialogComplaint && (
+        {complaintDialogAction && complaintDialogComplaint && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center" onClick={closeComplaintDialog}>
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
           <div
@@ -1024,9 +1043,11 @@ export function AdminOrdersPage() {
             </div>
           </div>
         </div>
-      )}
+        )}
 
-      {toast && (
+        <ImageLightbox images={lightbox?.images ?? []} initialIndex={lightbox?.index ?? 0} open={Boolean(lightbox)} onClose={() => setLightbox(null)} />
+
+        {toast && (
         <div
           className={`fixed bottom-6 right-6 z-[70] px-5 py-3.5 rounded-xl shadow-lg text-sm font-bold text-white flex items-center gap-2.5 ${
             toast.type === "success" ? "bg-emerald-500" : "bg-red-500"

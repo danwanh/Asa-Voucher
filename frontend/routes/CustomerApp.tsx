@@ -71,6 +71,14 @@ type VoucherListFilters = {
   effectiveStatus: string
 }
 
+type ComplaintTarget = {
+  id: string
+  voucherId: string
+  voucherTitle: string
+  partnerName: string
+  issuedVoucher: IssuedVoucher
+}
+
 const DEFAULT_VOUCHER_FILTERS: VoucherListFilters = {
   categoryId: "all",
   partnerId: "all",
@@ -101,6 +109,9 @@ export function CustomerApp({
   const [reviewTargetReturnPage, setReviewTargetReturnPage] = useState<CustomerPage>("orders")
   const [complaintOrder, setComplaintOrder] = useState<Order | null>(null)
   const [complaintIssuedVoucher, setComplaintIssuedVoucher] = useState<IssuedVoucher | null>(null)
+  const [complaintTargetOptions, setComplaintTargetOptions] = useState<ComplaintTarget[]>([])
+  const [complaintTargetOrder, setComplaintTargetOrder] = useState<Order | null>(null)
+  const [complaintTargetReturnPage, setComplaintTargetReturnPage] = useState<CustomerPage>("orders")
   const [reviewReturnPage, setReviewReturnPage] = useState<CustomerPage>("orders")
   const [lastCode, setLastCode] = useState("")
   const [lastQrPayload, setLastQrPayload] = useState("")
@@ -270,6 +281,25 @@ export function CustomerApp({
       toast.error("Chỉ người mua đơn hàng mới có thể gửi khiếu nại từ lịch sử.")
       return
     }
+    if (!issuedVoucher) {
+      const canComplaint = detail.status === "confirmed" || detail.status === "completed"
+      const targets = (detail.items ?? []).flatMap((item) => (item.issuedVouchers ?? [])
+        .filter((voucher) => voucher.complaint || canComplaint || voucher.status === "used")
+        .map((voucher) => ({
+          id: voucher.id,
+          voucherId: item.voucherId,
+          voucherTitle: item.voucherTitle ?? detail.voucherTitle,
+          partnerName: item.partnerName ?? detail.partnerName,
+          issuedVoucher: voucher,
+        })))
+      if (targets.length > 1) {
+        setComplaintTargetOptions(targets)
+        setComplaintTargetOrder(detail)
+        setComplaintTargetReturnPage(returnPage)
+        return
+      }
+      if (targets.length === 1) issuedVoucher = targets[0].issuedVoucher
+    }
     setComplaintOrder(detail)
     setComplaintIssuedVoucher(issuedVoucher ?? null)
     setReviewReturnPage(returnPage)
@@ -377,6 +407,8 @@ export function CustomerApp({
     setReviewTarget(null)
     setComplaintOrder(null)
     setComplaintIssuedVoucher(null)
+    setComplaintTargetOptions([])
+    setComplaintTargetOrder(null)
     onInitialPageConsumed?.()
   }
 
@@ -531,7 +563,7 @@ export function CustomerApp({
             onSubmit={returnFromFeedback}
          />
        )}
-       {reviewTargetOrder && reviewTargetOptions.length > 1 && (
+        {reviewTargetOrder && reviewTargetOptions.length > 1 && (
          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" role="presentation" onClick={() => { setReviewTargetOptions([]); setReviewTargetOrder(null) }}>
            <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="review-target-title" onClick={(event) => event.stopPropagation()}>
              <h2 id="review-target-title" className="text-lg font-black" style={{ color: C.indigo }}>Chọn voucher để đánh giá</h2>
@@ -548,8 +580,26 @@ export function CustomerApp({
              <button onClick={() => { setReviewTargetOptions([]); setReviewTargetOrder(null) }} className="mt-5 w-full rounded-xl border py-2.5 text-sm font-bold" style={{ borderColor: "#E2DFC8", color: C.indigo }}>Hủy</button>
            </div>
          </div>
-       )}
-       {page === "complaint" && complaintOrder && (
+        )}
+        {complaintTargetOrder && complaintTargetOptions.length > 1 && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" role="presentation" onClick={() => { setComplaintTargetOptions([]); setComplaintTargetOrder(null) }}>
+            <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="complaint-target-title" onClick={(event) => event.stopPropagation()}>
+              <h2 id="complaint-target-title" className="text-lg font-black" style={{ color: C.indigo }}>Chọn voucher để khiếu nại</h2>
+              <p className="mt-1 text-sm" style={{ color: "#8A8DA8" }}>Mỗi voucher có thể có một khiếu nại riêng từ bạn.</p>
+              <div className="mt-5 max-h-80 space-y-2 overflow-y-auto">
+                {complaintTargetOptions.map((target, index) => (
+                  <button key={target.id} onClick={() => { setComplaintTargetOptions([]); setComplaintTargetOrder(null); void goComplaint(complaintTargetOrder, target.issuedVoucher, complaintTargetReturnPage) }} className="flex w-full items-center gap-3 rounded-2xl border p-3 text-left hover:bg-gray-50" style={{ borderColor: "#E2DFC8" }}>
+                    <div className="flex h-12 w-14 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl" style={{ backgroundColor: C.eggshell }}><AppIcon name="gift" className="h-5 w-5" /></div>
+                    <div className="min-w-0 flex-1"><div className="truncate text-sm font-bold" style={{ color: C.indigo }}>{target.voucherTitle}</div><div className="text-xs" style={{ color: "#8A8DA8" }}>{target.partnerName} · Voucher {index + 1}</div></div>
+                    <span className="text-xs font-bold" style={{ color: target.issuedVoucher.complaint ? "#2563EB" : C.peach }}>{target.issuedVoucher.complaint ? "Xem" : "Khiếu nại"}</span>
+                  </button>
+                ))}
+              </div>
+              <button onClick={() => { setComplaintTargetOptions([]); setComplaintTargetOrder(null) }} className="mt-5 w-full rounded-xl border py-2.5 text-sm font-bold" style={{ borderColor: "#E2DFC8", color: C.indigo }}>Hủy</button>
+            </div>
+          </div>
+        )}
+        {page === "complaint" && complaintOrder && (
          <ComplaintPage
            order={complaintOrder}
            issuedVoucher={complaintIssuedVoucher ?? undefined}
