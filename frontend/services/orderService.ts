@@ -120,6 +120,7 @@ export function mapOrder(value: BackendRecord): Order {
         ? allPartnerNames[0]
         : allPartnerNames.join(", "),
     amount: num(value.total_amount),
+    refundAmount: num(value.refund_amount) || undefined,
     status: value.status,
     paymentStatus: value.payment_status ?? (refundedPayment ? "refunded" : paidPayment ? "paid" : unpaidPayment ? "pending" : failedPayment ? "failed" : "pending"),
     paymentMethod: String(value.payment_method ?? ""),

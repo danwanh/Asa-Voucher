@@ -207,6 +207,12 @@ export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAga
           <div className="flex justify-between"><span style={{ color: "#6B7280" }}>Phương thức</span><span className="font-semibold" style={{ color: C.indigo }}>{order.paymentMethod}</span></div>
            <div className="flex justify-between"><span style={{ color: "#6B7280" }}>Trạng thái thanh toán</span><span className="font-semibold" style={{ color: C.indigo }}>{order.paymentStatus === "paid" ? "Đã thanh toán" : order.paymentStatus === "failed" ? "Thanh toán thất bại" : order.paymentStatus === "refunded" ? "Đã hoàn tiền" : "Chờ thanh toán"}</span></div>
           <div className="flex justify-between"><span style={{ color: "#6B7280" }}>Số tiền</span><span className="font-black" style={{ color: C.peach }}>{fmt(order.amount)}</span></div>
+          {order.refundAmount && order.refundAmount > 0 && (
+            <>
+              <div className="flex justify-between"><span style={{ color: "#6B7280" }}>Đã hoàn tiền</span><span className="font-bold" style={{ color: "#DC2626" }}>-{fmt(order.refundAmount)}</span></div>
+              <div className="flex justify-between pt-2 border-t border-black/5"><span className="font-bold" style={{ color: C.indigo }}>Tổng cộng</span><span className="font-black" style={{ color: C.peach }}>{fmt(order.amount - order.refundAmount)}</span></div>
+            </>
+          )}
         </div>
       </div>
 

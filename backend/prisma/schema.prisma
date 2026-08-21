@@ -285,6 +285,7 @@ model Order {
   subtotal           Decimal      @db.Decimal(15, 0)
   discount_amount    Decimal      @default(0) @db.Decimal(15, 0)
   total_amount       Decimal      @db.Decimal(15, 0)
+  refund_amount      Decimal      @default(0) @db.Decimal(15, 0)
   payment_method     String       @db.VarChar(30)
   status             String       @default("pending") @db.VarChar(20)
   note               String?

@@ -160,6 +160,7 @@ export interface Order {
   partnerId?: string
   partnerName: string
   amount: number
+  refundAmount?: number
   status: OrderStatus
   paymentStatus: OrderPaymentStatus
   paymentMethod: string
