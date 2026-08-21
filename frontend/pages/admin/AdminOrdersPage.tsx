@@ -68,6 +68,8 @@ export function AdminOrdersPage() {
 
   const toastTimer = useRef<ReturnType<typeof setTimeout>>()
   const panelRef = useRef<HTMLDivElement>(null)
+  const partnerSearchTimer = useRef<ReturnType<typeof setTimeout>>()
+  const partnerSearchAbort = useRef<AbortController | null>(null)
 
   const showToast = useCallback((type: "success" | "error", message: string) => {
     setToast({ type, message })
@@ -223,6 +225,8 @@ export function AdminOrdersPage() {
 
   const closeComplaintDialog = () => {
     if (actionLoading) return
+    clearTimeout(partnerSearchTimer.current)
+    partnerSearchAbort.current?.abort()
     setComplaintDialogAction(null)
     setComplaintDialogComplaint(null)
     setComplaintResolutionNote("")
@@ -276,16 +280,22 @@ export function AdminOrdersPage() {
     }
   }
 
-  const searchPartners = async (q: string) => {
+  const searchPartners = useCallback((q: string) => {
     setPartnerSearch(q)
+    clearTimeout(partnerSearchTimer.current)
+    partnerSearchAbort.current?.abort()
     if (q.trim().length < 2) { setPartnerResults([]); return }
     setPartnerSearchLoading(true)
-    try {
-      const result = await feedbackService.searchPartners(q.trim())
-      setPartnerResults(result)
-    } catch {}
-    setPartnerSearchLoading(false)
-  }
+    partnerSearchTimer.current = setTimeout(async () => {
+      const controller = new AbortController()
+      partnerSearchAbort.current = controller
+      try {
+        const result = await feedbackService.searchPartners(q.trim())
+        if (!controller.signal.aborted) setPartnerResults(result)
+      } catch {}
+      setPartnerSearchLoading(false)
+    }, 300)
+  }, [])
 
   const filterTabs = [
     { v: "all", l: "Tất cả", desc: "Tất cả đơn hàng" },
