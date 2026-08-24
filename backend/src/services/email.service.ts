@@ -2,21 +2,59 @@ import nodemailer from "nodemailer";
 import { env } from "../config/env.js";
 import { HttpError } from "../utils/http-error.js";
 
-function getTransporter() {
+function requireSmtpAuth() {
   if (!env.SMTP_USER || !env.SMTP_PASS) {
     throw new HttpError(503, "Email service is not configured", "EMAIL_SERVICE_NOT_CONFIGURED");
   }
+
+  return { user: env.SMTP_USER, pass: env.SMTP_PASS.replace(/\s+/g, "") };
+}
+
+function getTransporter() {
+  const auth = requireSmtpAuth();
 
   return nodemailer.createTransport({
     host: env.SMTP_HOST,
     port: env.SMTP_PORT,
     secure: env.SMTP_PORT === 465,
-    auth: { user: env.SMTP_USER, pass: env.SMTP_PASS }
+    requireTLS: env.SMTP_PORT === 587,
+    auth
   });
 }
 
+function mailFrom() {
+  const smtpUser = env.SMTP_USER;
+  if (!smtpUser) return env.EMAIL_FROM;
+
+  const configuredAddress = env.EMAIL_FROM.match(/<([^>]+)>/)?.[1]?.trim() ?? env.EMAIL_FROM.trim();
+  if (configuredAddress.toLowerCase() === smtpUser.toLowerCase()) {
+    return env.EMAIL_FROM;
+  }
+
+  const displayName = env.EMAIL_FROM.match(/^(.*?)\s*</)?.[1]?.trim() || "Asa Voucher";
+  return `${displayName} <${smtpUser}>`;
+}
+
 export async function sendEmail(to: string, subject: string, html: string) {
-  await getTransporter().sendMail({ from: env.EMAIL_FROM, to, subject, html });
+  const smtpUser = requireSmtpAuth().user;
+
+  try {
+    await getTransporter().sendMail({
+      from: mailFrom(),
+      to,
+      subject,
+      html,
+      envelope: { from: smtpUser, to }
+    });
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    console.error(JSON.stringify({
+      event: "email.send_failed",
+      to,
+      message: error instanceof Error ? error.message : "Unknown email error"
+    }));
+    throw new HttpError(503, "Không gửi được email. Vui lòng thử lại sau.", "EMAIL_SEND_FAILED");
+  }
 }
 
 export function buildVerificationEmail(token: string) {
