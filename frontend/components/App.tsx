@@ -45,11 +45,11 @@ function rolePageFromPath(routePath: string | undefined, role: string): PartnerP
   const segment = segments.at(-1)
   if (role === "partner_owner") {
     if (segment === "profile") return "profile"
+    if (segment === "new" || segment === "create") return "create"
     if (segments[1] === "vouchers" && segments.length >= 3) {
       return segment === "edit" ? "edit" : "voucher-detail"
     }
     if (segment === "vouchers") return "vouchers"
-    if (segment === "new" || segment === "create") return "create"
     if (segment === "edit") return "edit"
     if (segment === "revenue") return "revenue"
     if (segment === "branches") return "branches"
@@ -65,10 +65,10 @@ function rolePageFromPath(routePath: string | undefined, role: string): PartnerP
   }
   if (role === "partner_voucher_staff") {
     if (segment === "profile") return "profile"
+    if (segment === "new" || segment === "create") return "create"
     if (segments[1] === "vouchers" && segments.length >= 3) {
       return segment === "edit" ? "edit" : "voucher-detail"
     }
-    if (segment === "new" || segment === "create") return "create"
     if (segment === "edit") return "edit"
     if (segment === "reports") return "staff-reports"
     if (segment === "check-voucher") return "check-voucher"

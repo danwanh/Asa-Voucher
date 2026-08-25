@@ -15,7 +15,7 @@ const voucherProductBaseSchema = z.object({
   category_id: z.string().uuid(),
   name: z.string().trim().min(1, "Name is required").max(255, "Name must not exceed 255 characters"),
   description: z.string().max(2000, "Description must not exceed 2000 characters").optional(),
-  thumbnail_url: z.string().url().optional(),
+  thumbnail_url: z.string().url().nullable().optional(),
   original_price: z.number().positive(),
   selling_price: z.number().positive(),
   applicable_area: z.string().max(255, "Applicable area must not exceed 255 characters").optional(),

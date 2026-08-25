@@ -25,12 +25,18 @@ function voucherStaffPageFromPath(pathname: string, fallback: VoucherStaffPage =
   const segments = pathname.split("/").filter(Boolean)
   const last = segments.at(-1)
   if (last === "profile") return "profile"
+  if (last === "new" || last === "create") return "create"
   if (segments[1] === "vouchers" && segments.length >= 3) return last === "edit" ? "edit" : "voucher-detail"
   if (last === "vouchers") return "vouchers"
-  if (last === "new" || last === "create") return "create"
   if (last === "reports") return "staff-reports"
   if (last === "check-voucher") return "check-voucher"
   return fallback
+}
+
+function voucherIdFromPath(pathname: string) {
+  const segments = pathname.split("/").filter(Boolean)
+  const voucherId = segments[1] === "vouchers" ? segments[2] : undefined
+  return voucherId && !["new", "create", "edit", "detail"].includes(voucherId) ? voucherId : undefined
 }
 
 interface Props {
@@ -59,21 +65,72 @@ const PAGE_LABELS: Record<Page, string> = {
   profile: "Hồ sơ cá nhân",
 }
 
+function activeNavPageFor(page: Page): Page {
+  if (page === "edit" || page === "voucher-detail") return "vouchers"
+  if (page === "reports") return "staff-reports"
+  return page
+}
+
+function locksPriceAndQuantityFor(voucher?: Voucher | null) {
+  return voucher?.status === "active" || voucher?.status === "selling"
+}
+
 export function VoucherStaffApp({ user, onLogout, initialPage, initialVoucherId }: Props) {
   const router = useRouter()
   const pathname = usePathname()
   const page = voucherStaffPageFromPath(pathname, initialPage ?? "vouchers")
+  const activeNavPage = activeNavPageFor(page)
+  const routeVoucherId = voucherIdFromPath(pathname)
+  const effectiveVoucherId = routeVoucherId ?? initialVoucherId
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null)
+  const [isVoucherLoading, setIsVoucherLoading] = useState(false)
+  const [voucherLoadError, setVoucherLoadError] = useState<string | null>(null)
   const [mobileOpen, setMobileOpen] = useState(false)
 
   useEffect(() => {
-    if (!initialVoucherId) return
-    void voucherService.getDetail(initialVoucherId).then((detail) => setSelectedVoucher(detail.voucher))
-  }, [initialVoucherId])
+    if (!effectiveVoucherId) {
+      setIsVoucherLoading(false)
+      setVoucherLoadError(null)
+      return
+    }
+
+    let isMounted = true
+    setIsVoucherLoading(true)
+    setVoucherLoadError(null)
+    void voucherService.getDetail(effectiveVoucherId)
+      .then((detail) => {
+        if (!isMounted) return
+        setSelectedVoucher(detail.voucher)
+      })
+      .catch(async () => {
+        try {
+          const manageDetail = await voucherService.getManageDetail(effectiveVoucherId)
+          if (!isMounted) return
+          setSelectedVoucher(manageDetail.voucher)
+        } catch {
+          if (!isMounted) return
+          setSelectedVoucher(null)
+          setVoucherLoadError("Không thể tải chi tiết voucher.")
+        }
+      })
+      .finally(() => {
+        if (isMounted) setIsVoucherLoading(false)
+      })
+
+    return () => {
+      isMounted = false
+    }
+  }, [effectiveVoucherId])
+
+  useEffect(() => {
+    if (page === "edit" && selectedVoucher && ["rejected", "expired", "locked", "sold_out"].includes(selectedVoucher.status)) {
+      router.replace(`/voucher-staff/vouchers/${selectedVoucher.id}`)
+    }
+  }, [page, router, selectedVoucher])
 
   const goEdit = (v: Voucher) => {
     setSelectedVoucher(v)
-    const nextPage = v.status === "rejected" ? "voucher-detail" : "edit"
+    const nextPage = ["rejected", "expired", "locked", "sold_out"].includes(v.status) ? "voucher-detail" : "edit"
     router.push(`/voucher-staff/vouchers/${v.id}/${nextPage === "edit" ? "edit" : ""}`.replace(/\/$/, ""))
   }
   const goDetail = (v: Voucher) => {
@@ -83,6 +140,18 @@ export function VoucherStaffApp({ user, onLogout, initialPage, initialVoucherId 
 
   const ACCENT = "#81B29A"
   const SIDEBAR_BG = "#253830"
+
+  const voucherRouteFallback = (
+    <div className="p-6">
+      {isVoucherLoading ? (
+        <LoadingState label="Đang tải chi tiết voucher..." variant="page" />
+      ) : (
+        <div className="rounded-xl border bg-white p-5 text-sm" style={{ borderColor: "#F0EDD8", color: "#C0392B" }}>
+          {voucherLoadError ?? "Không tìm thấy voucher."}
+        </div>
+      )}
+    </div>
+  )
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full" style={{ backgroundColor: SIDEBAR_BG }}>
@@ -116,7 +185,7 @@ export function VoucherStaffApp({ user, onLogout, initialPage, initialVoucherId 
       {/* Nav */}
       <nav className="flex-1 p-3 space-y-0.5">
         {NAV.map((n) => {
-          const active = page === n.pg
+          const active = activeNavPage === n.pg
           return (
             <button
               key={n.pg}
@@ -189,11 +258,20 @@ export function VoucherStaffApp({ user, onLogout, initialPage, initialVoucherId 
             <PartnerVouchersPage onCreateNew={() => router.push("/voucher-staff/vouchers/new")} onEdit={goEdit} onDetail={goDetail} />
           )}
           {page === "create" && <CreateVoucherPage onBack={() => router.push("/voucher-staff/vouchers")} onSaveDraft={() => router.push("/voucher-staff/vouchers")} />}
-          {page === "edit" && selectedVoucher && (
-            <EditVoucherPage voucher={selectedVoucher} onBack={() => router.push("/voucher-staff/vouchers")} onSave={(v) => setSelectedVoucher(v)} />
+          {page === "edit" && (
+            selectedVoucher ? (
+              <EditVoucherPage
+                voucher={selectedVoucher}
+                lockPriceAndQuantity={locksPriceAndQuantityFor(selectedVoucher)}
+                onBack={() => router.push("/voucher-staff/vouchers")}
+                onSave={(v) => setSelectedVoucher(v)}
+              />
+            ) : voucherRouteFallback
           )}
-          {page === "voucher-detail" && selectedVoucher && (
-            <PartnerVoucherDetailPage voucher={selectedVoucher} onBack={() => router.push("/voucher-staff/vouchers")} onEdit={goEdit} />
+          {page === "voucher-detail" && (
+            selectedVoucher ? (
+              <PartnerVoucherDetailPage voucher={selectedVoucher} onBack={() => router.push("/voucher-staff/vouchers")} onEdit={goEdit} />
+            ) : voucherRouteFallback
           )}
           {page === "reports" && <PartnerRevenuePage />}
           {page === "staff-reports" && <StaffVoucherReportPage/>}

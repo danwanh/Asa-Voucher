@@ -7,6 +7,7 @@ import { voucherService, type VoucherApplicableBranch, type VoucherDetailData, t
 import { LoadingState } from "@/components/LoadingState"
 import { ImageLightbox } from "@/components/ImageLightbox"
 import { isVoucherAvailable } from "@/hooks/useCart"
+import { VoucherImageGallery } from "@/components/VoucherImageGallery"
 
 interface Props {
   viewer?: "guest" | "customer"
@@ -25,6 +26,7 @@ export function GuestVoucherDetailPage({ viewer = "guest", voucher: v, detail, o
   const [reviews, setReviews] = useState<VoucherPublicReview[]>([])
   const [branches, setBranches] = useState<VoucherApplicableBranch[]>([])
   const [related, setRelated] = useState<Voucher[]>([])
+  const [detailImages, setDetailImages] = useState<string[]>([])
   const [detailMeta, setDetailMeta] = useState<Pick<VoucherDetailData, "conditions" | "usageInstructions" | "applicableArea" | "partnerId" | "categoryName">>({
     conditions: [],
     usageInstructions: [],
@@ -40,6 +42,7 @@ export function GuestVoucherDetailPage({ viewer = "guest", voucher: v, detail, o
     setDetailVoucher(detail.voucher)
     setReviews(detail.reviews)
     setBranches(detail.branches)
+    setDetailImages(detail.images.length > 0 ? detail.images.map((image) => image.imageUrl) : detail.voucher.image ? [detail.voucher.image] : [])
     setDetailMeta({ conditions: detail.conditions, usageInstructions: detail.usageInstructions, applicableArea: detail.applicableArea, partnerId: detail.partnerId, categoryName: detail.categoryName })
     setIsLoading(false)
   }, [detail])
@@ -94,16 +97,13 @@ export function GuestVoucherDetailPage({ viewer = "guest", voucher: v, detail, o
       <div className="grid md:grid-cols-2 gap-8 mb-8">
         {/* Left: Image gallery */}
         <div>
-          <div className="rounded-3xl overflow-hidden shadow-md h-72 mb-3">
-            <img src={detailVoucher.image} alt={detailVoucher.title} className="w-full h-full object-cover" />
-          </div>
-          <div className="flex gap-2">
-            {[detailVoucher.image, detailVoucher.image, detailVoucher.image].map((img, i) => (
-              <div key={i} className="w-20 h-16 rounded-xl overflow-hidden border-2 cursor-pointer transition-all" style={{ borderColor: i === 0 ? C.peach : "transparent" }}>
-                <img src={img} alt="" className="w-full h-full object-cover" />
-              </div>
-            ))}
-          </div>
+          <VoucherImageGallery
+            images={detailImages}
+            fallbackImageUrl={detailVoucher.image}
+            alt={detailVoucher.title}
+            className="mb-3 rounded-3xl overflow-hidden shadow-md bg-white"
+            mainHeightClass="h-72"
+          />
         </div>
 
         {/* Right: Info */}
@@ -230,7 +230,7 @@ export function GuestVoucherDetailPage({ viewer = "guest", voucher: v, detail, o
 
           <div className="bg-white rounded-2xl p-5 border border-black/5">
             <h3 className="font-black text-sm mb-3" style={{ color: C.indigo }}>Thông tin voucher</h3>
-            <div className="text-xs" style={{ color: "#6B7280" }}>Đối tác: {detailMeta.partnerId || detailVoucher.partnerId}</div>
+            <div className="text-xs" style={{ color: "#6B7280" }}>Đối tác: {detail.partnerName || detailVoucher.partnerName || detailMeta.partnerId || detailVoucher.partnerId}</div>
             <div className="text-xs mt-2" style={{ color: "#6B7280" }}>Khu vực áp dụng: {detailMeta.applicableArea || "Chưa cập nhật"}</div>
           </div>
         </div>
