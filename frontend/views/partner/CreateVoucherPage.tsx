@@ -8,7 +8,7 @@ import { mediaUploadService } from "@/services/mediaUploadService"
 import { useAuthStore } from "@/stores/authStore"
 import type { Voucher } from "@/types"
 import { serializeApplicableAreas } from "@/utils/applicableArea"
-import { VoucherImageUpload } from "@/components/VoucherImageUpload"
+import { VoucherImagesManager, normalizeVoucherImages, type ManagedVoucherImage } from "@/components/VoucherImagesManager"
 
 interface Props {
   partnerId?: string
@@ -68,6 +68,15 @@ function toLines(value: string) {
     .filter(Boolean)
 }
 
+function managedFromSavedImage(image: { id: string; imageUrl: string; isPrimary: boolean }): ManagedVoucherImage {
+  return {
+    localId: image.id,
+    id: image.id,
+    imageUrl: image.imageUrl,
+    isPrimary: image.isPrimary,
+  }
+}
+
 export function CreateVoucherPage({ partnerId, onBack }: Props) {
   const user = useAuthStore((state) => state.user)
   const currentPartnerId = user?.partnerId ?? partnerId
@@ -81,7 +90,8 @@ export function CreateVoucherPage({ partnerId, onBack }: Props) {
   const [confirmSave, setConfirmSave] = useState(false)
   const [createdVoucherId, setCreatedVoucherId] = useState<string | null>(null)
   const [assignedBranchIds, setAssignedBranchIds] = useState<string[]>([])
-  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [images, setImages] = useState<ManagedVoucherImage[]>([])
+  const [savedImageIds, setSavedImageIds] = useState<string[]>([])
 
   useEffect(() => {
     let isMounted = true
@@ -194,26 +204,58 @@ export function CreateVoucherPage({ partnerId, onBack }: Props) {
     setAssignedBranchIds((current) => Array.from(new Set([...current, ...newlyAssigned])))
   }
 
+  const uploadSelectedImages = async () => {
+    const fileImages = images.filter((image) => image.file)
+    const uploadedUrls = await mediaUploadService.uploadImages(fileImages.map((image) => image.file!))
+    let uploadIndex = 0
+    return images.map((image) => {
+      if (!image.file) return image
+      const imageUrl = uploadedUrls[uploadIndex++]
+      return { ...image, imageUrl, file: undefined }
+    })
+  }
+
+  const syncImages = async (voucherId: string, nextImages: ManagedVoucherImage[]) => {
+    const nextExistingIds = new Set(nextImages.map((image) => image.id).filter((id): id is string => Boolean(id)))
+    await Promise.all(savedImageIds
+      .filter((imageId) => !nextExistingIds.has(imageId))
+      .map((imageId) => voucherService.deleteVoucherImage(imageId, voucherId))
+    )
+
+    const savedImages = await Promise.all(nextImages.map((image, index) => (
+      image.id
+        ? voucherService.updateVoucherImage(image.id, {
+          voucherId,
+          imageUrl: image.imageUrl,
+          isPrimary: image.isPrimary,
+          sortOrder: index,
+        })
+        : voucherService.createVoucherImage(voucherId, {
+          imageUrl: image.imageUrl,
+          isPrimary: image.isPrimary,
+          sortOrder: index,
+        })
+    )))
+
+    setSavedImageIds(savedImages.map((image) => image.id))
+    setImages(normalizeVoucherImages(savedImages.map(managedFromSavedImage)))
+  }
+
   const saveVoucher = async () => {
     setIsSaving(true)
     setConfirmSave(false)
 
     let voucherId = createdVoucherId
     try {
+      const uploadedImages = await uploadSelectedImages()
       if (!voucherId) {
-        const uploadedImageUrl = imageFile
-          ? await mediaUploadService.uploadImage(imageFile)
-          : form.image.trim()
-        if (uploadedImageUrl) {
-          setForm((current) => ({ ...current, image: uploadedImageUrl }))
-          setImageFile(null)
-        }
+        const primaryImageUrl = uploadedImages.find((image) => image.isPrimary)?.imageUrl ?? uploadedImages[0]?.imageUrl
 
         const created = await voucherService.createVoucher({
           category_id: form.categoryId,
           name: form.name.trim(),
           description: form.description.trim(),
-          thumbnail_url: uploadedImageUrl || undefined,
+          thumbnail_url: primaryImageUrl || undefined,
           applicable_area: derivedApplicableArea || undefined,
           original_price: Number(form.originalPrice),
           selling_price: Number(form.sellingPrice),
@@ -227,6 +269,9 @@ export function CreateVoucherPage({ partnerId, onBack }: Props) {
         voucherId = created.id
         setCreatedVoucherId(created.id)
       }
+      if (uploadedImages.length > 0) {
+        await syncImages(voucherId, uploadedImages)
+      }
     } catch (error) {
       toast.error(getErrorMessage(error, "Không thể tạo voucher"))
       setIsSaving(false)
@@ -235,7 +280,7 @@ export function CreateVoucherPage({ partnerId, onBack }: Props) {
 
     try {
       await assignMissingBranches(voucherId)
-      toast.success("Đã lưu voucher nháp")
+      toast.success("Voucher đã được lưu.")
       onBack()
     } catch (error) {
       toast.error(getErrorMessage(error, "Voucher đã được lưu nháp nhưng chưa lưu đủ chi nhánh. Vui lòng thử lại."))
@@ -282,7 +327,7 @@ export function CreateVoucherPage({ partnerId, onBack }: Props) {
 
       {createdVoucherId && (
         <div className="mb-5 rounded-xl border px-4 py-3 text-sm font-semibold" style={{ borderColor: C.apricot, backgroundColor: C.apricot + "20", color: "#6B4F00" }}>
-          Voucher đã được tạo nháp. Vui lòng hoàn tất lưu chi nhánh áp dụng.
+          Voucher đã được lưu.
         </div>
       )}
 
@@ -307,12 +352,11 @@ export function CreateVoucherPage({ partnerId, onBack }: Props) {
                 Hệ thống tự động lấy khu vực từ tỉnh/thành của chi nhánh áp dụng.
               </p>
             </Field>
-            <Field label="Ảnh đại diện">
-              <VoucherImageUpload
-                imageUrl={form.image}
-                selectedFile={imageFile}
+            <Field label="Ảnh voucher">
+              <VoucherImagesManager
+                images={images}
                 disabled={Boolean(createdVoucherId)}
-                onFileChange={setImageFile}
+                onChange={setImages}
                 onError={toast.error}
               />
             </Field>
@@ -350,7 +394,7 @@ export function CreateVoucherPage({ partnerId, onBack }: Props) {
         </section>
 
         <section className="bg-white rounded-2xl p-6 border border-black/5">
-          <h3 className="font-bold text-sm mb-4" style={{ color: C.indigo }}>Điều kiện sử dụng</h3>
+          <h3 className="font-bold text-sm mb-4" style={{ color: C.indigo }}>Điều kiện & hướng dẫn sử dụng</h3>
           <div className="space-y-4">
             <Field label="Điều kiện áp dụng *" error={errors.terms}>
               <textarea rows={4} className={`${inputCls(errors.terms)} resize-none`} value={form.terms} onChange={(event) => updateField("terms", event.target.value)} disabled={Boolean(createdVoucherId)} />

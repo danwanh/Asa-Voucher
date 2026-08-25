@@ -6,20 +6,21 @@ import { AppIcon } from "@/components/AppIcon"
 import type { Voucher } from "@/types"
 import { voucherService } from "@/services/voucherService"
 import { parseApplicableAreas, serializeApplicableAreas } from "@/utils/applicableArea"
+import { VoucherImageGallery } from "@/components/VoucherImageGallery"
 
 interface Props {
   voucher: Voucher
   onBack: () => void
   onEdit: (v: Voucher) => void
+  readOnly?: boolean
 }
 
-export function PartnerVoucherDetailPage({ voucher: initialVoucher, onBack, onEdit }: Props) {
+export function PartnerVoucherDetailPage({ voucher: initialVoucher, onBack, onEdit, readOnly = false }: Props) {
   const [voucher, setVoucher] = useState(initialVoucher)
   const [detail, setDetail] = useState<Awaited<ReturnType<typeof voucherService.getDetail>> | null>(null)
   const [isLoadingDetail, setIsLoadingDetail] = useState(true)
   const [showSubmitDialog, setShowSubmitDialog] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [imageLoadFailed, setImageLoadFailed] = useState(false)
 
   useEffect(() => {
     let isMounted = true
@@ -42,6 +43,7 @@ export function PartnerVoucherDetailPage({ voucher: initialVoucher, onBack, onEd
             partnerId: manageDetail.voucher.partnerId,
             partnerName: manageDetail.voucher.partnerName,
             categoryName: "",
+            images: manageDetail.images,
           }
         })
         if (!isMounted) return
@@ -65,17 +67,21 @@ export function PartnerVoucherDetailPage({ voucher: initialVoucher, onBack, onEd
   const pct = voucher.originalPrice > 0
     ? Math.max(0, Math.round((((voucher.originalPrice - voucher.price) / voucher.originalPrice) * 100) * 100) / 100)
     : 0
-  const canSubmit = voucher.status === "draft"
+  const canSubmit = !readOnly && voucher.status === "draft"
 
-  const showImage = Boolean(voucher.image?.trim()) && !imageLoadFailed
   const branches = detail?.branches ?? []
   const conditions = detail?.conditions ?? []
   const usageInstructions = detail?.usageInstructions ?? []
+  const galleryImages = detail?.images.length
+    ? detail.images.map((image) => image.imageUrl)
+    : voucher.image?.trim()
+    ? [voucher.image]
+    : []
   const displayApplicableArea =
     serializeApplicableAreas(parseApplicableAreas(detail?.applicableArea ?? voucher.applicableArea)) || "Toàn quốc"
 
   const displayCategory = detail?.categoryName || formatCategoryLabel(voucher.category)
-  const canEdit = voucher.status !== "rejected"
+  const canEdit = !readOnly && !["rejected", "expired", "locked", "sold_out"].includes(voucher.status)
 
   const detailRows = useMemo(
     () => [
@@ -155,23 +161,20 @@ export function PartnerVoucherDetailPage({ voucher: initialVoucher, onBack, onEd
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-4">
             <div className="bg-white rounded-2xl overflow-hidden border border-black/5">
-              {showImage ? (
-                <div className="h-56 overflow-hidden">
-                  <img
-                    src={voucher.image}
-                    alt={`Ảnh voucher ${voucher.title}`}
-                    className="w-full h-full object-cover"
-                    onError={() => setImageLoadFailed(true)}
-                  />
-                </div>
-              ) : (
-                <div className="h-44 px-5 flex items-center justify-center" style={{ backgroundColor: C.eggshell }}>
+              <VoucherImageGallery
+                images={galleryImages}
+                alt={`Ảnh voucher ${voucher.title}`}
+                className="bg-white"
+                mainHeightClass="h-56"
+                emptyState={(
+                  <div className="h-44 px-5 flex items-center justify-center" style={{ backgroundColor: C.eggshell }}>
                   <div className="text-center">
                     <AppIcon name="image" className="w-8 h-8 mx-auto" />
                     <p className="text-sm mt-2" style={{ color: "#6B7280" }}>Voucher chưa có ảnh đại diện</p>
                   </div>
-                </div>
-              )}
+                  </div>
+                )}
+              />
               <div className="p-5">
                 <div className="text-xs font-semibold mb-1" style={{ color: C.teal }}>
                   <span className="inline-flex items-center gap-1"><AppIcon name={voucher.partnerLogo} className="w-4 h-4" /> {voucher.partnerName}</span>

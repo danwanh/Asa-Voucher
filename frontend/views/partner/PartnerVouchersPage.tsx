@@ -13,6 +13,7 @@ interface Props {
   onEdit: (v: Voucher) => void
   onDetail: (v: Voucher) => void
   canCreate?: boolean
+  readOnly?: boolean
   sessionDrafts?: Voucher[]
   onEditDraft?: (v: Voucher) => void
 }
@@ -23,7 +24,7 @@ const TAB_LABELS: Record<FilterTab, string> = {
   all: "Tất cả", active: "Đang hoạt động", draft: "Bản nháp", pending: "Chờ duyệt", other: "Khác",
 }
 
-export function PartnerVouchersPage({ partnerId, onCreateNew, onEdit, onDetail, canCreate = true, sessionDrafts = [], onEditDraft }: Props) {
+export function PartnerVouchersPage({ partnerId, onCreateNew, onEdit, onDetail, canCreate = true, readOnly = false, sessionDrafts = [], onEditDraft }: Props) {
   const [tab, setTab] = useState<FilterTab>("all")
   const [baseVouchers, setBaseVouchers] = useState<Voucher[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -227,8 +228,8 @@ export function PartnerVouchersPage({ partnerId, onCreateNew, onEdit, onDetail, 
               )}
               {!isLoading && visibleVouchers.map((v) => {
                 const isDraft = v.status === "draft"
-                const canSubmit = v.status === "draft"
-                const isRejected = v.status === "rejected"
+                const canSubmit = !readOnly && v.status === "draft"
+                const isViewOnly = readOnly || ["rejected", "expired", "locked", "sold_out"].includes(v.status)
                 return (
                   <tr
                     key={v.id}
@@ -281,7 +282,7 @@ export function PartnerVouchersPage({ partnerId, onCreateNew, onEdit, onDetail, 
                         >
                           <Send className="w-3 h-3" /> Gửi duyệt
                         </button>
-                      ) : isRejected ? (
+                      ) : isViewOnly ? (
                         <button onClick={() => onDetail(v)} className="p-1.5 rounded-lg hover:bg-muted transition-colors" title="Xem chi tiết">
                           <Eye className="w-3.5 h-3.5" style={{ color: "#8A8DA8" }} />
                         </button>
@@ -300,7 +301,9 @@ export function PartnerVouchersPage({ partnerId, onCreateNew, onEdit, onDetail, 
             <div className="text-center py-12">
               <AppIcon name="document" className="w-8 h-8 mb-2 mx-auto" />
               <div className="font-bold text-sm" style={{ color: C.indigo }}>Không có voucher nào</div>
-              <p className="text-xs mt-1" style={{ color: "#8A8DA8" }}>Thử chọn tab khác hoặc tạo voucher mới</p>
+              <p className="text-xs mt-1" style={{ color: "#8A8DA8" }}>
+                {canCreate ? "Thử chọn tab khác hoặc tạo voucher mới" : "Thử chọn tab khác hoặc tải lại danh sách"}
+              </p>
             </div>
           )}
         </div>

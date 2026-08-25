@@ -26,11 +26,17 @@ function partnerPageFromPath(pathname: string, fallback: PartnerPage = "revenue"
   const segments = pathname.split("/").filter(Boolean)
   const last = segments.at(-1)
   if (last === "profile") return "profile"
+  if (last === "new" || last === "create") return "create"
   if (segments[1] === "vouchers" && segments.length >= 3) return last === "edit" ? "edit" : "voucher-detail"
   if (last === "vouchers") return "vouchers"
-  if (last === "new" || last === "create") return "create"
   if (last === "revenue" || last === "branches" || last === "staff" || last === "check-voucher") return last
   return fallback
+}
+
+function voucherIdFromPath(pathname: string) {
+  const segments = pathname.split("/").filter(Boolean)
+  const voucherId = segments[1] === "vouchers" ? segments[2] : undefined
+  return voucherId && !["new", "create", "edit", "detail"].includes(voucherId) ? voucherId : undefined
 }
 
 interface Props {
@@ -40,28 +46,73 @@ interface Props {
   initialVoucherId?: string
 }
 
+function locksPriceAndQuantityFor(voucher?: Voucher | null) {
+  return voucher?.status === "active" || voucher?.status === "selling"
+}
+
 export function PartnerApp({ user, onLogout, initialPage, initialVoucherId }: Props) {
   const router = useRouter()
   const pathname = usePathname()
   const page = partnerPageFromPath(pathname, initialPage ?? "revenue")
+  const routeVoucherId = voucherIdFromPath(pathname)
+  const effectiveVoucherId = routeVoucherId ?? initialVoucherId
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null)
+  const [isVoucherLoading, setIsVoucherLoading] = useState(false)
+  const [voucherLoadError, setVoucherLoadError] = useState<string | null>(null)
   const [partner, setPartner] = useState<PartnerProfile | null>(null)
   const [isPartnerLoading, setIsPartnerLoading] = useState(true)
   // Drafts created in this session (cleared on logout); persists across page nav within the session
   const [sessionDrafts, setSessionDrafts] = useState<Voucher[]>([])
 
   useEffect(() => {
-    if (!initialVoucherId) return
-    void voucherService.getDetail(initialVoucherId).then((detail) => {
-      setSelectedVoucher(detail.voucher)
-    })
-  }, [initialVoucherId])
+    if (!effectiveVoucherId) {
+      setIsVoucherLoading(false)
+      setVoucherLoadError(null)
+      return
+    }
+
+    let isMounted = true
+    setIsVoucherLoading(true)
+    setVoucherLoadError(null)
+    void voucherService.getDetail(effectiveVoucherId)
+      .then((detail) => {
+        if (!isMounted) return
+        setSelectedVoucher(detail.voucher)
+      })
+      .catch(async () => {
+        try {
+          const manageDetail = await voucherService.getManageDetail(effectiveVoucherId)
+          if (!isMounted) return
+          setSelectedVoucher(manageDetail.voucher)
+        } catch {
+          if (!isMounted) return
+          setSelectedVoucher(null)
+          setVoucherLoadError("Không thể tải chi tiết voucher.")
+        }
+      })
+      .finally(() => {
+        if (isMounted) setIsVoucherLoading(false)
+      })
+
+    return () => {
+      isMounted = false
+    }
+  }, [effectiveVoucherId])
 
   useEffect(() => {
     if (user.role === "partner_owner" && page === "create") {
       router.replace("/partner/vouchers")
     }
-  }, [page, user.role])
+    if (user.role === "partner_owner" && page === "edit") {
+      router.replace(effectiveVoucherId ? `/partner/vouchers/${effectiveVoucherId}` : "/partner/vouchers")
+    }
+  }, [effectiveVoucherId, page, router, user.role])
+
+  useEffect(() => {
+    if (page === "edit" && selectedVoucher && ["rejected", "expired", "locked", "sold_out"].includes(selectedVoucher.status)) {
+      router.replace(`/partner/vouchers/${selectedVoucher.id}`)
+    }
+  }, [page, router, selectedVoucher])
 
   useEffect(() => {
     let isMounted = true
@@ -96,7 +147,7 @@ export function PartnerApp({ user, onLogout, initialPage, initialVoucherId }: Pr
 
   const goEdit = (v: Voucher) => {
     setSelectedVoucher(v)
-    const nextPage = v.status === "rejected" ? "voucher-detail" : "edit"
+    const nextPage = user.role === "partner_owner" || ["rejected", "expired", "locked", "sold_out"].includes(v.status) ? "voucher-detail" : "edit"
     router.push(`/partner/vouchers/${v.id}/${nextPage === "edit" ? "edit" : ""}`.replace(/\/$/, ""))
   }
   const goDetail = (v: Voucher) => {
@@ -128,6 +179,18 @@ export function PartnerApp({ user, onLogout, initialPage, initialVoucherId }: Pr
     )
   }
 
+  const voucherRouteFallback = (
+    <div className="p-6">
+      {isVoucherLoading ? (
+        <LoadingState label="Đang tải chi tiết voucher..." variant="page" />
+      ) : (
+        <div className="rounded-xl border bg-white p-5 text-sm" style={{ borderColor: "#F0EDD8", color: "#C0392B" }}>
+          {voucherLoadError ?? "Không tìm thấy voucher."}
+        </div>
+      )}
+    </div>
+  )
+
   return (
     <PartnerLayout user={user} partner={partner} page={page} onNavigate={() => undefined} onLogout={onLogout}>
       {page === "vouchers" && (
@@ -137,6 +200,7 @@ export function PartnerApp({ user, onLogout, initialPage, initialVoucherId }: Pr
           onEdit={goEdit}
           onDetail={goDetail}
           canCreate={false}
+          readOnly={user.role === "partner_owner"}
           sessionDrafts={sessionDrafts}
           onEditDraft={handleEditDraft}
         />
@@ -149,19 +213,24 @@ export function PartnerApp({ user, onLogout, initialPage, initialVoucherId }: Pr
           onSaveDraft={handleSaveDraft}
         />
       )}
-      {page === "edit" && selectedVoucher && (
-        <EditVoucherPage
-          voucher={selectedVoucher}
-          onBack={() => router.push("/partner/vouchers")}
-          onSave={(v) => {
-            setSelectedVoucher(v)
-            // If this was a session draft, update it
-            setSessionDrafts((prev) => prev.map((d) => d.id === v.id ? v : d))
-          }}
-        />
+      {page === "edit" && user.role !== "partner_owner" && (
+        selectedVoucher ? (
+          <EditVoucherPage
+            voucher={selectedVoucher}
+            lockPriceAndQuantity={locksPriceAndQuantityFor(selectedVoucher)}
+            onBack={() => router.push("/partner/vouchers")}
+            onSave={(v) => {
+              setSelectedVoucher(v)
+              // If this was a session draft, update it
+              setSessionDrafts((prev) => prev.map((d) => d.id === v.id ? v : d))
+            }}
+          />
+        ) : voucherRouteFallback
       )}
-      {page === "voucher-detail" && selectedVoucher && (
-        <PartnerVoucherDetailPage voucher={selectedVoucher} onBack={() => router.push("/partner/vouchers")} onEdit={goEdit} />
+      {page === "voucher-detail" && (
+        selectedVoucher ? (
+          <PartnerVoucherDetailPage voucher={selectedVoucher} onBack={() => router.push("/partner/vouchers")} onEdit={goEdit} readOnly={user.role === "partner_owner"} />
+        ) : voucherRouteFallback
       )}
       {page === "revenue" && <PartnerRevenuePage partnerId={user.partnerId} partnerName={partner?.businessName} />}
       {page === "check-voucher" && <StaffCheckVoucherPage />}

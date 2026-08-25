@@ -107,11 +107,19 @@ type BackendVoucherBranch = {
   }
 }
 
+type BackendVoucherImage = {
+  id: string
+  voucher_product_id: string
+  image_url: string
+  is_primary: boolean
+  sort_order: number
+}
+
 export type VoucherCreateInput = {
   category_id: string
   name: string
   description: string
-  thumbnail_url?: string
+  thumbnail_url?: string | null
   original_price: number
   selling_price: number
   applicable_area?: string
@@ -124,7 +132,7 @@ export type VoucherCreateInput = {
 }
 
 export type VoucherUpdateInput = Partial<VoucherCreateInput> & {
-  thumbnail_url?: string
+  thumbnail_url?: string | null
 }
 
 export type VoucherPublicReview = {
@@ -144,11 +152,22 @@ export type VoucherApplicableBranch = {
   address: string
 }
 
+export type VoucherImage = {
+  id: string
+  voucherProductId: string
+  imageUrl: string
+  isPrimary: boolean
+  sortOrder: number
+}
+
 export type VoucherManageDetailData = {
   voucher: Voucher
   conditions: string[]
   usageInstructions: string[]
   validityDays: number
+  images: VoucherImage[]
+  rawStatus: string
+  workflowStatus?: string
 }
 
 export type VoucherDetailData = {
@@ -161,6 +180,7 @@ export type VoucherDetailData = {
   partnerId: string
   partnerName: string
   categoryName: string
+  images: VoucherImage[]
 }
 
 function toNumber(value: string | number): number {
@@ -255,6 +275,16 @@ function mapBranch(item: BackendVoucherBranch): VoucherApplicableBranch {
     branchId: item.branch_id,
     name: branch.branch_name,
     address: `${branch.address}${district}, ${branch.city}`
+  }
+}
+
+function mapVoucherImage(item: BackendVoucherImage): VoucherImage {
+  return {
+    id: item.id,
+    voucherProductId: item.voucher_product_id,
+    imageUrl: item.image_url,
+    isPrimary: item.is_primary,
+    sortOrder: item.sort_order,
   }
 }
 
@@ -413,10 +443,41 @@ export const voucherService = {
     return extractData(res).map(mapBranch)
   },
 
+  async listVoucherImages(voucherId: string): Promise<VoucherImage[]> {
+    const res = await api.get<ApiEnvelope<BackendVoucherImage[]>>(`/voucher-products/${voucherId}/images`)
+    return extractData(res).map(mapVoucherImage)
+  },
+
+  async createVoucherImage(voucherId: string, input: { imageUrl: string; isPrimary?: boolean; sortOrder?: number }): Promise<VoucherImage> {
+    const res = await api.post<ApiEnvelope<BackendVoucherImage>>(`/voucher-products/${voucherId}/images`, {
+      image_url: input.imageUrl,
+      is_primary: input.isPrimary,
+      sort_order: input.sortOrder,
+    })
+    voucherDetailPromises.delete(voucherId)
+    return mapVoucherImage(extractData(res))
+  },
+
+  async updateVoucherImage(imageId: string, input: { imageUrl?: string; isPrimary?: boolean; sortOrder?: number; voucherId?: string }): Promise<VoucherImage> {
+    const res = await api.patch<ApiEnvelope<BackendVoucherImage>>(`/voucher-product-images/${imageId}`, {
+      image_url: input.imageUrl,
+      is_primary: input.isPrimary,
+      sort_order: input.sortOrder,
+    })
+    if (input.voucherId) voucherDetailPromises.delete(input.voucherId)
+    return mapVoucherImage(extractData(res))
+  },
+
+  async deleteVoucherImage(imageId: string, voucherId?: string): Promise<void> {
+    await api.delete(`/voucher-product-images/${imageId}`)
+    if (voucherId) voucherDetailPromises.delete(voucherId)
+  },
+
   async getManageDetail(id: string): Promise<VoucherManageDetailData> {
-    const [categoryMap, voucherRes] = await Promise.all([
+    const [categoryMap, voucherRes, imageRes] = await Promise.all([
       getCategoryMap(),
-      api.get<ApiEnvelope<BackendVoucherProduct>>(`/voucher-products/${id}`)
+      api.get<ApiEnvelope<BackendVoucherProduct>>(`/voucher-products/${id}`),
+      api.get<ApiEnvelope<BackendVoucherImage[]>>(`/voucher-products/${id}/images`)
     ])
     const product = extractData(voucherRes)
     const category = product.categories ?? categoryFromMap(categoryMap, product.category_id)
@@ -425,6 +486,9 @@ export const voucherService = {
       conditions: parseStringArray(product.terms_and_conditions),
       usageInstructions: parseStringArray(product.usage_instructions),
       validityDays: product.validity_days,
+      images: extractData(imageRes).map(mapVoucherImage),
+      rawStatus: product.status,
+      workflowStatus: product.workflow_status,
     }
   },
 
@@ -443,13 +507,14 @@ export const voucherService = {
     if (existing) return existing
 
     const request = (async () => {
-      const [detailRes, categoryMap] = await Promise.all([
+      const [detailRes, categoryMap, imageRes] = await Promise.all([
         api.get<ApiEnvelope<{
           voucher: BackendVoucherProduct
           branches: BackendVoucherBranch[]
           reviews: BackendReviewList
         }>>(`/voucher-products/${id}/detail`),
         getCategoryMap(),
+        api.get<ApiEnvelope<BackendVoucherImage[]>>(`/voucher-products/${id}/images`),
       ])
       const detail = extractData(detailRes)
       const voucherProduct = detail.voucher
@@ -476,7 +541,8 @@ export const voucherService = {
         applicableArea: voucherProduct.applicable_area,
         partnerId: voucherProduct.partner_id,
         partnerName: voucherProduct.partners?.business_name ?? current.partnerName,
-        categoryName: category.name
+        categoryName: category.name,
+        images: extractData(imageRes).map(mapVoucherImage),
       }
     })()
 
