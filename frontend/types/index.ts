@@ -228,7 +228,7 @@ export interface IssuedVoucher {
   id: string
   code: string
   qrPayload: string
-  status: "active" | "used" | "expired" | "refunded"
+  status: "active" | "used" | "expired" | "refunded" | "cancelled"
   expiredDate?: string
   review?: Review
   complaint?: Complaint
@@ -255,7 +255,7 @@ export interface ReviewTarget {
   review?: Review
 }
 
-export type ComplaintStatus = "open" | "resolved"
+export type ComplaintStatus = "open" | "under_review" | "resolved" | "closed"
 
 export interface Complaint {
   id: string

@@ -5,7 +5,7 @@ export async function listResponsesByReview(reviewId: string): Promise<ReviewRes
   return prisma.reviewResponse.findMany({
     where: { review_id: reviewId },
     orderBy: { created_at: "asc" },
-  }) as Promise<ReviewResponseRow[]>;
+  }) as unknown as Promise<ReviewResponseRow[]>;
 }
 
 export async function createReviewResponse(
@@ -15,5 +15,5 @@ export async function createReviewResponse(
 ): Promise<ReviewResponseRow> {
   return prisma.reviewResponse.create({
     data: { review_id: reviewId, responded_by: respondedBy, content },
-  }) as Promise<ReviewResponseRow>;
+  }) as unknown as Promise<ReviewResponseRow>;
 }

@@ -57,11 +57,11 @@ export async function createSecurityAlert(data: {
       ip_address: data.ip_address ?? null,
       status: "open",
     },
-  }) as Promise<SecurityAlertRow>;
+  }) as unknown as Promise<SecurityAlertRow>;
 }
 
 export async function updateSecurityAlert(id: string, patch: Record<string, unknown>) {
-  return prisma.securityAlert.update({ where: { id }, data: patch }) as Promise<SecurityAlertRow>;
+  return prisma.securityAlert.update({ where: { id }, data: patch }) as unknown as Promise<SecurityAlertRow>;
 }
 
 export async function countByStatus(): Promise<{ status: string; count: number }[]> {

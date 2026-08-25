@@ -256,7 +256,7 @@ describe("Commerce Service", () => {
     });
 
     it("rejects gifting a voucher to yourself", async () => {
-      vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: "u-buyer" } as unknown as { id: string });
+      vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: "u-buyer" } as any);
 
       await expect(commerceService.createOrder("u-buyer", {
         items: [{ voucher_product_id: "vp1", quantity: 1 }],
@@ -310,8 +310,8 @@ describe("Commerce Service", () => {
       expect(result.items[0].order_items[0].invalidated_voucher_count).toBe(0);
       expect(result.items[0].order_items[0].has_review).toBe(true);
       expect(result.items[0].has_complaint).toBe(true);
-      expect(result.countsByStatus.all).toBe(1);
-      expect(result.countsByStatus.payment_failed).toBe(1);
+      expect((result.countsByStatus as any).all).toBe(1);
+      expect((result.countsByStatus as any).payment_failed).toBe(1);
       expect(prisma.order.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: { AND: [{ user_id: "u-buyer" }] } })
       );
@@ -355,7 +355,7 @@ describe("Commerce Service", () => {
       const result = await commerceService.listOrders(BUYER);
 
       expect(result.items).toHaveLength(0);
-      expect(result.countsByStatus.all).toBe(0);
+      expect((result.countsByStatus as any).all).toBe(0);
       expect(prisma.order.findMany).toHaveBeenCalledWith(expect.objectContaining({
         where: { AND: [{ user_id: "u-buyer" }] },
       }));
@@ -373,7 +373,7 @@ describe("Commerce Service", () => {
 
       const result = await commerceService.listOrders(ADMIN);
       expect(result.items).toHaveLength(2);
-      expect(result.countsByStatus.cancelled).toBe(2);
+      expect((result.countsByStatus as any).cancelled).toBe(2);
     });
 
     it("scopes partner staff listings to their partner", async () => {
@@ -409,9 +409,9 @@ describe("Commerce Service", () => {
       const result = await commerceService.listOrders(BUYER, { status: "cancelled" });
 
       expect(result.items).toHaveLength(1);
-      expect(result.countsByStatus.all).toBe(2);
-      expect(result.countsByStatus.payment_failed).toBe(1);
-      expect(result.countsByStatus.cancelled).toBe(1);
+      expect((result.countsByStatus as any).all).toBe(2);
+      expect((result.countsByStatus as any).payment_failed).toBe(1);
+      expect((result.countsByStatus as any).cancelled).toBe(1);
       expect(prisma.order.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: expect.objectContaining({ status: { in: ["cancelled"] } }) })
       );

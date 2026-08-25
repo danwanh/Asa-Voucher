@@ -54,14 +54,14 @@ export async function createReview(userId: string, voucherProductId: string, inp
       comment: input.comment ?? null,
       media_urls: input.media_urls ?? undefined,
     },
-  }) as Promise<ReviewRow>;
+  }) as unknown as Promise<ReviewRow>;
 }
 
 export async function updateReview(id: string, input: UpdateReviewInput) {
   return prisma.review.update({
     where: { id },
     data: { ...input, updated_at: new Date() },
-  }) as Promise<ReviewRow>;
+  }) as unknown as Promise<ReviewRow>;
 }
 
 export async function setReviewPublished(id: string, isPublished: boolean) {
