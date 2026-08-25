@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { ChevronLeft, ChevronRight, X } from "lucide-react"
 import { C } from "@/utils/constants"
 import { cmsContentService } from "@/services/cmsContentService"
@@ -36,16 +36,8 @@ export function PopupModal({ isHome }: PopupModalProps) {
   const [popups, setPopups] = useState<CmsContent[]>([])
   const [activeIndex, setActiveIndex] = useState(0)
   const [visible, setVisible] = useState(false)
-  const requestStarted = useRef(false)
-
   useEffect(() => {
-    if (!isHome) {
-      requestStarted.current = false
-      setVisible(false)
-      return
-    }
-    if (requestStarted.current || wasClosedWithin24Hours()) return
-    requestStarted.current = true
+    if (!isHome || wasClosedWithin24Hours()) return
 
     let cancelled = false
     cmsContentService.listPublic("popup")
@@ -57,7 +49,6 @@ export function PopupModal({ isHome }: PopupModalProps) {
         setVisible(true)
       })
       .catch((error) => {
-        requestStarted.current = false
         console.error("Không thể tải popup trang chủ", error)
       })
     return () => {
