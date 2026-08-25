@@ -744,7 +744,7 @@ export function CustomerApp({
         />
       )}
     </CustomerLayout>
-    <PopupModal />
+    <PopupModal isHome={page === "home"} />
     </>
   )
 }

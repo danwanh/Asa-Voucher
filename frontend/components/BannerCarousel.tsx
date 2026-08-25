@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react"
 import { C } from "@/utils/constants"
 import { cmsContentService } from "@/services/cmsContentService"
 import type { CmsContent } from "@/types"
+import { CmsRichTextContent } from "@/components/CmsRichText"
 
 const AUTOPLAY_MS = 5000
 
@@ -74,9 +75,7 @@ export function BannerCarousel() {
             {banner.title}
           </h2>
           {banner.content && (
-            <p className="mt-2 text-sm md:text-base text-white/85 line-clamp-2" style={{ textShadow: "0 1px 8px rgba(0,0,0,0.35)" }}>
-              {banner.content}
-            </p>
+            <CmsRichTextContent html={banner.content} className="mt-2 text-sm md:text-base text-white/85 line-clamp-2" />
           )}
         </div>
       </div>

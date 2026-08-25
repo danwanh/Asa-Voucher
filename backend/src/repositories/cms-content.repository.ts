@@ -12,7 +12,14 @@ export async function listCmsContents(filter: {
 
   const skip = (filter.page - 1) * filter.limit;
   const [rows, total] = await Promise.all([
-    prisma.cmsContent.findMany({ where, orderBy: [{ sort_order: "asc" }, { created_at: "desc" }], skip, take: filter.limit }),
+    prisma.cmsContent.findMany({
+      where,
+      orderBy: filter.content_type === "banner" || filter.content_type === "popup"
+        ? [{ sort_order: "asc" }, { created_at: "desc" }]
+        : [{ created_at: "desc" }],
+      skip,
+      take: filter.limit,
+    }),
     prisma.cmsContent.count({ where }),
   ]);
   return { rows, total };
@@ -25,7 +32,9 @@ export async function findCmsContentById(id: string) {
 export async function listActiveCmsContentsByType(contentType: string) {
   return prisma.cmsContent.findMany({
     where: { content_type: contentType, status: "active" },
-    orderBy: [{ sort_order: "asc" }, { created_at: "desc" }],
+    orderBy: contentType === "banner" || contentType === "popup"
+      ? [{ sort_order: "asc" }, { created_at: "desc" }]
+      : [{ created_at: "desc" }],
   });
 }
 

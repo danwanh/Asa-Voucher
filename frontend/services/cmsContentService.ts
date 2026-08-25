@@ -38,9 +38,18 @@ export const cmsContentService = {
     content?: string
     image_url?: string
     status?: string
-    sort_order?: number
   }) {
     const res = await api.post<ApiData<CmsContent>>("/cms-contents", input)
+    return data(res)
+  },
+
+  async moveBanner(id: string, direction: "up" | "down") {
+    const res = await api.patch<ApiData<{ id: string; direction: string }>>(`/cms-contents/${id}/move`, { direction })
+    return data(res)
+  },
+
+  async movePopup(id: string, direction: "up" | "down") {
+    const res = await api.patch<ApiData<{ id: string; direction: string }>>(`/cms-contents/${id}/move`, { direction })
     return data(res)
   },
 

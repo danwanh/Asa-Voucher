@@ -8,6 +8,7 @@ import { cmsContentService } from "@/services/cmsContentService"
 import { AppFooter } from "@/components/AppFooter"
 import { GuestSiteHeader } from "@/components/GuestSiteHeader"
 import type { CmsContent } from "@/types"
+import { CmsRichTextContent } from "@/components/CmsRichText"
 
 type LegalKind = "terms" | "policy" | "privacy"
 
@@ -91,13 +92,6 @@ const iconMap = {
   privacy: ShieldCheck,
 }
 
-function splitParagraphs(content: string): string[] {
-  return content
-    .split(/\r?\n+/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-}
-
 function matchPolicy(policies: CmsContent[], kind: LegalKind, titleFilter: string | null): CmsContent | undefined {
   if (kind === "terms") {
     return policies.find((p) => p.title.toLowerCase().includes("điều khoản"))
@@ -145,11 +139,7 @@ export function LegalInfoPage({ kind }: LegalInfoPageProps) {
   const active = policy ?? null
   const title = active?.title ?? fallback.title
   const eyebrow = active ? "Chính sách" : fallback.eyebrow
-  const paragraphs = active?.content ? splitParagraphs(active.content) : []
-  const subtitle = active ? (paragraphs[0] ?? fallback.subtitle) : fallback.subtitle
-  const sections: LegalSection[] = active
-    ? [{ title: active.title, body: paragraphs.slice(1).length > 0 ? paragraphs.slice(1) : paragraphs }]
-    : fallback.sections
+  const sections: LegalSection[] = active ? [{ title: active.title, body: [] }] : fallback.sections
   const updatedAt = active?.updated_at ? fmtDate(active.updated_at) : null
 
   const Icon = iconMap[kind]
@@ -200,24 +190,21 @@ export function LegalInfoPage({ kind }: LegalInfoPageProps) {
         </section>
       ) : (
         <section className="flex-1 mx-auto max-w-5xl px-4 py-12 w-full">
-          <div className="mb-8 flex items-start gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl" style={{ backgroundColor: `${C.peach}18`, color: C.peach }}>
-              <Icon className="h-7 w-7" />
-            </div>
-            <div>
-              <div className="text-sm font-black uppercase tracking-wide" style={{ color: C.peach }}>{eyebrow}</div>
-              <h1 className="mt-1 text-3xl font-black md:text-4xl" style={{ color: C.indigo }}>{title}</h1>
-              <p className="mt-3 max-w-3xl text-sm leading-6" style={{ color: "#6B7280" }}>{subtitle}</p>
-              {updatedAt && <p className="mt-3 text-xs font-semibold" style={{ color: "#8A8DA8" }}>Cập nhật lần cuối: {updatedAt}</p>}
-            </div>
-          </div>
-
           <div className="space-y-4">
             {sections.map((section) => (
-              <section key={section.title} className="rounded-2xl border border-black/5 bg-white p-6 shadow-sm">
-                <h2 className="text-lg font-black" style={{ color: C.indigo }}>{section.title}</h2>
-                <div className="mt-3 space-y-2">
-                  {section.body.map((paragraph, i) => (
+              <section key={section.title} className="rounded-2xl border border-black/5 bg-white p-6 shadow-sm md:p-8">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl" style={{ backgroundColor: `${C.peach}18`, color: C.peach }}>
+                    <Icon className="h-7 w-7" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-black uppercase tracking-wide" style={{ color: C.peach }}>{eyebrow}</div>
+                    <h1 className="mt-1 text-3xl font-black md:text-4xl" style={{ color: C.indigo }}>{title}</h1>
+                    {updatedAt && <p className="mt-3 text-xs font-semibold" style={{ color: "#8A8DA8" }}>Cập nhật lần cuối: {updatedAt}</p>}
+                  </div>
+                </div>
+                <div className="mt-6 border-t border-black/5 pt-6">
+                  {active && active.content ? <CmsRichTextContent html={active.content} className="text-sm leading-6" /> : section.body.map((paragraph, i) => (
                     <p key={i} className="text-sm leading-6" style={{ color: "#4B5563" }}>{paragraph}</p>
                   ))}
                 </div>

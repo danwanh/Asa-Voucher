@@ -231,7 +231,7 @@ export function GuestApp({ onLogin, onRegister, onCheckout, cartCount, cartCount
         </div>
       )}
     </GuestLayout>
-    <PopupModal />
+    <PopupModal isHome={page === "home"} />
     </>
   )
 }

@@ -5,6 +5,7 @@ import { ChevronRight } from "lucide-react"
 import { C, fmtDate } from "@/utils/constants"
 import { cmsContentService } from "@/services/cmsContentService"
 import type { CmsContent } from "@/types"
+import { cmsContentToPlainText } from "@/components/CmsRichText"
 
 interface Props {
   onOpenArticle: (id: string) => void
@@ -59,7 +60,7 @@ export function NewsSection({ onOpenArticle, background = C.muted }: Props) {
                 <div className="text-xs font-semibold mb-1" style={{ color: C.peach }}>{fmtDate(article.created_at)}</div>
                 <h3 className="font-bold text-sm line-clamp-2 leading-snug" style={{ color: C.indigo }}>{article.title}</h3>
                 {article.content && (
-                  <p className="text-xs mt-1.5 line-clamp-2 leading-relaxed" style={{ color: "#6B7280" }}>{article.content}</p>
+                  <p className="text-xs mt-1.5 line-clamp-2 leading-relaxed" style={{ color: "#6B7280" }}>{cmsContentToPlainText(article.content)}</p>
                 )}
                 <div className="mt-3 flex items-center gap-1 text-xs font-semibold" style={{ color: C.teal }}>
                   Xem chi tiết <ChevronRight className="w-3.5 h-3.5" />

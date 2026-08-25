@@ -39,6 +39,13 @@ cmsContentRoutes.post(
 );
 
 cmsContentRoutes.patch(
+    "/cms-contents/:id/move",
+    requireAuth,
+    requireRole("admin_content"),
+    asyncHandler(cmsContentController.moveCmsBanner)
+);
+
+cmsContentRoutes.patch(
     "/cms-contents/:id",
     requireAuth,
     requireRole("admin_content"),

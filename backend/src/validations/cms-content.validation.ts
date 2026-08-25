@@ -9,7 +9,6 @@ export const createCmsContentSchema = z.object({
   content: z.string().nullable().optional(),
   image_url: z.string().url("Định dạng URL không hợp lệ").nullable().optional(),
   status: statusEnum.default("active"),
-  sort_order: z.number().int().min(0).default(0),
 });
 
 export const updateCmsContentSchema = createCmsContentSchema.partial().refine(
@@ -21,13 +20,18 @@ export const listCmsContentQuerySchema = z.object({
   content_type: contentTypeEnum.optional(),
   status: statusEnum.optional(),
   page: z.coerce.number().int().positive().default(1),
-  limit: z.coerce.number().int().positive().max(100).default(20),
+  limit: z.coerce.number().int().positive().max(1000).default(20),
 });
 
 export const publicCmsContentQuerySchema = z.object({
   type: contentTypeEnum,
 });
 
+export const moveCmsBannerSchema = z.object({
+  direction: z.enum(["up", "down"]),
+});
+
 export type CreateCmsContentInput = z.infer<typeof createCmsContentSchema>;
 export type UpdateCmsContentInput = z.infer<typeof updateCmsContentSchema>;
 export type ListCmsContentQuery = z.infer<typeof listCmsContentQuerySchema>;
+export type MoveCmsBannerInput = z.infer<typeof moveCmsBannerSchema>;
