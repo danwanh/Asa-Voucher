@@ -18,6 +18,9 @@ const { mockPrisma, mockTx } = vi.hoisted(() => ({
       create: vi.fn(),
       update: vi.fn(),
     },
+    voucherProductBranch: {
+      count: vi.fn(),
+    },
     $transaction: vi.fn(),
   },
   mockTx: {} as Record<string, unknown>,
@@ -39,6 +42,7 @@ const BUYER: CurrentUser = { id: "u-buyer", role: "buyer" };
 describe("Partner Service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrisma.voucherProductBranch.count.mockResolvedValue(0);
   });
 
   describe("listPartners", () => {
@@ -258,18 +262,52 @@ describe("Partner Service", () => {
     });
   });
 
+  describe("updateBranch", () => {
+    it("rejects deactivation when branch is attached to active vouchers", async () => {
+      vi.mocked(prisma.partnerBranch.findUnique).mockResolvedValue({
+        id: "b1", partner_id: "p1", is_active: true, partners: { representative_user_id: "u-owner" },
+      } as any);
+      vi.mocked(prisma.voucherProductBranch.count).mockResolvedValue(1);
+
+      await expect(partnerService.updateBranch(PARTNER_OWNER, "b1", { is_active: false })).rejects.toMatchObject({
+        statusCode: 409,
+        code: "BRANCH_HAS_ACTIVE_VOUCHERS",
+      });
+      expect(prisma.partnerBranch.update).not.toHaveBeenCalled();
+    });
+  });
+
   describe("deleteBranch", () => {
     it("owner can deactivate own branch", async () => {
       vi.mocked(prisma.partnerBranch.findUnique).mockResolvedValue({
-        id: "b1", partner_id: "p1", partners: { representative_user_id: "u-owner" },
+        id: "b1", partner_id: "p1", is_active: true, partners: { representative_user_id: "u-owner" },
       } as any);
       vi.mocked(prisma.partnerBranch.update).mockResolvedValue({} as any);
 
       await partnerService.deleteBranch(PARTNER_OWNER, "b1");
+      expect(prisma.voucherProductBranch.count).toHaveBeenCalledWith({
+        where: {
+          branch_id: "b1",
+          voucher_products: { status: "active" },
+        },
+      });
       expect(prisma.partnerBranch.update).toHaveBeenCalledWith({
         where: { id: "b1" },
         data: { is_active: false },
       });
+    });
+
+    it("rejects deactivation when branch is attached to active vouchers", async () => {
+      vi.mocked(prisma.partnerBranch.findUnique).mockResolvedValue({
+        id: "b1", partner_id: "p1", is_active: true, partners: { representative_user_id: "u-owner" },
+      } as any);
+      vi.mocked(prisma.voucherProductBranch.count).mockResolvedValue(1);
+
+      await expect(partnerService.deleteBranch(PARTNER_OWNER, "b1")).rejects.toMatchObject({
+        statusCode: 409,
+        code: "BRANCH_HAS_ACTIVE_VOUCHERS",
+      });
+      expect(prisma.partnerBranch.update).not.toHaveBeenCalled();
     });
   });
 });

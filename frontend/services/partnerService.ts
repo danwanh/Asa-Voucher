@@ -298,7 +298,7 @@ export const partnerService = {
 
   async updateBranch(
     branchId: string,
-    input: BranchInput,
+    input: Partial<BranchInput>,
   ): Promise<PartnerBranch> {
     const res = await api.patch<ApiEnvelope<BackendBranch>>(
       `/branches/${branchId}`,

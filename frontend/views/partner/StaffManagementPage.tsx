@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { CheckCircle, Eye, Loader2, Pencil, RefreshCw, Search, Users, X } from "lucide-react"
 import { toast } from "sonner"
 import { C } from "@/utils/constants"
@@ -48,6 +48,7 @@ export function StaffManagementPage() {
   const [isEditing, setIsEditing] = useState(false)
   const [form, setForm] = useState<StaffForm | null>(null)
   const [confirmSave, setConfirmSave] = useState(false)
+  const detailRequestId = useRef(0)
 
   const loadData = useCallback(async () => {
     if (!user?.partnerId) {
@@ -86,15 +87,26 @@ export function StaffManagementPage() {
   )
 
   const loadStaffDetail = async (item: PartnerStaffMember) => {
+    const requestId = detailRequestId.current + 1
+    detailRequestId.current = requestId
     setSelectedStaff(item)
     setForm(getInitialForm(item))
     try {
       const detail = await partnerService.getPartnerStaff(item.id)
+      if (detailRequestId.current !== requestId) return
       setSelectedStaff(detail)
       setForm(getInitialForm(detail))
     } catch (detailError) {
+      if (detailRequestId.current !== requestId) return
       toast.error(getErrorMessage(detailError, "Không thể tải chi tiết nhân viên"))
     }
+  }
+
+  const closeStaffModal = () => {
+    detailRequestId.current += 1
+    setSelectedStaff(null)
+    setIsEditing(false)
+    setForm(null)
   }
 
   const openDetail = async (item: PartnerStaffMember) => {
@@ -255,7 +267,7 @@ export function StaffManagementPage() {
           <div className="bg-white rounded-3xl p-6 w-full max-w-xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-lg font-black" style={{ color: C.indigo }}>{isEditing ? "Cập nhật nhân viên" : "Chi tiết nhân viên"}</h2>
-              <button onClick={() => { setSelectedStaff(null); setIsEditing(false); setForm(null) }}>
+              <button onClick={closeStaffModal}>
                 <X className="w-5 h-5" style={{ color: "#8A8DA8" }} />
               </button>
             </div>
@@ -269,9 +281,9 @@ export function StaffManagementPage() {
                   { label: "Vai trò nghiệp vụ", value: ROLE_LABELS[selectedStaff.role] },
                   { label: "Chi nhánh phụ trách", value: selectedStaff.branchName || "Chưa phân công" },
                 ].map((item) => (
-                  <div key={item.label} className="rounded-xl border bg-white px-4 py-3" style={{ borderColor: "#E2DFC8" }}>
+                  <div key={item.label} className="min-w-0 rounded-xl border bg-white px-4 py-3" style={{ borderColor: "#E2DFC8" }}>
                     <div className="text-xs font-bold mb-1" style={{ color: "#8A8DA8" }}>{item.label}</div>
-                    <div className="text-sm font-bold" style={{ color: C.indigo }}>{item.value}</div>
+                    <div className="text-sm font-bold" style={{ color: C.indigo, overflowWrap: "anywhere" }}>{item.value}</div>
                   </div>
                 ))}
                 <div className="rounded-xl border bg-white px-4 py-3" style={{ borderColor: "#E2DFC8" }}>
@@ -353,7 +365,7 @@ export function StaffManagementPage() {
 
             <div className="mt-6 flex gap-3">
               <button
-                onClick={() => { setSelectedStaff(null); setIsEditing(false); setForm(null) }}
+                onClick={closeStaffModal}
                 className="flex-1 py-2.5 rounded-xl border-2 font-bold"
                 style={{ borderColor: "#E2DFC8", color: C.indigo }}
               >

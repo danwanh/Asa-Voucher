@@ -67,8 +67,8 @@ function SidebarContent({ user, partner, page, onNavigate, onLogout, onClose }: 
         </div>
         <div className="flex items-center gap-3 p-3 rounded-2xl" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}>
            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "rgba(255,255,255,0.1)" }}><AppIcon name="gift" className="w-5 h-5 text-white" /></div>
-          <div className="min-w-0">
-            <div className="text-sm font-bold text-white truncate">{partnerName}</div>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-bold leading-tight text-white" style={{ overflowWrap: "anywhere" }}>{partnerName}</div>
             <div className="text-xs flex items-center gap-1" style={{ color: statusColor }}>
               <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: statusColor }} />
               {approvalText}
