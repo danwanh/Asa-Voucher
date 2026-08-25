@@ -21,6 +21,7 @@ function mapUser(u: BackendUser): AppUser {
     id: u.id,
     email: u.email,
     name: (u.full_name ?? u.name ?? "") as string,
+    avatarUrl: typeof u.avatar_url === "string" ? u.avatar_url : undefined,
     role: normalizeRole(u.role),
     partnerId: u.partnerId ?? undefined,
     branchId: u.branchId ?? undefined

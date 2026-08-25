@@ -75,6 +75,7 @@ export type UpdateUserData = {
 export interface AppUser {
   id: string
   name: string
+  avatarUrl?: string
   email: string
   role: Role
   partnerId?: string

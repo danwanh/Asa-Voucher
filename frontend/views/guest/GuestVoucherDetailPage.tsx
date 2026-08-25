@@ -5,19 +5,21 @@ import { AppIcon } from "@/components/AppIcon"
 import type { Voucher } from "@/types"
 import { voucherService, type VoucherApplicableBranch, type VoucherDetailData, type VoucherPublicReview } from "@/services/voucherService"
 import { LoadingState } from "@/components/LoadingState"
+import { ImageLightbox } from "@/components/ImageLightbox"
 import { isVoucherAvailable } from "@/hooks/useCart"
 
 interface Props {
+  viewer?: "guest" | "customer"
   voucher: Voucher
   detail: VoucherDetailData
   onBack: () => void
-  onLogin: () => void
+  onLogin?: () => void
   onDetail: (v: Voucher) => void
   onAddToCart: (v: Voucher) => void
   onBuyNow: (v: Voucher) => void
 }
 
-export function GuestVoucherDetailPage({ voucher: v, detail, onBack, onLogin, onDetail, onAddToCart, onBuyNow }: Props) {
+export function GuestVoucherDetailPage({ viewer = "guest", voucher: v, detail, onBack, onLogin, onDetail, onAddToCart, onBuyNow }: Props) {
   const [liked, setLiked] = useState(false)
   const [detailVoucher, setDetailVoucher] = useState<Voucher>(v)
   const [reviews, setReviews] = useState<VoucherPublicReview[]>([])
@@ -32,6 +34,7 @@ export function GuestVoucherDetailPage({ voucher: v, detail, onBack, onLogin, on
   })
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [lightbox, setLightbox] = useState<{ images: string[]; index: number } | null>(null)
 
   useEffect(() => {
     setDetailVoucher(detail.voucher)
@@ -178,7 +181,7 @@ export function GuestVoucherDetailPage({ voucher: v, detail, onBack, onLogin, on
               </button>
             </div>
           </div> : <div className="mb-2 w-full rounded-2xl py-4 text-center text-sm font-bold" style={{ backgroundColor: C.muted, color: "#8A8DA8" }}>Voucher không khả dụng</div>}
-          <p className="text-xs text-center" style={{ color: "#6B7280" }}>Đăng nhập để xem đơn hàng &amp; quản lý voucher</p>
+          {viewer === "guest" && <p className="text-xs text-center" style={{ color: "#6B7280" }}>Đăng nhập để xem đơn hàng &amp; quản lý voucher</p>}
         </div>
       </div>
 
@@ -242,27 +245,42 @@ export function GuestVoucherDetailPage({ voucher: v, detail, onBack, onLogin, on
         {reviews.length === 0 ? (
           <div className="text-sm" style={{ color: "#8A8DA8" }}>Chưa có đánh giá</div>
         ) : (
-          <div className="grid md:grid-cols-3 gap-4">
+          <div className="divide-y" style={{ borderColor: "#F0EDD8" }}>
             {reviews.map((r) => (
-              <div key={r.id} className="p-4 rounded-xl border border-black/5" style={{ backgroundColor: C.eggshell }}>
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-bold" style={{ color: C.indigo }}>
-                  {r.name[0]}
+              <div key={r.id} className="flex gap-3 py-4 first:pt-0 last:pb-0">
+                <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-full" style={{ backgroundColor: `${C.peach}20` }}>
+                  {r.avatarUrl ? (
+                    <img src={r.avatarUrl} alt={`Avatar của ${r.name}`} className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-sm font-black" style={{ color: C.peach }}>{r.name.charAt(0)}</div>
+                  )}
                 </div>
-                <div>
-                  <div className="text-xs font-bold" style={{ color: C.indigo }}>{r.name}</div>
-                  <div className="flex gap-0.5">
-                    {[...Array(r.rating)].map((_, j) => <Star key={j} className="w-2.5 h-2.5 fill-current" style={{ color: C.apricot }} />)}
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-sm font-bold" style={{ color: C.indigo }}>{r.name}</div>
+                    <div className="text-xs" style={{ color: "#9CA3AF" }}>{fmtDate(r.date)}</div>
                   </div>
+                  <div className="mt-1 flex gap-0.5">
+                    {Array.from({ length: 5 }, (_, j) => <Star key={j} className="h-3 w-3 fill-current" style={{ color: j < r.rating ? C.apricot : "#E5E7EB" }} />)}
+                  </div>
+                  <p className="mt-2 text-sm leading-relaxed" style={{ color: "#4B5563" }}>{r.text}</p>
+                  {r.mediaUrls.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {r.mediaUrls.map((url, index) => (
+                        <button type="button" key={url} onClick={() => setLightbox({ images: r.mediaUrls, index })} className="h-16 w-16 overflow-hidden rounded-xl border border-black/5">
+                          <img src={url} alt={`Ảnh đánh giá ${index + 1}`} className="h-full w-full object-cover" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </div>
-              <p className="text-xs leading-relaxed" style={{ color: "#4B5563" }}>{r.text}</p>
-                <div className="text-xs mt-2" style={{ color: "#9CA3AF" }}>{fmtDate(r.date)}</div>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      <ImageLightbox images={lightbox?.images ?? []} initialIndex={lightbox?.index ?? 0} open={Boolean(lightbox)} onClose={() => setLightbox(null)} />
 
       {/* Related */}
       {related.length > 0 && (

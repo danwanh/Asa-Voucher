@@ -17,9 +17,9 @@ import { isVoucherAvailable } from "@/hooks/useCart"
 
 const pageLoading = () => <LoadingState label="Đang tải trang..." variant="page" />
 const CategoryGridPage = dynamic(() => import("@/components/CategoryGridPage").then((module) => module.CategoryGridPage), { loading: pageLoading })
-const HomePage = dynamic(() => import("@/pages/customer/HomePage").then((module) => module.HomePage), { loading: pageLoading })
+const HomePage = dynamic(() => import("@/pages/guest/GuestHomePage").then((module) => module.GuestHomePage), { loading: pageLoading })
 const VoucherListPage = dynamic(() => import("@/pages/customer/VoucherListPage").then((module) => module.VoucherListPage), { loading: pageLoading })
-const VoucherDetailPage = dynamic(() => import("@/pages/customer/VoucherDetailPage").then((module) => module.VoucherDetailPage), { loading: pageLoading })
+const VoucherDetailPage = dynamic(() => import("@/pages/guest/GuestVoucherDetailPage").then((module) => module.GuestVoucherDetailPage), { loading: pageLoading })
 const CartPage = dynamic(() => import("@/pages/customer/CartPage").then((module) => module.CartPage), { loading: pageLoading })
 const CreateOrderPage = dynamic(() => import("@/pages/customer/CreateOrderPage").then((module) => module.CreateOrderPage), { loading: pageLoading })
 const PaymentPage = dynamic(() => import("@/pages/customer/PaymentPage").then((module) => module.PaymentPage), { loading: pageLoading })
@@ -560,7 +560,7 @@ export function CustomerApp({
       onNavigate={navigate}
       onLogout={onLogout}
     >
-      {page === "home" && <HomePage onAddToCart={handleAddToCart} onBuyNow={handleBuyNow} onDetail={goDetail} onNavigate={navigate} onOpenArticle={(id) => router.push(`/news/${id}`)} />}
+      {page === "home" && <HomePage viewer="customer" onAddToCart={handleAddToCart} onBuyNow={handleBuyNow} onVoucherDetail={goDetail} onNavigate={(nextPage) => navigate(nextPage as CustomerPage)} onOpenArticle={(id) => router.push(`/news/${id}`)} />}
       {page === "vouchers" && (
         <VoucherListPage
           onAddToCart={handleAddToCart}
@@ -573,11 +573,13 @@ export function CustomerApp({
       )}
       {page === "detail" && selectedVoucher && (
         <VoucherDetailPage
+          viewer="customer"
           voucher={selectedVoucher}
           detail={selectedVoucherDetail!}
-          onBuy={() => handleAddToCart(selectedVoucher)}
+          onDetail={goDetail}
+          onAddToCart={() => handleAddToCart(selectedVoucher)}
           onBuyNow={() => handleBuyNow(selectedVoucher)}
-           onBack={() => router.push("/vouchers")}
+          onBack={() => router.push("/vouchers")}
         />
       )}
       {page === "cart" && (

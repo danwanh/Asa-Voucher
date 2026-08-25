@@ -450,8 +450,9 @@ export async function getPublicVoucherDetail(id: string) {
           id: true,
           rating: true,
           comment: true,
+          media_urls: true,
           created_at: true,
-          users: { select: { full_name: true } }
+          users: { select: { full_name: true, avatar_url: true } }
         }
       }),
       prisma.review.aggregate({

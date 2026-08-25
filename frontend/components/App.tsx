@@ -194,7 +194,6 @@ export default function App({ initialPage, initialOrderId, initialVoucherId, ini
       onLogin={handleRequestLogin}
       onRegister={handleRequestRegister}
       onCheckout={handleCheckoutAsGuest}
-      cartAdd={add}
        cartCount={cartCount}
        cartCountLoading={cartCountLoading}
       cart={cart}

@@ -326,6 +326,7 @@ export async function refresh(refreshToken: string | undefined) {
           id: true,
           email: true,
           full_name: true,
+          avatar_url: true,
           role: true,
           is_active: true,
           is_verified: true,

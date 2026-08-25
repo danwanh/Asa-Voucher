@@ -85,6 +85,7 @@ type BackendReview = {
   } | null
   rating: number
   comment: string | null
+  media_urls?: unknown
   created_at: string
 }
 
@@ -132,6 +133,8 @@ export type VoucherPublicReview = {
   rating: number
   text: string
   date: string
+  avatarUrl?: string
+  mediaUrls: string[]
 }
 
 export type VoucherApplicableBranch = {
@@ -236,7 +239,11 @@ function mapReview(review: BackendReview): VoucherPublicReview {
     name: maskedName,
     rating: review.rating,
     text: review.comment?.trim() || "",
-    date: review.created_at
+    date: review.created_at,
+    avatarUrl: review.users?.avatar_url ?? undefined,
+    mediaUrls: Array.isArray(review.media_urls)
+      ? review.media_urls.filter((url): url is string => typeof url === "string" && url.length > 0)
+      : []
   }
 }
 
@@ -450,7 +457,7 @@ export const voucherService = {
 
       const current = mapVoucherProduct(voucherProduct, category.slug)
       const reviewList = detail.reviews
-      const reviews = reviewList.items.map(mapReview).filter((item) => item.text)
+      const reviews = reviewList.items.map(mapReview).filter((item) => item.text || item.mediaUrls.length > 0)
       const branches = detail.branches.map(mapBranch)
 
       const conditions = parseStringArray(voucherProduct.terms_and_conditions)

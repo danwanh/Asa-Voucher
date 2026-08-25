@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createUserByAdmin, deleteUser, getPartnerStaff, getUser, listPartnerStaff, listUsers, lookupRecipient, updatePartnerStaff, updateUser } from "../controllers/user.controller.js";
+import { createAvatarMediaSignature, createUserByAdmin, deleteUser, getPartnerStaff, getUser, listPartnerStaff, listUsers, lookupRecipient, updatePartnerStaff, updateUser } from "../controllers/user.controller.js";
 import { requireAuth } from "../middlewares/auth.js";
 import { requireRole } from "../middlewares/require-role.js";
 import { validateBody, validateParams, validateQuery } from "../middlewares/validate.js";
@@ -13,6 +13,7 @@ export const userRoutes = Router();
 userRoutes.get("/users/partner-staff", requireAuth, requireRole("partner_owner"), validateQuery(partnerStaffQuerySchema), asyncHandler(listPartnerStaff));
 userRoutes.get("/users/partner-staff/:id", requireAuth, requireRole("partner_owner"), validateParams(idParamSchema), asyncHandler(getPartnerStaff));
 userRoutes.get("/users/recipient-lookup", requireAuth, requireRole("buyer"), validateQuery(recipientLookupSchema), asyncHandler(lookupRecipient));
+userRoutes.post("/users/avatar/signature", requireAuth, asyncHandler(createAvatarMediaSignature));
 userRoutes.patch("/users/partner-staff/:id", requireAuth, requireRole("partner_owner"), validateParams(idParamSchema), validateBody(partnerStaffUpdateSchema), asyncHandler(updatePartnerStaff));
 
 userRoutes.get("/users", requireAuth, requireRole("admin_operations", "admin_security"), validateQuery(userQuerySchema), asyncHandler(listUsers));

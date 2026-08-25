@@ -33,7 +33,6 @@ interface Props {
   onRegister: () => void
   // Called when guest clicks "Tiến hành đặt hàng" — triggers login then redirects to create-order
   onCheckout: (items: CartItem[], kind?: "cart" | "direct") => void
-  cartAdd: (v: Voucher) => Promise<CartItem | undefined>
   cartCount: number | null
   cartCountLoading?: boolean
   cart: CartItem[]
@@ -53,7 +52,6 @@ interface FullProps {
   onLogin: () => void
   onRegister: () => void
   onCheckout: (items: CartItem[], kind?: "cart" | "direct") => void
-  cartAdd: (v: Voucher) => Promise<CartItem | undefined>
   cartCount: number | null
   cartCountLoading?: boolean
   cart: CartItem[]
@@ -82,7 +80,7 @@ const DEFAULT_VOUCHER_FILTERS: VoucherListFilters = {
   effectiveStatus: "all"
 }
 
-export function GuestApp({ onLogin, onRegister, onCheckout, cartAdd, cartCount, cartCountLoading = false, cart, total, cartRemove, cartUpdate, initialPage, initialVoucherId }: FullProps) {
+export function GuestApp({ onLogin, onRegister, onCheckout, cartCount, cartCountLoading = false, cart, total, cartRemove, cartUpdate, initialPage, initialVoucherId }: FullProps) {
   const router = useRouter()
   const pathname = usePathname()
   const page = guestPageFromPath(pathname, initialPage ?? "home")
@@ -125,8 +123,7 @@ export function GuestApp({ onLogin, onRegister, onCheckout, cartAdd, cartCount, 
   }
 
   const handleAddToCart = async (v: Voucher) => {
-    const item = await cartAdd(v)
-    if (item) toast.success(`Đã thêm "${v.title.slice(0, 30)}..." vào giỏ hàng`)
+    onLogin()
   }
 
   const handleBuyNow = (v: Voucher) => {

@@ -14,9 +14,10 @@ const LazyNewsSection = dynamic(() => import("@/components/NewsSection").then((m
 })
 
 interface Props {
+  viewer?: "guest" | "customer"
   onNavigate: (p: string) => void
   onVoucherDetail: (v: Voucher) => void
-  onLogin: () => void
+  onLogin?: () => void
   onAddToCart: (v: Voucher) => void
   onBuyNow: (v: Voucher) => void
   onOpenArticle: (id: string) => void
@@ -58,7 +59,7 @@ function formatCount(value: number) {
   return new Intl.NumberFormat("vi-VN").format(value)
 }
 
-export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCart, onBuyNow, onOpenArticle }: Props) {
+export function GuestHomePage({ viewer = "guest", onNavigate, onVoucherDetail, onLogin, onAddToCart, onBuyNow, onOpenArticle }: Props) {
   const [openFaq, setOpenFaq] = useState<number | null>(null)
   const [vouchers, setVouchers] = useState<Voucher[]>([])
   const [categories, setCategories] = useState<GuestCategory[]>([])
@@ -306,9 +307,11 @@ export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCar
           <h2 className="text-3xl font-black text-white mb-3" style={{ fontFamily: "'Nunito', sans-serif" }}>Bắt đầu tiết kiệm ngay hôm nay</h2>
           <p className="text-white/80 mb-6 text-sm">Đăng ký miễn phí để lưu voucher yêu thích và theo dõi đơn hàng của bạn</p>
           <div className="flex justify-center gap-3">
-            <button onClick={onLogin} className="px-6 py-3 rounded-xl font-bold text-sm bg-white hover:bg-opacity-90 transition-all" style={{ color: C.peach }}>
-              Đăng nhập
-            </button>
+            {viewer === "guest" && (
+              <button onClick={onLogin} className="px-6 py-3 rounded-xl font-bold text-sm bg-white hover:bg-opacity-90 transition-all" style={{ color: C.peach }}>
+                Đăng nhập
+              </button>
+            )}
             <button onClick={() => onNavigate("vouchers")} className="px-6 py-3 rounded-xl font-bold text-sm border-2 border-white text-white hover:bg-white/10 transition-all">
               Khám phá ngay
             </button>
