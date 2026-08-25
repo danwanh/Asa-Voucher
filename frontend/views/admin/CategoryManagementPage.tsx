@@ -89,15 +89,36 @@ export function CategoryManagementPage() {
     }
   }
 
+  function handleDeleteClick(c: CategoryWithCount) {
+    if (c.voucherCount > 0) {
+      showToast("error", `Không thể xóa danh mục "${c.name}" vì đang có ${c.voucherCount} voucher`)
+      return
+    }
+    setDeleteId(c.id)
+  }
+
   async function confirmDelete() {
     if (!deleteId) return
+    const target = categories.find((c) => c.id === deleteId)
+    if (target && target.voucherCount > 0) {
+      showToast("error", `Không thể xóa danh mục "${target.name}" vì đang có ${target.voucherCount} voucher`)
+      setDeleteId(null)
+      return
+    }
     try {
       await categoryService.remove(deleteId)
       showToast("success", "Xóa danh mục thành công")
       setDeleteId(null)
       loadCategories()
     } catch (err: any) {
-      const msg = err?.response?.data?.error?.message || "Xóa danh mục thất bại"
+      const code = err?.response?.data?.error?.code
+      const detailsCount = err?.response?.data?.error?.details?.voucherCount
+      let msg = err?.response?.data?.error?.message || "Xóa danh mục thất bại"
+      if (code === "CATEGORY_IN_USE" && typeof detailsCount === "number") {
+        msg = `Không thể xóa danh mục vì đang có ${detailsCount} voucher`
+      } else if (code === "CATEGORY_IN_USE") {
+        msg = "Danh mục đang được sử dụng, không thể xóa"
+      }
       showToast("error", msg)
       setDeleteId(null)
     }
@@ -150,7 +171,7 @@ export function CategoryManagementPage() {
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1">
                     <button onClick={() => openEdit(c)} className="p-1.5 rounded-lg hover:bg-muted" title="Chỉnh sửa"><Edit2 className="w-4 h-4" style={{ color: C.indigo }} /></button>
-                    <button onClick={() => setDeleteId(c.id)} className="p-1.5 rounded-lg hover:bg-muted" title="Xóa"><Trash2 className="w-4 h-4" style={{ color: C.peach }} /></button>
+                    <button onClick={() => handleDeleteClick(c)} className="p-1.5 rounded-lg hover:bg-muted disabled:opacity-40" title={c.voucherCount > 0 ? `Không thể xóa - đang có ${c.voucherCount} voucher` : "Xóa"}><Trash2 className="w-4 h-4" style={{ color: c.voucherCount > 0 ? "#9CA3AF" : C.peach }} /></button>
                   </div>
                 </td>
               </tr>

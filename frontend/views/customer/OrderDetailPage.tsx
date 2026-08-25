@@ -52,12 +52,17 @@ export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAga
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const TIMELINE = [
-    { label: "Đặt hàng", done: true, time: fmtDate(order.createdAt) },
-    { label: "Thanh toán", done: paymentStepDone, time: successfulPayment?.paidAt ? fmtDate(successfulPayment.paidAt) : "" },
-    { label: "Nhận voucher", done: voucherReceiveDone, time: voucherReceiveDone ? fmtDate(order.updatedAt ?? order.createdAt) : "" },
-    { label: "Đã sử dụng", done: voucherReceiveDone && issuedVouchers.some((voucher) => voucher.status === "used"), time: voucherReceiveDone && issuedVouchers.some((voucher) => voucher.status === "used") ? fmtDate(order.updatedAt ?? order.createdAt) : "" },
-  ]
+  const TIMELINE = isGiftSender
+    ? [
+        { label: "Đặt hàng", done: true, time: fmtDate(order.createdAt) },
+        { label: "Thanh toán", done: paymentStepDone, time: successfulPayment?.paidAt ? fmtDate(successfulPayment.paidAt) : "" },
+      ]
+    : [
+        { label: "Đặt hàng", done: true, time: fmtDate(order.createdAt) },
+        { label: "Thanh toán", done: paymentStepDone, time: successfulPayment?.paidAt ? fmtDate(successfulPayment.paidAt) : "" },
+        { label: "Nhận voucher", done: voucherReceiveDone, time: voucherReceiveDone ? fmtDate(order.updatedAt ?? order.createdAt) : "" },
+        { label: "Đã sử dụng", done: voucherReceiveDone && issuedVouchers.some((voucher) => voucher.status === "used"), time: voucherReceiveDone && issuedVouchers.some((voucher) => voucher.status === "used") ? fmtDate(order.updatedAt ?? order.createdAt) : "" },
+      ]
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
@@ -134,7 +139,7 @@ export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAga
               </div>
 
               <div className="mt-4 space-y-3">
-                {order.status !== "cancelled" && item.issuedVouchers && item.issuedVouchers.length > 0 ? (
+                {order.status !== "cancelled" && item.issuedVouchers && item.issuedVouchers.length > 0 && !isGiftSender ? (
                   item.issuedVouchers.map((voucher) => {
                     const isInvalidated = voucher.status === "refunded" || voucher.status === "cancelled"
                     return (

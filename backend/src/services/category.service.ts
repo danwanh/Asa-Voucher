@@ -29,7 +29,7 @@ export async function updateCategory(id: string, input: Record<string, unknown>)
 export async function deleteCategory(id: string) {
   const count = await prisma.voucherProduct.count({ where: { category_id: id } });
   if (count > 0) {
-    throw new HttpError(409, "Category is used by voucher products", "CATEGORY_IN_USE");
+    throw new HttpError(409, `Danh mục đang được sử dụng bởi ${count} voucher, không thể xóa`, "CATEGORY_IN_USE", { voucherCount: count });
   }
 
   try {
