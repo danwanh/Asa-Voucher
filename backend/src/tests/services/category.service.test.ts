@@ -27,9 +27,9 @@ describe("Category Service", () => {
   describe("listCategories", () => {
     it("returns categories ordered by sort_order then name", async () => {
       vi.mocked(prisma.category.findMany).mockResolvedValue([
-        { id: "c1", name: "A", slug: "a", sort_order: 1 },
-        { id: "c2", name: "B", slug: "b", sort_order: 2 },
-      ]);
+        { id: "c1", name: "A", slug: "a", sort_order: 1, description: null, parent_id: null },
+        { id: "c2", name: "B", slug: "b", sort_order: 2, description: null, parent_id: null },
+      ] as any);
 
       const result = await categoryService.listCategories();
       expect(result).toHaveLength(2);
@@ -41,8 +41,8 @@ describe("Category Service", () => {
 
   describe("createCategory", () => {
     it("creates category with input", async () => {
-      const cat = { id: "c1", name: "Food", slug: "food", sort_order: 0 };
-      vi.mocked(prisma.category.create).mockResolvedValue(cat);
+      const cat = { id: "c1", name: "Food", slug: "food", sort_order: 0, description: null, parent_id: null } as any;
+      vi.mocked(prisma.category.create).mockResolvedValue(cat as any);
 
       const result = await categoryService.createCategory({ name: "Food", slug: "food" });
       expect(result).toEqual(cat);
@@ -52,8 +52,8 @@ describe("Category Service", () => {
 
   describe("getCategory", () => {
     it("returns category by id", async () => {
-      const cat = { id: "c1", name: "Food", slug: "food" };
-      vi.mocked(prisma.category.findUnique).mockResolvedValue(cat);
+      const cat = { id: "c1", name: "Food", slug: "food", description: null, parent_id: null, sort_order: 0 } as any;
+      vi.mocked(prisma.category.findUnique).mockResolvedValue(cat as any);
 
       const result = await categoryService.getCategory("c1");
       expect(result).toEqual(cat);
@@ -67,7 +67,7 @@ describe("Category Service", () => {
 
   describe("updateCategory", () => {
     it("updates category", async () => {
-      vi.mocked(prisma.category.update).mockResolvedValue({ id: "c1", name: "Updated" });
+      vi.mocked(prisma.category.update).mockResolvedValue({ id: "c1", name: "Updated", slug: "updated", description: null, parent_id: null, sort_order: 0 } as any);
 
       const result = await categoryService.updateCategory("c1", { name: "Updated" });
       expect(result.name).toBe("Updated");

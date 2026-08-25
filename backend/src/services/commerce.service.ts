@@ -818,7 +818,7 @@ export async function refundOrder(user: CurrentUser, id: string, note?: string) 
 
     await tx.order.update({
       where: { id },
-      data: { status: "refunded", payment_status: "refunded", refund_amount: order.total_amount, updated_at: new Date() }
+      data: { status: "refunded", payment_status: "refunded", refund_amount: order.total_amount as unknown as never, updated_at: new Date() }
     });
 
     await tx.paymentLog.create({

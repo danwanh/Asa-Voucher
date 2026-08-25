@@ -365,7 +365,7 @@ describe("Complaint Service", () => {
 
       vi.mocked(prisma.order.findUnique).mockResolvedValue(mockOrder as any);
 
-      const mockTx: Record<string, unknown> = {
+      const mockTx: any = {
         issuedVoucher: { update: vi.fn().mockResolvedValue({}), create: vi.fn().mockResolvedValue({}) },
         voucherProduct: { update: vi.fn().mockResolvedValue({}) },
         payment: { update: vi.fn().mockResolvedValue({}) },
@@ -425,7 +425,7 @@ describe("Complaint Service", () => {
 
       vi.mocked(prisma.order.findUnique).mockResolvedValue(mockOrder as any);
 
-      const mockTx: Record<string, unknown> = {
+      const mockTx: any = {
         issuedVoucher: { update: vi.fn().mockResolvedValue({}) },
         voucherProduct: { update: vi.fn().mockResolvedValue({}) },
         payment: { update: vi.fn().mockResolvedValue({}) },
@@ -474,7 +474,7 @@ describe("Complaint Service", () => {
 
       vi.mocked(prisma.issuedVoucher.findUnique).mockResolvedValue(mockOldVoucher as any);
 
-      const mockTx: Record<string, unknown> = {
+      const mockTx: any = {
         issuedVoucher: { update: vi.fn().mockResolvedValue({}), create: vi.fn().mockResolvedValue({}) },
         voucherProduct: { update: vi.fn().mockResolvedValue({}) },
         orderLog: { create: vi.fn().mockResolvedValue({}) },
@@ -530,7 +530,7 @@ describe("Complaint Service", () => {
 
       vi.mocked(prisma.issuedVoucher.findUnique).mockResolvedValue(mockOldVoucher as any);
 
-      const mockTx: Record<string, unknown> = {
+      const mockTx: any = {
         issuedVoucher: { update: vi.fn().mockResolvedValue({}), create: vi.fn().mockResolvedValue({}) },
         voucherProduct: { update: vi.fn().mockResolvedValue({}) },
         orderLog: { create: vi.fn().mockResolvedValue({}) },

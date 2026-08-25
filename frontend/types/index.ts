@@ -255,7 +255,7 @@ export interface ReviewTarget {
   review?: Review
 }
 
-export type ComplaintStatus = "open" | "resolved"
+export type ComplaintStatus = "open" | "under_review" | "resolved" | "closed"
 
 export interface Complaint {
   id: string

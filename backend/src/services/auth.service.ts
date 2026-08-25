@@ -184,10 +184,14 @@ export async function login(identifier: string, password: string, metadata: { ip
 
 export async function registerBuyer(input: Record<string, unknown>) {
   const user = await createUser(input, "buyer");
-  const token = await createAuthToken((user as { id: string }).id, verificationTokenType);
-  const email = input.email as string;
-  const message = buildVerificationEmail(token);
-  await sendEmail(email, message.subject, message.html);
+  try {
+    const token = await createAuthToken((user as { id: string }).id, verificationTokenType);
+    const email = input.email as string;
+    const message = buildVerificationEmail(token);
+    await sendEmail(email, message.subject, message.html);
+  } catch (err) {
+    console.error(JSON.stringify({ event: "email.register_send_failed", email: input.email, message: err instanceof Error ? err.message : "Unknown error" }));
+  }
   return user;
 }
 
@@ -229,9 +233,13 @@ export async function registerPartner(input: Record<string, unknown>) {
       return { user, partner };
     });
     userId = result.user.id;
-    const token = await createAuthToken(userId, verificationTokenType);
-    const emailMessage = buildVerificationEmail(token);
-    await sendEmail(input.email as string, emailMessage.subject, emailMessage.html);
+    try {
+      const token = await createAuthToken(userId, verificationTokenType);
+      const emailMessage = buildVerificationEmail(token);
+      await sendEmail(input.email as string, emailMessage.subject, emailMessage.html);
+    } catch (err) {
+      console.error(JSON.stringify({ event: "email.partner_register_send_failed", email: input.email, message: err instanceof Error ? err.message : "Unknown error" }));
+    }
     return { user: sanitizeUser(result.user as unknown as Record<string, unknown>), partner: result.partner };
   } catch (error) {
     if (error instanceof HttpError) throw error;
@@ -248,7 +256,9 @@ async function createAuthToken(userId: string, type: string) {
 
 async function assertResendAllowed(userId: string, type: string) {
   const recent = await prisma.authToken.findFirst({ where: { user_id: userId, type, created_at: { gt: new Date(Date.now() - resendCooldownMs) } }, orderBy: { created_at: "desc" } });
-  if (recent) throw new HttpError(429, "Vui lòng chờ 60 giây trước khi yêu cầu gửi lại email.", "EMAIL_RESEND_COOLDOWN", { cooldown_seconds: 60 });
+  if (!recent) return;
+  const remainingSeconds = Math.max(1, Math.ceil((recent.created_at.getTime() + resendCooldownMs - Date.now()) / 1000));
+  throw new HttpError(429, `Vui lòng chờ ${remainingSeconds} giây trước khi yêu cầu gửi lại email.`, "EMAIL_RESEND_COOLDOWN", { cooldown_seconds: remainingSeconds });
 }
 
 export async function verifyEmail(token: string) {
@@ -266,12 +276,18 @@ export async function verifyEmail(token: string) {
 }
 
 export async function resendVerification(email: string) {
-  const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } }) as unknown as UserRow | null;
+  const user = await prisma.user.findFirst({
+    where: { email: { equals: email.trim().toLowerCase(), mode: "insensitive" } }
+  }) as unknown as UserRow | null;
   if (!user || user.is_verified) return;
   await assertResendAllowed(user.id, verificationTokenType);
   const token = await createAuthToken(user.id, verificationTokenType);
   const message = buildVerificationEmail(token);
-  await sendEmail(user.email, message.subject, message.html);
+  try {
+    await sendEmail(user.email, message.subject, message.html);
+  } catch (err) {
+    console.error(JSON.stringify({ event: "email.resend_send_failed", email: user.email, message: err instanceof Error ? err.message : "Unknown error" }));
+  }
 }
 
 export async function forgotPassword(identifier: string) {
@@ -281,7 +297,11 @@ export async function forgotPassword(identifier: string) {
   await assertResendAllowed(user.id, resetTokenType);
   const token = await createAuthToken(user.id, resetTokenType);
   const message = buildResetPasswordEmail(token);
-  await sendEmail(user.email, message.subject, message.html);
+  try {
+    await sendEmail(user.email, message.subject, message.html);
+  } catch (err) {
+    console.error(JSON.stringify({ event: "email.forgot_password_send_failed", email: user.email, message: err instanceof Error ? err.message : "Unknown error" }));
+  }
 }
 
 export async function resetPassword(token: string, newPassword: string) {
