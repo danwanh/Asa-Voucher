@@ -11,6 +11,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
     partner: {
       findFirst: vi.fn(),
     },
+    partnerBranch: {
+      findUnique: vi.fn(),
+    },
     refreshToken: {
       create: vi.fn(),
       findFirst: vi.fn(),
@@ -79,6 +82,20 @@ describe("Auth Service", () => {
       const result = await authService.login("test@test.com", "pass", {});
       expect(result.accessToken).toBeDefined();
       expect(result.user).toBeDefined();
+    });
+
+    it("returns the assigned branch name for voucher staff", async () => {
+      vi.mocked(prisma.user.findFirst).mockResolvedValue({
+        id: "u1", email: "staff@test.com", role: "partner_voucher_staff", password_hash: "hashed:pass", is_active: true, is_verified: true,
+        partner_branches_id: "branch-1",
+      } as any);
+      vi.mocked(prisma.partner.findFirst).mockResolvedValue(null);
+      vi.mocked(prisma.partnerBranch.findUnique).mockResolvedValue({ branch_name: "Cửa hàng Quận 1" } as any);
+      vi.mocked(prisma.refreshToken.create).mockResolvedValue({} as any);
+      vi.mocked(prisma.authenticationLog.create).mockResolvedValue({} as any);
+
+      const result = await authService.login("staff@test.com", "pass", {});
+      expect(result.user).toMatchObject({ branchId: "branch-1", branchName: "Cửa hàng Quận 1" });
     });
 
     it("throws 401 on wrong password", async () => {

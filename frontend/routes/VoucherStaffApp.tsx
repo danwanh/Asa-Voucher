@@ -177,7 +177,7 @@ export function VoucherStaffApp({ user, onLogout, initialPage, initialVoucherId 
           </div>
           <div className="min-w-0">
             <div className="text-sm font-bold text-white truncate">{user.name}</div>
-            <div className="text-xs truncate opacity-50 text-white">{user.email}</div>
+            <div className="text-xs break-words opacity-50 text-white">{user.branchName ?? "Chưa gán chi nhánh"}</div>
           </div>
         </div>
       </div>
