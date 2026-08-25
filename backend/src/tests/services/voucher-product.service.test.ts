@@ -42,6 +42,7 @@ const { mockPrisma } = vi.hoisted(() => ({
     review: {
       findMany: vi.fn(),
       aggregate: vi.fn(),
+      groupBy: vi.fn(),
     },
     user: {
       count: vi.fn(),
@@ -98,6 +99,7 @@ function makeCreateInput(overrides: Record<string, unknown> = {}) {
 describe("Voucher Product Service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrisma.review.groupBy.mockResolvedValue([]);
     mockPrisma.partner.findUnique.mockResolvedValue({
       id: "p1", approval_status: "approved", status: "active",
     } as any);
@@ -109,6 +111,24 @@ describe("Voucher Product Service", () => {
       mockPrisma.voucherProduct.count.mockResolvedValue(1);
       const result = await voucherProductService.listVoucherProducts(undefined, { page: 1, limit: 20 });
       expect(result.items).toHaveLength(1);
+    });
+
+    it("includes published review statistics for listed vouchers", async () => {
+      mockPrisma.voucherProduct.findMany.mockResolvedValue([makeVoucher()]);
+      mockPrisma.voucherProduct.count.mockResolvedValue(1);
+      mockPrisma.review.groupBy.mockResolvedValue([
+        { voucher_product_id: "vp1", _avg: { rating: 4.5 }, _count: { _all: 2 } }
+      ] as any);
+
+      const result = await voucherProductService.listVoucherProducts(undefined, { page: 1, limit: 20 });
+
+      expect(result.items[0]).toMatchObject({ average_rating: 4.5, review_count: 2 });
+      expect(prisma.review.groupBy).toHaveBeenCalledWith({
+        by: ["voucher_product_id"],
+        where: { voucher_product_id: { in: ["vp1"] }, is_published: true },
+        _avg: { rating: true },
+        _count: { _all: true }
+      });
     });
 
     it("only returns approved+active vouchers already on sale", async () => {

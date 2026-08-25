@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
-import { ArrowLeft, Star, MapPin, Calendar, Users, Heart } from "lucide-react"
+import { ArrowLeft, Star, MapPin, Calendar, Users } from "lucide-react"
 import { C, fmt, fmtDate } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import type { Voucher } from "@/types"
@@ -21,7 +21,6 @@ interface Props {
 }
 
 export function GuestVoucherDetailPage({ viewer = "guest", voucher: v, detail, onBack, onLogin, onDetail, onAddToCart, onBuyNow }: Props) {
-  const [liked, setLiked] = useState(false)
   const [detailVoucher, setDetailVoucher] = useState<Voucher>(v)
   const [reviews, setReviews] = useState<VoucherPublicReview[]>([])
   const [branches, setBranches] = useState<VoucherApplicableBranch[]>([])
@@ -164,22 +163,13 @@ export function GuestVoucherDetailPage({ viewer = "guest", voucher: v, detail, o
             >
               Mua ngay — {fmt(detailVoucher.price)}
             </button>
-            <div className="flex gap-2">
-              <button
-                onClick={() => onAddToCart(detailVoucher)}
-                className="flex-1 py-3 rounded-2xl font-bold text-sm border-2 hover:opacity-90 transition-opacity"
-                style={{ borderColor: C.peach, color: C.peach, backgroundColor: "white" }}
-              >
-                Thêm vào giỏ hàng
-              </button>
-              <button
-                onClick={() => setLiked(!liked)}
-                className="w-12 h-12 rounded-2xl flex items-center justify-center border-2 transition-all"
-                style={{ borderColor: liked ? "#EF4444" : "#E5E7EB", backgroundColor: liked ? "#FEF2F2" : "white" }}
-              >
-                <Heart className="w-5 h-5" fill={liked ? "#EF4444" : "none"} style={{ color: liked ? "#EF4444" : "#9CA3AF" }} />
-              </button>
-            </div>
+            <button
+              onClick={() => onAddToCart(detailVoucher)}
+              className="w-full py-3 rounded-2xl font-bold text-sm border-2 hover:opacity-90 transition-opacity"
+              style={{ borderColor: C.peach, color: C.peach, backgroundColor: "white" }}
+            >
+              Thêm vào giỏ hàng
+            </button>
           </div> : <div className="mb-2 w-full rounded-2xl py-4 text-center text-sm font-bold" style={{ backgroundColor: C.muted, color: "#8A8DA8" }}>Voucher không khả dụng</div>}
           {viewer === "guest" && <p className="text-xs text-center" style={{ color: "#6B7280" }}>Đăng nhập để xem đơn hàng &amp; quản lý voucher</p>}
         </div>

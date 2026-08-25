@@ -73,7 +73,7 @@ export function GuestHomePage({ viewer = "guest", onNavigate, onVoucherDetail, o
       setIsLoadingVouchers(true)
       try {
         const [voucherPage, categoryItems, summary] = await Promise.all([
-          voucherService.listPublicVouchersPage({ limit: 12 }),
+          voucherService.listPublicVouchersPage({ limit: 100 }),
           voucherService.listCategories(),
           voucherService.getHomepageSummary(),
         ])
@@ -98,8 +98,18 @@ export function GuestHomePage({ viewer = "guest", onNavigate, onVoucherDetail, o
   }, [])
 
   const availableVouchers = useMemo(() => vouchers.filter(isVoucherAvailable), [vouchers])
-  const featured = useMemo(() => availableVouchers.slice(0, 6), [availableVouchers])
-  const flashSale = useMemo(() => availableVouchers.filter((v) => v.discount >= 30).slice(0, 4), [availableVouchers])
+  const newestVouchers = useMemo(
+    () => [...availableVouchers]
+      .sort((first, second) => Date.parse(second.createdAt ?? second.validFrom) - Date.parse(first.createdAt ?? first.validFrom))
+      .slice(0, 6),
+    [availableVouchers],
+  )
+  const bestSellingVouchers = useMemo(
+    () => [...availableVouchers]
+      .sort((first, second) => second.sold - first.sold)
+      .slice(0, 6),
+    [availableVouchers],
+  )
 
   const categoryCountsById = useMemo(() => {
     const counts = new Map<string, number>()
@@ -197,17 +207,17 @@ export function GuestHomePage({ viewer = "guest", onNavigate, onVoucherDetail, o
         </div>
       </section>
 
-      {/* Flash Sale */}
+      {/* Newest vouchers */}
       <section className="py-14 px-4" style={{ backgroundColor: "#FFF5F0" }}>
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-white text-sm" style={{ backgroundColor: C.peach }}>
-                <Zap className="w-3.5 h-3.5" /> FLASH SALE
+                <Zap className="w-3.5 h-3.5" /> MỚI NHẤT
               </div>
               <div>
-                <div className="text-lg font-black" style={{ color: C.indigo, fontFamily: "'Nunito', sans-serif" }}>Ưu đãi sốc hôm nay</div>
-                <div className="text-xs mt-0.5" style={{ color: "#8A8DA8" }}>Giảm từ 30% trở lên, số lượng có hạn</div>
+                <div className="text-lg font-black" style={{ color: C.indigo, fontFamily: "'Nunito', sans-serif" }}>Voucher mới nhất</div>
+                <div className="text-xs mt-0.5" style={{ color: "#8A8DA8" }}>Khám phá các ưu đãi vừa được cập nhật</div>
               </div>
             </div>
             <button onClick={() => onNavigate("vouchers")} className="flex items-center gap-1 text-sm font-semibold hover:underline" style={{ color: C.peach }}>
@@ -215,12 +225,12 @@ export function GuestHomePage({ viewer = "guest", onNavigate, onVoucherDetail, o
             </button>
           </div>
           {isLoadingVouchers ? (
-            <div className="text-sm" style={{ color: "#6B7280" }}>Đang tải voucher flash sale...</div>
-          ) : flashSale.length === 0 ? (
-            <div className="rounded-xl bg-white p-5 text-sm shadow-sm border border-black/5" style={{ color: "#6B7280" }}>Chưa có voucher flash sale.</div>
+            <div className="text-sm" style={{ color: "#6B7280" }}>Đang tải voucher mới nhất...</div>
+          ) : newestVouchers.length === 0 ? (
+            <div className="rounded-xl bg-white p-5 text-sm shadow-sm border border-black/5" style={{ color: "#6B7280" }}>Chưa có voucher mới.</div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {flashSale.map((v) => (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {newestVouchers.map((v) => (
                 <VoucherCard key={v.id} voucher={v} onDetail={onVoucherDetail} onAddToCart={onAddToCart} onBuyNow={onBuyNow} />
               ))}
             </div>
@@ -228,22 +238,22 @@ export function GuestHomePage({ viewer = "guest", onNavigate, onVoucherDetail, o
         </div>
       </section>
 
-      {/* Featured Vouchers */}
+      {/* Best-selling vouchers */}
       <section className="py-14 px-4">
         <div className="max-w-7xl mx-auto">
           <SectionHeader
-            eyebrow="Gợi ý cho bạn"
-            title="Voucher nổi bật"
-            subtitle="Chọn lọc những ưu đãi được yêu thích nhất"
+            eyebrow="Được lựa chọn nhiều"
+            title="Voucher bán chạy nhất"
+            subtitle="Các ưu đãi có lượt mua cao nhất"
             action={{ label: "Xem tất cả", onClick: () => onNavigate("vouchers") }}
           />
           {isLoadingVouchers ? (
-            <div className="text-sm" style={{ color: "#6B7280" }}>Đang tải voucher nổi bật...</div>
-          ) : featured.length === 0 ? (
-            <div className="rounded-xl bg-white p-5 text-sm shadow-sm border border-black/5" style={{ color: "#6B7280" }}>Chưa có voucher nổi bật.</div>
+            <div className="text-sm" style={{ color: "#6B7280" }}>Đang tải voucher bán chạy...</div>
+          ) : bestSellingVouchers.length === 0 ? (
+            <div className="rounded-xl bg-white p-5 text-sm shadow-sm border border-black/5" style={{ color: "#6B7280" }}>Chưa có voucher bán chạy.</div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {featured.map((v) => (
+              {bestSellingVouchers.map((v) => (
                 <VoucherCard key={v.id} voucher={v} onDetail={onVoucherDetail} onAddToCart={onAddToCart} onBuyNow={onBuyNow} />
               ))}
             </div>

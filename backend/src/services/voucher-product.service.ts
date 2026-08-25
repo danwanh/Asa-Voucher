@@ -347,7 +347,32 @@ export async function listVoucherProducts(user: CurrentUser | undefined, queryIn
     }),
     prisma.voucherProduct.count({ where })
   ]);
-  return { items: (items as unknown as Record<string, unknown>[]).map(withWorkflow), count, page, limit };
+  const voucherIds = items.map((item) => item.id);
+  const reviewStats = voucherIds.length > 0
+    ? await prisma.review.groupBy({
+      by: ["voucher_product_id"],
+      where: { voucher_product_id: { in: voucherIds }, is_published: true },
+      _avg: { rating: true },
+      _count: { _all: true }
+    })
+    : [];
+  const reviewStatsByVoucher = new Map(reviewStats.map((stat) => [
+    stat.voucher_product_id,
+    {
+      average_rating: Number((stat._avg.rating ?? 0).toFixed(1)),
+      review_count: stat._count._all
+    }
+  ]));
+
+  return {
+    items: items.map((item) => ({
+      ...withWorkflow(item as unknown as Record<string, unknown>),
+      ...(reviewStatsByVoucher.get(item.id) ?? { average_rating: 0, review_count: 0 })
+    })),
+    count,
+    page,
+    limit
+  };
 }
 
 export async function getPublicHomepageSummary() {
