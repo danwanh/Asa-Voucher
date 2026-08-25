@@ -40,7 +40,7 @@ function SidebarContent({ user, page, onNavigate, onLogout, onClose }: Omit<Prop
           </div>
           <div className="min-w-0">
             <div className="text-sm font-bold text-white truncate">{user.name}</div>
-            <div className="text-xs" style={{ color: "rgba(244,241,222,0.5)" }}>{user.branchId ? `Chi nhánh ${user.branchId}` : "Chưa gán chi nhánh"}</div>
+            <div className="text-xs break-words" style={{ color: "rgba(244,241,222,0.5)" }}>{user.branchName ?? "Chưa gán chi nhánh"}</div>
           </div>
         </div>
       </div>

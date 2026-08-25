@@ -25,7 +25,8 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
           is_active: true,
            is_verified: true,
            auth_version: true,
-           partner_branches_id: true
+           partner_branches_id: true,
+           partner_branches: { select: { branch_name: true } }
          }
       }),
       "User not found"
@@ -52,7 +53,8 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
       name: user.full_name,
       role: user.role as never,
       partnerId: payload.partner_id,
-      branchId: payload.branch_id ?? user.partner_branches_id ?? undefined
+      branchId: payload.branch_id ?? user.partner_branches_id ?? undefined,
+      branchName: user.partner_branches?.branch_name
     };
 
     next();

@@ -317,7 +317,7 @@ export function CreateVoucherPage({ partnerId, onBack }: Props) {
   }
 
   return (
-    <div className="p-6 max-w-3xl">
+    <div className="p-6 max-w-3xl mx-auto">
       <button onClick={onBack} className="flex items-center gap-2 mb-5 text-sm font-semibold hover:underline" style={{ color: C.indigo }}>
         <ArrowLeft className="w-4 h-4" /> Quay lại
       </button>

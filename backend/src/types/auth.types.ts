@@ -16,6 +16,7 @@ export interface AuthUser {
   partnerId?: string | null;
   /** Chi nhánh làm việc: dùng cho partner_store_staff */
   branchId?: string | null;
+  branchName?: string | null;
 }
 
 export const ADMIN_ROLES: AppRole[] = ["admin_content", "admin_operations", "admin_security"];

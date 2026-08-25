@@ -80,6 +80,7 @@ export interface AppUser {
   role: Role
   partnerId?: string
   branchId?: string
+  branchName?: string
 }
 
 export interface Voucher {
