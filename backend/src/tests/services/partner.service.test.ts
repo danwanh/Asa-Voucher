@@ -288,7 +288,13 @@ describe("Partner Service", () => {
       expect(prisma.voucherProductBranch.count).toHaveBeenCalledWith({
         where: {
           branch_id: "b1",
-          voucher_products: { status: "active" },
+          voucher_products: {
+            approval_status: "approved",
+            status: "active",
+            sale_start_date: { lte: expect.any(Date) },
+            sale_end_date: { gte: expect.any(Date) },
+            remaining_quantity: { gt: 0 },
+          },
         },
       });
       expect(prisma.partnerBranch.update).toHaveBeenCalledWith({

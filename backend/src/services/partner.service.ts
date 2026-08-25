@@ -278,11 +278,16 @@ async function getBranch(id: string) {
 }
 
 async function assertBranchCanDeactivate(id: string) {
+  const today = new Date(new Date().toISOString().slice(0, 10));
   const activeVoucherCount = await prisma.voucherProductBranch.count({
     where: {
       branch_id: id,
       voucher_products: {
-        status: "active"
+        approval_status: "approved",
+        status: "active",
+        sale_start_date: { lte: today },
+        sale_end_date: { gte: today },
+        remaining_quantity: { gt: 0 }
       }
     }
   });
