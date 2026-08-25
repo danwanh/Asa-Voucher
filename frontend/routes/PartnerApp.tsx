@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react"
 import dynamic from "next/dynamic"
+import { usePathname, useRouter } from "next/navigation"
 import { AppIcon } from "@/components/AppIcon"
 import { PartnerLayout, type PartnerPage } from "@/layouts/PartnerLayout"
 import { C } from "@/utils/constants"
 import type { AppUser, Voucher } from "@/types"
 import { partnerService, type PartnerProfile } from "@/services/partnerService"
+import { voucherService } from "@/services/voucherService"
 import { LoadingState } from "@/components/LoadingState"
 
 const pageLoading = () => <LoadingState label="Đang tải trang..." variant="page" />
@@ -20,14 +22,28 @@ const BusinessProfilePage = dynamic(() => import("@/pages/partner/BusinessProfil
 const PersonalProfilePage = dynamic(() => import("@/components/PersonalProfilePage").then((module) => module.PersonalProfilePage), { loading: pageLoading })
 const PartnerSettingsPage = dynamic(() => import("@/pages/partner/PartnerSettingsPage").then((module) => module.PartnerSettingsPage), { loading: pageLoading })
 
+function partnerPageFromPath(pathname: string, fallback: PartnerPage = "revenue"): PartnerPage {
+  const segments = pathname.split("/").filter(Boolean)
+  const last = segments.at(-1)
+  if (last === "profile") return "profile"
+  if (segments[1] === "vouchers" && segments.length >= 3) return last === "edit" ? "edit" : "voucher-detail"
+  if (last === "vouchers") return "vouchers"
+  if (last === "new" || last === "create") return "create"
+  if (last === "revenue" || last === "branches" || last === "staff" || last === "check-voucher") return last
+  return fallback
+}
+
 interface Props {
   user: AppUser
   onLogout: () => void
-  initialPage?: "profile"
+  initialPage?: PartnerPage
+  initialVoucherId?: string
 }
 
-export function PartnerApp({ user, onLogout, initialPage }: Props) {
-  const [page, setPage] = useState<PartnerPage>(initialPage ?? "revenue")
+export function PartnerApp({ user, onLogout, initialPage, initialVoucherId }: Props) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const page = partnerPageFromPath(pathname, initialPage ?? "revenue")
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null)
   const [partner, setPartner] = useState<PartnerProfile | null>(null)
   const [isPartnerLoading, setIsPartnerLoading] = useState(true)
@@ -35,14 +51,15 @@ export function PartnerApp({ user, onLogout, initialPage }: Props) {
   const [sessionDrafts, setSessionDrafts] = useState<Voucher[]>([])
 
   useEffect(() => {
-    if (initialPage === "profile") {
-      setPage("profile")
-    }
-  }, [initialPage])
+    if (!initialVoucherId) return
+    void voucherService.getDetail(initialVoucherId).then((detail) => {
+      setSelectedVoucher(detail.voucher)
+    })
+  }, [initialVoucherId])
 
   useEffect(() => {
     if (user.role === "partner_owner" && page === "create") {
-      setPage("vouchers")
+      router.replace("/partner/vouchers")
     }
   }, [page, user.role])
 
@@ -79,9 +96,13 @@ export function PartnerApp({ user, onLogout, initialPage }: Props) {
 
   const goEdit = (v: Voucher) => {
     setSelectedVoucher(v)
-    setPage(v.status === "rejected" ? "voucher-detail" : "edit")
+    const nextPage = v.status === "rejected" ? "voucher-detail" : "edit"
+    router.push(`/partner/vouchers/${v.id}/${nextPage === "edit" ? "edit" : ""}`.replace(/\/$/, ""))
   }
-  const goDetail = (v: Voucher) => { setSelectedVoucher(v); setPage("voucher-detail") }
+  const goDetail = (v: Voucher) => {
+    setSelectedVoucher(v)
+    router.push(`/partner/vouchers/${v.id}`)
+  }
 
   const handleSaveDraft = (draft: Voucher) => {
     setSessionDrafts((prev) => {
@@ -91,28 +112,28 @@ export function PartnerApp({ user, onLogout, initialPage }: Props) {
       }
       return [...prev, draft]
     })
-    setPage("vouchers")
+    router.push("/partner/vouchers")
   }
 
   const handleEditDraft = (draft: Voucher) => {
     setSelectedVoucher(draft)
-    setPage("edit")
+    router.push(`/partner/vouchers/${draft.id}/edit`)
   }
 
   if (isPartnerLoading) {
     return (
-      <PartnerLayout user={user} partner={partner} page={page} onNavigate={setPage} onLogout={onLogout}>
+      <PartnerLayout user={user} partner={partner} page={page} onNavigate={() => undefined} onLogout={onLogout}>
         <LoadingState label="Đang tải dữ liệu đối tác..." variant="page" />
       </PartnerLayout>
     )
   }
 
   return (
-    <PartnerLayout user={user} partner={partner} page={page} onNavigate={setPage} onLogout={onLogout}>
+    <PartnerLayout user={user} partner={partner} page={page} onNavigate={() => undefined} onLogout={onLogout}>
       {page === "vouchers" && (
         <PartnerVouchersPage
           partnerId={user.partnerId}
-          onCreateNew={() => setPage("create")}
+          onCreateNew={() => router.push("/partner/vouchers/new")}
           onEdit={goEdit}
           onDetail={goDetail}
           canCreate={false}
@@ -124,14 +145,14 @@ export function PartnerApp({ user, onLogout, initialPage }: Props) {
         <CreateVoucherPage
           partnerId={user.partnerId}
           partnerName={partner?.businessName}
-          onBack={() => setPage("vouchers")}
+          onBack={() => router.push("/partner/vouchers")}
           onSaveDraft={handleSaveDraft}
         />
       )}
       {page === "edit" && selectedVoucher && (
         <EditVoucherPage
           voucher={selectedVoucher}
-          onBack={() => setPage("vouchers")}
+          onBack={() => router.push("/partner/vouchers")}
           onSave={(v) => {
             setSelectedVoucher(v)
             // If this was a session draft, update it
@@ -140,7 +161,7 @@ export function PartnerApp({ user, onLogout, initialPage }: Props) {
         />
       )}
       {page === "voucher-detail" && selectedVoucher && (
-        <PartnerVoucherDetailPage voucher={selectedVoucher} onBack={() => setPage("vouchers")} onEdit={goEdit} />
+        <PartnerVoucherDetailPage voucher={selectedVoucher} onBack={() => router.push("/partner/vouchers")} onEdit={goEdit} />
       )}
       {page === "revenue" && <PartnerRevenuePage partnerId={user.partnerId} partnerName={partner?.businessName} />}
       {page === "check-voucher" && <StaffCheckVoucherPage />}

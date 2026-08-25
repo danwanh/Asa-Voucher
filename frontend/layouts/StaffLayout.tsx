@@ -49,7 +49,7 @@ function SidebarContent({ user, page, onNavigate, onLogout, onClose }: Omit<Prop
         {NAV_ITEMS.map((n) => (
           <button
             key={n.pg}
-            onClick={() => { n.pg === "profile" ? router.push(`/${user.role}/profile`) : onNavigate(n.pg); onClose?.() }}
+            onClick={() => { onNavigate(n.pg); router.push(`/staff/${n.pg === "qr-scan" ? "verify" : n.pg}`); onClose?.() }}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-left transition-all"
             style={{
               backgroundColor: page === n.pg ? C.apricot : "transparent",

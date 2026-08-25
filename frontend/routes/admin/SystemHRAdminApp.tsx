@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { usePathname } from "next/navigation"
 import { Users, Store, UserCheck, User } from "lucide-react"
 import { SubAdminLayout, type SubAdminRole, type SubAdminNavItem } from "@/layouts/admin/SubAdminLayout"
 import { UserManagementPage } from "@/pages/admin/UserManagementPage"
@@ -33,7 +33,8 @@ interface Props {
 }
 
 export function SystemHRAdminApp({ user, onLogout, onSwitchRole }: Props) {
-  const [page, setPage] = useState<Page>("users")
+  const pathname = usePathname()
+  const page = (pathname.split("/").filter(Boolean).at(-1) as Page | undefined) ?? "users"
 
   return (
     <SubAdminLayout
@@ -41,7 +42,7 @@ export function SystemHRAdminApp({ user, onLogout, onSwitchRole }: Props) {
       role={ROLE}
       page={page}
       navItems={NAV}
-      onNavigate={(pg) => setPage(pg as Page)}
+      onNavigate={() => undefined}
       onLogout={onLogout}
       onSwitchRole={onSwitchRole}
     >

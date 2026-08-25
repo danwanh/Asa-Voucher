@@ -1,6 +1,6 @@
 import { startTransition, useEffect, useRef, useState } from "react"
 import dynamic from "next/dynamic"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { AppIcon } from "@/components/AppIcon"
 import { PopupModal } from "@/components/PopupModal"
 import { toast } from "sonner"
@@ -31,6 +31,26 @@ const ReviewPage = dynamic(() => import("@/pages/customer/ReviewPage").then((mod
 const ComplaintPage = dynamic(() => import("@/pages/customer/ComplaintPage").then((module) => module.ComplaintPage), { loading: pageLoading })
 const ProfilePage = dynamic(() => import("@/pages/customer/ProfilePage").then((module) => module.ProfilePage), { loading: pageLoading })
 const CustomerSettingsPage = dynamic(() => import("@/pages/customer/CustomerSettingsPage").then((module) => module.CustomerSettingsPage), { loading: pageLoading })
+
+function pageFromLocation(pathname: string, searchParams: URLSearchParams, fallback: CustomerPage = "home"): CustomerPage {
+  const view = searchParams.get("view")
+  if (view === "review" || view === "complaint") return view
+  if (pathname === "/") return "home"
+  if (pathname === "/vouchers") return "vouchers"
+  if (pathname.startsWith("/vouchers/")) return "detail"
+  if (pathname === "/categories") return "categories"
+  if (pathname === "/cart") return "cart"
+  if (pathname === "/orders") return "orders"
+  if (pathname.startsWith("/orders/")) return "order-detail"
+  if (pathname === "/my-vouchers") return "my-vouchers"
+  if (pathname === "/favorites") return "favorites"
+  if (pathname === "/settings") return "settings"
+  if (pathname === "/profile") return "profile"
+  if (pathname === "/checkout/create-order") return "create-order"
+  if (pathname.startsWith("/checkout/payment/")) return "payment"
+  if (pathname === "/checkout/payment/result") return "success"
+  return fallback
+}
 
 interface Props {
   user: AppUser
@@ -102,7 +122,9 @@ export function CustomerApp({
   initialPaymentStatus,
 }: Props) {
   const router = useRouter()
-  const [page, setPage] = useState<CustomerPage>(() => initialPage ?? "home")
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const page = pageFromLocation(pathname, searchParams, initialPage ?? "home")
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null)
   const [selectedVoucherDetail, setSelectedVoucherDetail] = useState<VoucherDetailData | null>(null)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
@@ -139,10 +161,6 @@ export function CustomerApp({
   const [myIssuedVouchersLoading, setMyIssuedVouchersLoading] = useState(initialPage === "my-vouchers")
 
   useEffect(() => {
-    setPage(initialPage ?? "home")
-  }, [initialPage])
-
-  useEffect(() => {
     if (!initialOrderId) {
       setPendingOrderLoading(false)
       return
@@ -150,7 +168,6 @@ export function CustomerApp({
     if (initialPage === "order-detail") {
       void orderService.get(initialOrderId).then((order) => {
         setSelectedOrder(order)
-        setPage("order-detail")
         if (initialPaymentStatus === "success" && (order.status === "confirmed" || order.status === "completed")) {
           toast.success("Thanh toán thành công, voucher đã được phát hành.")
         } else if (initialPaymentStatus) {
@@ -180,7 +197,6 @@ export function CustomerApp({
     void voucherService.getDetail(initialVoucherId).then((detail) => {
       setSelectedVoucher(detail.voucher)
       setSelectedVoucherDetail(detail)
-      setPage("detail")
     }).catch(() => {
       toast.error("Không thể tải chi tiết voucher.")
       router.push("/vouchers")
@@ -188,7 +204,6 @@ export function CustomerApp({
   }, [initialVoucherId, router])
 
   const navigate = (p: CustomerPage) => {
-    setPage(p)
     if (p === "home") {
       setVoucherSearch("")
       setVoucherFilters(DEFAULT_VOUCHER_FILTERS)
@@ -208,8 +223,8 @@ export function CustomerApp({
 
   const handleVoucherSearchFocus = () => {
     if (page === "vouchers") return
-    setPage("vouchers")
     onInitialPageConsumed?.()
+    router.push("/vouchers")
   }
 
   const goDetail = (v: Voucher) => startTransition(() => router.push(`/vouchers/${v.id}`))
@@ -223,7 +238,7 @@ export function CustomerApp({
     setReviewReturnPage(returnPage)
     setReviewTargetOptions([])
     setReviewTargetOrder(null)
-    navigate("review")
+    router.push(`/orders/${order.id}?view=review`)
   }
 
   const goReview = async (o: Order | OrderListItem, issuedVoucher?: IssuedVoucher, returnPage: CustomerPage = "orders") => {
@@ -307,7 +322,7 @@ export function CustomerApp({
     setComplaintOrder(detail)
     setComplaintIssuedVoucher(issuedVoucher ?? null)
     setReviewReturnPage(returnPage)
-    navigate("complaint")
+    router.push(`/orders/${detail.id}?view=complaint`)
   }
 
   const handleAddToCart = async (voucher: Voucher) => {
@@ -406,7 +421,8 @@ export function CustomerApp({
     if (reviewReturnPage === "order-detail" && selectedOrder) {
       void orderService.get(selectedOrder.id, { force: true }).then(setSelectedOrder).catch(() => undefined)
     }
-    setPage(reviewReturnPage)
+    const returnPath = customerPagePath(reviewReturnPage, user.role)
+    if (returnPath) router.push(returnPath)
     setReviewOrder(null)
     setReviewTarget(null)
     setComplaintOrder(null)

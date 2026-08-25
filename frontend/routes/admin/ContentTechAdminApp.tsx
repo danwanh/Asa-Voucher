@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { usePathname } from "next/navigation"
 import { FileText, Tag, MessageSquare, Shield, User } from "lucide-react"
 import { SubAdminLayout, type SubAdminRole, type SubAdminNavItem } from "@/layouts/admin/SubAdminLayout"
 import { ContentManagementPage } from "@/pages/admin/ContentManagementPage"
@@ -35,7 +35,8 @@ interface Props {
 }
 
 export function ContentTechAdminApp({ user, onLogout, onSwitchRole }: Props) {
-  const [page, setPage] = useState<Page>("content")
+  const pathname = usePathname()
+  const page = (pathname.split("/").filter(Boolean).at(-1) as Page | undefined) ?? "content"
 
   return (
     <SubAdminLayout
@@ -43,7 +44,7 @@ export function ContentTechAdminApp({ user, onLogout, onSwitchRole }: Props) {
       role={ROLE}
       page={page}
       navItems={NAV}
-      onNavigate={(pg) => setPage(pg as Page)}
+      onNavigate={() => undefined}
       onLogout={onLogout}
       onSwitchRole={onSwitchRole}
     >

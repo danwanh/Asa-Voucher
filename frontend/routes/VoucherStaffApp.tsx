@@ -1,11 +1,12 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import dynamic from "next/dynamic"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { Tag, PlusCircle, BarChart3, ScanLine, User, LogOut, Menu, ChevronRight } from "lucide-react"
 import { C } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import type { AppUser, Voucher } from "@/types"
 import { LoadingState } from "@/components/LoadingState"
+import { voucherService } from "@/services/voucherService"
 
 const pageLoading = () => <LoadingState label="Đang tải trang..." variant="page" />
 const PartnerVouchersPage = dynamic(() => import("@/pages/partner/PartnerVouchersPage").then((module) => module.PartnerVouchersPage), { loading: pageLoading })
@@ -17,12 +18,26 @@ const StaffProfilePage = dynamic(() => import("@/pages/staff/StaffProfilePage").
 const StaffVoucherReportPage = dynamic(() => import("@/pages/staff/StaffVoucherReportPage").then((module) => module.StaffVoucherReportPage), { loading: pageLoading })
 const StaffCheckVoucherPage = dynamic(() => import("@/pages/staff/StaffCheckVoucherPage").then((module) => module.StaffCheckVoucherPage), { loading: pageLoading })
 
-type Page = "vouchers" | "create" | "edit" | "voucher-detail" | "reports" | "staff-reports" | "check-voucher" | "profile"
+export type VoucherStaffPage = "vouchers" | "create" | "edit" | "voucher-detail" | "reports" | "staff-reports" | "check-voucher" | "profile"
+type Page = VoucherStaffPage
+
+function voucherStaffPageFromPath(pathname: string, fallback: VoucherStaffPage = "vouchers"): VoucherStaffPage {
+  const segments = pathname.split("/").filter(Boolean)
+  const last = segments.at(-1)
+  if (last === "profile") return "profile"
+  if (segments[1] === "vouchers" && segments.length >= 3) return last === "edit" ? "edit" : "voucher-detail"
+  if (last === "vouchers") return "vouchers"
+  if (last === "new" || last === "create") return "create"
+  if (last === "reports") return "staff-reports"
+  if (last === "check-voucher") return "check-voucher"
+  return fallback
+}
 
 interface Props {
   user: AppUser
   onLogout: () => void
-  initialPage?: "profile"
+  initialPage?: VoucherStaffPage
+  initialVoucherId?: string
 }
 
 const NAV = [
@@ -44,17 +59,27 @@ const PAGE_LABELS: Record<Page, string> = {
   profile: "Hồ sơ cá nhân",
 }
 
-export function VoucherStaffApp({ user, onLogout, initialPage }: Props) {
+export function VoucherStaffApp({ user, onLogout, initialPage, initialVoucherId }: Props) {
   const router = useRouter()
-  const [page, setPage] = useState<Page>(initialPage ?? "vouchers")
+  const pathname = usePathname()
+  const page = voucherStaffPageFromPath(pathname, initialPage ?? "vouchers")
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null)
   const [mobileOpen, setMobileOpen] = useState(false)
 
+  useEffect(() => {
+    if (!initialVoucherId) return
+    void voucherService.getDetail(initialVoucherId).then((detail) => setSelectedVoucher(detail.voucher))
+  }, [initialVoucherId])
+
   const goEdit = (v: Voucher) => {
     setSelectedVoucher(v)
-    setPage(v.status === "rejected" ? "voucher-detail" : "edit")
+    const nextPage = v.status === "rejected" ? "voucher-detail" : "edit"
+    router.push(`/voucher-staff/vouchers/${v.id}/${nextPage === "edit" ? "edit" : ""}`.replace(/\/$/, ""))
   }
-  const goDetail = (v: Voucher) => { setSelectedVoucher(v); setPage("voucher-detail") }
+  const goDetail = (v: Voucher) => {
+    setSelectedVoucher(v)
+    router.push(`/voucher-staff/vouchers/${v.id}`)
+  }
 
   const ACCENT = "#81B29A"
   const SIDEBAR_BG = "#253830"
@@ -95,7 +120,7 @@ export function VoucherStaffApp({ user, onLogout, initialPage }: Props) {
           return (
             <button
               key={n.pg}
-              onClick={() => { n.pg === "profile" ? router.push(`/${user.role}/profile`) : setPage(n.pg); setMobileOpen(false) }}
+              onClick={() => { router.push(`/voucher-staff/${n.pg === "profile" ? "profile" : n.pg}`); setMobileOpen(false) }}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-left transition-all"
               style={{
                 backgroundColor: active ? ACCENT : "transparent",
@@ -161,14 +186,14 @@ export function VoucherStaffApp({ user, onLogout, initialPage }: Props) {
 
         <main className="flex-1 overflow-y-auto" style={{ backgroundColor: C.content }}>
           {page === "vouchers" && (
-            <PartnerVouchersPage onCreateNew={() => setPage("create")} onEdit={goEdit} onDetail={goDetail} />
+            <PartnerVouchersPage onCreateNew={() => router.push("/voucher-staff/vouchers/new")} onEdit={goEdit} onDetail={goDetail} />
           )}
-          {page === "create" && <CreateVoucherPage onBack={() => setPage("vouchers")} onSaveDraft={() => setPage("vouchers")} />}
+          {page === "create" && <CreateVoucherPage onBack={() => router.push("/voucher-staff/vouchers")} onSaveDraft={() => router.push("/voucher-staff/vouchers")} />}
           {page === "edit" && selectedVoucher && (
-            <EditVoucherPage voucher={selectedVoucher} onBack={() => setPage("vouchers")} onSave={(v) => setSelectedVoucher(v)} />
+            <EditVoucherPage voucher={selectedVoucher} onBack={() => router.push("/voucher-staff/vouchers")} onSave={(v) => setSelectedVoucher(v)} />
           )}
           {page === "voucher-detail" && selectedVoucher && (
-            <PartnerVoucherDetailPage voucher={selectedVoucher} onBack={() => setPage("vouchers")} onEdit={goEdit} />
+            <PartnerVoucherDetailPage voucher={selectedVoucher} onBack={() => router.push("/voucher-staff/vouchers")} onEdit={goEdit} />
           )}
           {page === "reports" && <PartnerRevenuePage />}
           {page === "staff-reports" && <StaffVoucherReportPage/>}

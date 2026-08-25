@@ -83,12 +83,9 @@ function SidebarContent({ user, partner, page, onNavigate, onLogout, onClose }: 
           <button
             key={n.pg}
             onClick={() => {
-              if (n.pg === "profile") {
-                onNavigate("profile")
-                router.push(`/${user.role}/profile`)
-              } else {
-                onNavigate(n.pg)
-              }
+              onNavigate(n.pg)
+              const path = n.pg === "profile" ? "/partner/profile" : `/partner/${n.pg}`
+              router.push(path)
               onClose?.()
             }}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-left transition-all"
