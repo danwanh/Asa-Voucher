@@ -12,7 +12,6 @@ const prisma = new PrismaClient();
 async function clearSeedDomain() {
   await prisma.complaintResponse.deleteMany();
   await prisma.reviewResponse.deleteMany();
-  await prisma.voucherUsage.deleteMany();
   await prisma.complaint.deleteMany();
   await prisma.review.deleteMany();
   await prisma.issuedVoucher.deleteMany();

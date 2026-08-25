@@ -167,7 +167,7 @@ export async function countUsedIssuedVouchersByProduct(
       status: "used",
       is_test: false,
       voucher_product_id: { in: voucherProductIds },
-      ...(Object.keys(usageFilter).length ? { voucher_usages: { some: usageFilter } } : {}),
+      ...(Object.keys(usageFilter).length ? usageFilter : {}),
     },
     _count: true,
   });

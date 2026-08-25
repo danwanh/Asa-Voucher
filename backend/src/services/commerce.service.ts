@@ -642,7 +642,7 @@ export async function cancelOrder(user: CurrentUser, id: string, reason?: string
       where: { id },
       include: {
         payments: true,
-        order_items: { include: { issued_vouchers: { include: { voucher_usages: true } } } }
+        order_items: { include: { issued_vouchers: true } }
       }
     }) as unknown as Record<string, unknown> | null,
     "Order not found"
@@ -665,9 +665,7 @@ export async function cancelOrder(user: CurrentUser, id: string, reason?: string
 
   const orderItems = (order.order_items as Array<Record<string, unknown>>) ?? [];
   const hasUsedVoucher = orderItems.some((item) =>
-    ((item.issued_vouchers as Array<Record<string, unknown>>) ?? []).some(
-      (v) => ((v.voucher_usages as unknown[]) ?? []).length > 0
-    )
+    ((item.issued_vouchers as Array<Record<string, unknown>>) ?? []).some((v) => v.used_at != null)
   );
   if (hasUsedVoucher) {
     throw new HttpError(409, "An order with used vouchers cannot be cancelled", "ORDER_HAS_USED_VOUCHERS");

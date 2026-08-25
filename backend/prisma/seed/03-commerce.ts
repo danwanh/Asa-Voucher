@@ -66,12 +66,10 @@ type IssuedVoucherSeed = {
   created_at: Date;
 };
 
-type VoucherUsageSeed = {
-  id: string;
+type IssuedVoucherUsageSeed = {
   issued_voucher_id: string;
   branch_id: string;
   redeemed_by: string;
-  redemption_code: string;
   used_at: Date;
   note: string;
 };
@@ -727,22 +725,18 @@ const issuedVouchers: IssuedVoucherSeed[] = [
   }
 ];
 
-const voucherUsages: VoucherUsageSeed[] = [
+const issuedVoucherUsages: IssuedVoucherUsageSeed[] = [
   {
-    id: "74000000-0000-0000-0000-000000000001",
     issued_voucher_id: ids.issuedVouchers.iv01,
     branch_id: ids.branches.cgvVincom,
     redeemed_by: ids.users.storeStaffCGVVincom,
-    redemption_code: "RDM-CGV-0001",
     used_at: daysFrom(now, -13),
     note: "Khách đổi vé suất chiếu 19:30"
   },
   {
-    id: "74000000-0000-0000-0000-000000000002",
     issued_voucher_id: ids.issuedVouchers.iv03,
     branch_id: ids.branches.phucLongQ3,
     redeemed_by: ids.users.storeStaffPhucLongQ3,
-    redemption_code: "RDM-PL-0002",
     used_at: daysFrom(now, -11),
     note: "Đổi 2 ly trà sữa size L"
   }
@@ -859,11 +853,15 @@ export async function seedCommerce({ prisma }: SeedContext) {
     });
   }
 
-  for (const usage of voucherUsages) {
-    await prisma.voucherUsage.upsert({
-      where: { id: usage.id },
-      create: usage,
-      update: usage
+  for (const usage of issuedVoucherUsages) {
+    await prisma.issuedVoucher.update({
+      where: { id: usage.issued_voucher_id },
+      data: {
+        branch_id: usage.branch_id,
+        redeemed_by: usage.redeemed_by,
+        used_at: usage.used_at,
+        note: usage.note,
+      },
     });
   }
 }
