@@ -73,7 +73,7 @@ function managedFromSavedImage(image: { id: string; imageUrl: string; isPrimary:
     localId: image.id,
     id: image.id,
     imageUrl: image.imageUrl,
-    isPrimary: image.isPrimary,
+    isPrimary: false,
   }
 }
 
@@ -227,12 +227,12 @@ export function CreateVoucherPage({ partnerId, onBack }: Props) {
         ? voucherService.updateVoucherImage(image.id, {
           voucherId,
           imageUrl: image.imageUrl,
-          isPrimary: image.isPrimary,
+          isPrimary: index === 0,
           sortOrder: index,
         })
         : voucherService.createVoucherImage(voucherId, {
           imageUrl: image.imageUrl,
-          isPrimary: image.isPrimary,
+          isPrimary: index === 0,
           sortOrder: index,
         })
     )))
@@ -247,15 +247,15 @@ export function CreateVoucherPage({ partnerId, onBack }: Props) {
 
     let voucherId = createdVoucherId
     try {
-      const uploadedImages = await uploadSelectedImages()
+      const uploadedImages = normalizeVoucherImages(await uploadSelectedImages())
       if (!voucherId) {
-        const primaryImageUrl = uploadedImages.find((image) => image.isPrimary)?.imageUrl ?? uploadedImages[0]?.imageUrl
+        const thumbnailImageUrl = uploadedImages[0]?.imageUrl
 
         const created = await voucherService.createVoucher({
           category_id: form.categoryId,
           name: form.name.trim(),
           description: form.description.trim(),
-          thumbnail_url: primaryImageUrl || undefined,
+          thumbnail_url: thumbnailImageUrl || undefined,
           applicable_area: derivedApplicableArea || undefined,
           original_price: Number(form.originalPrice),
           selling_price: Number(form.sellingPrice),

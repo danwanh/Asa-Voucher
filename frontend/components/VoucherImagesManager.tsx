@@ -27,9 +27,7 @@ function makeLocalId() {
 
 export function normalizeVoucherImages(images: ManagedVoucherImage[]) {
   if (images.length === 0) return []
-  const primaryIndex = images.findIndex((image) => image.isPrimary)
-  const nextPrimaryIndex = primaryIndex >= 0 ? primaryIndex : 0
-  return images.map((image, index) => ({ ...image, isPrimary: index === nextPrimaryIndex }))
+  return images.map((image, index) => ({ ...image, isPrimary: index === 0 }))
 }
 
 export function VoucherImagesManager({ images, disabled = false, onChange, onError }: Props) {
@@ -62,7 +60,7 @@ export function VoucherImagesManager({ images, disabled = false, onChange, onErr
         localId: makeLocalId(),
         imageUrl: objectUrl,
         file,
-        isPrimary: images.length === 0 && nextImages.length === 0,
+        isPrimary: false,
       })
     }
 
@@ -87,11 +85,7 @@ export function VoucherImagesManager({ images, disabled = false, onChange, onErr
     const next = [...images]
     const [item] = next.splice(index, 1)
     next.splice(nextIndex, 0, item)
-    onChange(next)
-  }
-
-  const setPrimary = (localId: string) => {
-    onChange(images.map((image) => ({ ...image, isPrimary: image.localId === localId })))
+    onChange(normalizeVoucherImages(next))
   }
 
   return (
@@ -123,12 +117,13 @@ export function VoucherImagesManager({ images, disabled = false, onChange, onErr
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           {images.map((image, index) => (
-            <div key={image.localId} className="rounded-xl border bg-white p-2" style={{ borderColor: image.isPrimary ? C.teal : "#E2DFC8" }}>
-              <div className="relative overflow-hidden rounded-lg">
-                <img src={image.imageUrl} alt={`Ảnh voucher ${index + 1}`} className="h-28 w-full object-cover" />
-                {image.isPrimary && (
-                  <span className="absolute left-2 top-2 rounded-full px-2 py-0.5 text-xs font-bold text-white" style={{ backgroundColor: C.teal }}>
-                    Ảnh chính
+            <div key={image.localId} className="rounded-xl border bg-white p-2" style={{ borderColor: index === 0 ? C.teal : "#E2DFC8" }}>
+              <div className="relative flex h-28 items-center justify-center overflow-hidden rounded-lg bg-white">
+                <img src={image.imageUrl} alt={`Ảnh voucher ${index + 1}`} className="h-full w-full object-contain" />
+                {index === 0 && (
+                  <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold text-white" style={{ backgroundColor: C.teal }}>
+                    <Star className="h-3 w-3 fill-current" />
+                    Ảnh thumbnail
                   </span>
                 )}
               </div>
@@ -140,9 +135,6 @@ export function VoucherImagesManager({ images, disabled = false, onChange, onErr
                   </button>
                   <button type="button" onClick={() => moveImage(image.localId, 1)} disabled={disabled || index === images.length - 1} className="rounded-lg p-1.5 disabled:opacity-35" title="Đưa xuống">
                     <ArrowDown className="h-3.5 w-3.5" />
-                  </button>
-                  <button type="button" onClick={() => setPrimary(image.localId)} disabled={disabled || image.isPrimary} className="rounded-lg p-1.5 disabled:opacity-35" title="Đặt làm ảnh chính">
-                    <Star className="h-3.5 w-3.5" />
                   </button>
                   <button type="button" onClick={() => removeImage(image.localId)} disabled={disabled} className="rounded-lg p-1.5 text-red-500 disabled:opacity-35" title="Xóa ảnh">
                     <Trash2 className="h-3.5 w-3.5" />

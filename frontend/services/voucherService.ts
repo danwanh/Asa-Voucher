@@ -37,6 +37,9 @@ export type BackendVoucherProduct = {
     name: string
     slug: string
   } | null
+  voucher_product_images?: Array<{
+    image_url: string
+  }>
 }
 
 export type BackendCategory = {
@@ -218,6 +221,7 @@ function mapVoucherProduct(product: BackendVoucherProduct, categorySlug: string)
   const price = toNumber(product.selling_price)
   const sold = Math.max(0, product.total_quantity - product.remaining_quantity)
   const discount = Number.isFinite(product.discount_rate) ? Math.round(product.discount_rate) : 0
+  const firstImageUrl = product.voucher_product_images?.[0]?.image_url
 
   return {
     id: product.id,
@@ -240,7 +244,7 @@ function mapVoucherProduct(product: BackendVoucherProduct, categorySlug: string)
     rating: 0,
     reviews: 0,
     description: product.description ?? "",
-    image: product.thumbnail_url ?? "",
+    image: firstImageUrl ?? product.thumbnail_url ?? "",
     tags: [],
     applicableArea: product.applicable_area
   }
@@ -531,6 +535,7 @@ export const voucherService = {
       return {
         voucher: {
           ...current,
+          image: extractData(imageRes)[0]?.image_url ?? current.image,
           reviews: reviewList.pagination?.total ?? reviews.length,
           rating: reviewList.average_rating ?? 0
         },

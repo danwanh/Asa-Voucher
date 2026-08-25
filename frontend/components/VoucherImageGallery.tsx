@@ -51,11 +51,11 @@ export function VoucherImageGallery({
     <div className={className}>
       {showImage ? (
         <div>
-          <div className={`${mainHeightClass} relative overflow-hidden`}>
+          <div className={`${mainHeightClass} relative overflow-hidden bg-white`}>
             <img
               src={selectedImage}
               alt={alt}
-              className="h-full w-full object-cover"
+              className="h-full w-full object-contain"
               onError={(event) => {
                 if (fallbackImageUrl && selectedImage !== fallbackImageUrl) {
                   event.currentTarget.src = fallbackImageUrl

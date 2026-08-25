@@ -25,6 +25,14 @@ function todayIsoDate() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function dateOnly(value: unknown) {
+  if (!value) return null;
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString().slice(0, 10);
+}
+
 function getPublicVoucherWhere() {
   const today = new Date(todayIsoDate());
   return {
@@ -221,14 +229,30 @@ function validateVoucherBusinessFields(voucher: Record<string, unknown>) {
 }
 
 function getWorkflowStatus(voucher: Record<string, unknown>): WorkflowStatus {
-  if (voucher.status === "active" && voucher.approval_status === "approved") return "active";
-  if (voucher.status === "paused") return "paused";
-  if (voucher.status === "sold_out") return "sold_out";
-  if (voucher.status === "expired") return "expired";
   if (voucher.approval_status === "rejected") return "rejected";
-  if (voucher.approval_status === "approved") return "approved";
   if (voucher.status === "draft" && voucher.submitted_at) return "pending_approval";
+  if (voucher.approval_status !== "approved") return "draft";
+
+  const today = todayIsoDate();
+  const saleStart = dateOnly(voucher.sale_start_date);
+  const saleEnd = dateOnly(voucher.sale_end_date);
+  const remainingQuantity = Number(voucher.remaining_quantity);
+
+  if (voucher.status === "sold_out" || remainingQuantity <= 0) return "sold_out";
+  if (voucher.status === "expired" || (saleEnd && saleEnd < today)) return "expired";
+  if (voucher.status === "paused") return "paused";
+  if (voucher.status === "active" && (!saleStart || saleStart <= today)) return "active";
+  if (voucher.approval_status === "approved") return "approved";
   return "draft";
+}
+
+function getEditLockStatus(voucher: Record<string, unknown>): string {
+  const saleEnd = dateOnly(voucher.sale_end_date);
+  if (voucher.status === "expired" || (saleEnd && saleEnd < todayIsoDate())) {
+    return "expired";
+  }
+
+  return String(voucher.status ?? "draft");
 }
 
 const WORKFLOW_LABELS: Record<WorkflowStatus, string> = {
@@ -311,6 +335,11 @@ export async function listVoucherProducts(user: CurrentUser | undefined, queryIn
         approval_status: true,
         submitted_at: true,
         partners: { select: { business_name: true } },
+        voucher_product_images: {
+          select: { image_url: true },
+          orderBy: { sort_order: "asc" },
+          take: 1
+        },
       },
       skip: from,
       take: to - from + 1,
@@ -397,7 +426,8 @@ export async function createVoucherProduct(user: CurrentUser, input: Record<stri
 
 export async function getVoucherProduct(user: CurrentUser | undefined, id: string) {
   const voucher = await getVoucher(id);
-  const isPublicVisible = voucher.approval_status === "approved" && voucher.status === "active";
+  const workflowStatus = getWorkflowStatus(voucher);
+  const isPublicVisible = voucher.approval_status === "approved" && workflowStatus === "active";
   if (!isPublicVisible && user) await assertVoucherOwnerOrAdmin(user, voucher);
   if (!isPublicVisible && !user) throw new HttpError(404, "Voucher product not found", "NOT_FOUND");
   return withWorkflow(voucher);
@@ -485,7 +515,7 @@ export async function updateVoucherProduct(user: CurrentUser, id: string, input:
 
   // FC-PAV-MANAGE: Field locking — reject edits to locked fields based on current status
   const inputKeys = Object.keys(input).filter((k) => input[k] !== undefined);
-  assertFieldsNotLocked(String(voucher.status), inputKeys);
+  assertFieldsNotLocked(getEditLockStatus(voucher), inputKeys);
 
   // RB-02: selling price must not exceed original price
   if (input.selling_price && Number(input.selling_price) >= Number(input.original_price ?? voucher.original_price)) {

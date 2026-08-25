@@ -345,6 +345,21 @@ describe("Voucher Product Service", () => {
       expect(result.id).toBe("vp1");
     });
 
+    it("maps raw active voucher past sale end to expired workflow", async () => {
+      vi.mocked(prisma.voucherProduct.findUnique).mockResolvedValue(makeVoucher({ sale_end_date: "2020-01-01" }) as any);
+
+      const result = await voucherProductService.getVoucherProduct(PARTNER_OWNER, "vp1");
+
+      expect(result.workflow_status).toBe("expired");
+      expect(result.workflow_label).toBe("Hết hạn");
+    });
+
+    it("does not treat raw active voucher past sale end as public active", async () => {
+      vi.mocked(prisma.voucherProduct.findUnique).mockResolvedValue(makeVoucher({ sale_end_date: "2020-01-01" }) as any);
+
+      await expect(voucherProductService.getVoucherProduct(undefined, "vp1")).rejects.toThrow(HttpError);
+    });
+
     it("returns draft voucher to owner", async () => {
       vi.mocked(prisma.voucherProduct.findUnique).mockResolvedValue(makeVoucher({ approval_status: "pending" }) as any);
 
@@ -388,6 +403,13 @@ describe("Voucher Product Service", () => {
 
       await voucherProductService.updateVoucherProduct(PARTNER_OWNER, "vp1", { name: "B" });
       expect(prisma.voucherProduct.update).toHaveBeenCalled();
+    });
+
+    it("locks raw active voucher past sale end as expired", async () => {
+      vi.mocked(prisma.voucherProduct.findUnique).mockResolvedValue(makeVoucher({ sale_end_date: "2020-01-01" }) as any);
+
+      await expect(voucherProductService.updateVoucherProduct(PARTNER_OWNER, "vp1", { name: "B" })).rejects.toThrow(HttpError);
+      expect(prisma.voucherProduct.update).not.toHaveBeenCalled();
     });
 
     it("rejects updating other partner's voucher", async () => {

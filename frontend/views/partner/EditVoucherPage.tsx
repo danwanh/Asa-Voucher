@@ -69,7 +69,7 @@ function managedFromVoucherImage(image: VoucherImage): ManagedVoucherImage {
     localId: image.id,
     id: image.id,
     imageUrl: image.imageUrl,
-    isPrimary: image.isPrimary,
+    isPrimary: false,
   }
 }
 
@@ -263,12 +263,12 @@ export function EditVoucherPage({ voucher, onBack, onSave, lockPriceAndQuantity 
         ? voucherService.updateVoucherImage(image.id, {
           voucherId: voucher.id,
           imageUrl: image.imageUrl,
-          isPrimary: image.isPrimary,
+          isPrimary: index === 0,
           sortOrder: index,
         })
         : voucherService.createVoucherImage(voucher.id, {
           imageUrl: image.imageUrl,
-          isPrimary: image.isPrimary,
+          isPrimary: index === 0,
           sortOrder: index,
         })
     )))
@@ -282,14 +282,14 @@ export function EditVoucherPage({ voucher, onBack, onSave, lockPriceAndQuantity 
 
     setIsSaving(true)
     try {
-      const uploadedImages = await uploadSelectedImages()
-      const primaryImageUrl = uploadedImages.find((image) => image.isPrimary)?.imageUrl ?? uploadedImages[0]?.imageUrl
+      const uploadedImages = normalizeVoucherImages(await uploadSelectedImages())
+      const thumbnailImageUrl = uploadedImages[0]?.imageUrl
 
       const payload: VoucherUpdateInput = {
         category_id: form.categoryId,
         name: form.name.trim(),
         description: form.description.trim(),
-        thumbnail_url: primaryImageUrl ?? null,
+        thumbnail_url: thumbnailImageUrl ?? null,
         applicable_area: derivedApplicableArea || undefined,
         sale_start_date: form.saleStartDate,
         sale_end_date: form.saleEndDate,
