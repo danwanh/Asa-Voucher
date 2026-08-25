@@ -23,12 +23,15 @@ export type BackendVoucherProduct = {
   remaining_quantity: number
   sale_start_date: string
   sale_end_date: string
+  created_at?: string
   validity_days: number
   terms_and_conditions: unknown
   usage_instructions: unknown
   status: string
   workflow_status?: string
   workflow_label?: string
+  average_rating?: number
+  review_count?: number
   submitted_at?: string | null
   partners?: {
     business_name: string
@@ -238,11 +241,12 @@ function mapVoucherProduct(product: BackendVoucherProduct, categorySlug: string)
     originalPrice,
     validFrom: product.sale_start_date,
     validTo: product.sale_end_date,
+    createdAt: product.created_at,
     quantity: product.total_quantity,
     sold,
     status: mapStatus(product),
-    rating: 0,
-    reviews: 0,
+    rating: product.average_rating ?? 0,
+    reviews: product.review_count ?? 0,
     description: product.description ?? "",
     image: firstImageUrl ?? product.thumbnail_url ?? "",
     tags: [],

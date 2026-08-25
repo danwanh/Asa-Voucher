@@ -97,7 +97,10 @@ export function VoucherCard({ voucher: v, onAddToCart, onBuyNow, onClick }: Prop
         <p className="font-bold text-sm leading-snug mb-1 line-clamp-2" style={{ color: C.indigo }}>
           {v.title}
         </p>
-        <p className="text-xs mb-3" style={{ color: "#8A8DA8" }}>{v.partnerName}</p>
+        <div className="flex items-center gap-1 text-xs mb-3" style={{ color: C.teal }}>
+          <AppIcon name={v.partnerLogo} className="w-3.5 h-3.5" />
+          <span>{v.partnerName}</span>
+        </div>
 
         <div className="flex items-center justify-between mb-3">
           <div>
@@ -135,13 +138,10 @@ export function VoucherCard({ voucher: v, onAddToCart, onBuyNow, onClick }: Prop
           </div>
         )}
 
-        {v.rating > 0 && (
-          <div className="flex items-center gap-1 mt-2">
-            <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-            <span className="text-xs font-semibold">{v.rating}</span>
-            <span className="text-xs" style={{ color: "#B0B3C8" }}>({v.reviews})</span>
-          </div>
-        )}
+        <div className="flex items-center gap-1 mt-2 text-xs" style={{ color: "#6B7280" }}>
+          <Star className="w-3 h-3 fill-current" style={{ color: C.apricot }} />
+          <span>{v.rating} ({v.reviews})</span>
+        </div>
       </div>
     </div>
   )
