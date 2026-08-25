@@ -8,6 +8,7 @@ import { SectionHeader } from "@/components/SectionHeader"
 import type { Voucher } from "@/types"
 import { voucherService, type HomepageSummary } from "@/services/voucherService"
 import { isVoucherAvailable } from "@/hooks/useCart"
+import { AsaHero } from "@/components/AsaHero"
 
 const LazyNewsSection = dynamic(() => import("@/components/NewsSection").then((module) => module.LazyNewsSection), {
   loading: () => <div className="min-h-24" aria-hidden="true" />,
@@ -113,9 +114,10 @@ export function GuestHomePage({ viewer = "guest", onNavigate, onVoucherDetail, o
 
   return (
     <div>
-      {/* Hero */}
+      <AsaHero onNavigate={() => onNavigate("vouchers")} />
+      {/* Legacy hero markup retained as a hidden fallback for older snapshots. */}
       <section
-        className="relative overflow-hidden py-20 px-4"
+        className="hidden relative overflow-hidden py-20 px-4"
         style={{
           background: `linear-gradient(135deg, ${C.indigo} 0%, #4D5170 50%, #5A5E7A 100%)`,
         }}
@@ -154,7 +156,7 @@ export function GuestHomePage({ viewer = "guest", onNavigate, onVoucherDetail, o
       </section>
 
       {/* Banner carousel */}
-      <section className="px-4 pt-6">
+      <section className="px-4 pt-6 mb-10">
         <div className="max-w-7xl mx-auto">
           <div className="rounded-3xl border border-black/5 bg-white p-2 sm:p-3 shadow-sm">
             <BannerCarousel />
