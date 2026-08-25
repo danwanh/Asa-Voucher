@@ -23,12 +23,10 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
           full_name: true,
           role: true,
           is_active: true,
-          is_verified: true,
-          auth_version: true,
-          partner_branches_id: true,
-          represented_partners: { select: { id: true }, take: 1 },
-          partner_branches: { select: { partner_id: true } }
-        }
+           is_verified: true,
+           auth_version: true,
+           partner_branches_id: true
+         }
       }),
       "User not found"
     );
@@ -48,15 +46,13 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
       return;
     }
 
-    const partnerId = user.represented_partners[0]?.id ?? user.partner_branches?.partner_id;
-
     req.user = {
       id: user.id,
       email: user.email,
       name: user.full_name,
       role: user.role as never,
-      partnerId,
-      branchId: user.partner_branches_id ?? undefined
+      partnerId: payload.partner_id,
+      branchId: payload.branch_id ?? user.partner_branches_id ?? undefined
     };
 
     next();

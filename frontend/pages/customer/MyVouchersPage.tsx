@@ -32,9 +32,7 @@ const TABS = [
 
 const COMPLAINT_STATUS: Record<ComplaintStatus, { label: string; color: string; background: string }> = {
   open: { label: "Chờ tiếp nhận", color: "#B66A00", background: C.apricot + "25" },
-  under_review: { label: "Đang xử lý", color: "#2563EB", background: "#DBEAFE" },
   resolved: { label: "Đã giải quyết", color: "#15803D", background: "#DCFCE7" },
-  closed: { label: "Đã đóng", color: "#6B7280", background: "#F3F4F6" },
 }
 
 function buildEntries(orders: Order[]): VoucherEntry[] {
@@ -111,7 +109,7 @@ export function MyVouchersPage({ orders, ownerId, loading = false, onReview, onC
             const partner = item.partnerName ?? order.partnerName
             const canAct = order.status === "confirmed" || order.status === "completed" || issuedVoucher.status === "used"
             const complaintStatus = issuedVoucher.complaint ? COMPLAINT_STATUS[issuedVoucher.complaint.status] : null
-            const isInvalidated = issuedVoucher.status === "refunded" || issuedVoucher.status === "cancelled"
+            const isInvalidated = issuedVoucher.status === "refunded"
             return (
               <div key={issuedVoucher.id} className="bg-card rounded-3xl overflow-hidden shadow-sm" style={{ opacity: isInvalidated ? 0.7 : 1, borderColor: isInvalidated ? "#FCA5A5" : undefined, borderWidth: isInvalidated ? 1 : 0, borderStyle: "solid" }}>
                 <div className="p-5 flex items-start gap-4">
@@ -159,11 +157,11 @@ export function MyVouchersPage({ orders, ownerId, loading = false, onReview, onC
           <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center" onClick={(e) => e.stopPropagation()}>
             <div className="font-black text-lg mb-1" style={{ color: C.indigo }}>{openEntry.item.voucherTitle ?? openEntry.order.voucherTitle}</div>
             <div className="text-sm mb-4" style={{ color: "#8A8DA8" }}>{openEntry.item.partnerName ?? openEntry.order.partnerName}</div>
-            <div className="flex justify-center mb-4"><MockQR code={openEntry.issuedVoucher.qrPayload || openEntry.issuedVoucher.code} size={120} disabled={openEntry.issuedVoucher.status === "refunded" || openEntry.issuedVoucher.status === "cancelled"} /></div>
+            <div className="flex justify-center mb-4"><MockQR code={openEntry.issuedVoucher.qrPayload || openEntry.issuedVoucher.code} size={120} disabled={openEntry.issuedVoucher.status === "refunded"} /></div>
             <code className="text-lg font-black tracking-widest block mb-4" style={{ color: C.indigo, fontFamily: "'Inter', monospace" }}>{openEntry.issuedVoucher.code}</code>
             <div className="text-xs mb-1" style={{ color: "#8A8DA8" }}>Trạng thái</div>
             <StatusBadge status={openEntry.issuedVoucher.status} />
-            {(openEntry.issuedVoucher.status === "refunded" || openEntry.issuedVoucher.status === "cancelled") && (
+            {openEntry.issuedVoucher.status === "refunded" && (
               <div className="text-xs font-semibold mt-3" style={{ color: "#DC2626" }}>Voucher đã bị vô hiệu hóa</div>
             )}
             <button className="mt-6 px-5 py-2.5 rounded-xl font-bold text-sm border" style={{ borderColor: "#E2DFC8", color: C.indigo }} onClick={() => setQrOpen(null)}>Đóng</button>

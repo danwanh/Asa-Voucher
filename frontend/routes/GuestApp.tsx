@@ -1,18 +1,21 @@
 import { useEffect, useState } from "react"
+import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
 import { AppIcon } from "@/components/AppIcon"
-import { CategoryGridPage } from "@/components/CategoryGridPage"
 import { PopupModal } from "@/components/PopupModal"
 import { toast } from "sonner"
 import { GuestLayout, type GuestPage } from "@/layouts/GuestLayout"
-import { GuestHomePage } from "@/pages/guest/GuestHomePage"
-import { VoucherListPage } from "@/pages/customer/VoucherListPage"
-import { GuestVoucherDetailPage } from "@/pages/guest/GuestVoucherDetailPage"
-import { CartPage } from "@/pages/customer/CartPage"
 import type { Voucher, CartItem } from "@/types"
 import { voucherService, type VoucherDetailData } from "@/services/voucherService"
 import { LoadingState } from "@/components/LoadingState"
 import { isVoucherAvailable } from "@/hooks/useCart"
+
+const pageLoading = () => <LoadingState label="Đang tải trang..." variant="page" />
+const CategoryGridPage = dynamic(() => import("@/components/CategoryGridPage").then((module) => module.CategoryGridPage), { loading: pageLoading })
+const GuestHomePage = dynamic(() => import("@/pages/guest/GuestHomePage").then((module) => module.GuestHomePage), { loading: pageLoading })
+const VoucherListPage = dynamic(() => import("@/pages/customer/VoucherListPage").then((module) => module.VoucherListPage), { loading: pageLoading })
+const GuestVoucherDetailPage = dynamic(() => import("@/pages/guest/GuestVoucherDetailPage").then((module) => module.GuestVoucherDetailPage), { loading: pageLoading })
+const CartPage = dynamic(() => import("@/pages/customer/CartPage").then((module) => module.CartPage), { loading: pageLoading })
 
 interface Props {
   onLogin: () => void

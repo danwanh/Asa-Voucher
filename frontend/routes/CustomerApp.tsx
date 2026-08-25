@@ -1,24 +1,11 @@
 import { startTransition, useEffect, useRef, useState } from "react"
+import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
 import { AppIcon } from "@/components/AppIcon"
-import { CategoryGridPage } from "@/components/CategoryGridPage"
 import { PopupModal } from "@/components/PopupModal"
 import { toast } from "sonner"
 import { CustomerLayout, type CustomerPage } from "@/layouts/CustomerLayout"
-import { HomePage } from "@/pages/customer/HomePage"
-import { VoucherListPage } from "@/pages/customer/VoucherListPage"
-import { VoucherDetailPage } from "@/pages/customer/VoucherDetailPage"
-import { CartPage } from "@/pages/customer/CartPage"
-import { CreateOrderPage, type RecipientInfo } from "@/pages/customer/CreateOrderPage"
-import { PaymentPage } from "@/pages/customer/PaymentPage"
-import { CheckoutSuccessPage } from "@/pages/customer/CheckoutSuccessPage"
-import { MyVouchersPage } from "@/pages/customer/MyVouchersPage"
-import { OrderHistoryPage } from "@/pages/customer/OrderHistoryPage"
-import { OrderDetailPage } from "@/pages/customer/OrderDetailPage"
-import { ReviewPage } from "@/pages/customer/ReviewPage"
-import { ComplaintPage } from "@/pages/customer/ComplaintPage"
-import { ProfilePage } from "@/pages/customer/ProfilePage"
-import { CustomerSettingsPage } from "@/pages/customer/CustomerSettingsPage"
+import type { RecipientInfo } from "@/pages/customer/CreateOrderPage"
 import { C } from "@/utils/constants"
 import { customerPagePath } from "@/utils/customerRoutes"
 import type { AppUser, CartItem, CheckoutDraft, IssuedVoucher, Voucher, Order, OrderListItem, ReviewTarget } from "@/types"
@@ -27,6 +14,23 @@ import { issuedVoucherService } from "@/services/issuedVoucherService"
 import { voucherService, type VoucherDetailData } from "@/services/voucherService"
 import { LoadingState } from "@/components/LoadingState"
 import { isVoucherAvailable } from "@/hooks/useCart"
+
+const pageLoading = () => <LoadingState label="Đang tải trang..." variant="page" />
+const CategoryGridPage = dynamic(() => import("@/components/CategoryGridPage").then((module) => module.CategoryGridPage), { loading: pageLoading })
+const HomePage = dynamic(() => import("@/pages/customer/HomePage").then((module) => module.HomePage), { loading: pageLoading })
+const VoucherListPage = dynamic(() => import("@/pages/customer/VoucherListPage").then((module) => module.VoucherListPage), { loading: pageLoading })
+const VoucherDetailPage = dynamic(() => import("@/pages/customer/VoucherDetailPage").then((module) => module.VoucherDetailPage), { loading: pageLoading })
+const CartPage = dynamic(() => import("@/pages/customer/CartPage").then((module) => module.CartPage), { loading: pageLoading })
+const CreateOrderPage = dynamic(() => import("@/pages/customer/CreateOrderPage").then((module) => module.CreateOrderPage), { loading: pageLoading })
+const PaymentPage = dynamic(() => import("@/pages/customer/PaymentPage").then((module) => module.PaymentPage), { loading: pageLoading })
+const CheckoutSuccessPage = dynamic(() => import("@/pages/customer/CheckoutSuccessPage").then((module) => module.CheckoutSuccessPage), { loading: pageLoading })
+const MyVouchersPage = dynamic(() => import("@/pages/customer/MyVouchersPage").then((module) => module.MyVouchersPage), { loading: pageLoading })
+const OrderHistoryPage = dynamic(() => import("@/pages/customer/OrderHistoryPage").then((module) => module.OrderHistoryPage), { loading: pageLoading })
+const OrderDetailPage = dynamic(() => import("@/pages/customer/OrderDetailPage").then((module) => module.OrderDetailPage), { loading: pageLoading })
+const ReviewPage = dynamic(() => import("@/pages/customer/ReviewPage").then((module) => module.ReviewPage), { loading: pageLoading })
+const ComplaintPage = dynamic(() => import("@/pages/customer/ComplaintPage").then((module) => module.ComplaintPage), { loading: pageLoading })
+const ProfilePage = dynamic(() => import("@/pages/customer/ProfilePage").then((module) => module.ProfilePage), { loading: pageLoading })
+const CustomerSettingsPage = dynamic(() => import("@/pages/customer/CustomerSettingsPage").then((module) => module.CustomerSettingsPage), { loading: pageLoading })
 
 interface Props {
   user: AppUser

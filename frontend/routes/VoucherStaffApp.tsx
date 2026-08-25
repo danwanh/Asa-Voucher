@@ -1,17 +1,21 @@
 import { useState } from "react"
+import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
 import { Tag, PlusCircle, BarChart3, ScanLine, User, LogOut, Menu, ChevronRight } from "lucide-react"
 import { C } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
-import { PartnerVouchersPage } from "@/pages/partner/PartnerVouchersPage"
-import { CreateVoucherPage } from "@/pages/partner/CreateVoucherPage"
-import { EditVoucherPage } from "@/pages/partner/EditVoucherPage"
-import { PartnerVoucherDetailPage } from "@/pages/partner/PartnerVoucherDetailPage"
-import { PartnerRevenuePage } from "@/pages/partner/PartnerRevenuePage"
-import { StaffProfilePage } from "@/pages/staff/StaffProfilePage"
 import type { AppUser, Voucher } from "@/types"
-import { StaffVoucherReportPage } from "@/pages/staff/StaffVoucherReportPage"
-import { StaffCheckVoucherPage } from "@/pages/staff/StaffCheckVoucherPage"
+import { LoadingState } from "@/components/LoadingState"
+
+const pageLoading = () => <LoadingState label="Đang tải trang..." variant="page" />
+const PartnerVouchersPage = dynamic(() => import("@/pages/partner/PartnerVouchersPage").then((module) => module.PartnerVouchersPage), { loading: pageLoading })
+const CreateVoucherPage = dynamic(() => import("@/pages/partner/CreateVoucherPage").then((module) => module.CreateVoucherPage), { loading: pageLoading })
+const EditVoucherPage = dynamic(() => import("@/pages/partner/EditVoucherPage").then((module) => module.EditVoucherPage), { loading: pageLoading })
+const PartnerVoucherDetailPage = dynamic(() => import("@/pages/partner/PartnerVoucherDetailPage").then((module) => module.PartnerVoucherDetailPage), { loading: pageLoading })
+const PartnerRevenuePage = dynamic(() => import("@/pages/partner/PartnerRevenuePage").then((module) => module.PartnerRevenuePage), { loading: pageLoading })
+const StaffProfilePage = dynamic(() => import("@/pages/staff/StaffProfilePage").then((module) => module.StaffProfilePage), { loading: pageLoading })
+const StaffVoucherReportPage = dynamic(() => import("@/pages/staff/StaffVoucherReportPage").then((module) => module.StaffVoucherReportPage), { loading: pageLoading })
+const StaffCheckVoucherPage = dynamic(() => import("@/pages/staff/StaffCheckVoucherPage").then((module) => module.StaffCheckVoucherPage), { loading: pageLoading })
 
 type Page = "vouchers" | "create" | "edit" | "voucher-detail" | "reports" | "staff-reports" | "check-voucher" | "profile"
 

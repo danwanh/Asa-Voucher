@@ -1,21 +1,24 @@
 import { useEffect, useState } from "react"
+import dynamic from "next/dynamic"
 import { AppIcon } from "@/components/AppIcon"
 import { PartnerLayout, type PartnerPage } from "@/layouts/PartnerLayout"
-import { PartnerVouchersPage } from "@/pages/partner/PartnerVouchersPage"
-import { CreateVoucherPage } from "@/pages/partner/CreateVoucherPage"
-import { EditVoucherPage } from "@/pages/partner/EditVoucherPage"
-import { PartnerVoucherDetailPage } from "@/pages/partner/PartnerVoucherDetailPage"
-import { PartnerRevenuePage } from "@/pages/partner/PartnerRevenuePage"
-import { StaffCheckVoucherPage } from "@/pages/staff/StaffCheckVoucherPage"
-import { BranchManagementPage } from "@/pages/partner/BranchManagementPage"
-import { StaffManagementPage } from "@/pages/partner/StaffManagementPage"
-import { BusinessProfilePage } from "@/pages/partner/BusinessProfilePage"
-import { PersonalProfilePage } from "@/components/PersonalProfilePage"
-import { PartnerSettingsPage } from "@/pages/partner/PartnerSettingsPage"
 import { C } from "@/utils/constants"
 import type { AppUser, Voucher } from "@/types"
 import { partnerService, type PartnerProfile } from "@/services/partnerService"
 import { LoadingState } from "@/components/LoadingState"
+
+const pageLoading = () => <LoadingState label="Đang tải trang..." variant="page" />
+const PartnerVouchersPage = dynamic(() => import("@/pages/partner/PartnerVouchersPage").then((module) => module.PartnerVouchersPage), { loading: pageLoading })
+const CreateVoucherPage = dynamic(() => import("@/pages/partner/CreateVoucherPage").then((module) => module.CreateVoucherPage), { loading: pageLoading })
+const EditVoucherPage = dynamic(() => import("@/pages/partner/EditVoucherPage").then((module) => module.EditVoucherPage), { loading: pageLoading })
+const PartnerVoucherDetailPage = dynamic(() => import("@/pages/partner/PartnerVoucherDetailPage").then((module) => module.PartnerVoucherDetailPage), { loading: pageLoading })
+const PartnerRevenuePage = dynamic(() => import("@/pages/partner/PartnerRevenuePage").then((module) => module.PartnerRevenuePage), { loading: pageLoading })
+const StaffCheckVoucherPage = dynamic(() => import("@/pages/staff/StaffCheckVoucherPage").then((module) => module.StaffCheckVoucherPage), { loading: pageLoading })
+const BranchManagementPage = dynamic(() => import("@/pages/partner/BranchManagementPage").then((module) => module.BranchManagementPage), { loading: pageLoading })
+const StaffManagementPage = dynamic(() => import("@/pages/partner/StaffManagementPage").then((module) => module.StaffManagementPage), { loading: pageLoading })
+const BusinessProfilePage = dynamic(() => import("@/pages/partner/BusinessProfilePage").then((module) => module.BusinessProfilePage), { loading: pageLoading })
+const PersonalProfilePage = dynamic(() => import("@/components/PersonalProfilePage").then((module) => module.PersonalProfilePage), { loading: pageLoading })
+const PartnerSettingsPage = dynamic(() => import("@/pages/partner/PartnerSettingsPage").then((module) => module.PartnerSettingsPage), { loading: pageLoading })
 
 interface Props {
   user: AppUser

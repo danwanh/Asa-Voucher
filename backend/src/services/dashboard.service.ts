@@ -167,7 +167,7 @@ export async function getContentDashboardStats(filter: {from?: Date, to?: Date, 
       };
 
   // Query voucher stats (theo approval_status)
-  const [pending, approved, rejected] = await Promise.all([
+  const [pending, approved, rejected, banners, articles, popups, policies, categories] = await Promise.all([
     prisma.voucherProduct.count({
       where: {
         approval_status: "pending",
@@ -186,10 +186,6 @@ export async function getContentDashboardStats(filter: {from?: Date, to?: Date, 
         ...dateFilter,
       }
     }),
-  ]);
-
-  // Query CMS content stats (theo content_type)
-  const [banners, articles, popups, policies, categories] = await Promise.all([
     prisma.cmsContent.count({
       where: {
         content_type: "banner",

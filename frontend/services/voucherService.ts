@@ -1,4 +1,5 @@
 import { api } from "./api"
+import type { AxiosRequestConfig } from "axios"
 import type { Voucher } from "@/types"
 
 type ApiEnvelope<T> = {
@@ -279,7 +280,10 @@ function categoryFromMap(categoryMap: Map<string, BackendCategory>, categoryId: 
 }
 
 export const voucherService = {
-  async listPublicVouchersPage(params?: { page?: number; limit?: number; search?: string; categoryId?: string; partnerId?: string; area?: string }): Promise<VoucherListPage> {
+  async listPublicVouchersPage(
+    params?: { page?: number; limit?: number; search?: string; categoryId?: string; partnerId?: string; area?: string },
+    config?: Pick<AxiosRequestConfig, "signal">,
+  ): Promise<VoucherListPage> {
     const [categoryMap, listRes] = await Promise.all([
       getCategoryMap(),
       api.get<ApiEnvelope<BackendVoucherList>>("/voucher-products", {
@@ -291,6 +295,7 @@ export const voucherService = {
           partner_id: params?.partnerId,
           area: params?.area,
         },
+        ...config,
       }),
     ])
     const list = extractData(listRes)

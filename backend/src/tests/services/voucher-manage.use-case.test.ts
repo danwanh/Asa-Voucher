@@ -80,7 +80,8 @@ beforeEach(() => {
 // ═══════════════════════════════════════════════════════════════════════════════
 describe("Main Flow — Xem danh sach", () => {
   it("public sees only approved+active vouchers", async () => {
-    mockPrisma.$transaction.mockResolvedValue([[vp()], 1]);
+    mockPrisma.voucherProduct.findMany.mockResolvedValue([vp()]);
+    mockPrisma.voucherProduct.count.mockResolvedValue(1);
     const result = await svc.listVoucherProducts(undefined, { page: 1, limit: 20 });
     expect(result.items).toHaveLength(1);
     expect(result.count).toBe(1);
@@ -92,10 +93,10 @@ describe("Main Flow — Xem danh sach", () => {
   });
 
   it("partner_owner with scope=mine sees all own vouchers", async () => {
-    mockPrisma.$transaction.mockResolvedValue([
-      [vp({ status: "draft", approval_status: "pending" }), vp()],
-      2,
+    mockPrisma.voucherProduct.findMany.mockResolvedValue([
+      vp({ status: "draft", approval_status: "pending" }), vp(),
     ]);
+    mockPrisma.voucherProduct.count.mockResolvedValue(2);
     const result = await svc.listVoucherProducts(PARTNER_A, { page: 1, limit: 20, scope: "mine" });
     expect(result.items).toHaveLength(2);
     expect(mockPrisma.voucherProduct.findMany).toHaveBeenCalledWith(
@@ -104,7 +105,8 @@ describe("Main Flow — Xem danh sach", () => {
   });
 
   it("supports search filter", async () => {
-    mockPrisma.$transaction.mockResolvedValue([[vp({ name: "Highlands" })], 1]);
+    mockPrisma.voucherProduct.findMany.mockResolvedValue([vp({ name: "Highlands" })]);
+    mockPrisma.voucherProduct.count.mockResolvedValue(1);
     await svc.listVoucherProducts(undefined, { page: 1, limit: 20, search: "Highlands" });
     expect(mockPrisma.voucherProduct.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -115,7 +117,8 @@ describe("Main Flow — Xem danh sach", () => {
 
   it("voucher_staff with scope=mine resolves partner via branch", async () => {
     vi.mocked(mockPrisma.partnerBranch.findUnique).mockResolvedValue({ partner_id: "partner-a" } as any);
-    mockPrisma.$transaction.mockResolvedValue([[vp()], 1]);
+    mockPrisma.voucherProduct.findMany.mockResolvedValue([vp()]);
+    mockPrisma.voucherProduct.count.mockResolvedValue(1);
     const result = await svc.listVoucherProducts(STAFF_A, { page: 1, limit: 20, scope: "mine" });
     expect(result.items).toHaveLength(1);
   });

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { ChevronRight } from "lucide-react"
 import { C, fmtDate } from "@/utils/constants"
 import { cmsContentService } from "@/services/cmsContentService"
@@ -50,7 +50,7 @@ export function NewsSection({ onOpenArticle, background = C.muted }: Props) {
             >
               <div className="h-40 overflow-hidden bg-gray-100">
                 {article.image_url ? (
-                  <img src={article.image_url} alt={article.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                  <img src={article.image_url} alt={article.title} width={640} height={360} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-xs font-semibold" style={{ color: "#8A8DA8" }}>Chưa có ảnh</div>
                 )}
@@ -71,4 +71,27 @@ export function NewsSection({ onOpenArticle, background = C.muted }: Props) {
       </div>
     </section>
   )
+}
+
+export function LazyNewsSection(props: Props) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [isNearViewport, setIsNearViewport] = useState(false)
+
+  useEffect(() => {
+    const element = containerRef.current
+    if (!element || !("IntersectionObserver" in window)) {
+      setIsNearViewport(true)
+      return
+    }
+
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry?.isIntersecting) return
+      setIsNearViewport(true)
+      observer.disconnect()
+    }, { rootMargin: "400px 0px" })
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
+
+  return <div ref={containerRef}>{isNearViewport ? <NewsSection {...props} /> : null}</div>
 }

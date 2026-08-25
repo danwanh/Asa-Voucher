@@ -52,10 +52,6 @@ export default function App({ initialPage, initialOrderId, initialVoucherId, ini
   } = useCartContext()
 
   useEffect(() => {
-    initialize()
-  }, [initialize])
-
-  useEffect(() => {
     if (!pendingCheckout || !user || !checkoutDraft) return
     if (user.role !== "buyer") {
       toast.error("Chỉ tài khoản khách hàng có thể đặt voucher.")
@@ -118,9 +114,22 @@ export default function App({ initialPage, initialOrderId, initialVoucherId, ini
   const guestInitialPage = initialPage === "cart" || initialPage === "vouchers" || initialPage === "detail" || initialPage === "categories"
     ? initialPage
     : undefined
+  const isPublicRoute = !initialPage || Boolean(guestInitialPage)
 
-  if (!isInitialized) return <LoadingState label="Đang khôi phục phiên đăng nhập..." variant="page" />
-  if (initializationError) return (
+  useEffect(() => {
+    if (!isPublicRoute) {
+      void initialize()
+      return
+    }
+
+    const timer = window.setTimeout(() => void initialize(), 250)
+    return () => window.clearTimeout(timer)
+  }, [initialize, isPublicRoute])
+
+  // Public pages do not need to wait for session recovery before showing content.
+  // Protected pages still wait so their first render cannot expose the wrong shell.
+  if (!isInitialized && !isPublicRoute) return <LoadingState label="Đang khôi phục phiên đăng nhập..." variant="page" />
+  if (initializationError && !isPublicRoute) return (
     <div className="mx-auto max-w-md px-4 py-20 text-center">
       <h1 className="text-xl font-black text-[#3D405B]">Không thể khôi phục phiên đăng nhập</h1>
       <p className="mt-2 text-sm text-[#8A8DA8]">Vui lòng kiểm tra kết nối và thử lại.</p>

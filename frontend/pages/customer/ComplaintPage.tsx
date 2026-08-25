@@ -25,9 +25,7 @@ const REASONS = [
 
 const STATUS: Record<ComplaintStatus, { label: string; color: string; background: string }> = {
   open: { label: "Chờ tiếp nhận", color: "#B66A00", background: C.apricot + "25" },
-  under_review: { label: "Đang xử lý", color: "#2563EB", background: "#DBEAFE" },
   resolved: { label: "Đã giải quyết", color: "#15803D", background: "#DCFCE7" },
-  closed: { label: "Đã đóng", color: "#6B7280", background: "#F3F4F6" },
 }
 
 export function ComplaintPage({ order, issuedVoucher, onBack, onSubmit }: Props) {

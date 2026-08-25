@@ -228,7 +228,7 @@ export interface IssuedVoucher {
   id: string
   code: string
   qrPayload: string
-  status: "active" | "used" | "expired" | "refunded"
+  status: "active" | "used" | "expired" | "refunded" | "cancelled"
   expiredDate?: string
   review?: Review
   complaint?: Complaint

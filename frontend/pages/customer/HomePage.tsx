@@ -3,13 +3,17 @@ import { ChevronRight } from "lucide-react"
 import { C, formatCategoryLabel } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import { BannerCarousel } from "@/components/BannerCarousel"
-import { NewsSection } from "@/components/NewsSection"
+import dynamic from "next/dynamic"
 import { SectionHeader } from "@/components/SectionHeader"
 import { VoucherCard } from "@/components/VoucherCard"
 import type { Voucher } from "@/types"
 import type { CustomerPage } from "@/layouts/CustomerLayout"
 import { voucherService } from "@/services/voucherService"
 import { LoadingState } from "@/components/LoadingState"
+
+const LazyNewsSection = dynamic(() => import("@/components/NewsSection").then((module) => module.LazyNewsSection), {
+  loading: () => <div className="min-h-24" aria-hidden="true" />,
+})
 
 interface Props {
   onAddToCart: (v: Voucher) => void
@@ -158,7 +162,7 @@ export function HomePage({ onAddToCart, onBuyNow, onDetail, onNavigate, onOpenAr
 
       {/* News / Articles */}
       <div>
-        <NewsSection onOpenArticle={onOpenArticle} background="#EAF2EE" />
+        <LazyNewsSection onOpenArticle={onOpenArticle} background="#EAF2EE" />
       </div>
     </div>
   )

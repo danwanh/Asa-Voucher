@@ -97,6 +97,12 @@ export function VoucherListPage({ onAddToCart, onBuyNow, onDetail, searchQuery, 
   const [totalPages, setTotalPages] = useState(1)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchQuery)
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearchQuery(searchQuery), 350)
+    return () => window.clearTimeout(timer)
+  }, [searchQuery])
 
   const updateFilters = (patch: Partial<Props["filters"]>) => {
     onFiltersChange({ ...filters, ...patch })
@@ -104,6 +110,7 @@ export function VoucherListPage({ onAddToCart, onBuyNow, onDetail, searchQuery, 
 
   useEffect(() => {
     let isMounted = true
+    const controller = new AbortController()
 
     async function loadVouchers() {
       setIsLoading(true)
@@ -112,11 +119,11 @@ export function VoucherListPage({ onAddToCart, onBuyNow, onDetail, searchQuery, 
          const result = await voucherService.listPublicVouchersPage({
            page,
            limit: 20,
-          search: searchQuery.trim() || undefined,
+           search: debouncedSearchQuery.trim() || undefined,
           categoryId: filters.categoryId !== "all" ? filters.categoryId : undefined,
           partnerId: filters.partnerId !== "all" ? filters.partnerId : undefined,
           area: filters.area !== "all" ? filters.area : undefined,
-        })
+        }, { signal: controller.signal })
 
         // TODO(backend): add server-side filters for price/discount/effective_status
         // in GET /voucher-products to avoid client-side filtering for large datasets.
@@ -124,6 +131,7 @@ export function VoucherListPage({ onAddToCart, onBuyNow, onDetail, searchQuery, 
          setSource(result.items)
          setTotalPages(result.totalPages)
       } catch {
+        if (controller.signal.aborted) return
         if (!isMounted) return
         setLoadError("Không thể tải danh sách voucher")
         setSource([])
@@ -135,12 +143,13 @@ export function VoucherListPage({ onAddToCart, onBuyNow, onDetail, searchQuery, 
     loadVouchers()
     return () => {
       isMounted = false
+      controller.abort()
     }
-  }, [searchQuery, filters.categoryId, filters.partnerId, filters.area, page])
+  }, [debouncedSearchQuery, filters.categoryId, filters.partnerId, filters.area, page])
 
   useEffect(() => {
     setPage(1)
-  }, [searchQuery, filters.categoryId, filters.partnerId, filters.area])
+  }, [debouncedSearchQuery, filters.categoryId, filters.partnerId, filters.area])
 
   const categoryOptions = useMemo(() => {
     const map = new Map<string, { id: string; label: string }>()

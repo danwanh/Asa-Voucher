@@ -288,7 +288,7 @@ export async function listVoucherProducts(user: CurrentUser | undefined, queryIn
     }
   }
 
-  const [items, count] = await prisma.$transaction([
+  const [items, count] = await Promise.all([
     prisma.voucherProduct.findMany({
       where,
       select: {
@@ -323,7 +323,7 @@ export async function listVoucherProducts(user: CurrentUser | undefined, queryIn
 
 export async function getPublicHomepageSummary() {
   const publicVoucherWhere = getPublicVoucherWhere();
-  const [voucherCount, partnerCount, customerCount, categoryCounts, discountStats] = await prisma.$transaction([
+  const [voucherCount, partnerCount, customerCount, categoryCounts, discountStats] = await Promise.all([
     prisma.voucherProduct.count({ where: publicVoucherWhere }),
     prisma.partner.count({ where: { approval_status: "approved", status: "active" } }),
     prisma.user.count({ where: { role: "buyer", is_active: true } }),

@@ -105,13 +105,15 @@ describe("Voucher Product Service", () => {
 
   describe("listVoucherProducts", () => {
     it("returns paginated sellable vouchers", async () => {
-      mockPrisma.$transaction.mockResolvedValue([[makeVoucher()], 1]);
+      mockPrisma.voucherProduct.findMany.mockResolvedValue([makeVoucher()]);
+      mockPrisma.voucherProduct.count.mockResolvedValue(1);
       const result = await voucherProductService.listVoucherProducts(undefined, { page: 1, limit: 20 });
       expect(result.items).toHaveLength(1);
     });
 
     it("only returns approved+active vouchers already on sale", async () => {
-      mockPrisma.$transaction.mockResolvedValue([[makeVoucher()], 1]);
+      mockPrisma.voucherProduct.findMany.mockResolvedValue([makeVoucher()]);
+      mockPrisma.voucherProduct.count.mockResolvedValue(1);
 
       const result = await voucherProductService.listVoucherProducts(undefined, { page: 1, limit: 20 });
 
@@ -131,7 +133,8 @@ describe("Voucher Product Service", () => {
 
     it("resolves mine scope partner from voucher staff branch", async () => {
       vi.mocked(prisma.partnerBranch.findUnique).mockResolvedValue({ partner_id: "p1" } as any);
-      mockPrisma.$transaction.mockResolvedValue([[makeVoucher({ status: "draft", approval_status: "pending" })], 1]);
+      mockPrisma.voucherProduct.findMany.mockResolvedValue([makeVoucher({ status: "draft", approval_status: "pending" })]);
+      mockPrisma.voucherProduct.count.mockResolvedValue(1);
 
       const result = await voucherProductService.listVoucherProducts(VOUCHER_STAFF_WITH_BRANCH, { page: 1, limit: 20, scope: "mine" });
 
@@ -143,7 +146,8 @@ describe("Voucher Product Service", () => {
     });
 
     it("returns only pending approval vouchers for approval_status=pending", async () => {
-      mockPrisma.$transaction.mockResolvedValue([[makeVoucher({ status: "draft", approval_status: "pending", submitted_at: new Date() })], 1]);
+      mockPrisma.voucherProduct.findMany.mockResolvedValue([makeVoucher({ status: "draft", approval_status: "pending", submitted_at: new Date() })]);
+      mockPrisma.voucherProduct.count.mockResolvedValue(1);
 
       const result = await voucherProductService.listVoucherProducts(ADMIN_CONTENT, { page: 1, limit: 20, approval_status: "pending" });
 
@@ -158,7 +162,8 @@ describe("Voucher Product Service", () => {
     });
 
     it("returns approved vouchers for approval_status=approved without sellable filters", async () => {
-      mockPrisma.$transaction.mockResolvedValue([[makeVoucher({ status: "active", approval_status: "approved" })], 1]);
+      mockPrisma.voucherProduct.findMany.mockResolvedValue([makeVoucher({ status: "active", approval_status: "approved" })]);
+      mockPrisma.voucherProduct.count.mockResolvedValue(1);
 
       const result = await voucherProductService.listVoucherProducts(ADMIN_CONTENT, { page: 1, limit: 20, approval_status: "approved" });
 
@@ -180,7 +185,8 @@ describe("Voucher Product Service", () => {
     });
 
     it("applies area filter through branch city relation", async () => {
-      mockPrisma.$transaction.mockResolvedValue([[makeVoucher()], 1]);
+      mockPrisma.voucherProduct.findMany.mockResolvedValue([makeVoucher()]);
+      mockPrisma.voucherProduct.count.mockResolvedValue(1);
 
       await voucherProductService.listVoucherProducts(undefined, {
         page: 1,
@@ -210,16 +216,17 @@ describe("Voucher Product Service", () => {
 
   describe("getPublicHomepageSummary", () => {
     it("returns aggregate counts for public homepage data", async () => {
-      mockPrisma.$transaction.mockResolvedValue([
-        12,
-        4,
-        8,
-        [
-          { category_id: "cat1", _count: { category_id: 7 } },
-          { category_id: "cat2", _count: { category_id: 5 } },
-        ],
-        { _max: { discount_rate: 42.4 } },
+      mockPrisma.voucherProduct.count
+        .mockResolvedValueOnce(12)
+        .mockResolvedValueOnce(4)
+        .mockResolvedValueOnce(8);
+      mockPrisma.partner.count.mockResolvedValue(4);
+      mockPrisma.user.count.mockResolvedValue(8);
+      mockPrisma.voucherProduct.groupBy.mockResolvedValue([
+        { category_id: "cat1", _count: { category_id: 7 } },
+        { category_id: "cat2", _count: { category_id: 5 } },
       ]);
+      mockPrisma.voucherProduct.aggregate.mockResolvedValue({ _max: { discount_rate: 42.4 } });
 
       const result = await voucherProductService.getPublicHomepageSummary();
 

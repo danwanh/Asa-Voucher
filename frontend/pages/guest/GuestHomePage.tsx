@@ -3,11 +3,15 @@ import { Search, Star, ChevronRight, Zap, ShieldCheck, Smartphone, TrendingUp, C
 import { C, fmt } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import { BannerCarousel } from "@/components/BannerCarousel"
-import { NewsSection } from "@/components/NewsSection"
+import dynamic from "next/dynamic"
 import { SectionHeader } from "@/components/SectionHeader"
 import type { Voucher } from "@/types"
 import { voucherService, type HomepageSummary } from "@/services/voucherService"
 import { isVoucherAvailable } from "@/hooks/useCart"
+
+const LazyNewsSection = dynamic(() => import("@/components/NewsSection").then((module) => module.LazyNewsSection), {
+  loading: () => <div className="min-h-24" aria-hidden="true" />,
+})
 
 interface Props {
   onNavigate: (p: string) => void
@@ -68,7 +72,7 @@ export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCar
       setIsLoadingVouchers(true)
       try {
         const [voucherPage, categoryItems, summary] = await Promise.all([
-          voucherService.listPublicVouchersPage({ limit: 100 }),
+          voucherService.listPublicVouchersPage({ limit: 12 }),
           voucherService.listCategories(),
           voucherService.getHomepageSummary(),
         ])
@@ -247,7 +251,7 @@ export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCar
       </section>
 
       {/* News / Articles */}
-      <NewsSection onOpenArticle={onOpenArticle} />
+      <LazyNewsSection onOpenArticle={onOpenArticle} />
 
       {/* How it works */}
       <section className="py-14 px-4" style={{ backgroundColor: "#EAF2EE" }}>
@@ -322,7 +326,7 @@ function VoucherCard({ voucher: v, onDetail, onAddToCart, onBuyNow }: { voucher:
     <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-black/5 hover:shadow-md transition-shadow cursor-pointer group" onClick={() => onDetail(v)}>
       <div className="relative h-40 overflow-hidden">
         {v.image ? (
-          <img src={v.image} alt={v.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+          <img src={v.image} alt={v.title} width={640} height={360} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
         ) : (
           <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-gray-100 text-xs font-semibold" style={{ color: "#8A8DA8" }}>
             <AppIcon name="gift" className="h-8 w-8" />

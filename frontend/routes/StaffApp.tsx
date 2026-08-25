@@ -1,10 +1,14 @@
 import { useState, useEffect } from "react"
+import dynamic from "next/dynamic"
 import { StaffLayout, type StaffPage } from "@/layouts/StaffLayout"
-import { StaffDashboardPage } from "@/pages/staff/StaffDashboardPage"
-import { VerifyVoucherPage } from "@/pages/staff/VerifyVoucherPage"
-import { VerificationHistoryPage } from "@/pages/staff/VerificationHistoryPage"
-import { StaffProfilePage } from "@/pages/staff/StaffProfilePage"
 import type { AppUser } from "@/types"
+import { LoadingState } from "@/components/LoadingState"
+
+const pageLoading = () => <LoadingState label="Đang tải trang..." variant="page" />
+const StaffDashboardPage = dynamic(() => import("@/pages/staff/StaffDashboardPage").then((module) => module.StaffDashboardPage), { loading: pageLoading })
+const VerifyVoucherPage = dynamic(() => import("@/pages/staff/VerifyVoucherPage").then((module) => module.VerifyVoucherPage), { loading: pageLoading })
+const VerificationHistoryPage = dynamic(() => import("@/pages/staff/VerificationHistoryPage").then((module) => module.VerificationHistoryPage), { loading: pageLoading })
+const StaffProfilePage = dynamic(() => import("@/pages/staff/StaffProfilePage").then((module) => module.StaffProfilePage), { loading: pageLoading })
 
 interface Props {
   user: AppUser
