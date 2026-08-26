@@ -65,8 +65,8 @@ export function ReviewPage({ order, target, onBack, onSubmit }: Props) {
       toast.success("Đánh giá đã được gửi thành công")
       onSubmit()
     } catch (errorResponse) {
-      const response = errorResponse as { response?: { data?: { message?: string } } }
-      const message = response.response?.data?.message ?? "Không thể gửi đánh giá. Vui lòng thử lại."
+      const response = errorResponse as { response?: { data?: { error?: { message?: string } } } }
+      const message = response.response?.data?.error?.message ?? "Không thể gửi đánh giá. Vui lòng thử lại."
       setError(message)
       toast.error(message)
     } finally {

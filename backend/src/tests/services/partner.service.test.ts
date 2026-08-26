@@ -18,6 +18,7 @@ const { mockPrisma, mockTx } = vi.hoisted(() => ({
       create: vi.fn(),
       update: vi.fn(),
     },
+    issuedVoucher: {
     voucherProductBranch: {
       count: vi.fn(),
     },
@@ -132,7 +133,8 @@ describe("Partner Service", () => {
   });
 
   describe("deletePartner", () => {
-    it("sets partner status to closed", async () => {
+    it("sets partner status to closed when no active vouchers", async () => {
+      vi.mocked(mockPrisma.issuedVoucher.count).mockResolvedValue(0);
       vi.mocked(prisma.partner.update).mockResolvedValue({} as any);
 
       await partnerService.deletePartner("p1");
@@ -140,6 +142,11 @@ describe("Partner Service", () => {
         where: { id: "p1" },
         data: { status: "closed", updated_at: expect.any(Date) },
       });
+    });
+
+    it("rejects closing partner with active vouchers", async () => {
+      vi.mocked(mockPrisma.issuedVoucher.count).mockResolvedValue(3);
+      await expect(partnerService.deletePartner("p1")).rejects.toThrow("Đối tác còn voucher đang hoạt động");
     });
   });
 
@@ -157,6 +164,8 @@ describe("Partner Service", () => {
 
   describe("updatePartnerStatus", () => {
     it("updates partner status", async () => {
+      vi.mocked(prisma.partner.findUnique).mockResolvedValue({ id: "p1", status: "active" } as any);
+      vi.mocked(mockPrisma.issuedVoucher.count).mockResolvedValue(0);
       vi.mocked(prisma.partner.update).mockResolvedValue({ id: "p1", status: "suspended" } as any);
 
       await partnerService.updatePartnerStatus("p1", "suspended");

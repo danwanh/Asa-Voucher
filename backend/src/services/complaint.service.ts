@@ -40,7 +40,7 @@ export async function listComplaints(user: AuthUser, query: { status?: string; o
     page,
     limit,
   });
-  return { items: result.rows, total: result.total, page, limit };
+  return { items: result.rows, total: result.total, countsByStatus: result.countsByStatus, page, limit };
 }
 
 export async function getComplaintById(user: AuthUser, id: string) {
@@ -56,11 +56,14 @@ export async function createComplaint(user: AuthUser, input: CreateComplaintInpu
   if (input.order_id) {
     const order = await complaintRepo.findOrderOwner(input.order_id);
     if (!order) throw new HttpError(404, "Không tìm thấy đơn hàng");
+    if (order.is_gift && order.recipient_id === user.id) {
+      throw new HttpError(403, "Người nhận quà không thể khiếu nại đơn hàng này");
+    }
     if (!input.issued_voucher_id && order.user_id !== user.id) {
       throw new HttpError(403, "Bạn chỉ được khiếu nại đơn hàng của mình");
     }
-    if (!input.issued_voucher_id && order.status !== "confirmed" && order.status !== "completed") {
-      throw new HttpError(422, "Chỉ được khiếu nại đơn hàng đã thanh toán hoặc hoàn tất");
+    if (!input.issued_voucher_id && order.status !== "confirmed") {
+      throw new HttpError(422, "Chỉ được khiếu nại đơn hàng đã thanh toán");
     }
     if (!input.issued_voucher_id && await complaintRepo.findOrderLevelComplaint(user.id, input.order_id)) {
       throw new HttpError(409, "Đơn hàng này đã có khiếu nại");
@@ -76,7 +79,10 @@ export async function createComplaint(user: AuthUser, input: CreateComplaintInpu
     }
 
     const order = voucher.order_items?.orders;
-    const isPaid = order?.status === "confirmed" || order?.status === "completed";
+    if (order?.is_gift && order.recipient_id === user.id) {
+      throw new HttpError(403, "Người nhận quà không thể khiếu nại voucher này");
+    }
+    const isPaid = order?.status === "confirmed";
     if (!isPaid && voucher.status !== "used") {
       throw new HttpError(422, "Chỉ được khiếu nại voucher đã thanh toán hoặc đã sử dụng");
     }
@@ -85,7 +91,9 @@ export async function createComplaint(user: AuthUser, input: CreateComplaintInpu
     if (existing) throw new HttpError(409, "Voucher này đã có khiếu nại");
   }
 
-  return complaintRepo.createComplaint(user.id, input);
+  const complaint = await complaintRepo.createComplaint(user.id, input);
+
+  return complaint;
 }
 
 export async function updateComplaint(user: AuthUser, id: string, input: UpdateComplaintInput) {
@@ -109,11 +117,11 @@ export async function closeComplaint(user: AuthUser, id: string) {
   const isAdmin = isAdminRole(user.role);
   if (!isOwner && !isAdmin) throw new HttpError(403, "Bạn không có quyền đóng khiếu nại này");
 
-  if (complaint.status === "resolved") {
-    throw new HttpError(422, "Khiếu nại đã được xử lý trước đó");
+  if (complaint.status !== "open") {
+    throw new HttpError(422, "Chỉ có thể đóng khiếu nại đang mở");
   }
 
-  return complaintRepo.updateComplaint(id, { status: "resolved" });
+  return complaintRepo.updateComplaint(id, { status: "refunded" });
 }
 
 export async function assignComplaint(user: AuthUser, id: string, input: AssignComplaintInput) {
@@ -138,7 +146,7 @@ export async function resolveComplaint(user: AuthUser, id: string, input: Resolv
 
   const complaint = await complaintRepo.findComplaintById(id);
   if (!complaint) throw new HttpError(404, "Không tìm thấy khiếu nại");
-  if (complaint.status === "resolved") {
+  if (complaint.status !== "open" && complaint.status !== "contacting_partner") {
     throw new HttpError(409, "Khiếu nại đã được xử lý trước đó");
   }
 
@@ -152,8 +160,17 @@ export async function resolveComplaint(user: AuthUser, id: string, input: Resolv
     await processReissueVoucher(user.id, complaint.id, issuedVoucherId, input.resolution_note);
   }
 
+  let newStatus: ComplaintStatus = "open";
+  if (input.resolution_types.includes("refund")) {
+    newStatus = "refunded";
+  } else if (input.resolution_types.includes("reissue")) {
+    newStatus = "reissued";
+  } else {
+    newStatus = "contacting_partner";
+  }
+
   const updated = await complaintRepo.updateComplaint(id, {
-    status: "resolved",
+    status: newStatus,
     resolution_note: input.resolution_note,
     resolution_types: input.resolution_types,
     resolved_at: new Date().toISOString(),
@@ -178,12 +195,15 @@ async function processRefundVoucher(
   const payments = (order.payments as Array<Record<string, unknown>>) ?? [];
   const successPayment = payments.find((p) => p.status === "success");
   if (!successPayment) throw new HttpError(409, "Đơn hàng chưa thanh toán, không thể hoàn tiền");
+  if (!["confirmed", "cancelled"].includes(order.status)) {
+    throw new HttpError(409, "Đơn hàng chưa xác nhận thanh toán, không thể hoàn tiền");
+  }
 
   const targetVoucher = order.order_items
     .flatMap((item) => item.issued_vouchers)
     .find((v) => v.id === issuedVoucherId);
   if (!targetVoucher) throw new HttpError(404, "Không tìm thấy voucher trong đơn hàng");
-  if (targetVoucher.status === "refunded") return;
+  if (targetVoucher.status === "revoked") return;
 
   const targetItem = order.order_items.find((item) =>
     item.issued_vouchers.some((v) => v.id === issuedVoucherId),
@@ -239,17 +259,21 @@ async function processRefundVoucher(
   }
 
   const allVouchers = order.order_items.flatMap((item) => item.issued_vouchers);
+  const shouldRevoke = targetVoucher.status === "active";
+  const newVoucherStatus = targetVoucher.status === "active" ? "revoked" : "refunded";
 
   await prisma.$transaction(async (tx) => {
     await tx.issuedVoucher.update({
       where: { id: issuedVoucherId },
-      data: { status: "refunded", updated_at: new Date() },
+      data: { status: newVoucherStatus, updated_at: new Date() },
     });
 
-    await tx.voucherProduct.update({
-      where: { id: targetItem.voucher_product_id },
-      data: { remaining_quantity: { increment: 1 } },
-    });
+    if (shouldRevoke) {
+      await tx.voucherProduct.update({
+        where: { id: targetItem.voucher_product_id },
+        data: { remaining_quantity: { increment: 1 } },
+      });
+    }
 
     await tx.payment.update({
       where: { id: successPayment.id as string },
@@ -277,13 +301,13 @@ async function processRefundVoucher(
     });
 
     const updatedAllVouchers = allVouchers.map((v) =>
-      v.id === issuedVoucherId ? { ...v, status: "refunded" as const } : v,
+      v.id === issuedVoucherId ? { ...v, status: newVoucherStatus as "revoked" | "refunded" } : v,
     );
-    const allRefunded = updatedAllVouchers.every(
-      (v) => v.status === "refunded" || v.status === "cancelled",
+    const allRevoked = updatedAllVouchers.every(
+      (v) => v.status === "revoked" || v.status === "cancelled" || v.status === "refunded",
     );
 
-    if (allRefunded) {
+    if (allRevoked && order.status === "confirmed") {
       await tx.order.update({
         where: { id: orderId },
         data: { status: "refunded", payment_status: "refunded", updated_at: new Date() },
@@ -323,21 +347,37 @@ async function processReissueVoucher(
   const oldVoucher = await prisma.issuedVoucher.findUnique({
     where: { id: issuedVoucherId },
     include: {
-      voucher_products: { select: { id: true, validity_days: true } },
-      order_items: { select: { order_id: true } },
+      voucher_products: { select: { id: true, name: true, validity_days: true, selling_price: true } },
+      order_items: {
+        select: {
+          order_id: true,
+          voucher_product_id: true,
+          unit_price: true,
+          snapped_original_price: true,
+          snapped_selling_price: true,
+          snapped_discount_rate: true,
+          orders: { select: { user_id: true, recipient_id: true, order_code: true } },
+        },
+      },
     },
   });
   if (!oldVoucher) throw new HttpError(404, "Không tìm thấy voucher cần cấp lại");
 
+  const oldOrder = oldVoucher.order_items?.orders;
+  if (!oldOrder) throw new HttpError(404, "Không tìm thấy đơn hàng gốc");
+
   const validityDays = oldVoucher.voucher_products.validity_days;
   const newExpiredDate = new Date(Date.now() + validityDays * 86400000);
-  const newCode = generateVoucherCode();
+  const newVoucherCode = generateVoucherCode();
   const newQrPayload = crypto.randomUUID();
+  const newOrderCode = `ORD${Date.now()}${crypto.randomInt(1000, 9999)}`;
+  const unitPrice = Number(oldVoucher.voucher_products.selling_price);
 
   const isActive = oldVoucher.status === "active";
-  const orderId = oldVoucher.order_items?.order_id ?? "";
+  const oldOrderId = oldVoucher.order_items?.order_id ?? "";
 
   await prisma.$transaction(async (tx) => {
+    // 1. Cancel old voucher if active
     if (isActive) {
       await tx.issuedVoucher.update({
         where: { id: issuedVoucherId },
@@ -349,42 +389,90 @@ async function processReissueVoucher(
       });
     }
 
+    // 2. Create new order (auto-confirmed, paid, total=0, method=reissue)
+    const newOrder = await tx.order.create({
+      data: {
+        order_code: newOrderCode,
+        user_id: oldOrder.user_id,
+        recipient_id: oldOrder.recipient_id,
+        is_gift: false,
+        subtotal: unitPrice,
+        discount_amount: 0,
+        total_amount: unitPrice,
+        payment_method: "reissue",
+        payment_status: "paid",
+        status: "confirmed",
+        note: `Cấp lại từ đơn ${oldOrder.order_code} - Khiếu nại ${complaintId}`,
+      },
+    });
+
+    // 3. Create new order item
+    const newOrderItem = await tx.orderItem.create({
+      data: {
+        order_id: newOrder.id,
+        voucher_product_id: oldVoucher.voucher_product_id,
+        quantity: 1,
+        unit_price: unitPrice,
+        snapped_original_price: oldVoucher.order_items?.snapped_original_price ?? unitPrice,
+        snapped_selling_price: oldVoucher.order_items?.snapped_selling_price ?? unitPrice,
+        snapped_discount_rate: oldVoucher.order_items?.snapped_discount_rate ?? 0,
+        subtotal: unitPrice,
+      },
+    });
+
+    // 4. Create new voucher on new order
     await tx.issuedVoucher.create({
       data: {
-        voucher_code: newCode,
+        voucher_code: newVoucherCode,
         qr_code_payload: newQrPayload,
         voucher_product_id: oldVoucher.voucher_product_id,
         owner_id: oldVoucher.owner_id,
-        order_item_id: oldVoucher.order_item_id,
+        order_item_id: newOrderItem.id,
         issued_date: new Date(),
         expired_date: newExpiredDate,
         status: "active",
       },
     });
 
-    if (!isActive) {
-      await tx.voucherProduct.update({
-        where: { id: oldVoucher.voucher_product_id },
-        data: { remaining_quantity: { decrement: 1 } },
-      });
-    }
+    // 5. Create payment log for reissue
+    await tx.paymentLog.create({
+      data: {
+        payment_id: null as never,
+        order_id: newOrder.id,
+        user_id: adminId,
+        action: "REISSUE_PAYMENT",
+        status: "success",
+        amount: unitPrice as never,
+      },
+    });
 
-    if (orderId) {
+    // 6. Order log on new order
+    await tx.orderLog.create({
+      data: {
+        order_id: newOrder.id,
+        user_id: adminId,
+        action: "CREATE_ORDER",
+        description: `Đơn hàng cấp lại từ khiếu nại ${complaintId}. Voucher cũ: ${oldVoucher.voucher_code} (${oldVoucher.status})`,
+      },
+    });
+
+    // 7. Order log on old order
+    if (oldOrderId) {
       await tx.orderLog.create({
         data: {
-          order_id: orderId,
+          order_id: oldOrderId,
           user_id: adminId,
           action: "REISSUE_VOUCHER",
-          description: `Cấp lại voucher ${oldVoucher.voucher_code} → ${newCode} từ khiếu nại ${complaintId}. Voucher cũ status: ${oldVoucher.status}: ${note || "Không có ghi chú"}`,
+          description: `Voucher ${oldVoucher.voucher_code} → ${newVoucherCode} từ khiếu nại ${complaintId}. Đơn mới: ${newOrderCode}: ${note || "Không có ghi chú"}`,
         },
       });
 
       await tx.adminLog.create({
         data: {
           admin_id: adminId,
-          target_order_id: orderId,
+          target_order_id: oldOrderId,
           action: "complaint.reissue_voucher",
-          description: `Cấp lại voucher ${oldVoucher.voucher_code} → ${newCode} từ khiếu nại ${complaintId} (voucher cũ: ${oldVoucher.status})`,
+          description: `Cấp lại voucher ${oldVoucher.voucher_code} → ${newVoucherCode} từ khiếu nại ${complaintId}. Đơn mới: ${newOrderCode}`,
         },
       });
     }

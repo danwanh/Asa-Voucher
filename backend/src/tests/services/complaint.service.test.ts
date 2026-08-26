@@ -6,6 +6,11 @@ const { mockPrisma } = vi.hoisted(() => ({
   mockPrisma: {
     order: {
       findUnique: vi.fn(),
+      update: vi.fn(),
+      create: vi.fn(),
+    },
+    orderItem: {
+      create: vi.fn(),
     },
     issuedVoucher: {
       findUnique: vi.fn(),
@@ -41,6 +46,7 @@ vi.mock("../../repositories/complaint.repository.js", () => ({
   findOrderLevelComplaint: vi.fn(),
   findOrderOwner: vi.fn(),
   updateComplaint: vi.fn(),
+  countOpenComplaintsForOrder: vi.fn(),
 }));
 
 vi.mock("../../repositories/complaint-response.repository.js", () => ({
@@ -114,7 +120,7 @@ describe("Complaint Service", () => {
 
   describe("createComplaint", () => {
     it("creates complaint for buyer's order", async () => {
-      vi.mocked(complaintRepo.findOrderOwner).mockResolvedValue({ id: "order-1", user_id: "u-buyer", recipient_id: "u-buyer", status: "confirmed" });
+      vi.mocked(complaintRepo.findOrderOwner).mockResolvedValue({ id: "order-1", user_id: "u-buyer", recipient_id: "", status: "confirmed" });
       vi.mocked(complaintRepo.createComplaint).mockResolvedValue(makeComplaint());
 
       const result = await complaintService.createComplaint(BUYER, {
@@ -139,14 +145,14 @@ describe("Complaint Service", () => {
 
     it("rejects an order-level complaint from the gift recipient", async () => {
       vi.mocked(complaintRepo.findOrderOwner).mockResolvedValue({
-        id: "order-1", user_id: "u-other", recipient_id: "u-buyer", status: "confirmed",
+        id: "order-1", user_id: "u-other", recipient_id: "u-buyer", status: "confirmed", is_gift: true,
       });
 
       await expect(complaintService.createComplaint(BUYER, {
         order_id: "order-1",
         reason: "not_as_described",
         description: "Wrong item",
-      })).rejects.toThrow(HttpError);
+      })).rejects.toThrow("Người nhận quà không thể khiếu nại đơn hàng này");
     });
 
     it("rejects an order-level complaint before payment", async () => {
@@ -189,24 +195,21 @@ describe("Complaint Service", () => {
       ).rejects.toThrow(HttpError);
     });
 
-    it("allows the issued voucher owner to complain about a gift voucher", async () => {
+    it("rejects complaint from gift voucher recipient", async () => {
       vi.mocked(complaintRepo.findOrderOwner).mockResolvedValue({
-        id: "order-1", user_id: "u-other", recipient_id: "u-buyer", status: "confirmed",
+        id: "order-1", user_id: "u-other", recipient_id: "u-buyer", status: "confirmed", is_gift: true,
       });
       vi.mocked(issuedVoucherRepo.findIssuedVoucherById).mockResolvedValue({
         id: "iv-1", owner_id: "u-buyer", status: "active", voucher_product_id: "vp-1",
-        order_items: { order_id: "order-1", orders: { user_id: "u-other", status: "confirmed" } },
+        order_items: { order_id: "order-1", orders: { user_id: "u-other", recipient_id: "u-buyer", status: "confirmed", is_gift: true } },
       } as any);
-      vi.mocked(complaintRepo.createComplaint).mockResolvedValue(makeComplaint({ issued_voucher_id: "iv-1" }));
 
-      await complaintService.createComplaint(BUYER, {
+      await expect(complaintService.createComplaint(BUYER, {
         order_id: "order-1",
         issued_voucher_id: "iv-1",
         reason: "cannot_redeem",
         description: "Cannot redeem",
-      });
-
-      expect(complaintRepo.createComplaint).toHaveBeenCalledWith("u-buyer", expect.objectContaining({ issued_voucher_id: "iv-1" }));
+      })).rejects.toThrow("Người nhận quà không thể khiếu nại đơn hàng này");
     });
   });
 
@@ -308,22 +311,22 @@ describe("Complaint Service", () => {
   });
 
   describe("resolveComplaint", () => {
-    it("admin can resolve open complaint", async () => {
+    it("admin can resolve open complaint with no_action → contacting_partner", async () => {
       vi.mocked(complaintRepo.findComplaintById).mockResolvedValue(makeComplaint());
       vi.mocked(complaintRepo.updateComplaint).mockResolvedValue(makeComplaint({
-        status: "resolved", resolution_note: "Reviewed", resolution_types: ["no_action"],
+        status: "contacting_partner", resolution_note: "Reviewed", resolution_types: ["no_action"],
       }));
 
       const result = await complaintService.resolveComplaint(ADMIN, "comp-1", {
         resolution_note: "Reviewed",
         resolution_types: ["no_action"],
       });
-      expect(result.status).toBe("resolved");
+      expect(result.status).toBe("contacting_partner");
       expect(result.resolution_note).toBe("Reviewed");
     });
 
-    it("rejects resolving already resolved complaint", async () => {
-      vi.mocked(complaintRepo.findComplaintById).mockResolvedValue(makeComplaint({ status: "resolved" }));
+    it("rejects resolving complaint that is not open or contacting_partner", async () => {
+      vi.mocked(complaintRepo.findComplaintById).mockResolvedValue(makeComplaint({ status: "refunded" }));
       await expect(
         complaintService.resolveComplaint(ADMIN, "comp-1", {
           resolution_note: "Already done",
@@ -344,12 +347,13 @@ describe("Complaint Service", () => {
     it("per-voucher refund: refund amount = unit_price, only 1 voucher updated", async () => {
       vi.mocked(complaintRepo.findComplaintById).mockResolvedValue(makeComplaint({ issued_voucher_id: "iv-1" }));
       vi.mocked(complaintRepo.updateComplaint).mockResolvedValue(makeComplaint({
-        status: "resolved", resolution_types: ["refund"],
+        status: "refunded", resolution_types: ["refund"],
       }));
 
       const mockOrder = {
         id: "order-1",
         order_code: "ORD-001",
+        status: "confirmed",
         payments: [{ id: "pay-1", status: "success", method: "simulated", transaction_ref: "SIM-123" }],
         order_items: [
           {
@@ -383,7 +387,7 @@ describe("Complaint Service", () => {
 
       expect(mockTx.issuedVoucher.update).toHaveBeenCalledWith({
         where: { id: "iv-1" },
-        data: { status: "refunded", updated_at: expect.any(Date) },
+        data: { status: "revoked", updated_at: expect.any(Date) },
       });
 
       expect(mockTx.paymentLog.create).toHaveBeenCalledWith({
@@ -395,22 +399,23 @@ describe("Complaint Service", () => {
         }),
       });
 
-      // Only 1 voucher refunded: refund_amount incremented, but order stays "confirmed"
+      // Only 1 voucher revoked: refund_amount incremented, but order stays "confirmed"
       expect(mockTx.order.update).toHaveBeenCalledWith({
         where: { id: "order-1" },
         data: { refund_amount: { increment: 50000 }, updated_at: expect.any(Date) },
       });
     });
 
-    it("per-voucher refund: all vouchers refunded → order status updated", async () => {
+    it("per-voucher refund: all vouchers revoked → order status updated", async () => {
       vi.mocked(complaintRepo.findComplaintById).mockResolvedValue(makeComplaint({ issued_voucher_id: "iv-1" }));
       vi.mocked(complaintRepo.updateComplaint).mockResolvedValue(makeComplaint({
-        status: "resolved", resolution_types: ["refund"],
+        status: "refunded", resolution_types: ["refund"],
       }));
 
       const mockOrder = {
         id: "order-1",
         order_code: "ORD-001",
+        status: "confirmed",
         payments: [{ id: "pay-1", status: "success", method: "simulated", transaction_ref: "SIM-123" }],
         order_items: [
           {
@@ -441,7 +446,7 @@ describe("Complaint Service", () => {
         resolution_types: ["refund"],
       });
 
-      // Only voucher in order refunded → all vouchers refunded → order status updated
+      // Only voucher in order revoked → all vouchers revoked → order status updated
       expect(mockTx.order.update).toHaveBeenCalledWith({
         where: { id: "order-1" },
         data: { status: "refunded", payment_status: "refunded", updated_at: expect.any(Date) },
@@ -455,10 +460,73 @@ describe("Complaint Service", () => {
       );
     });
 
-    it("per-voucher reissue (active): old voucher → cancelled, create new voucher", async () => {
+    it("per-voucher refund: used voucher → status 'refunded', no stock return", async () => {
       vi.mocked(complaintRepo.findComplaintById).mockResolvedValue(makeComplaint({ issued_voucher_id: "iv-1" }));
       vi.mocked(complaintRepo.updateComplaint).mockResolvedValue(makeComplaint({
-        status: "resolved", resolution_types: ["reissue"],
+        status: "refunded", resolution_types: ["refund"],
+      }));
+
+      const mockOrder = {
+        id: "order-1",
+        order_code: "ORD-001",
+        status: "confirmed",
+        payments: [{ id: "pay-1", status: "success", method: "simulated", transaction_ref: "SIM-123" }],
+        order_items: [
+          {
+            unit_price: 50000,
+            voucher_product_id: "vp-1",
+            issued_vouchers: [
+              { id: "iv-1", voucher_code: "VC-001", status: "used" },
+            ],
+          },
+        ],
+      };
+
+      vi.mocked(prisma.order.findUnique).mockResolvedValue(mockOrder as any);
+
+      const mockTx: any = {
+        issuedVoucher: { update: vi.fn().mockResolvedValue({}) },
+        voucherProduct: { update: vi.fn().mockResolvedValue({}) },
+        payment: { update: vi.fn().mockResolvedValue({}) },
+        paymentLog: { create: vi.fn().mockResolvedValue({}) },
+        order: { update: vi.fn().mockResolvedValue({}) },
+        orderLog: { create: vi.fn().mockResolvedValue({}) },
+        adminLog: { create: vi.fn().mockResolvedValue({}) },
+      };
+      vi.mocked(prisma.$transaction).mockImplementation(async (fn: any) => fn(mockTx));
+
+      await complaintService.resolveComplaint(ADMIN, "comp-1", {
+        resolution_note: "Refund used voucher",
+        resolution_types: ["refund"],
+      });
+
+      // Used voucher → status "refunded" (not revoked)
+      expect(mockTx.issuedVoucher.update).toHaveBeenCalledWith({
+        where: { id: "iv-1" },
+        data: { status: "refunded", updated_at: expect.any(Date) },
+      });
+      // No stock return for used voucher
+      expect(mockTx.voucherProduct.update).not.toHaveBeenCalled();
+
+      // Refund payment still processed
+      expect(mockTx.paymentLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          payment_id: "pay-1",
+          action: "REFUND",
+          status: "refunded",
+          amount: 50000,
+        }),
+      });
+      expect(mockTx.order.update).toHaveBeenCalledWith({
+        where: { id: "order-1" },
+        data: { refund_amount: { increment: 50000 }, updated_at: expect.any(Date) },
+      });
+    });
+
+    it("per-voucher reissue (active): old voucher → cancelled, create new order + voucher", async () => {
+      vi.mocked(complaintRepo.findComplaintById).mockResolvedValue(makeComplaint({ issued_voucher_id: "iv-1" }));
+      vi.mocked(complaintRepo.updateComplaint).mockResolvedValue(makeComplaint({
+        status: "reissued", resolution_types: ["reissue"],
       }));
 
       const mockOldVoucher = {
@@ -468,8 +536,16 @@ describe("Complaint Service", () => {
         owner_id: "u-buyer",
         order_item_id: "oi-1",
         status: "active",
-        voucher_products: { id: "vp-1", validity_days: 30 },
-        order_items: { order_id: "order-1" },
+        voucher_products: { id: "vp-1", name: "Test Voucher", validity_days: 30, selling_price: 100000 },
+        order_items: {
+          order_id: "order-1",
+          voucher_product_id: "vp-1",
+          unit_price: 100000,
+          snapped_original_price: 120000,
+          snapped_selling_price: 100000,
+          snapped_discount_rate: 17,
+          orders: { user_id: "u-buyer", recipient_id: null, order_code: "ORD-TEST" },
+        },
       };
 
       vi.mocked(prisma.issuedVoucher.findUnique).mockResolvedValue(mockOldVoucher as any);
@@ -477,6 +553,9 @@ describe("Complaint Service", () => {
       const mockTx: any = {
         issuedVoucher: { update: vi.fn().mockResolvedValue({}), create: vi.fn().mockResolvedValue({}) },
         voucherProduct: { update: vi.fn().mockResolvedValue({}) },
+        order: { create: vi.fn().mockResolvedValue({ id: "new-order-1" }) },
+        orderItem: { create: vi.fn().mockResolvedValue({ id: "new-oi-1" }) },
+        paymentLog: { create: vi.fn().mockResolvedValue({}) },
         orderLog: { create: vi.fn().mockResolvedValue({}) },
         adminLog: { create: vi.fn().mockResolvedValue({}) },
       };
@@ -493,12 +572,21 @@ describe("Complaint Service", () => {
         data: { status: "cancelled", updated_at: expect.any(Date) },
       });
 
-      // New voucher created with order_item_id
+      // New order created
+      expect(mockTx.order.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          payment_method: "reissue",
+          payment_status: "paid",
+          status: "confirmed",
+          user_id: "u-buyer",
+        }),
+      });
+
+      // New voucher created on new order item
       expect(mockTx.issuedVoucher.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           voucher_product_id: "vp-1",
           owner_id: "u-buyer",
-          order_item_id: "oi-1",
           status: "active",
           voucher_code: expect.stringMatching(/^VC/),
         }),
@@ -511,10 +599,10 @@ describe("Complaint Service", () => {
       });
     });
 
-    it("per-voucher reissue (used/expired): old voucher unchanged, create new from stock", async () => {
+    it("per-voucher reissue (used/expired): old voucher unchanged, create new order + voucher", async () => {
       vi.mocked(complaintRepo.findComplaintById).mockResolvedValue(makeComplaint({ issued_voucher_id: "iv-1" }));
       vi.mocked(complaintRepo.updateComplaint).mockResolvedValue(makeComplaint({
-        status: "resolved", resolution_types: ["reissue"],
+        status: "reissued", resolution_types: ["reissue"],
       }));
 
       const mockOldVoucher = {
@@ -524,8 +612,16 @@ describe("Complaint Service", () => {
         owner_id: "u-buyer",
         order_item_id: "oi-1",
         status: "used",
-        voucher_products: { id: "vp-1", validity_days: 30 },
-        order_items: { order_id: "order-1" },
+        voucher_products: { id: "vp-1", name: "Test Voucher", validity_days: 30, selling_price: 100000 },
+        order_items: {
+          order_id: "order-1",
+          voucher_product_id: "vp-1",
+          unit_price: 100000,
+          snapped_original_price: 120000,
+          snapped_selling_price: 100000,
+          snapped_discount_rate: 17,
+          orders: { user_id: "u-buyer", recipient_id: null, order_code: "ORD-TEST" },
+        },
       };
 
       vi.mocked(prisma.issuedVoucher.findUnique).mockResolvedValue(mockOldVoucher as any);
@@ -533,6 +629,9 @@ describe("Complaint Service", () => {
       const mockTx: any = {
         issuedVoucher: { update: vi.fn().mockResolvedValue({}), create: vi.fn().mockResolvedValue({}) },
         voucherProduct: { update: vi.fn().mockResolvedValue({}) },
+        order: { create: vi.fn().mockResolvedValue({ id: "new-order-1" }) },
+        orderItem: { create: vi.fn().mockResolvedValue({ id: "new-oi-1" }) },
+        paymentLog: { create: vi.fn().mockResolvedValue({}) },
         orderLog: { create: vi.fn().mockResolvedValue({}) },
         adminLog: { create: vi.fn().mockResolvedValue({}) },
       };
@@ -543,24 +642,30 @@ describe("Complaint Service", () => {
         resolution_types: ["reissue"],
       });
 
-      // Used voucher: old voucher NOT changed, only new created
+      // Used voucher: old voucher NOT changed (not active)
       expect(mockTx.issuedVoucher.update).not.toHaveBeenCalled();
+
+      // New order created
+      expect(mockTx.order.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          payment_method: "reissue",
+          payment_status: "paid",
+          status: "confirmed",
+          user_id: "u-buyer",
+        }),
+      });
 
       expect(mockTx.issuedVoucher.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           voucher_product_id: "vp-1",
           owner_id: "u-buyer",
-          order_item_id: "oi-1",
           status: "active",
           voucher_code: expect.stringMatching(/^VC/),
         }),
       });
 
-      // Used reissue: -1 from stock
-      expect(mockTx.voucherProduct.update).toHaveBeenCalledWith({
-        where: { id: "vp-1" },
-        data: { remaining_quantity: { decrement: 1 } },
-      });
+      // Used reissue: no stock change (stock was already deducted when original order was paid)
+      expect(mockTx.voucherProduct.update).not.toHaveBeenCalled();
     });
   });
 

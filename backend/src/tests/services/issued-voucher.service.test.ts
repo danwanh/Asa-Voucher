@@ -118,15 +118,15 @@ describe("Issued Voucher Service", () => {
     it("allows admin to update status", async () => {
       const voucher = makeIssuedVoucher();
       vi.mocked(issuedVoucherRepo.findIssuedVoucherById).mockResolvedValue(voucher);
-      vi.mocked(issuedVoucherRepo.updateIssuedVoucherStatus).mockResolvedValue({ ...voucher, status: "refunded" });
+      vi.mocked(issuedVoucherRepo.updateIssuedVoucherStatus).mockResolvedValue({ ...voucher, status: "revoked" });
 
-      const result = await issuedVoucherService.updateIssuedVoucherStatus(ADMIN, "iv-1", { status: "refunded" });
-      expect(result.status).toBe("refunded");
+      const result = await issuedVoucherService.updateIssuedVoucherStatus(ADMIN, "iv-1", { status: "revoked" });
+      expect(result.status).toBe("revoked");
     });
 
     it("rejects non-admin users", async () => {
       await expect(
-        issuedVoucherService.updateIssuedVoucherStatus(BUYER, "iv-1", { status: "refunded" })
+        issuedVoucherService.updateIssuedVoucherStatus(BUYER, "iv-1", { status: "revoked" })
       ).rejects.toThrow(HttpError);
     });
   });

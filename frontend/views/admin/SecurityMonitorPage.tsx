@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { AlertTriangle, Shield, Lock, Unlock, Eye, CheckCircle2, XCircle, Wifi, Clock } from "lucide-react"
+import { AlertTriangle, Shield, Lock, Unlock, Eye, CheckCircle2, XCircle, Wifi, Clock, ChevronLeft, ChevronRight } from "lucide-react"
 import { toast } from "sonner"
 import { C } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
@@ -19,7 +19,7 @@ const STATUS_CONFIG: Record<string, { label: string; bg: string; color: string }
 }
 
 export function SecurityMonitorPage() {
-  const [alerts, setAlerts] = useState<SecurityAlertItem[]>([])
+  const [allAlerts, setAllAlerts] = useState<SecurityAlertItem[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<"all" | string>("all")
   const [confirmId, setConfirmId] = useState<string | null>(null)
@@ -33,29 +33,45 @@ export function SecurityMonitorPage() {
     async function load() {
       setLoading(true)
       try {
-        const params: Record<string, any> = { limit: 100 }
-        if (filter !== "all") params.status = filter
-        const result = await securityService.listAlerts(params)
-        if (mounted) setAlerts(result.items)
+        const result = await securityService.listAlerts({ limit: 100 })
+        if (mounted) setAllAlerts(result.items)
       } catch {
-        if (mounted) setAlerts([])
+        if (mounted) setAllAlerts([])
       } finally {
         if (mounted) setLoading(false)
       }
     }
     load()
     return () => { mounted = false }
-  }, [filter])
+  }, [])
 
-  const openCount = alerts.filter((a) => a.status === "open").length
-  const reviewedCount = alerts.filter((a) => a.status === "reviewed").length
-  const lockedCount = alerts.filter((a) => a.status === "locked").length
+  // Table only shows the alerts matching the active filter; counts below
+  // always come from allAlerts so switching tabs never moves the stat numbers.
+  const alerts = filter === "all" ? allAlerts : allAlerts.filter((a) => a.status === filter)
+
+  const PAGE_SIZE = 20
+  const [page, setPage] = useState(1)
+  useEffect(() => { setPage(1) }, [filter])
+  const totalPages = Math.max(1, Math.ceil(alerts.length / PAGE_SIZE))
+  const pageAlerts = alerts.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const goPrevPage = () => setPage((p) => (p === 1 ? totalPages : p - 1))
+  const goNextPage = () => setPage((p) => (p === totalPages ? 1 : p + 1))
+
+  const openCount = allAlerts.filter((a) => a.status === "open").length
+  const reviewedCount = allAlerts.filter((a) => a.status === "reviewed").length
+  const lockedCount = allAlerts.filter((a) => a.status === "locked").length
+  const filterCounts: Record<string, number> = {
+    all: allAlerts.length,
+    open: openCount,
+    reviewed: reviewedCount,
+    locked: lockedCount,
+  }
 
   const handleLock = async (id: string) => {
     setActionLoading(true)
     try {
       await securityService.lockAccount(id)
-      setAlerts((prev) => prev.map((a) => a.id === id ? { ...a, status: "locked" } : a))
+      setAllAlerts((prev) => prev.map((a) => a.id === id ? { ...a, status: "locked" } : a))
       toast.success("Đã khóa tài khoản")
     } catch {
       toast.error("Không thể khóa tài khoản")
@@ -69,7 +85,7 @@ export function SecurityMonitorPage() {
     setActionLoading(true)
     try {
       await securityService.unlockAccount(id)
-      setAlerts((prev) => prev.map((a) => a.id === id ? { ...a, status: "reviewed" } : a))
+      setAllAlerts((prev) => prev.map((a) => a.id === id ? { ...a, status: "reviewed" } : a))
       toast.success("Đã mở khóa tài khoản")
     } catch {
       toast.error("Không thể mở khóa tài khoản")
@@ -81,7 +97,7 @@ export function SecurityMonitorPage() {
   const handleReview = async (id: string) => {
     try {
       await securityService.reviewAlert(id)
-      setAlerts((prev) => prev.map((a) => a.id === id ? { ...a, status: "reviewed" } : a))
+      setAllAlerts((prev) => prev.map((a) => a.id === id ? { ...a, status: "reviewed" } : a))
       toast.success("Đã đánh dấu đã xem xét")
     } catch {
       toast.error("Không thể cập nhật trạng thái")
@@ -115,7 +131,7 @@ export function SecurityMonitorPage() {
           { label: "Tài khoản đã khóa", value: lockedCount, color: "#D97706", bg: "#FFF7ED" },
         ].map((s) => (
           <div key={s.label} className="bg-white rounded-2xl p-5 shadow-sm flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl font-black flex-shrink-0" style={{ backgroundColor: s.bg, color: s.color }}>
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl font-black flex-shrink-0 tabular-nums" style={{ backgroundColor: s.bg, color: s.color }}>
               {s.value}
             </div>
             <div className="text-sm font-semibold" style={{ color: C.indigo }}>{s.label}</div>
@@ -129,7 +145,7 @@ export function SecurityMonitorPage() {
           <button
             key={f}
             onClick={() => setFilter(f)}
-            className="px-4 py-2 rounded-xl text-sm font-bold transition-all"
+            className="px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-1.5"
             style={{
               backgroundColor: filter === f ? C.indigo : "white",
               color: filter === f ? "white" : "#6B7280",
@@ -137,6 +153,15 @@ export function SecurityMonitorPage() {
             }}
           >
             {{ all: "Tất cả", open: "Chưa xử lý", reviewed: "Đã xem xét", locked: "Đã khóa" }[f]}
+            <span
+              className="px-1.5 py-0.5 rounded-full text-[11px] font-bold tabular-nums"
+              style={{
+                backgroundColor: filter === f ? "rgba(255,255,255,0.25)" : "#F3F4F6",
+                color: filter === f ? "white" : "#6B7280",
+              }}
+            >
+              {filterCounts[f]}
+            </span>
           </button>
         ))}
       </div>
@@ -158,7 +183,7 @@ export function SecurityMonitorPage() {
               </tr>
             </thead>
             <tbody>
-              {alerts.map((a) => {
+              {pageAlerts.map((a) => {
                 const typeInfo = TYPE_LABELS[a.alertType] ?? { label: a.alertType, color: "#6B7280", icon: <AlertTriangle className="w-3.5 h-3.5" /> }
                 const statusInfo = STATUS_CONFIG[a.status] ?? { label: a.status, bg: "#F3F4F6", color: "#6B7280" }
                 return (
@@ -219,6 +244,24 @@ export function SecurityMonitorPage() {
         )}
         {!loading && alerts.length === 0 && (
           <div className="text-center py-12 text-sm" style={{ color: "#8A8DA8" }}>Không có cảnh báo nào</div>
+        )}
+        {!loading && alerts.length > 0 && totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t" style={{ borderColor: "#F0EDD8" }}>
+            <div className="text-xs" style={{ color: "#8A8DA8" }}>
+              Hiển thị {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, alerts.length)} / {alerts.length}
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={goPrevPage} className="p-1.5 rounded-lg hover:bg-muted/30 transition-colors" title="Trang trước (quay về trang cuối nếu đang ở trang đầu)">
+                <ChevronLeft className="w-4 h-4" style={{ color: C.indigo }} />
+              </button>
+              <span className="text-xs font-bold tabular-nums" style={{ color: C.indigo }}>
+                Trang {page} / {totalPages}
+              </span>
+              <button onClick={goNextPage} className="p-1.5 rounded-lg hover:bg-muted/30 transition-colors" title="Trang sau (quay về trang đầu nếu đang ở trang cuối)">
+                <ChevronRight className="w-4 h-4" style={{ color: C.indigo }} />
+              </button>
+            </div>
+          </div>
         )}
       </div>
 

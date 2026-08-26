@@ -148,7 +148,7 @@ function mapOrderListItem(value: BackendRecord): OrderListItem {
     voucherTitle: String(item.voucher_products?.name ?? "Voucher"),
     partnerName: String(item.voucher_products?.partners?.business_name ?? ""),
     issuedCount: num(item.issued_voucher_count ?? item._count?.issued_vouchers),
-    invalidatedCount: num(item.invalidated_voucher_count) || undefined,
+    invalidatedCount: num(item.invalidated_voucher_count) ?? undefined,
     hasReview: Boolean(item.has_review),
   }))
   const first = items[0]

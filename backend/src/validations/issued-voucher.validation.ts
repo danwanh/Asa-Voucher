@@ -1,14 +1,14 @@
 import { z } from "zod";
 
 export const listIssuedVouchersQuerySchema = z.object({
-  status: z.enum(["active", "used", "expired", "refunded", "cancelled"]).optional(),
+  status: z.enum(["active", "used", "expired", "revoked", "cancelled"]).optional(),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20),
 });
 export type ListIssuedVouchersQuery = z.infer<typeof listIssuedVouchersQuerySchema>;
 
 export const updateIssuedVoucherStatusSchema = z.object({
-  status: z.enum(["expired", "refunded"]),
+  status: z.enum(["expired", "revoked"]),
   note: z.string().max(500).optional(),
 });
 export type UpdateIssuedVoucherStatusInput = z.infer<typeof updateIssuedVoucherStatusSchema>;

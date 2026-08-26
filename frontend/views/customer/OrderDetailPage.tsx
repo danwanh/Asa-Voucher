@@ -19,14 +19,14 @@ function orderStatusLabel(status: OrderStatus) {
   if (status === "pending_payment") return "Đã tạo đơn, đang chờ thanh toán"
   if (status === "payment_failed") return "Thanh toán thất bại, có thể thử lại"
   if (status === "confirmed") return "Thanh toán thành công, voucher đã phát hành"
-  if (status === "completed") return "Đơn đã hoàn tất sử dụng/xử lý"
   if (status === "cancelled") return "Đơn bị hủy trước khi hoàn tất"
   return "Đã hoàn tiền cho khách"
 }
 
 function issuedVoucherStatusLabel(status: string) {
-  if (status === "refunded") return "Đã vô hiệu do hoàn tiền"
+  if (status === "revoked") return "Đã vô hiệu do thu hồi"
   if (status === "cancelled") return "Đã vô hiệu do cấp lại"
+  if (status === "refunded") return "Đã hoàn tiền"
   if (status === "used") return "Đã sử dụng"
   if (status === "expired") return "Hết hạn"
   return "Đang hoạt động"
@@ -43,7 +43,7 @@ export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAga
   const successfulPayment = order.payments?.find((payment) => payment.status === "success" || payment.status === "refunded")
   const isCreator = order.userId === currentUserId
   const ownsVoucher = order.recipientId === currentUserId
-  const canCreateFeedback = order.status === "confirmed" || order.status === "completed"
+  const canCreateFeedback = order.status === "confirmed"
   const isGiftSender = Boolean(order.isGift && order.recipientId !== currentUserId)
 
   const copy = () => {
@@ -77,7 +77,7 @@ export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAga
             <div className="font-black text-xl" style={{ color: C.indigo, fontFamily: "'Nunito', sans-serif" }}>{order.orderCode ?? order.id}</div>
             <div className="text-xs mt-1" style={{ color: "#9CA3AF" }}>Ngày đặt: {fmtDate(order.createdAt)}</div>
           </div>
-          <span className="px-3 py-1.5 rounded-xl text-sm font-bold" style={{ backgroundColor: order.status === "confirmed" || order.status === "completed" ? C.teal + "20" : order.status === "payment_failed" || order.status === "cancelled" ? "#FEE2E2" : order.status === "refunded" ? "#E0EEFF" : C.apricot + "25", color: order.status === "confirmed" || order.status === "completed" ? C.teal : order.status === "payment_failed" || order.status === "cancelled" ? "#DC2626" : order.status === "refunded" ? "#1A5FAD" : "#D97706" }}>
+          <span className="px-3 py-1.5 rounded-xl text-sm font-bold" style={{ backgroundColor: order.status === "confirmed" ? C.teal + "20" : order.status === "payment_failed" || order.status === "cancelled" ? "#FEE2E2" : order.status === "refunded" ? "#E0EEFF" : C.apricot + "25", color: order.status === "confirmed" ? C.teal : order.status === "payment_failed" || order.status === "cancelled" ? "#DC2626" : order.status === "refunded" ? "#1A5FAD" : "#D97706" }}>
             {orderStatusLabel(order.status)}
           </span>
         </div>
@@ -86,9 +86,6 @@ export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAga
       {isRefunded && (
         <div className="rounded-2xl border p-4 mb-4" style={{ borderColor: "#93C5FD", backgroundColor: "#EFF6FF" }}>
           <div className="text-sm font-bold" style={{ color: "#1A5FAD" }}>Đơn hàng đã hoàn tiền</div>
-          <div className="text-xs mt-1" style={{ color: "#1E40AF" }}>
-            Voucher code vẫn hiển thị để tra cứu lịch sử, nhưng đã bị vô hiệu và không thể sử dụng.
-          </div>
         </div>
       )}
 
@@ -141,7 +138,7 @@ export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAga
               <div className="mt-4 space-y-3">
                 {order.status !== "cancelled" && item.issuedVouchers && item.issuedVouchers.length > 0 && !isGiftSender ? (
                   item.issuedVouchers.map((voucher) => {
-                    const isInvalidated = voucher.status === "refunded" || voucher.status === "cancelled"
+                    const isInvalidated = voucher.status === "revoked" || voucher.status === "cancelled"
                     return (
                     <div key={voucher.id} className="rounded-2xl border p-4" style={{ borderColor: voucher.status === "used" ? C.teal + "60" : isInvalidated ? "#FCA5A5" : "#E2DFC8", opacity: isInvalidated ? 0.7 : 1 }}>
                       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">

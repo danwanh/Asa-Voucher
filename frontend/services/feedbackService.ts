@@ -90,7 +90,7 @@ export const feedbackService = {
   },
 
   async listComplaints(params?: { status?: string; order_id?: string; page?: number; limit?: number }) {
-    const response = await api.get<Envelope<{ items: any[]; total: number; page: number; limit: number }>>("/complaints", { params })
+    const response = await api.get<Envelope<{ items: any[]; total: number; page: number; limit: number; countsByStatus?: Record<string, number> }>>("/complaints", { params })
     const data = unwrap(response)
     return {
       items: (data.items ?? []).map((c: any) => ({
@@ -113,6 +113,7 @@ export const feedbackService = {
         resolvedAt: c.resolved_at,
       })) as ComplaintListItem[],
       total: data.total ?? 0,
+      countsByStatus: (data.countsByStatus ?? {}) as Record<string, number>,
       page: data.page ?? 1,
       limit: data.limit ?? 20,
     }

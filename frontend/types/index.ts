@@ -19,7 +19,7 @@ export type VoucherStatus =
   | "locked"
   | "cancelled"
   | "used"
-export type OrderStatus = "pending_payment" | "payment_failed" | "confirmed" | "completed" | "cancelled" | "refunded" | "complaining"
+export type OrderStatus = "pending_payment" | "payment_failed" | "confirmed" | "cancelled" | "refunded"
 export type OrderPaymentStatus = "pending" | "paid" | "failed" | "refunded"
 
 // Kept for pages that still reference the old admin sub-role concept;
@@ -231,7 +231,7 @@ export interface IssuedVoucher {
   id: string
   code: string
   qrPayload: string
-  status: "active" | "used" | "expired" | "refunded" | "cancelled"
+  status: "active" | "used" | "expired" | "revoked" | "cancelled" | "refunded"
   expiredDate?: string
   review?: Review
   complaint?: Complaint
@@ -258,7 +258,7 @@ export interface ReviewTarget {
   review?: Review
 }
 
-export type ComplaintStatus = "open" | "under_review" | "resolved" | "closed"
+export type ComplaintStatus = "open" | "contacting_partner" | "reissued" | "refunded"
 
 export interface Complaint {
   id: string
