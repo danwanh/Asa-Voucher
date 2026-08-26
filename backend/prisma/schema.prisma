@@ -47,7 +47,6 @@ model User {
   represented_partners  Partner[]           @relation("PartnerRepresentative")
   payment_logs          PaymentLog[]
   refresh_tokens        RefreshToken[]
-  review_responses      ReviewResponse[]
   reviews               Review[]
   reviewed_alerts       SecurityAlert[]     @relation("SecurityAlertReviewer")
   security_alerts       SecurityAlert[]     @relation("SecurityAlertUser")
@@ -417,7 +416,6 @@ model Review {
   is_published       Boolean          @default(true)
   created_at         DateTime         @default(now()) @db.Timestamptz(6)
   updated_at         DateTime         @default(now()) @updatedAt @db.Timestamptz(6)
-  review_responses   ReviewResponse[]
   issued_vouchers    IssuedVoucher    @relation(fields: [issued_voucher_id], references: [id], onDelete: Cascade)
   users              User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
   voucher_products   VoucherProduct   @relation(fields: [voucher_product_id], references: [id], onDelete: Cascade)
@@ -426,19 +424,6 @@ model Review {
   @@index([voucher_product_id])
   @@index([user_id])
   @@map("reviews")
-}
-
-model ReviewResponse {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  review_id    String   @db.Uuid
-  responded_by String   @db.Uuid
-  content      String
-  created_at   DateTime @default(now()) @db.Timestamptz(6)
-  responder    User     @relation(fields: [responded_by], references: [id], onDelete: Cascade)
-  reviews      Review   @relation(fields: [review_id], references: [id], onDelete: Cascade)
-
-  @@index([review_id])
-  @@map("review_responses")
 }
 
 model Complaint {
