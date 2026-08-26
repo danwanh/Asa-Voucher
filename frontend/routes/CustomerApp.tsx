@@ -216,7 +216,7 @@ export function CustomerApp({
           })
         } else if (page === "complaint") {
           if (feedbackVoucherId) {
-            const canComplaint = order.status === "confirmed" || order.status === "completed"
+            const canComplaint = order.status === "confirmed"
             const selectedTarget = (order.items ?? []).flatMap((item) => (item.issuedVouchers ?? [])
               .filter((voucher) => voucher.id === feedbackVoucherId && (voucher.complaint || canComplaint || voucher.status === "used"))
               .map((voucher) => ({
@@ -238,7 +238,7 @@ export function CustomerApp({
             setPendingOrderLoading(false)
             return
           }
-          const canComplaint = order.status === "confirmed" || order.status === "completed"
+          const canComplaint = order.status === "confirmed"
           const targets = (order.items ?? []).flatMap((item) => (item.issuedVouchers ?? [])
             .filter((voucher) => voucher.complaint || canComplaint || voucher.status === "used")
             .map((voucher) => ({
@@ -258,7 +258,7 @@ export function CustomerApp({
             toast.error("Không tìm thấy voucher có thể khiếu nại.")
             router.replace(`/orders/${order.id}`)
           }
-        } else if (initialPaymentStatus === "success" && (order.status === "confirmed" || order.status === "completed")) {
+        } else if (initialPaymentStatus === "success" && order.status === "confirmed") {
           toast.success("Thanh toán thành công, voucher đã được phát hành.")
         } else if (initialPaymentStatus) {
           toast.error(order.status === "cancelled"

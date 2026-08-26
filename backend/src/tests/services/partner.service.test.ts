@@ -19,6 +19,8 @@ const { mockPrisma, mockTx } = vi.hoisted(() => ({
       update: vi.fn(),
     },
     issuedVoucher: {
+      count: vi.fn(),
+    },
     voucherProductBranch: {
       count: vi.fn(),
     },

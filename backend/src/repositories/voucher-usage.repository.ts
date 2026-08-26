@@ -1,6 +1,14 @@
 import { prisma } from "../config/prisma.js";
 import type { VoucherUsageListFilter, VoucherUsageRow } from "../types/issued-voucher.types.js";
 
+function toUsageRow(row: Record<string, unknown>) {
+  return {
+    ...row,
+    issued_voucher_id: row.id,
+    issued_vouchers: row,
+  } as unknown as VoucherUsageRow;
+}
+
 export async function createVoucherUsage(input: {
   issued_voucher_id: string;
   branch_id: string;

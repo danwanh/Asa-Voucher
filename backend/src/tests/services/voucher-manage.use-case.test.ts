@@ -32,6 +32,9 @@ const { mockPrisma } = vi.hoisted(() => ({
     partnerBranch: {
       findUnique: vi.fn(),
     },
+    review: {
+      groupBy: vi.fn(),
+    },
     $transaction: vi.fn(),
   },
 }));
@@ -73,6 +76,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockPrisma.partner.findUnique.mockResolvedValue(APPROVED_PARTNER as any);
   mockPrisma.partner.findFirst.mockResolvedValue(APPROVED_PARTNER as any);
+  mockPrisma.review.groupBy.mockResolvedValue([]);
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════

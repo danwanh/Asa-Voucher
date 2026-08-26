@@ -31,8 +31,6 @@ const TABS = [
 ]
 
 const COMPLAINT_STATUS: Record<ComplaintStatus, { label: string; color: string; background: string }> = {
-  under_review: { label: "Đang xem xét", color: "#1D4ED8", background: "#DBEAFE" },
-  closed: { label: "Đã đóng", color: "#6B7280", background: "#F3F4F6" },
   open: { label: "Chờ tiếp nhận", color: "#B66A00", background: C.apricot + "25" },
   contacting_partner: { label: "Đang liên hệ đối tác", color: "#B66A00", background: "#FEF3C7" },
   reissued: { label: "Đã cấp lại", color: "#15803D", background: "#DCFCE7" },

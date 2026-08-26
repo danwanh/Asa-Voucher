@@ -69,7 +69,15 @@ function listInclude(feedbackUserId?: string) {
 
 type IssuedVoucherWithRelations = IssuedVoucherRow & {
   voucher_products: { partner_id: string };
-  order_items: { order_id: string; orders?: { user_id: string; status: string } | null } | null;
+  order_items: {
+    order_id: string;
+    orders?: {
+      user_id: string;
+      recipient_id: string;
+      status: string;
+      is_gift: boolean;
+    } | null;
+  } | null;
   owners?: { id: string; full_name: string } | null;
 };
 

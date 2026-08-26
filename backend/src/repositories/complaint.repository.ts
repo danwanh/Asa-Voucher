@@ -110,7 +110,7 @@ export async function createComplaint(userId: string, input: CreateComplaintInpu
 }
 
 export async function findOrderOwner(orderId: string): Promise<{ id: string; user_id: string; recipient_id: string; status: string; is_gift: boolean } | null> {
-  return prisma.order.findUnique({ where: { id: orderId }, select: { id: true, user_id: true, recipient_id: true, status: true, is_gift: true } });
+  return prisma.order.findUnique({ where: { id: orderId }, select: { id: true, user_id: true, recipient_id: true, status: true, is_gift: true } }) as unknown as Promise<{ id: string; user_id: string; recipient_id: string; status: string; is_gift: boolean } | null>;
 }
 
 export async function findComplaintByIssuedVoucherId(userId: string, issuedVoucherId: string) {
