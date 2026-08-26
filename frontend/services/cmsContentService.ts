@@ -36,7 +36,7 @@ export const cmsContentService = {
     content_type: string
     title: string
     content?: string
-    image_url?: string
+    image_url?: string | null
     status?: string
   }) {
     const res = await api.post<ApiData<CmsContent>>("/cms-contents", input)

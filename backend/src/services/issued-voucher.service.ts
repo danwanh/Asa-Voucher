@@ -186,7 +186,7 @@ export async function checkVoucher(user: AuthUser, input: CheckVoucherInput) {
     const userBranchId = user.branchId;
 
     if (!userBranchId || !eligibleBranchIds.includes(userBranchId)) {
-      throw new HttpError(403, "Bạn chỉ được kiểm tra voucher tại chi nhánh của mình");
+      throw new HttpError(403, "Voucher không áp dụng ở chi nhánh của bạn, vui lòng kiểm tra lại");
     }
   }
 

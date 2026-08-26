@@ -105,7 +105,7 @@ export function ContentManagementPage() {
     if (!form.title.trim()) return
     setIsSaving(true)
     try {
-      let imageUrl = form.image_url || undefined
+      let imageUrl = form.image_url || null
       if (selectedImageFile) {
         imageUrl = await mediaUploadService.uploadImage(selectedImageFile)
       }
@@ -342,17 +342,13 @@ export function ContentManagementPage() {
                 <VoucherImageUpload
                   imageUrl={form.image_url}
                   selectedFile={selectedImageFile}
+                  onClear={() => setForm((current) => ({ ...current, image_url: "" }))}
                   onFileChange={(file) => {
                     setSelectedImageFile(file)
-                    if (file) setForm((f) => ({ ...f, image_url: "" }))
+                    setForm((current) => ({ ...current, image_url: file ? "" : current.image_url }))
                   }}
                   onError={(msg) => showToast("error", msg)}
                 />
-                <div className="mt-2">
-                  <input value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })}
-                    placeholder="Hoặc dán URL ảnh: https://..."
-                    className="w-full px-4 py-2.5 rounded-xl border-2 text-sm outline-none" style={{ borderColor: "#E5E7EB" }} />
-                </div>
               </div>
 
               <div className="grid grid-cols-1 gap-3">

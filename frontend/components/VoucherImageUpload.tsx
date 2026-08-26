@@ -10,11 +10,12 @@ type Props = {
   imageUrl?: string
   selectedFile?: File | null
   disabled?: boolean
+  onClear?: () => void
   onFileChange: (file: File | null) => void
   onError?: (message: string) => void
 }
 
-export function VoucherImageUpload({ imageUrl, selectedFile, disabled = false, onFileChange, onError }: Props) {
+export function VoucherImageUpload({ imageUrl, selectedFile, disabled = false, onClear, onFileChange, onError }: Props) {
   const [previewUrl, setPreviewUrl] = useState("")
 
   useEffect(() => {
@@ -65,12 +66,15 @@ export function VoucherImageUpload({ imageUrl, selectedFile, disabled = false, o
       {previewUrl ? (
         <div className="relative w-40 overflow-hidden rounded-xl border bg-white" style={{ borderColor: "#E2DFC8" }}>
           <img src={previewUrl} alt="Ảnh đại diện voucher" className="h-24 w-full object-cover" />
-          {selectedFile && !disabled && (
+          {(selectedFile || (imageUrl && onClear)) && !disabled && (
             <button
               type="button"
-              onClick={() => onFileChange(null)}
+              onClick={() => {
+                if (selectedFile) onFileChange(null)
+                else onClear?.()
+              }}
               className="absolute right-1 top-1 rounded-full bg-black/60 p-1 text-white"
-              aria-label="Bỏ ảnh đã chọn"
+              aria-label={selectedFile ? "Bỏ ảnh đã chọn" : "Xóa ảnh hiện tại"}
             >
               <X className="h-3 w-3" />
             </button>
