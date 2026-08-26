@@ -1,6 +1,7 @@
 import { adminRoles, type UserRole } from "../types/auth.types.js";
 import { prisma } from "../config/prisma.js";
 import { requireData, throwDbError } from "../utils/db.js";
+import https from "https";
 import { HttpError } from "../utils/http-error.js";
 import { rangeFromPagination } from "../validations/common.validation.js";
 
@@ -69,8 +70,15 @@ export async function updatePartner(user: CurrentUser, id: string, input: Record
 
 export async function deletePartner(id: string) {
   try {
+    const activeVoucherCount = await prisma.issuedVoucher.count({
+      where: { status: "active", order_items: { voucher_products: { partner_id: id } } },
+    });
+    if (activeVoucherCount > 0) {
+      throw new HttpError(409, "Đối tác còn voucher đang hoạt động, không thể đóng", "PARTNER_HAS_ACTIVE_VOUCHERS");
+    }
     await prisma.partner.update({ where: { id }, data: { status: "closed", updated_at: new Date() } });
   } catch (error) {
+    if (error instanceof HttpError) throw error;
     throwDbError(error, "Partner not found");
   }
 }
@@ -82,6 +90,12 @@ export async function updatePartnerApproval(adminId: string, id: string, approva
     if (representativeUserId) {
       await prisma.user.update({ where: { id: representativeUserId }, data: { is_active: approvalStatus === "approved", auth_version: { increment: 1 } } });
     }
+    if (approvalStatus === "rejected") {
+      await prisma.voucherProduct.updateMany({
+        where: { partner_id: id, status: { in: ["active", "paused"] } },
+        data: { status: "paused", updated_at: new Date() },
+      });
+    }
     return updatedPartner;
   } catch (error) {
     throwDbError(error, "Partner not found");
@@ -90,8 +104,17 @@ export async function updatePartnerApproval(adminId: string, id: string, approva
 
 export async function updatePartnerStatus(id: string, status: string) {
   try {
+    if (status === "closed" || status === "suspended") {
+      const activeVoucherCount = await prisma.issuedVoucher.count({
+        where: { status: "active", order_items: { voucher_products: { partner_id: id } } },
+      });
+      if (activeVoucherCount > 0) {
+        throw new HttpError(409, "Đối tác còn voucher đang hoạt động, không thể thay đổi trạng thái", "PARTNER_HAS_ACTIVE_VOUCHERS");
+      }
+    }
     return await prisma.partner.update({ where: { id }, data: { status, updated_at: new Date() } });
   } catch (error) {
+    if (error instanceof HttpError) throw error;
     throwDbError(error, "Partner not found");
   }
 }
@@ -143,11 +166,15 @@ export async function createBranch(
       );
     }
 
-    const { latitude, longitude } = await geocodeAddress(
-      address,
-      locality,
-      city,
-    );
+    let latitude: number | null = null;
+    let longitude: number | null = null;
+    try {
+      const coords = await geocodeAddress(address, locality, city);
+      latitude = coords.latitude;
+      longitude = coords.longitude;
+    } catch {
+      // Geocoding failed — create branch without coordinates
+    }
 
     return await prisma.partnerBranch.create({
       data: {
@@ -179,6 +206,19 @@ async function geocodeAddress(
   district: string | undefined,
   city: string,
 ): Promise<{ latitude: number; longitude: number }> {
+  const dns = await import("dns");
+  const resolver = new dns.Resolver();
+  resolver.setServers(["8.8.8.8", "8.8.4.4"]);
+
+  const hostname = "nominatim.openstreetmap.org";
+
+  const addrs = await new Promise<string[]>((resolve, reject) => {
+    resolver.resolve4(hostname, (err, addresses) => {
+      if (err || !addresses?.length) return reject(err ?? new Error("DNS lookup failed"));
+      resolve(addresses);
+    });
+  });
+
   const fullAddress = [address, district, city]
     .filter(Boolean)
     .join(", ");
@@ -190,21 +230,7 @@ async function geocodeAddress(
   url.searchParams.set("limit", "5");
   url.searchParams.set("countrycodes", "vn");
 
-  const response = await fetch(url, {
-    headers: {
-      "User-Agent": "Asa-Voucher/1.0",
-    },
-  });
-
-  if (!response.ok) {
-    throw new HttpError(
-      502,
-      "Không thể xác định địa chỉ",
-      "GEOCODING_FAILED",
-    );
-  }
-
-  const results = (await response.json()) as Array<{
+  const results = await new Promise<Array<{
     lat: string;
     lon: string;
     display_name?: string;
@@ -220,7 +246,32 @@ async function geocodeAddress(
       state?: string;
       country?: string;
     };
-  }>;
+  }>>((resolve, reject) => {
+    const req = https.get(
+      {
+        hostname: addrs[0],
+        port: 443,
+        path: url.pathname + url.search,
+        method: "GET",
+        headers: { "User-Agent": "Asa-Voucher/1.0", Host: hostname },
+        servername: hostname,
+        timeout: 10000,
+      },
+      (res) => {
+        let data = "";
+        res.on("data", (chunk: Buffer) => (data += chunk.toString()));
+        res.on("end", () => {
+          if (res.statusCode !== 200) {
+            return reject(new HttpError(502, "Không thể xác định địa chỉ", "GEOCODING_FAILED"));
+          }
+          try { resolve(JSON.parse(data) as Array<any>); }
+          catch { reject(new HttpError(502, "Không thể xác định địa chỉ", "GEOCODING_FAILED")); }
+        });
+      }
+    );
+    req.on("error", () => reject(new HttpError(502, "Không thể xác định địa chỉ", "GEOCODING_FAILED")));
+    req.setTimeout(10000, () => { req.destroy(); reject(new HttpError(504, "Geocoding timeout", "GEOCODING_TIMEOUT")); });
+  });
 
   if (results.length === 0) {
     throw new HttpError(

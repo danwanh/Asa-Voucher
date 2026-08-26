@@ -56,7 +56,7 @@ export function PaymentResultPage({ orderId, callbackStatus }: { orderId?: strin
   if (initializationError) return <main className="mx-auto max-w-md px-4 py-20 text-center"><h1 className="text-xl font-black" style={{ color: C.indigo }}>Không thể khôi phục phiên đăng nhập</h1><p className="mt-2 text-sm" style={{ color: "#8A8DA8" }}>Vui lòng kiểm tra kết nối và thử lại.</p><button onClick={() => void initialize()} className="mt-6 rounded-2xl px-6 py-3 font-bold text-white" style={{ backgroundColor: C.peach }}>Thử lại</button></main>
   if (!user) return <LoadingState label="Đang chuyển đến đăng nhập..." variant="page" />
 
-  const succeeded = order?.status === "confirmed" || order?.status === "completed"
+  const succeeded = order?.status === "confirmed"
   const refunded = order?.status === "refunded"
   const pending = order?.status === "pending_payment" || callbackStatus === "pending"
   const Icon = succeeded ? CheckCircle2 : pending || refunded ? Clock3 : XCircle

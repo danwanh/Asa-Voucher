@@ -1,4 +1,4 @@
-export type IssuedVoucherStatus = "active" | "used" | "expired" | "refunded" | "cancelled";
+export type IssuedVoucherStatus = "active" | "used" | "expired" | "revoked" | "cancelled";
 
 export interface IssuedVoucherRow {
   id: string;

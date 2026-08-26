@@ -41,7 +41,7 @@ function resolveRedeemableState(voucher: NonNullable<IssuedVoucherWithProduct>) 
   const today = new Date().toISOString().slice(0, 10);
 
   if (voucher.status === "used") return { redeemable: false, reason: "Voucher đã được sử dụng" };
-  if (voucher.status === "refunded") return { redeemable: false, reason: "Voucher đã hoàn tiền" };
+  if (voucher.status === "revoked") return { redeemable: false, reason: "Voucher đã bị thu hồi" };
   if (voucher.status === "cancelled") return { redeemable: false, reason: "Voucher đã bị vô hiệu do cấp lại" };
   if (voucher.status === "expired" || dateToIsoDate(voucher.expired_date) < today) {
     return { redeemable: false, reason: "Voucher đã hết hạn" };

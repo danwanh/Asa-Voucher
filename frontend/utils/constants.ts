@@ -28,27 +28,33 @@ export const STATUS_LABEL: Record<string, string> = {
   sold_out: "Hết số lượng",
   expired: "Hết hạn",
   locked: "Đã khóa",
-  confirmed: "Đã xác nhận",
+  confirmed: "Thanh toán thành công",
   cancelled: "Đã hủy",
   refunded: "Đã hoàn tiền",
+  revoked: "Đã thu hồi",
   used: "Đã dùng",
   pending_payment: "Chờ thanh toán",
   payment_failed: "Thanh toán thất bại",
   paid: "Đã thanh toán",
   completed: "Hoàn thành",
   complaining: "Đang khiếu nại",
+  resolved: "Đã xử lý",
   banned: "Bị khóa",
   inactive: "Không hoạt động",
+  contacting_partner: "Liên hệ đối tác",
+  reissued: "Đã cấp lại",
+  open: "Đang khiếu nại",
 };
 
 export const STATUS_DESCRIPTION: Record<string, string> = {
   all: "Tất cả đơn hàng",
   pending: "Chờ xác nhận thanh toán",
   confirmed: "Đã xác nhận, voucher đã phát hành",
-  completed: "Hoàn thành, voucher đã sử dụng",
   cancelled: "Đã hủy",
-  refunded: "Đã hoàn tiền (tự động hoặc từ khiếu nại)",
-  complaining: "Đơn hàng đang có khiếu nại cần xử lý",
+  refunded: "Đã hoàn tiền",
+  open: "Khiếu nại đang chờ xử lý",
+  contacting_partner: "Đang liên hệ đối tác",
+  reissued: "Đã cấp lại voucher",
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -80,14 +86,18 @@ export function statusColor(s: string): { bg: string; text: string } {
     s === "active" ||
     s === "completed" ||
     s === "approved" ||
-    s === "selling"
+    s === "selling" ||
+    s === "reissued"
   )
-    return { bg: "#E8F5EE", text: "#2D7A52" };
-  if (s === "pending" || s === "pending_payment" || s === "draft")
+    return { bg: "#F0EDF8", text: "#7C3AED" };
+  if (s === "pending" || s === "pending_payment" || s === "draft" || s === "open")
     return { bg: "#FFF3CD", text: "#856404" };
   if (s === "used" || s === "confirmed") return { bg: "#E0EEFF", text: "#1A5FAD" };
   if (s === "refunded") return { bg: "#E8F5EE", text: "#2D7A52" };
+  if (s === "cancelled") return { bg: "#F3F4F6", text: "#6B7280" };
+  if (s === "revoked") return { bg: "#FFF3CD", text: "#856404" };
   if (s === "complaining") return { bg: "#FFF3CD", text: "#856404" };
+  if (s === "resolved" || s === "contacting_partner") return { bg: "#E0EEFF", text: "#1A5FAD" };
   if (s === "suspended") {
     return { bg: "#FFF3CD", text: "#856404" };
   }

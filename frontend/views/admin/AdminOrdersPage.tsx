@@ -4,19 +4,9 @@ import { AppIcon } from "@/components/AppIcon"
 import { ImageLightbox } from "@/components/ImageLightbox"
 import { StatusBadge } from "@/components/StatusBadge"
 import { orderService, type OrderStatusCounts } from "@/services/orderService"
-import { feedbackService, type ComplaintListItem } from "@/services/feedbackService"
 import type { Order, OrderListItem } from "@/types"
 
 type Action = "cancel" | "cancel_refund_prompt" | "refund"
-type ComplaintAction = "accept_refund" | "accept_reissue" | "reject" | "external"
-
-const REASON_LABELS: Record<string, string> = {
-  not_as_described: "Không đúng mô tả",
-  cannot_redeem: "Không thể sử dụng",
-  expired_early: "Hết hạn sớm",
-  wrong_value: "Sai giá trị",
-  other: "Khác",
-}
 
 const ACTION_CONFIG: Record<Action, { label: string; icon: string; color: string; confirmLabel: string; description: string }> = {
   cancel: { label: "Hủy đơn", icon: "trash", color: "#C0392B", confirmLabel: "Hủy đơn", description: "Bạn có chắc chắn muốn hủy đơn hàng này không? Thao tác này không thể hoàn tác." },
@@ -27,7 +17,6 @@ const ACTION_CONFIG: Record<Action, { label: string; icon: string; color: string
 function getActionsForStatus(status: string, paymentStatus: string): Action[] {
   if (status === "pending_payment" || status === "payment_failed") return ["cancel"]
   if (status === "confirmed") return ["cancel_refund_prompt"]
-  if (status === "completed") return []
   if (status === "cancelled" && paymentStatus === "paid") return ["refund"]
   return []
 }
@@ -54,22 +43,13 @@ export function AdminOrdersPage() {
   const [dialogOrder, setDialogOrder] = useState<Order | null>(null)
   const [refundNote, setRefundNote] = useState("")
   const [actionLoading, setActionLoading] = useState(false)
+  const [refundLoading, setRefundLoading] = useState(false)
 
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null)
-
-  const [orderComplaints, setOrderComplaints] = useState<ComplaintListItem[]>([])
-  const [complaintDialogAction, setComplaintDialogAction] = useState<ComplaintAction | null>(null)
-  const [complaintDialogComplaint, setComplaintDialogComplaint] = useState<ComplaintListItem | null>(null)
   const [lightbox, setLightbox] = useState<{ images: string[]; index: number } | null>(null)
-  const [complaintResolutionNote, setComplaintResolutionNote] = useState("")
-  const [partnerSearch, setPartnerSearch] = useState("")
-  const [partnerResults, setPartnerResults] = useState<any[]>([])
-  const [partnerSearchLoading, setPartnerSearchLoading] = useState(false)
 
   const toastTimer = useRef<ReturnType<typeof setTimeout>>()
   const panelRef = useRef<HTMLDivElement>(null)
-  const partnerSearchTimer = useRef<ReturnType<typeof setTimeout>>()
-  const partnerSearchAbort = useRef<AbortController | null>(null)
 
   const showToast = useCallback((type: "success" | "error", message: string) => {
     setToast({ type, message })
@@ -136,14 +116,9 @@ export function AdminOrdersPage() {
   const handleSelectOrder = async (order: OrderListItem) => {
     setDetailLoading(true)
     setShowPanel(true)
-    setOrderComplaints([])
     try {
       const detail = await orderService.getOrder(order.id)
       setSelectedOrder(detail)
-      try {
-        const complaints = await feedbackService.listComplaints({ order_id: order.id, limit: 100 })
-        setOrderComplaints(complaints.items)
-      } catch {}
     } catch {
       showToast("error", "Không thể tải chi tiết đơn hàng")
       setShowPanel(false)
@@ -163,7 +138,7 @@ export function AdminOrdersPage() {
   }
 
   const closeDialog = () => {
-    if (actionLoading) return
+    if (actionLoading || refundLoading) return
     setDialogType(null)
     setDialogAction(null)
     setDialogOrder(null)
@@ -174,7 +149,8 @@ export function AdminOrdersPage() {
     if (!dialogAction || !dialogOrder) return
     const action = dialogAction
     const order = dialogOrder
-    setActionLoading(true)
+    if (withRefund) setRefundLoading(true)
+    else setActionLoading(true)
     try {
       if (action === "cancel") {
         await orderService.cancelOrder(order.id)
@@ -212,103 +188,20 @@ export function AdminOrdersPage() {
       showToast("error", message)
     } finally {
       setActionLoading(false)
+      setRefundLoading(false)
     }
   }
-
-  const handleComplaintAction = (action: ComplaintAction, complaint: ComplaintListItem) => {
-    setComplaintDialogAction(action)
-    setComplaintDialogComplaint(complaint)
-    setComplaintResolutionNote("")
-    setPartnerSearch("")
-    setPartnerResults([])
-  }
-
-  const closeComplaintDialog = () => {
-    if (actionLoading) return
-    clearTimeout(partnerSearchTimer.current)
-    partnerSearchAbort.current?.abort()
-    setComplaintDialogAction(null)
-    setComplaintDialogComplaint(null)
-    setComplaintResolutionNote("")
-    setPartnerSearch("")
-    setPartnerResults([])
-  }
-
-  const executeComplaintAction = async () => {
-    if (!complaintDialogAction || !complaintDialogComplaint) return
-    const complaint = complaintDialogComplaint
-    setActionLoading(true)
-    try {
-      if (complaintDialogAction === "accept_refund") {
-        await feedbackService.resolveComplaint(complaint.id, {
-          resolutionNote: complaintResolutionNote || "Chấp nhận hoàn tiền",
-          resolutionTypes: ["refund"],
-        })
-        showToast("success", "Đã chấp nhận hoàn tiền cho voucher khiếu nại")
-      } else if (complaintDialogAction === "accept_reissue") {
-        await feedbackService.resolveComplaint(complaint.id, {
-          resolutionNote: complaintResolutionNote || "Chấp nhận cấp lại voucher",
-          resolutionTypes: ["reissue"],
-        })
-        showToast("success", "Đã chấp nhận cấp lại voucher khiếu nại")
-      } else if (complaintDialogAction === "reject") {
-        await feedbackService.resolveComplaint(complaint.id, {
-          resolutionNote: complaintResolutionNote || "Từ chối khiếu nại",
-          resolutionTypes: ["no_action"],
-        })
-        showToast("success", "Đã từ chối khiếu nại")
-      } else if (complaintDialogAction === "external") {
-        await feedbackService.resolveComplaint(complaint.id, {
-          resolutionNote: complaintResolutionNote || "Xử lý bên ngoài - đã liên hệ đối tác",
-          resolutionTypes: ["no_action"],
-        })
-        showToast("success", "Đã đánh dấu xử lý bên ngoài")
-      }
-      closeComplaintDialog()
-      if (selectedOrder) {
-        const detail = await orderService.getOrder(selectedOrder.id)
-        setSelectedOrder(detail)
-        const complaints = await feedbackService.listComplaints({ order_id: selectedOrder.id, limit: 100 })
-        setOrderComplaints(complaints.items)
-      }
-      fetchOrders()
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Thao tác thất bại"
-      showToast("error", message)
-    } finally {
-      setActionLoading(false)
-    }
-  }
-
-  const searchPartners = useCallback((q: string) => {
-    setPartnerSearch(q)
-    clearTimeout(partnerSearchTimer.current)
-    partnerSearchAbort.current?.abort()
-    if (q.trim().length < 2) { setPartnerResults([]); return }
-    setPartnerSearchLoading(true)
-    partnerSearchTimer.current = setTimeout(async () => {
-      const controller = new AbortController()
-      partnerSearchAbort.current = controller
-      try {
-        const result = await feedbackService.searchPartners(q.trim())
-        if (!controller.signal.aborted) setPartnerResults(result)
-      } catch {}
-      setPartnerSearchLoading(false)
-    }, 300)
-  }, [])
 
   const filterTabs = [
-    { v: "all", l: "Tất cả", desc: "Tất cả đơn hàng" },
-    { v: "pending_payment", l: "Chờ thanh toán", desc: "Đơn tạo xong, chờ khách thanh toán" },
-    { v: "payment_failed", l: "Thanh toán thất bại", desc: "Giao dịch thanh toán lỗi" },
-    { v: "confirmed", l: "Đã xác nhận", desc: "Đã xác nhận, voucher đã phát hành" },
-    { v: "complaining", l: "Đang khiếu nại", desc: "Đơn có khiếu nại cần xử lý" },
-    { v: "completed", l: "Hoàn thành", desc: "Đơn đã hoàn thành, voucher đã sử dụng" },
-    { v: "cancelled", l: "Đã hủy", desc: "Đơn đã hủy" },
-    { v: "refunded", l: "Đã hoàn tiền", desc: "Hoàn tiền từ khiếu nại hoặc tự động" },
+    { v: "all", l: "Tất cả", color: C.indigo },
+    { v: "pending_payment", l: "Chờ thanh toán", color: "#856404" },
+    { v: "payment_failed", l: "Thanh toán thất bại", color: "#C0392B" },
+    { v: "confirmed", l: "Thanh toán thành công", color: "#1A5FAD" },
+    { v: "cancelled", l: "Đã hủy", color: "#6B7280" },
+    { v: "refunded", l: "Đã hoàn tiền", color: "#2D7A52" },
   ]
 
-  const availableActions = selectedOrder && orderComplaints.filter(c => c.status === "open").length === 0
+  const availableActions = selectedOrder
     ? getActionsForStatus(selectedOrder.status, selectedOrder.paymentStatus)
     : []
 
@@ -329,38 +222,23 @@ export function AdminOrdersPage() {
 
         <div className="bg-white rounded-2xl shadow-sm p-4 mb-5">
           <div className="flex flex-wrap gap-2 mb-4">
-            {filterTabs.map(({ v, l, desc }) => (
-              <div key={v} className="relative group">
-                <button
-                  onClick={() => { setFilter(v); setCancelledSubFilter("all") }}
-                  className="px-4 py-2 rounded-full text-sm font-semibold transition-all"
-                  style={{
-                    backgroundColor: filter === v ? C.indigo : "transparent",
-                    color: filter === v ? "white" : C.indigo,
-                    border: `1.5px solid ${filter === v ? C.indigo : "#E2DFC8"}`,
-                  }}
-                >
-                  {l}
-                  <span
-                    className="ml-1.5 px-1.5 py-0.5 rounded-full text-xs"
-                    style={{
-                      backgroundColor: filter === v ? "rgba(255,255,255,0.25)" : C.eggshell,
-                      color: filter === v ? "white" : C.indigo,
-                    }}
-                  >
-                    {counts[v as keyof OrderStatusCounts] ?? 0}
-                  </span>
-                </button>
-                {desc && (
-                  <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 px-3 py-1.5 rounded-lg text-xs whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-10 shadow-lg" style={{ backgroundColor: "#333", color: "white" }}>
-                    {desc}
-                    <div className="absolute left-1/2 -translate-x-1/2 -top-1 w-2 h-2 rotate-45" style={{ backgroundColor: "#333" }} />
-                  </div>
-                )}
-              </div>
+            {filterTabs.map(({ v, l, color }) => (
+              <button
+                key={v}
+                onClick={() => { setFilter(v); setCancelledSubFilter("all") }}
+                className="px-4 py-2 rounded-full text-sm font-semibold transition-all"
+                style={{
+                  backgroundColor: filter === v ? color : "transparent",
+                  color: filter === v ? "white" : color,
+                  border: `1.5px solid ${filter === v ? color : "#E2DFC8"}`,
+                }}
+              >
+                {l} ({(counts as Record<string, number>)[v] ?? 0})
+              </button>
             ))}
-          </div>
+           </div>
 
+          {/* Search */}
           <div className="relative">
             <AppIcon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "#8A8DA8" }} />
             <input
@@ -467,7 +345,7 @@ export function AdminOrdersPage() {
                       </span>
                     </td>
                     <td className="px-5 py-3.5">
-                      <StatusBadge status={o.hasComplaint ? "complaining" : o.status} />
+                      <StatusBadge status={o.status} />
                     </td>
                     <td className="px-5 py-3.5 text-right">
                       <span className="text-xs font-bold" style={{ color: C.peach }}>
@@ -593,108 +471,30 @@ export function AdminOrdersPage() {
                             {item.partnerName && <span>{item.partnerName} · </span>}
                             x{item.quantity} &times; {fmt(item.unitPrice)}
                           </p>
+                          {item.issuedVouchers && item.issuedVouchers.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1.5">
+                              {item.issuedVouchers.map((v) => {
+                                const label = v.status === "active" ? "Đang hoạt động" : v.status === "used" ? "Đã sử dụng" : v.status === "expired" ? "Hết hạn" : v.status === "revoked" ? "Đã thu hồi" : v.status === "cancelled" ? "Đã cấp lại" : v.status === "refunded" ? "Đã hoàn tiền" : v.status
+                                const bg = v.status === "active" ? "#E0F2FE" : v.status === "used" ? "#D1FAE5" : v.status === "expired" ? "#F3F4F6" : v.status === "refunded" ? "#E8F5EE" : v.status === "revoked" ? "#FFF3CD" : "#FEE2E2"
+                                const fg = v.status === "active" ? "#1A5FAD" : v.status === "used" ? "#2D7A52" : v.status === "expired" ? "#6B7280" : v.status === "refunded" ? "#2D7A52" : v.status === "revoked" ? "#856404" : "#DC2626"
+                                return (
+                                  <span
+                                    key={v.id}
+                                    className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
+                                    style={{ backgroundColor: bg, color: fg }}
+                                  >
+                                    {label}
+                                  </span>
+                                )
+                              })}
+                            </div>
+                          )}
                         </div>
                         <p className="text-sm font-bold whitespace-nowrap" style={{ color: C.peach }}>{fmt(item.subtotal)}</p>
                       </div>
                     ))}
                   </div>
                 </div>
-
-                {orderComplaints.length > 0 && (
-                  <div className="mb-5">
-                    <h4 className="text-[11px] font-semibold uppercase tracking-wider mb-2.5 flex items-center gap-1.5" style={{ color: "#8A8DA8" }}>
-                      <AppIcon name="alert" className="w-3.5 h-3.5" style={{ color: C.peach }} />
-                      Khiếu nại ({orderComplaints.length})
-                    </h4>
-                    <div className="space-y-2.5">
-                      {orderComplaints.map((c) => (
-                        <div
-                          key={c.id}
-                          className="rounded-xl p-3.5 border"
-                          style={{
-                            backgroundColor: c.status === "open" ? "#FEF3C7" : "#F0FDF4",
-                            borderColor: c.status === "open" ? "#FDE68A" : "#BBF7D0",
-                          }}
-                        >
-                          <div className="flex items-center justify-between mb-2">
-                            <span
-                              className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
-                              style={{
-                                backgroundColor: c.status === "open" ? "#FDE68A" : "#BBF7D0",
-                                color: c.status === "open" ? "#856404" : "#2D7A52",
-                              }}
-                            >
-                              {c.status === "open" ? "Đang mở" : "Đã xử lý"}
-                            </span>
-                            {c.voucherName && (
-                              <span className="text-xs font-semibold truncate max-w-[180px]" style={{ color: C.indigo }}>
-                                {c.voucherName}
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs mb-1" style={{ color: "#8A8DA8" }}>
-                            {REASON_LABELS[c.reason as keyof typeof REASON_LABELS] ?? c.reason}
-                           </p>
-                           <p className="text-xs mb-2 leading-relaxed" style={{ color: C.indigo }}>{c.description}</p>
-                           {c.evidenceUrls.length > 0 && (
-                             <div className="mb-2">
-                               <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "#8A8DA8" }}>Ảnh bằng chứng</p>
-                               <div className="grid grid-cols-4 gap-1.5 max-h-28 overflow-y-auto rounded-lg pr-1">
-                                  {c.evidenceUrls.map((url, index) => (
-                                    <button key={`${url}-${index}`} type="button" onClick={() => setLightbox({ images: c.evidenceUrls, index })} className="block w-full">
-                                      <img
-                                        src={url}
-                                        alt={`Ảnh bằng chứng ${index + 1}`}
-                                        className="aspect-square w-full rounded-lg border object-cover"
-                                        style={{ borderColor: "#E2DFC8" }}
-                                      />
-                                    </button>
-                                  ))}
-                               </div>
-                             </div>
-                           )}
-                           {c.resolutionNote && (
-                            <p className="text-xs italic mb-2" style={{ color: "#2D7A52" }}>
-                              {c.resolutionNote}
-                            </p>
-                          )}
-                          {c.status === "open" && (
-                            <div className="flex flex-wrap gap-1.5 pt-2 border-t" style={{ borderColor: c.status === "open" ? "#FDE68A" : "#BBF7D0" }}>
-                              <button
-                                onClick={() => handleComplaintAction("accept_refund", c)}
-                                className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-white transition-all hover:shadow-sm active:scale-[0.98]"
-                                style={{ backgroundColor: C.peach }}
-                              >
-                                Hoàn tiền
-                              </button>
-                              <button
-                                onClick={() => handleComplaintAction("accept_reissue", c)}
-                                className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-white transition-all hover:shadow-sm active:scale-[0.98]"
-                                style={{ backgroundColor: "#2D7A52" }}
-                              >
-                                Cấp lại
-                              </button>
-                              <button
-                                onClick={() => handleComplaintAction("reject", c)}
-                                className="px-3 py-1.5 rounded-lg text-[11px] font-bold border transition-colors hover:bg-white/50"
-                                style={{ borderColor: "#D1D5DB", color: C.indigo }}
-                              >
-                                Từ chối
-                              </button>
-                              <button
-                                onClick={() => handleComplaintAction("external", c)}
-                                className="px-3 py-1.5 rounded-lg text-[11px] font-bold border transition-colors hover:bg-white/50"
-                                style={{ borderColor: "#D1D5DB", color: "#856404" }}
-                              >
-                                Liên hệ ĐT
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
                 <div className="bg-gray-50 rounded-xl p-4 mb-5 space-y-2">
                   <div className="flex justify-between items-center">
@@ -918,7 +718,7 @@ export function AdminOrdersPage() {
             <div className="flex justify-end gap-3">
               <button
                 onClick={closeDialog}
-                disabled={actionLoading}
+                disabled={actionLoading || refundLoading}
                 className="px-5 py-2.5 rounded-xl text-sm font-bold border transition-colors hover:bg-gray-50 disabled:opacity-50"
                 style={{ borderColor: "#E2DFC8", color: C.indigo }}
               >
@@ -926,7 +726,7 @@ export function AdminOrdersPage() {
               </button>
               <button
                 onClick={() => executeAction(false)}
-                disabled={actionLoading}
+                disabled={actionLoading || refundLoading}
                 className="px-5 py-2.5 rounded-xl text-sm font-bold border transition-colors hover:bg-gray-50 disabled:opacity-50"
                 style={{ borderColor: "#E2DFC8", color: C.indigo }}
               >
@@ -934,132 +734,17 @@ export function AdminOrdersPage() {
               </button>
               <button
                 onClick={() => executeAction(true)}
-                disabled={actionLoading}
+                disabled={actionLoading || refundLoading}
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:shadow-md active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ backgroundColor: C.peach }}
               >
-                {actionLoading && <AppIcon name="clock" className="w-4 h-4 animate-spin" />}
-                {actionLoading ? "Đang xử lý..." : "Có, hoàn tiền"}
+                {refundLoading && <AppIcon name="clock" className="w-4 h-4 animate-spin" />}
+                {refundLoading ? "Đang xử lý..." : "Có, hoàn tiền"}
               </button>
             </div>
           </div>
         </div>
       )}
-
-        {complaintDialogAction && complaintDialogComplaint && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center" onClick={closeComplaintDialog}>
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6"
-          >
-            <div className="flex items-center gap-3 mb-4">
-              <div
-                className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
-                style={{ backgroundColor: C.peach + "15" }}
-              >
-                <AppIcon name="alert" className="w-5 h-5" style={{ color: C.peach }} />
-              </div>
-              <h3 className="text-base font-black" style={{ color: C.indigo }}>
-                {complaintDialogAction === "accept_refund" && "Hoàn tiền voucher"}
-                {complaintDialogAction === "accept_reissue" && "Cấp lại voucher"}
-                {complaintDialogAction === "reject" && "Từ chối khiếu nại"}
-                {complaintDialogAction === "external" && "Liên hệ đối tác"}
-              </h3>
-            </div>
-
-            <div className="bg-gray-50 rounded-xl p-3.5 mb-4">
-              <p className="text-xs font-semibold mb-1" style={{ color: C.indigo }}>
-                {complaintDialogComplaint.voucherName ?? "Khiếu nại đơn hàng"}
-              </p>
-              <p className="text-xs" style={{ color: "#8A8DA8" }}>
-                {REASON_LABELS[complaintDialogComplaint.reason as keyof typeof REASON_LABELS] ?? complaintDialogComplaint.reason}
-              </p>
-            </div>
-
-            {complaintDialogAction === "external" && (
-              <div className="mb-4">
-                <label className="text-xs font-semibold mb-1.5 block" style={{ color: C.indigo }}>Tìm đối tác</label>
-                <input
-                  value={partnerSearch}
-                  onChange={(e) => searchPartners(e.target.value)}
-                  placeholder="Nhập tên đối tác..."
-                  className="w-full px-3 py-2 rounded-xl text-sm border outline-none"
-                  style={{ borderColor: "#E2DFC8" }}
-                />
-                {partnerSearchLoading && (
-                  <p className="text-xs mt-1" style={{ color: "#8A8DA8" }}>Đang tìm...</p>
-                )}
-                {partnerResults.length > 0 && (
-                  <div className="mt-2 bg-white border rounded-xl max-h-40 overflow-y-auto" style={{ borderColor: "#E2DFC8" }}>
-                    {partnerResults.map((p) => (
-                      <div
-                        key={p.id}
-                        className="px-3 py-2 border-b last:border-b-0 cursor-pointer hover:bg-gray-50"
-                        style={{ borderColor: "#F0EDD8" }}
-                        onClick={() => {
-                          setComplaintResolutionNote(
-                            `Liên hệ đối tác: ${p.businessName} - ${p.representativeName} (${p.representativeEmail}, ${p.representativePhone})`
-                          )
-                          setPartnerResults([])
-                        }}
-                      >
-                        <p className="text-sm font-semibold" style={{ color: C.indigo }}>{p.businessName}</p>
-                        <p className="text-xs" style={{ color: "#8A8DA8" }}>
-                          {p.representativeName} &middot; {p.representativeEmail} &middot; {p.representativePhone}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="mb-5">
-              <label className="text-xs font-semibold mb-1.5 block" style={{ color: C.indigo }}>Ghi chú xử lý</label>
-              <textarea
-                value={complaintResolutionNote}
-                onChange={(e) => setComplaintResolutionNote(e.target.value)}
-                placeholder="Nhập ghi chú xử lý..."
-                rows={3}
-                className="w-full px-3 py-2 rounded-xl text-sm border outline-none resize-none"
-                style={{ borderColor: "#E2DFC8" }}
-              />
-            </div>
-
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={closeComplaintDialog}
-                disabled={actionLoading}
-                className="px-5 py-2.5 rounded-xl text-sm font-bold border transition-colors hover:bg-gray-50 disabled:opacity-50"
-                style={{ borderColor: "#E2DFC8", color: C.indigo }}
-              >
-                Đóng
-              </button>
-              <button
-                onClick={executeComplaintAction}
-                disabled={actionLoading}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:shadow-md active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{
-                  backgroundColor:
-                    complaintDialogAction === "accept_refund" ? C.peach :
-                    complaintDialogAction === "accept_reissue" ? "#2D7A52" :
-                    complaintDialogAction === "reject" ? "#C0392B" :
-                    "#856404",
-                }}
-              >
-                {actionLoading && <AppIcon name="clock" className="w-4 h-4 animate-spin" />}
-                {actionLoading ? "Đang xử lý..." :
-                  complaintDialogAction === "accept_refund" ? "Xác nhận hoàn tiền" :
-                  complaintDialogAction === "accept_reissue" ? "Xác nhận cấp lại" :
-                  complaintDialogAction === "reject" ? "Xác nhận từ chối" :
-                  "Xác nhận"
-                }
-              </button>
-            </div>
-          </div>
-        </div>
-        )}
 
         <ImageLightbox images={lightbox?.images ?? []} initialIndex={lightbox?.index ?? 0} open={Boolean(lightbox)} onClose={() => setLightbox(null)} />
 

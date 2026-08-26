@@ -156,10 +156,6 @@ export async function countUsedIssuedVouchersByProduct(
   branchId?: string,
 ): Promise<Record<string, number>> {
   if (voucherProductIds.length === 0) return {};
-  const usageFilter = {
-    ...(branchId ? { branch_id: branchId } : {}),
-    ...dateRangeFilter("used_at", dateFrom, dateTo),
-  };
 
   const rows = await prisma.issuedVoucher.groupBy({
     by: ["voucher_product_id"],
@@ -167,7 +163,8 @@ export async function countUsedIssuedVouchersByProduct(
       status: "used",
       is_test: false,
       voucher_product_id: { in: voucherProductIds },
-      ...(Object.keys(usageFilter).length ? usageFilter : {}),
+      ...(branchId ? { branch_id: branchId } : {}),
+      ...dateRangeFilter("used_at", dateFrom, dateTo),
     },
     _count: true,
   });

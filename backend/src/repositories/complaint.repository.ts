@@ -35,7 +35,7 @@ const INCLUDE = {
 
 export async function listComplaints(
   filter: ComplaintListFilter,
-): Promise<{ rows: ComplaintRow[]; total: number }> {
+): Promise<{ rows: ComplaintRow[]; total: number; countsByStatus: Record<string, number> }> {
   const where: Record<string, unknown> = {};
 
   if (filter.userId) {
@@ -57,12 +57,22 @@ export async function listComplaints(
   const skip = (filter.page - 1) * filter.limit;
   const take = filter.limit;
 
-  const [rows, total] = await Promise.all([
+  const countsWhere: Record<string, unknown> = {};
+  if (filter.userId) countsWhere.user_id = filter.userId;
+  if (filter.partnerId) countsWhere.issued_vouchers = { voucher_products: { partner_id: filter.partnerId } };
+
+  const [rows, total, groupedCounts] = await Promise.all([
     prisma.complaint.findMany({ where, include: INCLUDE, orderBy: { created_at: "desc" }, skip, take }),
     prisma.complaint.count({ where }),
+    prisma.complaint.groupBy({ by: ["status"], where: countsWhere, _count: { _all: true } }),
   ]);
 
-  return { rows: rows as unknown as ComplaintRow[], total };
+  const counts: Record<string, number> = { all: total };
+  for (const row of groupedCounts) {
+    counts[row.status] = row._count._all;
+  }
+
+  return { rows: rows as unknown as ComplaintRow[], total, countsByStatus: counts };
 }
 
 export async function findComplaintById(id: string) {
@@ -99,8 +109,8 @@ export async function createComplaint(userId: string, input: CreateComplaintInpu
   }) as unknown as Promise<ComplaintRow>;
 }
 
-export async function findOrderOwner(orderId: string): Promise<{ id: string; user_id: string; recipient_id: string; status: string } | null> {
-  return prisma.order.findUnique({ where: { id: orderId }, select: { id: true, user_id: true, recipient_id: true, status: true } });
+export async function findOrderOwner(orderId: string): Promise<{ id: string; user_id: string; recipient_id: string; status: string; is_gift: boolean } | null> {
+  return prisma.order.findUnique({ where: { id: orderId }, select: { id: true, user_id: true, recipient_id: true, status: true, is_gift: true } });
 }
 
 export async function findComplaintByIssuedVoucherId(userId: string, issuedVoucherId: string) {
@@ -120,3 +130,5 @@ export async function findOrderLevelComplaint(userId: string, orderId: string) {
 export async function updateComplaint(id: string, patch: Record<string, unknown>) {
   return prisma.complaint.update({ where: { id }, data: patch }) as unknown as Promise<ComplaintRow>;
 }
+
+

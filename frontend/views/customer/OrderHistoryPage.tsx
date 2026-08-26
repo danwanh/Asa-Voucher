@@ -35,7 +35,6 @@ function orderStatusLabel(status: OrderStatus) {
   if (status === "pending_payment") return "Đã tạo đơn, đang chờ thanh toán"
   if (status === "payment_failed") return "Thanh toán thất bại, có thể thử lại"
   if (status === "confirmed") return "Thanh toán thành công, voucher đã phát hành"
-  if (status === "completed") return "Đơn đã hoàn tất sử dụng/xử lý"
   if (status === "cancelled") return "Đơn bị hủy trước khi hoàn tất"
   return "Đã hoàn tiền cho khách"
 }
@@ -152,7 +151,7 @@ export function OrderHistoryPage({ orders, countsByStatus, onDetail, onReview, o
           const hasIssuedCodes = issuedCount > 0
           const isRefunded = order.status === "refunded"
           const isCreator = order.userId === currentUserId
-          const canReview = isCreator && (order.status === "confirmed" || order.status === "completed")
+          const canReview = isCreator && order.status === "confirmed"
           const hasReview = order.items.some((item) => item.hasReview)
           const canPayAgain = order.userId === currentUserId && (order.status === "pending_payment" || order.status === "payment_failed") && (!order.paymentExpiresAt || new Date(order.paymentExpiresAt).getTime() > Date.now())
           const voucherSummary = itemSummary(order)
@@ -171,7 +170,7 @@ export function OrderHistoryPage({ orders, countsByStatus, onDetail, onReview, o
                 <div className="flex items-center gap-2">
                   <span className="text-xs" style={{ color: "#8A8DA8" }}>{fmtDate(order.createdAt)}</span>
                   <span className="text-xs" style={{ color: "#6B7280" }}>Trạng thái:</span>
-                  <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{ backgroundColor: order.status === "confirmed" || order.status === "completed" ? C.teal + "20" : order.status === "payment_failed" || order.status === "cancelled" ? "#FEE2E2" : order.status === "refunded" ? "#E0EEFF" : C.apricot + "25", color: order.status === "confirmed" || order.status === "completed" ? C.teal : order.status === "payment_failed" || order.status === "cancelled" ? "#DC2626" : order.status === "refunded" ? "#1A5FAD" : "#D97706" }}>
+                  <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{ backgroundColor: order.status === "confirmed" ? C.teal + "20" : order.status === "payment_failed" || order.status === "cancelled" ? "#FEE2E2" : order.status === "refunded" ? "#E0EEFF" : C.apricot + "25", color: order.status === "confirmed" ? C.teal : order.status === "payment_failed" || order.status === "cancelled" ? "#DC2626" : order.status === "refunded" ? "#1A5FAD" : "#D97706" }}>
                      {orderStatusLabel(order.status)}
                   </span>
                 </div>
@@ -194,9 +193,7 @@ export function OrderHistoryPage({ orders, countsByStatus, onDetail, onReview, o
                   {order.isGift && <p className="mt-1 text-xs font-bold" style={{ color: C.teal }}>Đơn quà tặng đã gửi</p>}
                   <div className="mt-2 text-xs font-semibold" style={{ color: hasIssuedCodes ? (isRefunded ? "#DC2626" : invalidatedCount > 0 ? "#D97706" : C.teal) : "#8A8DA8" }}>
                     {hasIssuedCodes
-                      ? invalidatedCount > 0
-                        ? `Đã phát hành ${issuedCount} mã voucher nhưng vô hiệu hóa ${invalidatedCount} voucher`
-                        : `Đã phát hành ${issuedCount} mã voucher`
+                      ? `Đã phát hành ${issuedCount} voucher${invalidatedCount > 0 ? ` · Đã thu hồi ${invalidatedCount} voucher` : ""}`
                       : "Chưa phát hành mã voucher"}
                   </div>
                 </div>
@@ -228,13 +225,13 @@ export function OrderHistoryPage({ orders, countsByStatus, onDetail, onReview, o
                     {hasReview ? "Xem đánh giá" : "Đánh giá"}
                   </button>
                 )}
-                {onComplaint && isCreator && (order.hasComplaint || order.status === "confirmed" || order.status === "completed") && (
+                {onComplaint && isCreator && order.status === "confirmed" && (
                   <button
                     onClick={() => onComplaint(order)}
                     className="text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors"
-                    style={{ backgroundColor: order.hasComplaint ? "#DBEAFE" : "#EFF6FF", color: "#2563EB" }}
+                    style={{ backgroundColor: "#EFF6FF", color: "#2563EB" }}
                   >
-                    <MessageSquare className="w-3 h-3" /> {order.hasComplaint ? "Xem khiếu nại đơn" : "Khiếu nại đơn"}
+                    <MessageSquare className="w-3 h-3" /> Khiếu nại
                   </button>
                 )}
                 {canPayAgain && onPayAgain && (
