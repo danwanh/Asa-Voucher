@@ -6,6 +6,9 @@ import { CartProvider } from "@/components/CartProvider"
 export const metadata: Metadata = {
   title: "Asa Vouchers",
   description: "Nền tảng mua bán voucher ưu đãi",
+  icons: {
+    icon: '/icon.png'
+  }
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

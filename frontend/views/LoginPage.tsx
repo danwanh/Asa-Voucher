@@ -43,8 +43,7 @@ function LeftPanel() {
     <div className="hidden lg:flex flex-col justify-between w-1/2 p-12 relative overflow-hidden" style={{ backgroundColor: C.indigo }}>
       <div className="relative z-10">
         <div className="flex items-center gap-3 mb-16">
-          <div className="w-10 h-10 rounded-2xl flex items-center justify-center font-black text-lg" style={{ backgroundColor: C.peach, color: "white" }}>A</div>
-          <span className="text-2xl font-black text-white tracking-tight">Asa Vouchers</span>
+          <img src="/logo.png" alt="Asa" className="h-10 object-contain" />
         </div>
         <h1 className="text-4xl font-black text-white leading-tight mb-6">
           Mua voucher ưu đãi<br />
@@ -158,8 +157,7 @@ function LoginForm({ onLogin, onNavigate }: { onLogin: (u: AppUser) => void; onN
   return (
     <div className="w-full max-w-md">
       <div className="lg:hidden flex items-center gap-3 mb-8 justify-center">
-        <div className="w-10 h-10 rounded-2xl flex items-center justify-center font-black text-lg" style={{ backgroundColor: C.peach, color: "white" }}>A</div>
-        <span className="text-2xl font-black" style={{ color: C.indigo }}>Asa Vouchers</span>
+        <img src="/logo.png" alt="Asa Vouchers" className="h-10 object-contain" />
       </div>
 
       <h2 className="text-2xl font-black mb-4" style={{ color: C.indigo }}>Đăng nhập</h2>

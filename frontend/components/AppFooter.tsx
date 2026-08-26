@@ -90,16 +90,14 @@ export function AppFooter({
       <div className="max-w-7xl mx-auto px-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8 mb-8">
           <div>
-            <button
+<button
               type="button"
               onClick={onHome}
               className="flex items-center gap-2 font-black text-lg mb-3 text-white"
               style={{ fontFamily: "'Nunito', sans-serif" }}
             >
-              <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: C.peach }}>
-                <Tag className="w-3.5 h-3.5 text-white" />
-              </div>
-              ASA Voucher
+              <img src="/logo.png" alt="Asa" className="h-7 object-contain" />
+              <span className="h-7 font-black text-white">Asa Voucher</span>
             </button>
             <p className="text-sm leading-relaxed text-white/60">
               Nền tảng mua bán voucher điện tử hàng đầu Việt Nam. Tiết kiệm thông minh, trải nghiệm đỉnh cao.

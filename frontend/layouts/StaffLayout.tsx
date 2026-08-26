@@ -28,11 +28,7 @@ function SidebarContent({ user, page, onNavigate, onLogout, onClose }: Omit<Prop
     <div className="flex flex-col h-full">
       <div className="p-5 border-b" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
         <div className="flex items-center gap-3 mb-5">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center font-black" style={{ backgroundColor: C.peach, color: "white" }}>A</div>
-          <div>
-            <div className="font-black text-white text-sm">Asa Staff</div>
-            <div className="text-xs" style={{ color: "rgba(244,241,222,0.5)" }}>Nhân viên</div>
-          </div>
+          <img src="/logo.png" alt="Asa" className="h-8 object-contain" />
         </div>
         <div className="flex items-center gap-3 p-3 rounded-2xl" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}>
           <div className="w-10 h-10 rounded-full flex items-center justify-center text-lg font-black" style={{ backgroundColor: C.apricot + "30", color: C.apricot }}>

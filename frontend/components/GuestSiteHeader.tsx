@@ -47,10 +47,8 @@ export function GuestSiteHeader({
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center gap-4">
         {/* Logo */}
         <button onClick={navItems.find((n) => n.id === "home")?.onClick} className="flex items-center gap-2 flex-shrink-0">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center font-black text-sm" style={{ backgroundColor: C.peach, color: "white" }}>
-            A
-          </div>
-          <span className="font-black text-lg text-white hidden sm:block">Asa</span>
+          <img src="/logo.png" alt="Asa Voucher" className="w-8 h-8 rounded-xl object-contain" />
+          <span className="font-black text-lg text-white hidden sm:block">Asa Voucher</span>
         </button>
 
         {/* Search */}

@@ -44,11 +44,7 @@ function SidebarContent({ user, page, pendingVouchers, onNavigate, onLogout, onC
     <div className="flex flex-col h-full">
       <div className="p-4 border-b" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center font-black" style={{ backgroundColor: C.peach, color: "white" }}>A</div>
-          <div>
-            <div className="font-black text-white text-sm">Asa Admin</div>
-            <div className="text-xs" style={{ color: "rgba(244,241,222,0.5)" }}>Quản trị viên</div>
-          </div>
+          <img src="/logo.png" alt="Asa" className="h-8 object-contain" />
         </div>
         <div className="flex items-center gap-3 p-3 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}>
           <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm" style={{ backgroundColor: C.peach, color: "white" }}>{user.name[0]}</div>

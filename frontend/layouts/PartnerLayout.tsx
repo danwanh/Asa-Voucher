@@ -59,11 +59,7 @@ function SidebarContent({ user, partner, page, onNavigate, onLogout, onClose }: 
       {/* Header */}
       <div className="p-5 border-b" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
         <div className="flex items-center gap-3 mb-5">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center font-black" style={{ backgroundColor: C.peach, color: "white" }}>A</div>
-          <div>
-            <div className="font-black text-white text-sm">Asa Partner</div>
-            <div className="text-xs" style={{ color: "rgba(244,241,222,0.5)" }}>Quản lý doanh nghiệp</div>
-          </div>
+          <img src="/logo.png" alt="Asa" className="h-8 object-contain" />
         </div>
         <div className="flex items-center gap-3 p-3 rounded-2xl" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}>
            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "rgba(255,255,255,0.1)" }}><AppIcon name="gift" className="w-5 h-5 text-white" /></div>
