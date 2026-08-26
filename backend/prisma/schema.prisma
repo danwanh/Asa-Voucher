@@ -406,7 +406,6 @@ model IssuedVoucher {
   @@map("issued_vouchers")
 }
 
-
 model Review {
   id                 String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   voucher_product_id String           @db.Uuid

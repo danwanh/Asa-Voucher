@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react"
-import { Plus, Edit2, Trash2, Eye, EyeOff, Image, FileText, Megaphone, Loader2, X, AlertCircle } from "lucide-react"
+import { Plus, Edit2, Trash2, Eye, EyeOff, Image, FileText, Megaphone, Loader2, X, AlertCircle, ChevronUp, ChevronDown } from "lucide-react"
 import { C, fmtDate } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import { VoucherImageUpload } from "@/components/VoucherImageUpload"
+import { CmsRichTextEditor, cmsContentToPlainText } from "@/components/CmsRichText"
 import { mediaUploadService } from "@/services/mediaUploadService"
 import { cmsContentService, type CmsContentFilters } from "@/services/cmsContentService"
 import type { CmsContent } from "@/types"
@@ -35,6 +36,7 @@ export function ContentManagementPage() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [toast, setToast] = useState<{ type: "success" | "error"; msg: string } | null>(null)
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null)
+  const [movingId, setMovingId] = useState<string | null>(null)
 
   const [form, setForm] = useState({
     content_type: "banner" as ContentType,
@@ -42,7 +44,6 @@ export function ContentManagementPage() {
     content: "",
     image_url: "",
     status: "active",
-    sort_order: 0,
   })
 
   async function loadContents() {
@@ -61,6 +62,20 @@ export function ContentManagementPage() {
 
   useEffect(() => { loadContents() }, [filters])
 
+  async function moveContent(id: string, direction: "up" | "down", contentType: "banner" | "popup") {
+    setMovingId(id)
+    try {
+      const move = contentType === "popup" ? cmsContentService.movePopup : cmsContentService.moveBanner
+      await move(id, direction)
+      await loadContents()
+    } catch (err: any) {
+      const msg = err?.response?.data?.error?.message || "Không thể cập nhật vị trí nội dung"
+      showToast("error", msg)
+    } finally {
+      setMovingId(null)
+    }
+  }
+
   function showToast(type: "success" | "error", msg: string) {
     setToast({ type, msg })
     setTimeout(() => setToast(null), 3000)
@@ -69,7 +84,7 @@ export function ContentManagementPage() {
   function openCreate() {
     setEditItem(null)
     setSelectedImageFile(null)
-    setForm({ content_type: "banner", title: "", content: "", image_url: "", status: "active", sort_order: items.length + 1 })
+    setForm({ content_type: "banner", title: "", content: "", image_url: "", status: "active" })
     setShowModal(true)
   }
 
@@ -82,7 +97,6 @@ export function ContentManagementPage() {
       content: item.content || "",
       image_url: item.image_url || "",
       status: item.status,
-      sort_order: item.sort_order,
     })
     setShowModal(true)
   }
@@ -101,7 +115,6 @@ export function ContentManagementPage() {
         content: form.content || undefined,
         image_url: imageUrl,
         status: form.status,
-        sort_order: form.sort_order,
       }
       if (editItem) {
         await cmsContentService.update(editItem.id, payload)
@@ -174,7 +187,7 @@ export function ContentManagementPage() {
           const tc = TYPE_CONFIG[t]
           const active = filters.content_type === t
           return (
-            <button key={t} onClick={() => setFilters({ ...filters, content_type: active ? undefined : t, page: 1 })}
+            <button key={t} onClick={() => setFilters({ ...filters, content_type: active ? undefined : t, status: t === "banner" || t === "popup" ? undefined : filters.status, limit: t === "banner" || t === "popup" ? 1000 : 20, page: 1 })}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all"
               style={{ backgroundColor: active ? C.teal : "white", color: active ? "white" : "#6B7280", border: `1px solid ${active ? C.teal : "#E5E7EB"}` }}>
               <span style={{ color: active ? "white" : tc.color }}>{tc.icon}</span>
@@ -209,9 +222,17 @@ export function ContentManagementPage() {
       {/* Content list */}
       {!isLoading && !error && (
         <div className="space-y-3">
+          {(filters.content_type === "banner" || filters.content_type === "popup") && !filters.status && items.length > 0 && (
+            <div className="flex items-center gap-2 px-4 py-3 rounded-2xl text-sm font-semibold" style={{ backgroundColor: "#EFF6FF", color: "#1D4ED8" }}>
+              Dùng nút mũi tên để thay đổi vị trí {filters.content_type === "popup" ? "popup" : "banner"}. Bao gồm cả nội dung đang ẩn.
+            </div>
+          )}
           {items.map((item) => {
             const tc = TYPE_CONFIG[item.content_type as ContentType] || TYPE_CONFIG.banner
             const sc = STATUS_CFG[item.status] || STATUS_CFG.active
+            const canMove = (filters.content_type === "banner" || filters.content_type === "popup") && !filters.status
+            const itemIndex = items.findIndex((current) => current.id === item.id)
+            const isMoving = movingId === item.id
             return (
               <div key={item.id} className="bg-white rounded-2xl border border-black/5 overflow-hidden hover:shadow-sm transition-shadow">
                 <div className="flex items-start gap-4 p-4">
@@ -234,12 +255,20 @@ export function ContentManagementPage() {
                       </span>
                     </div>
                     <h3 className="font-bold text-sm mb-0.5 truncate" style={{ color: C.indigo }}>{item.title}</h3>
-                    <p className="text-xs line-clamp-1" style={{ color: "#6B7280" }}>{item.content || "—"}</p>
+                    <p className="text-xs line-clamp-1" style={{ color: "#6B7280" }}>{item.content ? cmsContentToPlainText(item.content) : "—"}</p>
                     <div className="flex items-center gap-3 mt-1.5 text-xs" style={{ color: "#9CA3AF" }}>
                       <span>Tạo {fmtDate(item.created_at)}</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
+                    {canMove && <div className="flex flex-col gap-1 mr-1">
+                      <button onClick={() => moveContent(item.id, "up", item.content_type as "banner" | "popup")} disabled={itemIndex === 0 || movingId !== null} className="p-1 rounded-lg hover:bg-gray-100 disabled:opacity-30" title="Đưa lên">
+                        {isMoving ? <Loader2 className="w-4 h-4 animate-spin" style={{ color: "#6B7280" }} /> : <ChevronUp className="w-4 h-4" style={{ color: "#6B7280" }} />}
+                      </button>
+                      <button onClick={() => moveContent(item.id, "down", item.content_type as "banner" | "popup")} disabled={itemIndex === items.length - 1 || movingId !== null} className="p-1 rounded-lg hover:bg-gray-100 disabled:opacity-30" title="Đưa xuống">
+                        <ChevronDown className="w-4 h-4" style={{ color: "#6B7280" }} />
+                      </button>
+                    </div>}
                     <button onClick={() => handleToggle(item.id)} className="p-2 rounded-xl hover:bg-gray-100 transition-colors" title={item.status === "active" ? "Ẩn" : "Hiện"}>
                       {item.status === "active" ? <EyeOff className="w-4 h-4" style={{ color: "#E07A5F" }} /> : <Eye className="w-4 h-4" style={{ color: "#81B29A" }} />}
                     </button>
@@ -304,8 +333,7 @@ export function ContentManagementPage() {
               {/* Content */}
               <div>
                 <label className="block text-sm font-bold mb-1.5" style={{ color: "#6B7280" }}>Nội dung</label>
-                <textarea rows={3} value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} placeholder="Nội dung hiển thị..."
-                  className="w-full px-4 py-2.5 rounded-xl border-2 text-sm outline-none resize-none" style={{ borderColor: "#E5E7EB" }} />
+                <CmsRichTextEditor value={form.content} onChange={(content) => setForm((current) => ({ ...current, content }))} />
               </div>
 
               {/* Image */}
@@ -327,7 +355,7 @@ export function ContentManagementPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3">
                 {/* Status */}
                 <div>
                   <label className="block text-sm font-bold mb-1.5" style={{ color: "#6B7280" }}>Trạng thái</label>
@@ -336,12 +364,6 @@ export function ContentManagementPage() {
                     <option value="active">Hiển thị</option>
                     <option value="hidden">Ẩn</option>
                   </select>
-                </div>
-                {/* Sort order */}
-                <div>
-                  <label className="block text-sm font-bold mb-1.5" style={{ color: "#6B7280" }}>Thứ tự</label>
-                  <input type="number" min={0} value={form.sort_order} onChange={(e) => setForm({ ...form, sort_order: Number(e.target.value) })}
-                    className="w-full px-3 py-2.5 rounded-xl border-2 text-sm outline-none" style={{ borderColor: "#E5E7EB" }} />
                 </div>
               </div>
             </div>

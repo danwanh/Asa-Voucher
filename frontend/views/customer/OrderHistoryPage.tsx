@@ -45,6 +45,32 @@ function itemSummary(order: OrderListItem) {
   return items.map((item) => `${item.voucherTitle ?? order.voucherTitle} ×${item.quantity}`).join(" · ")
 }
 
+function partnerSummary(order: OrderListItem) {
+  const partnerNames = [...new Set(order.items.map((item) => item.partnerName).filter(Boolean))]
+  const names = partnerNames.length > 0 ? partnerNames : order.partnerName.split(",").map((name) => name.trim()).filter(Boolean)
+  const firstName = names[0] ?? order.partnerName
+  const remainingCount = Math.max(0, names.length - 1)
+  return remainingCount > 0 ? `${firstName} và ${remainingCount} thương hiệu khác` : firstName
+}
+
+function orderDisplaySummary(order: OrderListItem) {
+  const items = order.items
+  const first = items[0]
+  if (items.length <= 1) {
+    return {
+      title: first?.voucherTitle ?? order.voucherTitle,
+      subtitle: first?.partnerName || order.partnerName,
+      titleHref: `/vouchers/${first?.voucherId || order.voucherId}`,
+    }
+  }
+
+  const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0)
+  return {
+    title: `Đơn hàng gồm ${items.length} loại voucher từ ${partnerSummary(order)}`,
+    titleHref: undefined,
+  }
+}
+
 export function OrderHistoryPage({ orders, countsByStatus, onDetail, onReview, onComplaint, onPayAgain, page = 1, totalPages = 1, onPageChange, onFilterChange, loading = false, currentUserId }: Props) {
   const [tab, setTab] = useState<OrderPaymentStatus | "all">("all")
   const [search, setSearch] = useState("")
@@ -57,7 +83,7 @@ export function OrderHistoryPage({ orders, countsByStatus, onDetail, onReview, o
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-black" style={{ color: C.indigo }}>Lịch sử đơn hàng</h1>
-          <p className="text-sm mt-1" style={{ color: "#8A8DA8" }}>Lọc theo trạng thái đơn hàng</p>
+          <p className="text-sm mt-1" style={{ color: "#8A8DA8" }}>Lọc theo trạng thái thanh toán của đơn hàng</p>
         </div>
       </div>
 
@@ -129,6 +155,7 @@ export function OrderHistoryPage({ orders, countsByStatus, onDetail, onReview, o
           const hasReview = order.items.some((item) => item.hasReview)
           const canPayAgain = order.userId === currentUserId && (order.status === "pending_payment" || order.status === "payment_failed") && (!order.paymentExpiresAt || new Date(order.paymentExpiresAt).getTime() > Date.now())
           const voucherSummary = itemSummary(order)
+          const displaySummary = orderDisplaySummary(order)
 
           return (
             <div
@@ -151,8 +178,12 @@ export function OrderHistoryPage({ orders, countsByStatus, onDetail, onReview, o
 
               <div className="px-4 py-3 flex flex-wrap gap-4 items-start">
                 <div className="flex-1 min-w-0">
-                  <Link href={`/vouchers/${order.voucherId}`} className="font-bold text-sm hover:underline" style={{ color: C.indigo }}>{order.voucherTitle}</Link>
-                  <p className="text-xs mt-0.5" style={{ color: "#8A8DA8" }}>{order.partnerName}</p>
+                  {displaySummary.titleHref ? (
+                    <Link href={displaySummary.titleHref} className="font-bold text-sm hover:underline" style={{ color: C.indigo }}>{displaySummary.title}</Link>
+                  ) : (
+                    <div className="font-bold text-sm" style={{ color: C.indigo }}>{displaySummary.title}</div>
+                  )}
+                  <p className="text-xs mt-0.5" style={{ color: "#8A8DA8" }}>{displaySummary.subtitle}</p>
                   <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs" style={{ color: "#8A8DA8" }}>
                     {order.items.length > 0
                       ? order.items.map((item) => <Link key={item.voucherId} href={`/vouchers/${item.voucherId}`} className="hover:underline">{item.voucherTitle} ×{item.quantity}</Link>)

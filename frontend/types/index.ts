@@ -75,10 +75,12 @@ export type UpdateUserData = {
 export interface AppUser {
   id: string
   name: string
+  avatarUrl?: string
   email: string
   role: Role
   partnerId?: string
   branchId?: string
+  branchName?: string
 }
 
 export interface Voucher {
@@ -96,6 +98,7 @@ export interface Voucher {
   originalPrice: number
   validFrom: string
   validTo: string
+  createdAt?: string
   quantity: number
   sold: number
   status: VoucherStatus

@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import axios from "axios"
-import { AlertCircle, CheckCircle, Eye, EyeOff, Lock, LogOut, User } from "lucide-react"
+import { AlertCircle, CheckCircle, Eye, EyeOff, ImagePlus, Lock, LogOut, User } from "lucide-react"
 import { toast } from "sonner"
 import { C } from "@/utils/constants"
 import type { AppUser, Role } from "@/types"
 import { authService } from "@/services/authService"
 import { useAuthStore } from "@/stores/authStore"
 import { LoadingState } from "@/components/LoadingState"
+import { mediaUploadService } from "@/services/mediaUploadService"
 
 interface Props {
   user: AppUser
@@ -75,6 +76,9 @@ export function PersonalProfilePage({ user, onLogout, showPasswordSection = true
   const [form, setForm] = useState<ProfileForm>({ ...emptyForm, full_name: user.name })
   const [email, setEmail] = useState(user.email)
   const [role, setRole] = useState(user.role)
+  const [avatarUrl, setAvatarUrl] = useState(user.avatarUrl ?? "")
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [profileSubmitting, setProfileSubmitting] = useState(false)
   const [profileMessage, setProfileMessage] = useState("")
@@ -94,6 +98,7 @@ export function PersonalProfilePage({ user, onLogout, showPasswordSection = true
         setForm(profileFormFromResponse(profile))
         if (typeof profile.email === "string") setEmail(profile.email)
         if (typeof profile.role === "string") setRole(profile.role as AppUser["role"])
+        setAvatarUrl(typeof profile.avatar_url === "string" ? profile.avatar_url : "")
       })
       .catch((error) => {
         if (active) setProfileError(getErrorMessage(error, "Không thể tải thông tin hồ sơ."))
@@ -103,6 +108,16 @@ export function PersonalProfilePage({ user, onLogout, showPasswordSection = true
       })
     return () => { active = false }
   }, [user.id])
+
+  useEffect(() => {
+    if (!avatarFile) {
+      setAvatarPreview(null)
+      return
+    }
+    const previewUrl = URL.createObjectURL(avatarFile)
+    setAvatarPreview(previewUrl)
+    return () => URL.revokeObjectURL(previewUrl)
+  }, [avatarFile])
 
   const updateField = <K extends keyof ProfileForm>(key: K, value: ProfileForm[K]) => {
     setForm((current) => ({ ...current, [key]: value }))
@@ -124,6 +139,7 @@ export function PersonalProfilePage({ user, onLogout, showPasswordSection = true
 
     setProfileSubmitting(true)
     try {
+      const nextAvatarUrl = avatarFile ? await mediaUploadService.uploadAvatar(avatarFile) : avatarUrl
       const profile = await authService.updateProfile(user.id, {
         full_name: form.full_name.trim(),
         phone: form.phone.trim() || null,
@@ -132,17 +148,32 @@ export function PersonalProfilePage({ user, onLogout, showPasswordSection = true
         district: form.district.trim() || null,
         dob: form.dob || null,
         gender: form.gender || null,
+        avatar_url: nextAvatarUrl || null,
       })
       const nextForm = profileFormFromResponse(profile)
       setForm(nextForm)
+      const savedAvatarUrl = typeof profile.avatar_url === "string" ? profile.avatar_url : nextAvatarUrl
+      setAvatarUrl(savedAvatarUrl)
+      setAvatarFile(null)
       const nextName = nextForm.full_name || user.name
-      setUser({ ...user, name: nextName })
+      setUser({ ...user, name: nextName, avatarUrl: savedAvatarUrl || undefined })
       setProfileMessage("Đã lưu thay đổi hồ sơ.")
     } catch (error) {
       setProfileError(getErrorMessage(error, "Không thể cập nhật hồ sơ. Vui lòng thử lại."))
     } finally {
       setProfileSubmitting(false)
     }
+  }
+
+  const handleAvatarChange = (file: File | undefined) => {
+    if (!file) return
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 5 * 1024 * 1024) {
+      setProfileError("Ảnh đại diện phải là JPG, PNG hoặc WEBP và không quá 5 MB.")
+      return
+    }
+    setAvatarFile(file)
+    setProfileMessage("")
+    setProfileError("")
   }
 
   const changePassword = async () => {
@@ -184,13 +215,20 @@ export function PersonalProfilePage({ user, onLogout, showPasswordSection = true
 
       <section className="rounded-2xl bg-white p-6 shadow-sm">
         <div className="mb-6 flex items-center gap-4 border-b pb-6" style={{ borderColor: "#F0EDD8" }}>
-          <div className="flex h-16 w-16 items-center justify-center rounded-full text-2xl font-black" style={{ backgroundColor: `${C.peach}20`, color: C.peach }}>
-            {form.full_name.trim().charAt(0).toUpperCase() || <User className="h-8 w-8" />}
+          <div className="relative h-16 w-16 flex-shrink-0">
+            <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full text-2xl font-black" style={{ backgroundColor: `${C.peach}20`, color: C.peach }}>
+              {avatarPreview || avatarUrl ? <img src={avatarPreview || avatarUrl} alt="Ảnh đại diện" className="h-full w-full object-cover" /> : form.full_name.trim().charAt(0).toUpperCase() || <User className="h-8 w-8" />}
+            </div>
+            <label className="absolute -bottom-1 -right-1 cursor-pointer rounded-full border-2 border-white p-1.5 text-white shadow-sm" style={{ backgroundColor: C.peach }} title="Đổi ảnh đại diện">
+              <ImagePlus className="h-3.5 w-3.5" />
+              <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => { handleAvatarChange(event.target.files?.[0]); event.target.value = "" }} />
+            </label>
           </div>
           <div>
             <div className="font-black text-lg" style={{ color: C.indigo }}>{form.full_name || user.name}</div>
             <div className="text-sm" style={{ color: "#8A8DA8" }}>{email}</div>
             <div className="mt-1 text-xs font-semibold" style={{ color: C.teal }}>{ROLE_LABELS[role] ?? role}</div>
+            <div className="mt-1 text-xs" style={{ color: "#9CA3AF" }}>JPG, PNG hoặc WEBP, tối đa 5 MB</div>
           </div>
         </div>
 

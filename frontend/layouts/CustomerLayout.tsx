@@ -66,7 +66,7 @@ export function CustomerLayout({
   }, [page, router])
 
   return (
-    <div className="min-h-screen pb-16 md:pb-0" style={{ backgroundColor: C.content, fontFamily: "'Nunito', sans-serif" }}>
+    <div className="flex min-h-screen flex-col pb-16 md:pb-0" style={{ backgroundColor: C.content, fontFamily: "'Nunito', sans-serif" }}>
       <header className="sticky top-0 z-50 shadow-sm" style={{ backgroundColor: C.indigo }}>
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center gap-4">
           {/* Logo */}
@@ -165,7 +165,7 @@ export function CustomerLayout({
         )}
       </header>
 
-      <main>{children}</main>
+      <main className="flex-1">{children}</main>
       <AppFooter
         onHome={() => onNavigate("home")}
         onVouchers={() => onNavigate("vouchers")}

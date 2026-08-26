@@ -7,6 +7,7 @@ import type { Voucher } from "@/types"
 import { type VoucherApplicableBranch, type VoucherDetailData, type VoucherPublicReview } from "@/services/voucherService"
 import { LoadingState } from "@/components/LoadingState"
 import { isVoucherAvailable } from "@/hooks/useCart"
+import { VoucherImageGallery } from "@/components/VoucherImageGallery"
 
 const FALLBACK = "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=600&h=400&fit=crop"
 
@@ -26,6 +27,7 @@ export function VoucherDetailPage({ voucher: v, detail, onBuy, onBuyNow, onBack,
   const [detailVoucher, setDetailVoucher] = useState<Voucher>(v)
   const [reviews, setReviews] = useState<VoucherPublicReview[]>([])
   const [branches, setBranches] = useState<VoucherApplicableBranch[]>([])
+  const [detailImages, setDetailImages] = useState<string[]>([])
   const [detailMeta, setDetailMeta] = useState<Pick<VoucherDetailData, "conditions" | "usageInstructions" | "applicableArea" | "partnerId" | "categoryName">>({
     conditions: [],
     usageInstructions: [],
@@ -40,6 +42,7 @@ export function VoucherDetailPage({ voucher: v, detail, onBuy, onBuyNow, onBack,
     setDetailVoucher(detail.voucher)
     setReviews(detail.reviews)
     setBranches(detail.branches)
+    setDetailImages(detail.images.length > 0 ? detail.images.map((image) => image.imageUrl) : detail.voucher.image ? [detail.voucher.image] : [])
     setDetailMeta({ conditions: detail.conditions, usageInstructions: detail.usageInstructions, applicableArea: detail.applicableArea, partnerId: detail.partnerId, categoryName: detail.categoryName })
     setIsLoading(false)
   }, [detail])
@@ -83,14 +86,13 @@ export function VoucherDetailPage({ voucher: v, detail, onBuy, onBuyNow, onBack,
       <div className="grid md:grid-cols-2 gap-8">
         {/* Left */}
         <div>
-          <div className="rounded-3xl overflow-hidden shadow-md mb-4 h-64">
-            <img
-              src={detailVoucher.image}
-              alt={detailVoucher.title}
-              className="w-full h-full object-cover"
-              onError={(e) => { (e.target as HTMLImageElement).src = FALLBACK }}
-            />
-          </div>
+          <VoucherImageGallery
+            images={detailImages}
+            fallbackImageUrl={FALLBACK}
+            alt={detailVoucher.title}
+            className="mb-4 rounded-3xl overflow-hidden shadow-md bg-white"
+            mainHeightClass="h-64"
+          />
 
           <div className="bg-card rounded-2xl p-4 flex items-center gap-4 shadow-sm">
             <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl" style={{ backgroundColor: C.eggshell }}>

@@ -247,17 +247,23 @@ export async function confirmVoucher(user: AuthUser, input: ConfirmVoucherInput)
 
     const updatedVoucher = await tx.issuedVoucher.update({
       where: { id: voucher.id },
-      data: { status: "used", updated_at: new Date() },
-    });
-
-    const usage = await tx.voucherUsage.create({
       data: {
-        issued_voucher_id: voucher.id,
+        status: "used",
         branch_id: userBranchId,
         redeemed_by: user.id,
         used_at: new Date(),
+        updated_at: new Date(),
       },
     });
+
+    const usage = {
+      id: updatedVoucher.id,
+      issued_voucher_id: updatedVoucher.id,
+      branch_id: updatedVoucher.branch_id,
+      redeemed_by: updatedVoucher.redeemed_by,
+      used_at: updatedVoucher.used_at,
+      note: updatedVoucher.note,
+    };
 
 const remainingVouchers = await tx.issuedVoucher.count({
       where: {

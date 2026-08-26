@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import dynamic from "next/dynamic"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { AppIcon } from "@/components/AppIcon"
 import { PopupModal } from "@/components/PopupModal"
 import { toast } from "sonner"
@@ -17,12 +17,22 @@ const VoucherListPage = dynamic(() => import("@/pages/customer/VoucherListPage")
 const GuestVoucherDetailPage = dynamic(() => import("@/pages/guest/GuestVoucherDetailPage").then((module) => module.GuestVoucherDetailPage), { loading: pageLoading })
 const CartPage = dynamic(() => import("@/pages/customer/CartPage").then((module) => module.CartPage), { loading: pageLoading })
 
+function guestPageFromPath(pathname: string, fallback: GuestPage = "home"): GuestPage {
+  if (pathname === "/") return "home"
+  if (pathname === "/vouchers") return "vouchers"
+  if (pathname.startsWith("/vouchers/")) return "detail"
+  if (pathname === "/categories") return "categories"
+  if (pathname === "/cart") return "cart"
+  if (pathname === "/about") return "about"
+  if (pathname === "/contact") return "contact"
+  return fallback
+}
+
 interface Props {
   onLogin: () => void
   onRegister: () => void
   // Called when guest clicks "Tiến hành đặt hàng" — triggers login then redirects to create-order
   onCheckout: (items: CartItem[], kind?: "cart" | "direct") => void
-  cartAdd: (v: Voucher) => Promise<CartItem | undefined>
   cartCount: number | null
   cartCountLoading?: boolean
   cart: CartItem[]
@@ -42,7 +52,6 @@ interface FullProps {
   onLogin: () => void
   onRegister: () => void
   onCheckout: (items: CartItem[], kind?: "cart" | "direct") => void
-  cartAdd: (v: Voucher) => Promise<CartItem | undefined>
   cartCount: number | null
   cartCountLoading?: boolean
   cart: CartItem[]
@@ -71,17 +80,14 @@ const DEFAULT_VOUCHER_FILTERS: VoucherListFilters = {
   effectiveStatus: "all"
 }
 
-export function GuestApp({ onLogin, onRegister, onCheckout, cartAdd, cartCount, cartCountLoading = false, cart, total, cartRemove, cartUpdate, initialPage, initialVoucherId }: FullProps) {
+export function GuestApp({ onLogin, onRegister, onCheckout, cartCount, cartCountLoading = false, cart, total, cartRemove, cartUpdate, initialPage, initialVoucherId }: FullProps) {
   const router = useRouter()
-  const [page, setPage] = useState<GuestPage>(initialPage ?? "home")
+  const pathname = usePathname()
+  const page = guestPageFromPath(pathname, initialPage ?? "home")
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null)
   const [selectedVoucherDetail, setSelectedVoucherDetail] = useState<VoucherDetailData | null>(null)
   const [voucherSearch, setVoucherSearch] = useState("")
   const [voucherFilters, setVoucherFilters] = useState<VoucherListFilters>(DEFAULT_VOUCHER_FILTERS)
-
-  useEffect(() => {
-    setPage(initialPage ?? "home")
-  }, [initialPage])
 
   useEffect(() => {
     if (!initialVoucherId) return
@@ -99,7 +105,6 @@ export function GuestApp({ onLogin, onRegister, onCheckout, cartAdd, cartCount, 
   }
 
   const navigate = (nextPage: GuestPage) => {
-    setPage(nextPage)
     if (nextPage === "home") {
       setVoucherSearch("")
       setVoucherFilters(DEFAULT_VOUCHER_FILTERS)
@@ -108,17 +113,17 @@ export function GuestApp({ onLogin, onRegister, onCheckout, cartAdd, cartCount, 
     else if (nextPage === "vouchers") router.push("/vouchers")
     else if (nextPage === "categories") router.push("/categories")
     else if (nextPage === "cart") router.push("/cart")
+    else if (nextPage === "about") router.push("/about")
+    else if (nextPage === "contact") router.push("/contact")
   }
 
   const handleVoucherSearchFocus = () => {
     if (page === "vouchers") return
-    setPage("vouchers")
     router.push("/vouchers")
   }
 
   const handleAddToCart = async (v: Voucher) => {
-    const item = await cartAdd(v)
-    if (item) toast.success(`Đã thêm "${v.title.slice(0, 30)}..." vào giỏ hàng`)
+    onLogin()
   }
 
   const handleBuyNow = (v: Voucher) => {
@@ -181,7 +186,7 @@ export function GuestApp({ onLogin, onRegister, onCheckout, cartAdd, cartCount, 
           onRemove={cartRemove}
           onUpdate={cartUpdate}
           onCheckout={onCheckout}
-          onContinue={() => setPage("vouchers")}
+          onContinue={() => router.push("/vouchers")}
         />
       )}
       {page === "categories" && (
@@ -226,7 +231,7 @@ export function GuestApp({ onLogin, onRegister, onCheckout, cartAdd, cartCount, 
         </div>
       )}
     </GuestLayout>
-    <PopupModal />
+    <PopupModal isHome={page === "home"} />
     </>
   )
 }

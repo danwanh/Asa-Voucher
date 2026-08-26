@@ -9,16 +9,10 @@ import { cmsContentService } from "@/services/cmsContentService"
 import { AppFooter } from "@/components/AppFooter"
 import { GuestSiteHeader } from "@/components/GuestSiteHeader"
 import type { CmsContent } from "@/types"
+import { CmsRichTextContent } from "@/components/CmsRichText"
 
 interface Props {
   articleId: string
-}
-
-function splitParagraphs(content: string): string[] {
-  return content
-    .split(/\r?\n+/)
-    .map((line) => line.trim())
-    .filter(Boolean)
 }
 
 export function ArticleDetailPage({ articleId }: Props) {
@@ -109,11 +103,7 @@ export function ArticleDetailPage({ articleId }: Props) {
 
             {article.content ? (
               <div className="rounded-3xl border border-black/5 bg-white p-6 shadow-sm md:p-8">
-                <div className="space-y-4">
-                  {splitParagraphs(article.content).map((paragraph, i) => (
-                    <p key={i} className="text-sm leading-7 md:text-base" style={{ color: "#4B5563" }}>{paragraph}</p>
-                  ))}
-                </div>
+                <CmsRichTextContent html={article.content} className="text-sm leading-7 md:text-base" />
               </div>
             ) : (
               <div className="rounded-3xl border border-black/5 bg-white p-10 text-center text-sm shadow-sm" style={{ color: "#8A8DA8" }}>

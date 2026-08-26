@@ -238,40 +238,35 @@ export async function getStaffDashboardStats(user: AuthUser) {
   }
 
   const [usagesToday, invalidToday, recentUsagesRaw, customersRaw] = await Promise.all([
-    prisma.voucherUsage.count({
+    prisma.issuedVoucher.count({
       where: { branch_id: branchId, used_at: { gte: todayStart } },
     }),
     prisma.voucherCheckLog.count({
       where: { user_id: user.id, status: "failed", created_at: { gte: todayStart } },
     }),
-    prisma.voucherUsage.findMany({
+    prisma.issuedVoucher.findMany({
       where: { branch_id: branchId },
       orderBy: { used_at: "desc" },
       take: 5,
       include: {
-        issued_vouchers: {
-          select: {
-            voucher_code: true,
-            owners: { select: { full_name: true } },
-            voucher_products: { select: { name: true } },
-          },
-        },
+        owners: { select: { full_name: true } },
+        voucher_products: { select: { name: true } },
       },
     }),
-    prisma.voucherUsage.findMany({
+    prisma.issuedVoucher.findMany({
       where: { branch_id: branchId, used_at: { gte: todayStart } },
-      select: { issued_vouchers: { select: { owner_id: true } } },
+      select: { owner_id: true },
     }),
   ]);
 
   const customersToday = new Set(
-    customersRaw.map((c) => c.issued_vouchers?.owner_id).filter(Boolean)
+    customersRaw.map((c) => c.owner_id).filter(Boolean)
   ).size;
 
   const recentVerifications = recentUsagesRaw.map((usage) => ({
-    code: usage.issued_vouchers?.voucher_code ?? "",
-    name: usage.issued_vouchers?.voucher_products?.name ?? "Voucher",
-    customer: usage.issued_vouchers?.owners?.full_name ?? "",
+    code: usage.voucher_code ?? "",
+    name: usage.voucher_products?.name ?? "Voucher",
+    customer: usage.owners?.full_name ?? "",
     time: usage.used_at,
     status: "used",
   }));

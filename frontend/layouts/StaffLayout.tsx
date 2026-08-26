@@ -40,7 +40,7 @@ function SidebarContent({ user, page, onNavigate, onLogout, onClose }: Omit<Prop
           </div>
           <div className="min-w-0">
             <div className="text-sm font-bold text-white truncate">{user.name}</div>
-            <div className="text-xs" style={{ color: "rgba(244,241,222,0.5)" }}>{user.branchId ? `Chi nhánh ${user.branchId}` : "Chưa gán chi nhánh"}</div>
+            <div className="text-xs break-words" style={{ color: "rgba(244,241,222,0.5)" }}>{user.branchName ?? "Chưa gán chi nhánh"}</div>
           </div>
         </div>
       </div>
@@ -49,7 +49,7 @@ function SidebarContent({ user, page, onNavigate, onLogout, onClose }: Omit<Prop
         {NAV_ITEMS.map((n) => (
           <button
             key={n.pg}
-            onClick={() => { n.pg === "profile" ? router.push(`/${user.role}/profile`) : onNavigate(n.pg); onClose?.() }}
+            onClick={() => { onNavigate(n.pg); router.push(`/staff/${n.pg === "qr-scan" ? "verify" : n.pg}`); onClose?.() }}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-left transition-all"
             style={{
               backgroundColor: page === n.pg ? C.apricot : "transparent",

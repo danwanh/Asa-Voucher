@@ -8,15 +8,17 @@ import { SectionHeader } from "@/components/SectionHeader"
 import type { Voucher } from "@/types"
 import { voucherService, type HomepageSummary } from "@/services/voucherService"
 import { isVoucherAvailable } from "@/hooks/useCart"
+import { AsaHero } from "@/components/AsaHero"
 
 const LazyNewsSection = dynamic(() => import("@/components/NewsSection").then((module) => module.LazyNewsSection), {
   loading: () => <div className="min-h-24" aria-hidden="true" />,
 })
 
 interface Props {
+  viewer?: "guest" | "customer"
   onNavigate: (p: string) => void
   onVoucherDetail: (v: Voucher) => void
-  onLogin: () => void
+  onLogin?: () => void
   onAddToCart: (v: Voucher) => void
   onBuyNow: (v: Voucher) => void
   onOpenArticle: (id: string) => void
@@ -58,7 +60,7 @@ function formatCount(value: number) {
   return new Intl.NumberFormat("vi-VN").format(value)
 }
 
-export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCart, onBuyNow, onOpenArticle }: Props) {
+export function GuestHomePage({ viewer = "guest", onNavigate, onVoucherDetail, onLogin, onAddToCart, onBuyNow, onOpenArticle }: Props) {
   const [openFaq, setOpenFaq] = useState<number | null>(null)
   const [vouchers, setVouchers] = useState<Voucher[]>([])
   const [categories, setCategories] = useState<GuestCategory[]>([])
@@ -72,7 +74,7 @@ export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCar
       setIsLoadingVouchers(true)
       try {
         const [voucherPage, categoryItems, summary] = await Promise.all([
-          voucherService.listPublicVouchersPage({ limit: 12 }),
+          voucherService.listPublicVouchersPage({ limit: 100 }),
           voucherService.listCategories(),
           voucherService.getHomepageSummary(),
         ])
@@ -97,8 +99,18 @@ export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCar
   }, [])
 
   const availableVouchers = useMemo(() => vouchers.filter(isVoucherAvailable), [vouchers])
-  const featured = useMemo(() => availableVouchers.slice(0, 6), [availableVouchers])
-  const flashSale = useMemo(() => availableVouchers.filter((v) => v.discount >= 30).slice(0, 4), [availableVouchers])
+  const newestVouchers = useMemo(
+    () => [...availableVouchers]
+      .sort((first, second) => Date.parse(second.createdAt ?? second.validFrom) - Date.parse(first.createdAt ?? first.validFrom))
+      .slice(0, 6),
+    [availableVouchers],
+  )
+  const bestSellingVouchers = useMemo(
+    () => [...availableVouchers]
+      .sort((first, second) => second.sold - first.sold)
+      .slice(0, 6),
+    [availableVouchers],
+  )
 
   const categoryCountsById = useMemo(() => {
     const counts = new Map<string, number>()
@@ -112,9 +124,10 @@ export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCar
 
   return (
     <div>
-      {/* Hero */}
+      <AsaHero onNavigate={() => onNavigate("vouchers")} />
+      {/* Legacy hero markup retained as a hidden fallback for older snapshots. */}
       <section
-        className="relative overflow-hidden py-20 px-4"
+        className="hidden relative overflow-hidden py-20 px-4"
         style={{
           background: `linear-gradient(135deg, ${C.indigo} 0%, #4D5170 50%, #5A5E7A 100%)`,
         }}
@@ -153,7 +166,7 @@ export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCar
       </section>
 
       {/* Banner carousel */}
-      <section className="px-4 pt-6">
+      <section className="px-4 pt-6 mb-10">
         <div className="max-w-7xl mx-auto">
           <div className="rounded-3xl border border-black/5 bg-white p-2 sm:p-3 shadow-sm">
             <BannerCarousel />
@@ -196,17 +209,17 @@ export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCar
         </div>
       </section>
 
-      {/* Flash Sale */}
+      {/* Newest vouchers */}
       <section className="py-14 px-4" style={{ backgroundColor: "#FFF5F0" }}>
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-white text-sm" style={{ backgroundColor: C.peach }}>
-                <Zap className="w-3.5 h-3.5" /> FLASH SALE
+                <Zap className="w-3.5 h-3.5" /> MỚI NHẤT
               </div>
               <div>
-                <div className="text-lg font-black" style={{ color: C.indigo, fontFamily: "'Nunito', sans-serif" }}>Ưu đãi sốc hôm nay</div>
-                <div className="text-xs mt-0.5" style={{ color: "#8A8DA8" }}>Giảm từ 30% trở lên, số lượng có hạn</div>
+                <div className="text-lg font-black" style={{ color: C.indigo, fontFamily: "'Nunito', sans-serif" }}>Voucher mới nhất</div>
+                <div className="text-xs mt-0.5" style={{ color: "#8A8DA8" }}>Khám phá các ưu đãi vừa được cập nhật</div>
               </div>
             </div>
             <button onClick={() => onNavigate("vouchers")} className="flex items-center gap-1 text-sm font-semibold hover:underline" style={{ color: C.peach }}>
@@ -214,12 +227,12 @@ export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCar
             </button>
           </div>
           {isLoadingVouchers ? (
-            <div className="text-sm" style={{ color: "#6B7280" }}>Đang tải voucher flash sale...</div>
-          ) : flashSale.length === 0 ? (
-            <div className="rounded-xl bg-white p-5 text-sm shadow-sm border border-black/5" style={{ color: "#6B7280" }}>Chưa có voucher flash sale.</div>
+            <div className="text-sm" style={{ color: "#6B7280" }}>Đang tải voucher mới nhất...</div>
+          ) : newestVouchers.length === 0 ? (
+            <div className="rounded-xl bg-white p-5 text-sm shadow-sm border border-black/5" style={{ color: "#6B7280" }}>Chưa có voucher mới.</div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {flashSale.map((v) => (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {newestVouchers.map((v) => (
                 <VoucherCard key={v.id} voucher={v} onDetail={onVoucherDetail} onAddToCart={onAddToCart} onBuyNow={onBuyNow} />
               ))}
             </div>
@@ -227,22 +240,22 @@ export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCar
         </div>
       </section>
 
-      {/* Featured Vouchers */}
+      {/* Best-selling vouchers */}
       <section className="py-14 px-4">
         <div className="max-w-7xl mx-auto">
           <SectionHeader
-            eyebrow="Gợi ý cho bạn"
-            title="Voucher nổi bật"
-            subtitle="Chọn lọc những ưu đãi được yêu thích nhất"
+            eyebrow="Được lựa chọn nhiều"
+            title="Voucher bán chạy nhất"
+            subtitle="Các ưu đãi có lượt mua cao nhất"
             action={{ label: "Xem tất cả", onClick: () => onNavigate("vouchers") }}
           />
           {isLoadingVouchers ? (
-            <div className="text-sm" style={{ color: "#6B7280" }}>Đang tải voucher nổi bật...</div>
-          ) : featured.length === 0 ? (
-            <div className="rounded-xl bg-white p-5 text-sm shadow-sm border border-black/5" style={{ color: "#6B7280" }}>Chưa có voucher nổi bật.</div>
+            <div className="text-sm" style={{ color: "#6B7280" }}>Đang tải voucher bán chạy...</div>
+          ) : bestSellingVouchers.length === 0 ? (
+            <div className="rounded-xl bg-white p-5 text-sm shadow-sm border border-black/5" style={{ color: "#6B7280" }}>Chưa có voucher bán chạy.</div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {featured.map((v) => (
+              {bestSellingVouchers.map((v) => (
                 <VoucherCard key={v.id} voucher={v} onDetail={onVoucherDetail} onAddToCart={onAddToCart} onBuyNow={onBuyNow} />
               ))}
             </div>
@@ -306,9 +319,11 @@ export function GuestHomePage({ onNavigate, onVoucherDetail, onLogin, onAddToCar
           <h2 className="text-3xl font-black text-white mb-3" style={{ fontFamily: "'Nunito', sans-serif" }}>Bắt đầu tiết kiệm ngay hôm nay</h2>
           <p className="text-white/80 mb-6 text-sm">Đăng ký miễn phí để lưu voucher yêu thích và theo dõi đơn hàng của bạn</p>
           <div className="flex justify-center gap-3">
-            <button onClick={onLogin} className="px-6 py-3 rounded-xl font-bold text-sm bg-white hover:bg-opacity-90 transition-all" style={{ color: C.peach }}>
-              Đăng nhập
-            </button>
+            {viewer === "guest" && (
+              <button onClick={onLogin} className="px-6 py-3 rounded-xl font-bold text-sm bg-white hover:bg-opacity-90 transition-all" style={{ color: C.peach }}>
+                Đăng nhập
+              </button>
+            )}
             <button onClick={() => onNavigate("vouchers")} className="px-6 py-3 rounded-xl font-bold text-sm border-2 border-white text-white hover:bg-white/10 transition-all">
               Khám phá ngay
             </button>

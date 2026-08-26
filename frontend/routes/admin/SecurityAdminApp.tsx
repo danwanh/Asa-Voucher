@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react"
+import { usePathname } from "next/navigation"
 import { ScrollText, Shield, User } from "lucide-react"
 import { SubAdminLayout, type SubAdminRole, type SubAdminNavItem } from "@/layouts/admin/SubAdminLayout"
 import { SystemLogsPage } from "@/pages/admin/SystemLogsPage"
@@ -10,12 +10,9 @@ type Page = "logs" | "security" | "profile"
 
 const VALID_PAGES: Page[] = ["logs", "security", "profile"]
 
-function getInitialPage(initialPage?: "profile"): Page {
-  if (typeof window !== "undefined") {
-    const tab = new URLSearchParams(window.location.search).get("tab") as Page | null
-    if (tab && VALID_PAGES.includes(tab)) return tab
-  }
-  return initialPage ?? "logs"
+function pageFromPath(pathname: string, fallback: Page): Page {
+  const segment = pathname.split("/").filter(Boolean).at(-1) as Page | undefined
+  return segment && VALID_PAGES.includes(segment) ? segment : fallback
 }
 
 const ROLE: SubAdminRole = {
@@ -34,35 +31,15 @@ const NAV: SubAdminNavItem[] = [
   { label: "Hồ sơ",             pg: "profile",  icon: <User className="w-4 h-4" /> },
 ]
 
-interface Props { user: AppUser; onLogout: () => void; onSwitchRole: () => void; initialPage?: "profile" }
+interface Props { user: AppUser; onLogout: () => void; onSwitchRole: () => void; initialPage?: Page }
 
 export function SecurityAdminApp({ user, onLogout, onSwitchRole, initialPage }: Props) {
-  const [page, setPage] = useState<Page>(() => getInitialPage(initialPage))
-
-  const handleNavigate = useCallback((pg: string) => {
-    setPage(pg as Page)
-    if (pg === "profile") return
-    const url = new URL(window.location.href)
-    url.searchParams.set("tab", pg)
-    window.history.replaceState({}, "", url.toString())
-  }, [])
-
-  useEffect(() => {
-    if (initialPage === "profile") setPage("profile")
-  }, [initialPage])
-
-  useEffect(() => {
-    function onPopState() {
-      const tab = new URLSearchParams(window.location.search).get("tab") as Page | null
-      if (tab && VALID_PAGES.includes(tab)) setPage(tab)
-    }
-    window.addEventListener("popstate", onPopState)
-    return () => window.removeEventListener("popstate", onPopState)
-  }, [])
+  const pathname = usePathname()
+  const page = pageFromPath(pathname, initialPage ?? "logs")
 
   return (
     <SubAdminLayout user={user} role={ROLE} page={page} navItems={NAV}
-      onNavigate={handleNavigate} onLogout={onLogout} onSwitchRole={onSwitchRole}>
+      onNavigate={() => undefined} onLogout={onLogout} onSwitchRole={onSwitchRole}>
       {page === "logs"     && <SystemLogsPage />}
       {page === "security" && <SecurityMonitorPage />}
       {page === "profile"  && <AdminProfilePage user={user} onLogout={onLogout} />}

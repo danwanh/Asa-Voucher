@@ -83,7 +83,7 @@ export function SubAdminLayout({ user, role, page, navItems, onNavigate, onLogou
               key={n.pg}
               onClick={() => {
                 onNavigate(n.pg)
-                if (n.pg === "profile") router.push(`/${user.role}/profile`)
+                router.push(`/admin/${n.pg}`)
                 setMobileOpen(false)
               }}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-left transition-all"

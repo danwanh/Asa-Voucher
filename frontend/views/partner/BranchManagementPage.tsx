@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
-import { Plus, Search, Edit2, Trash2, MapPin, Phone, X, CheckCircle, Loader2 } from "lucide-react"
+import { Plus, Search, Edit2, Lock, Unlock, MapPin, Phone, X, CheckCircle, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { C } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
@@ -33,6 +33,10 @@ const EMPTY_FORM: FormData = {
   isActive: true,
 }
 
+type DeactivateBranchRequest =
+  | { type: "toggle"; branch: PartnerBranch }
+  | { type: "form"; branch: PartnerBranch }
+
 export function BranchManagementPage({ user, partner, embedded = false }: Props) {
   const [branches, setBranches] = useState<PartnerBranch[]>([])
   const [search, setSearch] = useState("")
@@ -40,7 +44,8 @@ export function BranchManagementPage({ user, partner, embedded = false }: Props)
   const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState<FormData>(EMPTY_FORM)
   const [saved, setSaved] = useState(false)
-  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [togglingId, setTogglingId] = useState<string | null>(null)
+  const [deactivateRequest, setDeactivateRequest] = useState<DeactivateBranchRequest | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [provinces, setProvinces] = useState<Province[]>([])
@@ -179,18 +184,11 @@ export function BranchManagementPage({ user, partner, embedded = false }: Props)
     setShowForm(false)
     setEditId(null)
     setForm(EMPTY_FORM)
+    setDeactivateRequest(null)
   }
 
-  const saveForm = async () => {
-    if (!partner?.id) {
-      toast.error("Không tìm thấy đối tác hiện tại")
-      return
-    }
-
-    if (!form.branchName.trim() || !form.address.trim() || !form.city.trim() || !form.ward.trim()) {
-      toast.error("Vui lòng nhập đầy đủ tên chi nhánh, địa chỉ, tỉnh/thành và phường/xã")
-      return
-    }
+  const persistForm = async () => {
+    if (!partner?.id) return
 
     setIsSaving(true)
     try {
@@ -221,23 +219,77 @@ export function BranchManagementPage({ user, partner, embedded = false }: Props)
       window.setTimeout(() => setSaved(false), 2000)
     } catch (error: unknown) {
       const err = error as { response?: { data?: { error?: { message?: string } } } }
+      if (deactivateRequest?.type === "form") {
+        setForm((prev) => ({ ...prev, isActive: true }))
+      }
       toast.error(err?.response?.data?.error?.message ?? "Không thể lưu chi nhánh")
     } finally {
       setIsSaving(false)
+      setDeactivateRequest(null)
     }
   }
 
-  const confirmDelete = async () => {
-    if (!deleteId) return
+  const saveForm = async () => {
+    if (!partner?.id) {
+      toast.error("Không tìm thấy đối tác hiện tại")
+      return
+    }
+
+    if (!form.branchName.trim() || !form.address.trim() || !form.city.trim() || !form.ward.trim()) {
+      toast.error("Vui lòng nhập đầy đủ tên chi nhánh, địa chỉ, tỉnh/thành và phường/xã")
+      return
+    }
+
+    if (editId && !form.isActive) {
+      const currentBranch = branches.find((branch) => branch.id === editId)
+      if (currentBranch?.isActive) {
+        setDeactivateRequest({ type: "form", branch: currentBranch })
+        return
+      }
+    }
+
+    await persistForm()
+  }
+
+  const performToggleBranchStatus = async (branch: PartnerBranch) => {
+    setTogglingId(branch.id)
     try {
-      await partnerService.deleteBranch(deleteId)
-      setBranches((prev) => prev.filter((branch) => branch.id !== deleteId))
-      setDeleteId(null)
-      toast.success("Đã tắt hoạt động chi nhánh")
+      const updated = await partnerService.updateBranch(branch.id, { is_active: !branch.isActive })
+      setBranches((prev) => prev.map((item) => (item.id === branch.id ? updated : item)))
+      toast.success(updated.isActive ? "Chi nhánh đã hoạt động lại" : "Đã ngưng hoạt động chi nhánh")
     } catch (error: unknown) {
       const err = error as { response?: { data?: { error?: { message?: string } } } }
-      toast.error(err?.response?.data?.error?.message ?? "Không thể xóa chi nhánh")
+      toast.error(err?.response?.data?.error?.message ?? "Không thể cập nhật trạng thái chi nhánh")
+    } finally {
+      setTogglingId(null)
+      setDeactivateRequest(null)
     }
+  }
+
+  const toggleBranchStatus = async (branch: PartnerBranch) => {
+    if (branch.isActive) {
+      setDeactivateRequest({ type: "toggle", branch })
+      return
+    }
+
+    await performToggleBranchStatus(branch)
+  }
+
+  const confirmDeactivateBranch = async () => {
+    if (!deactivateRequest) return
+    if (deactivateRequest.type === "form") {
+      await persistForm()
+      return
+    }
+
+    await performToggleBranchStatus(deactivateRequest.branch)
+  }
+
+  const cancelDeactivateBranch = () => {
+    if (deactivateRequest?.type === "form") {
+      setForm((prev) => ({ ...prev, isActive: true }))
+    }
+    setDeactivateRequest(null)
   }
 
   const isReadOnly = user.role !== "partner_owner" || !partner?.id
@@ -309,8 +361,20 @@ export function BranchManagementPage({ user, partner, embedded = false }: Props)
                     <button disabled={isReadOnly} onClick={() => openEdit(branch)} className="p-1.5 rounded-lg hover:bg-muted disabled:opacity-40">
                       <Edit2 className="w-4 h-4" style={{ color: C.indigo }} />
                     </button>
-                    <button disabled={isReadOnly} onClick={() => setDeleteId(branch.id)} className="p-1.5 rounded-lg hover:bg-muted disabled:opacity-40">
-                      <Trash2 className="w-4 h-4" style={{ color: C.peach }} />
+                    <button
+                      disabled={isReadOnly || togglingId === branch.id}
+                      onClick={() => toggleBranchStatus(branch)}
+                      className="p-1.5 rounded-lg hover:bg-muted disabled:opacity-40"
+                      title={branch.isActive ? "Ngưng hoạt động chi nhánh" : "Kích hoạt lại chi nhánh"}
+                      aria-label={branch.isActive ? "Ngưng hoạt động chi nhánh" : "Kích hoạt lại chi nhánh"}
+                    >
+                      {togglingId === branch.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" style={{ color: C.peach }} />
+                      ) : branch.isActive ? (
+                        <Unlock className="w-4 h-4" style={{ color: C.teal }} />
+                      ) : (
+                        <Lock className="w-4 h-4" style={{ color: C.peach }} />
+                      )}
                     </button>
                   </div>
                 </div>
@@ -432,17 +496,32 @@ export function BranchManagementPage({ user, partner, embedded = false }: Props)
         </div>
       )}
 
-      {deleteId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
-          <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
-            <h3 className="text-lg font-black mb-2" style={{ color: C.indigo }}>Tắt hoạt động chi nhánh?</h3>
-            <p className="text-sm" style={{ color: "#8A8DA8" }}>Chi nhánh sẽ không còn xuất hiện trong phạm vi sử dụng voucher.</p>
+      {deactivateRequest && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
+            <div className="flex items-center gap-2 mb-2">
+              <Lock className="w-5 h-5" style={{ color: C.peach }} />
+              <h3 className="text-lg font-black" style={{ color: C.indigo }}>Ngưng hoạt động chi nhánh?</h3>
+            </div>
+            <p className="text-sm leading-6" style={{ color: "#5F6278" }}>
+              Chi nhánh <span className="font-bold" style={{ color: C.indigo }}>{deactivateRequest.branch.branchName}</span> sẽ chỉ được ngưng hoạt động nếu không còn gắn với voucher đang hoạt động.
+            </p>
             <div className="mt-5 flex gap-3">
-              <button onClick={() => setDeleteId(null)} className="flex-1 py-2.5 rounded-xl border-2 font-bold" style={{ borderColor: "#E2DFC8", color: C.indigo }}>
+              <button
+                onClick={cancelDeactivateBranch}
+                disabled={isSaving || togglingId === deactivateRequest.branch.id}
+                className="flex-1 py-2.5 rounded-xl border-2 font-bold disabled:opacity-60"
+                style={{ borderColor: "#E2DFC8", color: C.indigo }}
+              >
                 Hủy
               </button>
-              <button onClick={confirmDelete} className="flex-1 py-2.5 rounded-xl font-bold text-white" style={{ backgroundColor: C.peach }}>
-                Xác nhận
+              <button
+                onClick={confirmDeactivateBranch}
+                disabled={isSaving || togglingId === deactivateRequest.branch.id}
+                className="flex-1 py-2.5 rounded-xl font-bold text-white disabled:opacity-70"
+                style={{ backgroundColor: C.peach }}
+              >
+                {isSaving || togglingId === deactivateRequest.branch.id ? "Đang kiểm tra..." : "Ngưng hoạt động"}
               </button>
             </div>
           </div>

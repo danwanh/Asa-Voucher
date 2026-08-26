@@ -92,6 +92,12 @@ async function getPartnerId(userId: string, branchId?: string | null) {
   return undefined;
 }
 
+async function getBranchName(branchId?: string | null) {
+  if (!branchId) return undefined;
+  const branch = await prisma.partnerBranch.findUnique({ where: { id: branchId }, select: { branch_name: true } });
+  return branch?.branch_name;
+}
+
 async function persistRefreshToken(userId: string, refreshToken: string) {
   try {
     await prisma.refreshToken.create({
@@ -123,7 +129,13 @@ export async function issueTokens(user: UserRow, partnerId?: string) {
 
 async function publicUser(user: UserRow, partnerId?: string) {
   const resolvedPartnerId = partnerId ?? await getPartnerId(user.id, user.partner_branches_id ?? null);
-  return { ...sanitizeUser(user), partnerId: resolvedPartnerId, branchId: user.partner_branches_id ?? undefined };
+  const branchId = user.partner_branches_id ?? undefined;
+  return {
+    ...sanitizeUser(user),
+    partnerId: resolvedPartnerId,
+    branchId,
+    branchName: await getBranchName(branchId)
+  };
 }
 
 export async function login(identifier: string, password: string, metadata: { ip?: string; userAgent?: string }) {
@@ -326,6 +338,7 @@ export async function refresh(refreshToken: string | undefined) {
           id: true,
           email: true,
           full_name: true,
+          avatar_url: true,
           role: true,
           is_active: true,
           is_verified: true,

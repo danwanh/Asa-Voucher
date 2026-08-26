@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { usePathname } from "next/navigation"
 import { BarChart2, Tag, ShoppingBag, User, MessageSquare } from "lucide-react"
 import { SubAdminLayout, type SubAdminRole, type SubAdminNavItem } from "@/layouts/admin/SubAdminLayout"
 import { AdminDashboardPage } from "@/pages/admin/AdminDashboardPage"
@@ -35,7 +35,8 @@ interface Props {
 }
 
 export function BizOpsAdminApp({ user, onLogout, onSwitchRole }: Props) {
-  const [page, setPage] = useState<Page>("dashboard")
+  const pathname = usePathname()
+  const page = (pathname.split("/").filter(Boolean).at(-1) as Page | undefined) ?? "dashboard"
 
   return (
     <SubAdminLayout
@@ -43,7 +44,7 @@ export function BizOpsAdminApp({ user, onLogout, onSwitchRole }: Props) {
       role={ROLE}
       page={page}
       navItems={NAV}
-      onNavigate={(pg) => setPage(pg as Page)}
+      onNavigate={() => undefined}
       onLogout={onLogout}
       onSwitchRole={onSwitchRole}
     >

@@ -63,7 +63,7 @@ function SidebarContent({ user, page, pendingVouchers, onNavigate, onLogout, onC
         {navItems.map((n) => (
           <button
             key={n.pg}
-            onClick={() => { n.pg === "profile" ? router.push(`/${user.role}/profile`) : onNavigate(n.pg); onClose?.() }}
+            onClick={() => { onNavigate(n.pg); router.push(`/admin/${n.pg}`); onClose?.() }}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-left transition-all"
             style={{ backgroundColor: page === n.pg ? C.peach : "transparent", color: page === n.pg ? "white" : "rgba(244,241,222,0.7)" }}
           >

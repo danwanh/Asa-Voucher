@@ -1,1 +1,2 @@
-ALTER TABLE "cms_contents" DROP COLUMN "display_time";
+ALTER TABLE "cms_contents"
+DROP COLUMN IF EXISTS "display_time";

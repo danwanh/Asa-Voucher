@@ -8,10 +8,14 @@ export interface IssuedVoucherRow {
   order_item_id: string | null;
   voucher_product_id: string;
   owner_id: string | null;
+  branch_id?: string | null;
+  redeemed_by?: string | null;
   issued_date: string;
   expired_date: string;
   status: IssuedVoucherStatus;
   is_test?: boolean;
+  used_at?: string | null;
+  note?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -21,7 +25,6 @@ export interface VoucherUsageRow {
   issued_voucher_id: string;
   branch_id: string;
   redeemed_by: string;
-  redemption_code: string | null;
   used_at: string;
   note: string | null;
 }

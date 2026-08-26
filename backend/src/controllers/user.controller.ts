@@ -7,6 +7,7 @@ import { HttpError } from "../utils/http-error.js";
 import { created, noContent, ok } from "../utils/response.js";
 import { rangeFromPagination } from "../validations/common.validation.js";
 import { writeAuditLog } from "../services/audit-log.service.js";
+import { createCloudinarySignature } from "../utils/cloudinary.js";
 
 const PARTNER_STAFF_ROLES = ["partner_voucher_staff", "partner_store_staff"] as const;
 
@@ -253,6 +254,10 @@ export async function getUser(req: Request, res: Response) {
 
   const user = requireData(await prisma.user.findUnique({ where: { id: req.params.id } }), "Không tìm thấy người dùng");
   ok(res, sanitizeUser(user as unknown as Record<string, unknown>));
+}
+
+export async function createAvatarMediaSignature(_req: Request, res: Response) {
+  ok(res, createCloudinarySignature("asa-voucher/avatars"));
 }
 
 export async function lookupRecipient(req: Request, res: Response) {

@@ -10,6 +10,7 @@ import type { Voucher } from "@/types"
 import type { CustomerPage } from "@/layouts/CustomerLayout"
 import { voucherService } from "@/services/voucherService"
 import { LoadingState } from "@/components/LoadingState"
+import { AsaHero } from "@/components/AsaHero"
 
 const LazyNewsSection = dynamic(() => import("@/components/NewsSection").then((module) => module.LazyNewsSection), {
   loading: () => <div className="min-h-24" aria-hidden="true" />,
@@ -66,8 +67,9 @@ export function HomePage({ onAddToCart, onBuyNow, onDetail, onNavigate, onOpenAr
 
   return (
     <div>
-      {/* Hero */}
-      <div className="relative overflow-hidden" style={{ background: `linear-gradient(135deg, ${C.indigo} 0%, ${C.indigoLight} 100%)` }}>
+      <AsaHero onNavigate={() => onNavigate("vouchers")} />
+      {/* Legacy hero retained as a no-op for backwards-compatible markup snapshots. */}
+      <div className="hidden relative overflow-hidden" style={{ background: `linear-gradient(135deg, ${C.indigo} 0%, ${C.indigoLight} 100%)` }}>
         <div className="max-w-6xl mx-auto px-4 py-16 md:py-24 relative z-10">
           <div className="max-w-xl">
             <h1 className="text-4xl md:text-5xl font-black text-white leading-tight mb-8">

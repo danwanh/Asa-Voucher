@@ -67,5 +67,5 @@ export async function listUsages(
     prisma.issuedVoucher.count({ where }),
   ]);
 
-  return { rows: rows as unknown as VoucherUsageRow[], total };
+  return { rows: rows.map((row) => toUsageRow(row as unknown as Record<string, unknown>)), total };
 }

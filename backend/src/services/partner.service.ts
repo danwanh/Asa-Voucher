@@ -328,6 +328,31 @@ async function getBranch(id: string) {
   return requireData<Record<string, unknown>>(await prisma.partnerBranch.findUnique({ where: { id }, include: { partners: true } }) as unknown as Record<string, unknown> | null, "Branch not found");
 }
 
+async function assertBranchCanDeactivate(id: string) {
+  const today = new Date(new Date().toISOString().slice(0, 10));
+  const activeVoucherCount = await prisma.voucherProductBranch.count({
+    where: {
+      branch_id: id,
+      voucher_products: {
+        approval_status: "approved",
+        status: "active",
+        sale_start_date: { lte: today },
+        sale_end_date: { gte: today },
+        remaining_quantity: { gt: 0 }
+      }
+    }
+  });
+
+  if (activeVoucherCount > 0) {
+    throw new HttpError(
+      409,
+      "Chi nhánh đang được áp dụng cho voucher đang hoạt động, không thể ngưng hoạt động.",
+      "BRANCH_HAS_ACTIVE_VOUCHERS",
+      { activeVoucherCount }
+    );
+  }
+}
+
 export async function getBranchById(user: CurrentUser, id: string) {
   const branch = await getBranch(id);
   if (user.role === "partner_store_staff" && user.branchId !== id) {
@@ -342,6 +367,9 @@ export async function getBranchById(user: CurrentUser, id: string) {
 export async function updateBranch(user: CurrentUser, id: string, input: Record<string, unknown>) {
   const branch = await getBranch(id);
   assertPartnerOwnerOrAdmin(user, branch.partners as Record<string, unknown>);
+  if (input.is_active === false && branch.is_active !== false) {
+    await assertBranchCanDeactivate(id);
+  }
   try {
     return await prisma.partnerBranch.update({ where: { id }, data: input as never });
   } catch (error) {
@@ -352,6 +380,9 @@ export async function updateBranch(user: CurrentUser, id: string, input: Record<
 export async function deleteBranch(user: CurrentUser, id: string) {
   const branch = await getBranch(id);
   assertPartnerOwnerOrAdmin(user, branch.partners as Record<string, unknown>);
+  if (branch.is_active !== false) {
+    await assertBranchCanDeactivate(id);
+  }
   try {
     await prisma.partnerBranch.update({ where: { id }, data: { is_active: false } });
   } catch (error) {

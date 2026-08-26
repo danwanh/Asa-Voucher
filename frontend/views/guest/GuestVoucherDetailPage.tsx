@@ -1,28 +1,31 @@
 import { useEffect, useMemo, useState } from "react"
-import { ArrowLeft, Star, MapPin, Calendar, Users, Heart } from "lucide-react"
+import { ArrowLeft, Star, MapPin, Calendar, Users } from "lucide-react"
 import { C, fmt, fmtDate } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import type { Voucher } from "@/types"
 import { voucherService, type VoucherApplicableBranch, type VoucherDetailData, type VoucherPublicReview } from "@/services/voucherService"
 import { LoadingState } from "@/components/LoadingState"
+import { ImageLightbox } from "@/components/ImageLightbox"
 import { isVoucherAvailable } from "@/hooks/useCart"
+import { VoucherImageGallery } from "@/components/VoucherImageGallery"
 
 interface Props {
+  viewer?: "guest" | "customer"
   voucher: Voucher
   detail: VoucherDetailData
   onBack: () => void
-  onLogin: () => void
+  onLogin?: () => void
   onDetail: (v: Voucher) => void
   onAddToCart: (v: Voucher) => void
   onBuyNow: (v: Voucher) => void
 }
 
-export function GuestVoucherDetailPage({ voucher: v, detail, onBack, onLogin, onDetail, onAddToCart, onBuyNow }: Props) {
-  const [liked, setLiked] = useState(false)
+export function GuestVoucherDetailPage({ viewer = "guest", voucher: v, detail, onBack, onLogin, onDetail, onAddToCart, onBuyNow }: Props) {
   const [detailVoucher, setDetailVoucher] = useState<Voucher>(v)
   const [reviews, setReviews] = useState<VoucherPublicReview[]>([])
   const [branches, setBranches] = useState<VoucherApplicableBranch[]>([])
   const [related, setRelated] = useState<Voucher[]>([])
+  const [detailImages, setDetailImages] = useState<string[]>([])
   const [detailMeta, setDetailMeta] = useState<Pick<VoucherDetailData, "conditions" | "usageInstructions" | "applicableArea" | "partnerId" | "categoryName">>({
     conditions: [],
     usageInstructions: [],
@@ -32,11 +35,13 @@ export function GuestVoucherDetailPage({ voucher: v, detail, onBack, onLogin, on
   })
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [lightbox, setLightbox] = useState<{ images: string[]; index: number } | null>(null)
 
   useEffect(() => {
     setDetailVoucher(detail.voucher)
     setReviews(detail.reviews)
     setBranches(detail.branches)
+    setDetailImages(detail.images.length > 0 ? detail.images.map((image) => image.imageUrl) : detail.voucher.image ? [detail.voucher.image] : [])
     setDetailMeta({ conditions: detail.conditions, usageInstructions: detail.usageInstructions, applicableArea: detail.applicableArea, partnerId: detail.partnerId, categoryName: detail.categoryName })
     setIsLoading(false)
   }, [detail])
@@ -91,16 +96,13 @@ export function GuestVoucherDetailPage({ voucher: v, detail, onBack, onLogin, on
       <div className="grid md:grid-cols-2 gap-8 mb-8">
         {/* Left: Image gallery */}
         <div>
-          <div className="rounded-3xl overflow-hidden shadow-md h-72 mb-3">
-            <img src={detailVoucher.image} alt={detailVoucher.title} className="w-full h-full object-cover" />
-          </div>
-          <div className="flex gap-2">
-            {[detailVoucher.image, detailVoucher.image, detailVoucher.image].map((img, i) => (
-              <div key={i} className="w-20 h-16 rounded-xl overflow-hidden border-2 cursor-pointer transition-all" style={{ borderColor: i === 0 ? C.peach : "transparent" }}>
-                <img src={img} alt="" className="w-full h-full object-cover" />
-              </div>
-            ))}
-          </div>
+          <VoucherImageGallery
+            images={detailImages}
+            fallbackImageUrl={detailVoucher.image}
+            alt={detailVoucher.title}
+            className="mb-3 rounded-3xl overflow-hidden shadow-md bg-white"
+            mainHeightClass="h-72"
+          />
         </div>
 
         {/* Right: Info */}
@@ -161,24 +163,15 @@ export function GuestVoucherDetailPage({ voucher: v, detail, onBack, onLogin, on
             >
               Mua ngay — {fmt(detailVoucher.price)}
             </button>
-            <div className="flex gap-2">
-              <button
-                onClick={() => onAddToCart(detailVoucher)}
-                className="flex-1 py-3 rounded-2xl font-bold text-sm border-2 hover:opacity-90 transition-opacity"
-                style={{ borderColor: C.peach, color: C.peach, backgroundColor: "white" }}
-              >
-                Thêm vào giỏ hàng
-              </button>
-              <button
-                onClick={() => setLiked(!liked)}
-                className="w-12 h-12 rounded-2xl flex items-center justify-center border-2 transition-all"
-                style={{ borderColor: liked ? "#EF4444" : "#E5E7EB", backgroundColor: liked ? "#FEF2F2" : "white" }}
-              >
-                <Heart className="w-5 h-5" fill={liked ? "#EF4444" : "none"} style={{ color: liked ? "#EF4444" : "#9CA3AF" }} />
-              </button>
-            </div>
+            <button
+              onClick={() => onAddToCart(detailVoucher)}
+              className="w-full py-3 rounded-2xl font-bold text-sm border-2 hover:opacity-90 transition-opacity"
+              style={{ borderColor: C.peach, color: C.peach, backgroundColor: "white" }}
+            >
+              Thêm vào giỏ hàng
+            </button>
           </div> : <div className="mb-2 w-full rounded-2xl py-4 text-center text-sm font-bold" style={{ backgroundColor: C.muted, color: "#8A8DA8" }}>Voucher không khả dụng</div>}
-          <p className="text-xs text-center" style={{ color: "#6B7280" }}>Đăng nhập để xem đơn hàng &amp; quản lý voucher</p>
+          {viewer === "guest" && <p className="text-xs text-center" style={{ color: "#6B7280" }}>Đăng nhập để xem đơn hàng &amp; quản lý voucher</p>}
         </div>
       </div>
 
@@ -227,7 +220,7 @@ export function GuestVoucherDetailPage({ voucher: v, detail, onBack, onLogin, on
 
           <div className="bg-white rounded-2xl p-5 border border-black/5">
             <h3 className="font-black text-sm mb-3" style={{ color: C.indigo }}>Thông tin voucher</h3>
-            <div className="text-xs" style={{ color: "#6B7280" }}>Đối tác: {detailMeta.partnerId || detailVoucher.partnerId}</div>
+            <div className="text-xs" style={{ color: "#6B7280" }}>Đối tác: {detail.partnerName || detailVoucher.partnerName || detailMeta.partnerId || detailVoucher.partnerId}</div>
             <div className="text-xs mt-2" style={{ color: "#6B7280" }}>Khu vực áp dụng: {detailMeta.applicableArea || "Chưa cập nhật"}</div>
           </div>
         </div>
@@ -242,27 +235,42 @@ export function GuestVoucherDetailPage({ voucher: v, detail, onBack, onLogin, on
         {reviews.length === 0 ? (
           <div className="text-sm" style={{ color: "#8A8DA8" }}>Chưa có đánh giá</div>
         ) : (
-          <div className="grid md:grid-cols-3 gap-4">
+          <div className="divide-y" style={{ borderColor: "#F0EDD8" }}>
             {reviews.map((r) => (
-              <div key={r.id} className="p-4 rounded-xl border border-black/5" style={{ backgroundColor: C.eggshell }}>
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-bold" style={{ color: C.indigo }}>
-                  {r.name[0]}
+              <div key={r.id} className="flex gap-3 py-4 first:pt-0 last:pb-0">
+                <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-full" style={{ backgroundColor: `${C.peach}20` }}>
+                  {r.avatarUrl ? (
+                    <img src={r.avatarUrl} alt={`Avatar của ${r.name}`} className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-sm font-black" style={{ color: C.peach }}>{r.name.charAt(0)}</div>
+                  )}
                 </div>
-                <div>
-                  <div className="text-xs font-bold" style={{ color: C.indigo }}>{r.name}</div>
-                  <div className="flex gap-0.5">
-                    {[...Array(r.rating)].map((_, j) => <Star key={j} className="w-2.5 h-2.5 fill-current" style={{ color: C.apricot }} />)}
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-sm font-bold" style={{ color: C.indigo }}>{r.name}</div>
+                    <div className="text-xs" style={{ color: "#9CA3AF" }}>{fmtDate(r.date)}</div>
                   </div>
+                  <div className="mt-1 flex gap-0.5">
+                    {Array.from({ length: 5 }, (_, j) => <Star key={j} className="h-3 w-3 fill-current" style={{ color: j < r.rating ? C.apricot : "#E5E7EB" }} />)}
+                  </div>
+                  <p className="mt-2 text-sm leading-relaxed" style={{ color: "#4B5563" }}>{r.text}</p>
+                  {r.mediaUrls.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {r.mediaUrls.map((url, index) => (
+                        <button type="button" key={url} onClick={() => setLightbox({ images: r.mediaUrls, index })} className="h-16 w-16 overflow-hidden rounded-xl border border-black/5">
+                          <img src={url} alt={`Ảnh đánh giá ${index + 1}`} className="h-full w-full object-cover" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </div>
-              <p className="text-xs leading-relaxed" style={{ color: "#4B5563" }}>{r.text}</p>
-                <div className="text-xs mt-2" style={{ color: "#9CA3AF" }}>{fmtDate(r.date)}</div>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      <ImageLightbox images={lightbox?.images ?? []} initialIndex={lightbox?.index ?? 0} open={Boolean(lightbox)} onClose={() => setLightbox(null)} />
 
       {/* Related */}
       {related.length > 0 && (

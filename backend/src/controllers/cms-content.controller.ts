@@ -8,6 +8,7 @@ import {
   updateCmsContentSchema,
   listCmsContentQuerySchema,
   publicCmsContentQuerySchema,
+  moveCmsBannerSchema,
 } from "../validations/cms-content.validation.js";
 
 function requireUser(req: Request) {
@@ -59,4 +60,10 @@ export async function deleteCmsContent(req: Request, res: Response) {
 export async function createMediaSignature(_req: Request, res: Response) {
   const signature = await cmsContentService.createMediaSignature();
   sendSuccess(res, signature);
+}
+
+export async function moveCmsBanner(req: Request, res: Response) {
+  const input = moveCmsBannerSchema.parse(req.body);
+  const result = await cmsContentService.moveCmsBanner(requireUser(req), req.params.id, input);
+  sendSuccess(res, result, "Đã cập nhật vị trí banner");
 }

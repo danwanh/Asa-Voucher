@@ -1,6 +1,6 @@
 import { startTransition, useEffect, useRef, useState } from "react"
 import dynamic from "next/dynamic"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { AppIcon } from "@/components/AppIcon"
 import { PopupModal } from "@/components/PopupModal"
 import { toast } from "sonner"
@@ -17,9 +17,9 @@ import { isVoucherAvailable } from "@/hooks/useCart"
 
 const pageLoading = () => <LoadingState label="Đang tải trang..." variant="page" />
 const CategoryGridPage = dynamic(() => import("@/components/CategoryGridPage").then((module) => module.CategoryGridPage), { loading: pageLoading })
-const HomePage = dynamic(() => import("@/pages/customer/HomePage").then((module) => module.HomePage), { loading: pageLoading })
+const HomePage = dynamic(() => import("@/pages/guest/GuestHomePage").then((module) => module.GuestHomePage), { loading: pageLoading })
 const VoucherListPage = dynamic(() => import("@/pages/customer/VoucherListPage").then((module) => module.VoucherListPage), { loading: pageLoading })
-const VoucherDetailPage = dynamic(() => import("@/pages/customer/VoucherDetailPage").then((module) => module.VoucherDetailPage), { loading: pageLoading })
+const VoucherDetailPage = dynamic(() => import("@/pages/guest/GuestVoucherDetailPage").then((module) => module.GuestVoucherDetailPage), { loading: pageLoading })
 const CartPage = dynamic(() => import("@/pages/customer/CartPage").then((module) => module.CartPage), { loading: pageLoading })
 const CreateOrderPage = dynamic(() => import("@/pages/customer/CreateOrderPage").then((module) => module.CreateOrderPage), { loading: pageLoading })
 const PaymentPage = dynamic(() => import("@/pages/customer/PaymentPage").then((module) => module.PaymentPage), { loading: pageLoading })
@@ -31,6 +31,27 @@ const ReviewPage = dynamic(() => import("@/pages/customer/ReviewPage").then((mod
 const ComplaintPage = dynamic(() => import("@/pages/customer/ComplaintPage").then((module) => module.ComplaintPage), { loading: pageLoading })
 const ProfilePage = dynamic(() => import("@/pages/customer/ProfilePage").then((module) => module.ProfilePage), { loading: pageLoading })
 const CustomerSettingsPage = dynamic(() => import("@/pages/customer/CustomerSettingsPage").then((module) => module.CustomerSettingsPage), { loading: pageLoading })
+
+function pageFromLocation(pathname: string, searchParams: URLSearchParams, fallback: CustomerPage = "home"): CustomerPage {
+  const view = searchParams.get("view")
+  if (view === "review") return "review"
+  if (view === "complaint" || view === "complaints") return "complaint"
+  if (pathname === "/") return "home"
+  if (pathname === "/vouchers") return "vouchers"
+  if (pathname.startsWith("/vouchers/")) return "detail"
+  if (pathname === "/categories") return "categories"
+  if (pathname === "/cart") return "cart"
+  if (pathname === "/orders") return "orders"
+  if (pathname.startsWith("/orders/")) return "order-detail"
+  if (pathname === "/my-vouchers") return "my-vouchers"
+  if (pathname === "/favorites") return "favorites"
+  if (pathname === "/settings") return "settings"
+  if (pathname === "/profile") return "profile"
+  if (pathname === "/checkout/create-order") return "create-order"
+  if (pathname.startsWith("/checkout/payment/")) return "payment"
+  if (pathname === "/checkout/payment/result") return "success"
+  return fallback
+}
 
 interface Props {
   user: AppUser
@@ -102,7 +123,10 @@ export function CustomerApp({
   initialPaymentStatus,
 }: Props) {
   const router = useRouter()
-  const [page, setPage] = useState<CustomerPage>(() => initialPage ?? "home")
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const page = pageFromLocation(pathname, searchParams, initialPage ?? "home")
+  const feedbackVoucherId = searchParams.get("voucherId")
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null)
   const [selectedVoucherDetail, setSelectedVoucherDetail] = useState<VoucherDetailData | null>(null)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
@@ -132,6 +156,8 @@ export function CustomerApp({
   const [orderSearch, setOrderSearch] = useState("")
   const [myOrdersLoading, setMyOrdersLoading] = useState(initialPage === "orders" || initialPage === "my-vouchers")
   const ordersRequestIdRef = useRef(0)
+  const feedbackSelectionRef = useRef<string | null>(null)
+  const previousFeedbackPageRef = useRef<CustomerPage | null>(null)
   const [myIssuedVouchers, setMyIssuedVouchers] = useState<Order[]>([])
   const [issuedPage, setIssuedPage] = useState(1)
   const [issuedTotalPages, setIssuedTotalPages] = useState(1)
@@ -139,19 +165,100 @@ export function CustomerApp({
   const [myIssuedVouchersLoading, setMyIssuedVouchersLoading] = useState(initialPage === "my-vouchers")
 
   useEffect(() => {
-    setPage(initialPage ?? "home")
-  }, [initialPage])
-
-  useEffect(() => {
+    if (page !== "review" && page !== "complaint") {
+      if (previousFeedbackPageRef.current === "review" || previousFeedbackPageRef.current === "complaint") {
+        feedbackSelectionRef.current = null
+      }
+    }
+    previousFeedbackPageRef.current = page
     if (!initialOrderId) {
       setPendingOrderLoading(false)
       return
     }
-    if (initialPage === "order-detail") {
-      void orderService.get(initialOrderId).then((order) => {
+    if (page === "order-detail" || page === "review" || page === "complaint") {
+      void orderService.get(initialOrderId).then(async (order) => {
         setSelectedOrder(order)
-        setPage("order-detail")
-        if (initialPaymentStatus === "success" && order.status === "confirmed") {
+        if (page === "review") {
+          if (feedbackVoucherId) {
+            const selectedTarget = (await orderService.getReviewTargets(order.id))
+              .filter((target) => target.review || target.reviewable)
+              .find((target) => target.id === feedbackVoucherId)
+            if (selectedTarget) {
+              setReviewOrder(order)
+              setReviewTarget(selectedTarget)
+              setReviewTargetOptions([])
+              setReviewTargetOrder(null)
+              setPendingOrderLoading(false)
+              return
+            }
+          }
+          if (feedbackSelectionRef.current === `review:${order.id}:${reviewTarget?.id ?? ""}` || (reviewOrder?.id === order.id && reviewTarget)) {
+            setPendingOrderLoading(false)
+            return
+          }
+          setReviewOrder(order)
+          void orderService.getReviewTargets(order.id).then((targets) => {
+            const availableTargets = targets.filter((target) => target.review || target.reviewable)
+            if (availableTargets.length === 1) {
+              setReviewTarget(availableTargets[0])
+              return
+            }
+            if (availableTargets.length > 1) {
+              setReviewTargetOptions(availableTargets)
+              setReviewTargetOrder(order)
+              return
+            }
+            toast.error("Không tìm thấy voucher đã phát hành để đánh giá.")
+            router.replace(`/orders/${order.id}`)
+          }).catch(() => {
+            toast.error("Không thể tải danh sách voucher để đánh giá.")
+            router.replace(`/orders/${order.id}`)
+          })
+        } else if (page === "complaint") {
+          if (feedbackVoucherId) {
+            const canComplaint = order.status === "confirmed" || order.status === "completed"
+            const selectedTarget = (order.items ?? []).flatMap((item) => (item.issuedVouchers ?? [])
+              .filter((voucher) => voucher.id === feedbackVoucherId && (voucher.complaint || canComplaint || voucher.status === "used"))
+              .map((voucher) => ({
+                voucherId: item.voucherId,
+                voucherTitle: item.voucherTitle ?? order.voucherTitle,
+                partnerName: item.partnerName ?? order.partnerName,
+                issuedVoucher: voucher,
+              })))[0]
+            if (selectedTarget) {
+              setComplaintOrder(order)
+              setComplaintIssuedVoucher(selectedTarget.issuedVoucher)
+              setComplaintTargetOptions([])
+              setComplaintTargetOrder(null)
+              setPendingOrderLoading(false)
+              return
+            }
+          }
+          if (feedbackSelectionRef.current === `complaint:${order.id}:${complaintIssuedVoucher?.id ?? ""}` || (complaintOrder?.id === order.id && complaintIssuedVoucher)) {
+            setPendingOrderLoading(false)
+            return
+          }
+          const canComplaint = order.status === "confirmed" || order.status === "completed"
+          const targets = (order.items ?? []).flatMap((item) => (item.issuedVouchers ?? [])
+            .filter((voucher) => voucher.complaint || canComplaint || voucher.status === "used")
+            .map((voucher) => ({
+              id: voucher.id,
+              voucherId: item.voucherId,
+              voucherTitle: item.voucherTitle ?? order.voucherTitle,
+              partnerName: item.partnerName ?? order.partnerName,
+              issuedVoucher: voucher,
+            })))
+          setComplaintOrder(order)
+          if (targets.length === 1) {
+            setComplaintIssuedVoucher(targets[0].issuedVoucher)
+          } else if (targets.length > 1) {
+            setComplaintTargetOptions(targets)
+            setComplaintTargetOrder(order)
+          } else {
+            toast.error("Không tìm thấy voucher có thể khiếu nại.")
+            router.replace(`/orders/${order.id}`)
+          }
+        } else if (initialPaymentStatus === "success" && (order.status === "confirmed" || order.status === "completed")) {
           toast.success("Thanh toán thành công, voucher đã được phát hành.")
         } else if (initialPaymentStatus) {
           toast.error(order.status === "cancelled"
@@ -167,20 +274,20 @@ export function CustomerApp({
             : "Không thể tải chi tiết đơn hàng. Vui lòng thử lại.")
         router.replace("/orders")
       })
+      setPendingOrderLoading(false)
       return
     }
     void orderService.get(initialOrderId).then((order) => {
       setPendingOrder({ id: initialOrderId, order, recipient: { name: "", identifier: "", note: "", forSelf: true } })
     }).catch(() => setPendingOrder({ id: initialOrderId, recipient: { name: "", identifier: "", note: "", forSelf: false } }))
       .finally(() => setPendingOrderLoading(false))
-  }, [initialOrderId, initialPage, initialPaymentStatus, router])
+  }, [feedbackVoucherId, initialOrderId, initialPaymentStatus, page, router])
 
   useEffect(() => {
     if (!initialVoucherId) return
     void voucherService.getDetail(initialVoucherId).then((detail) => {
       setSelectedVoucher(detail.voucher)
       setSelectedVoucherDetail(detail)
-      setPage("detail")
     }).catch(() => {
       toast.error("Không thể tải chi tiết voucher.")
       router.push("/vouchers")
@@ -188,7 +295,6 @@ export function CustomerApp({
   }, [initialVoucherId, router])
 
   const navigate = (p: CustomerPage) => {
-    setPage(p)
     if (p === "home") {
       setVoucherSearch("")
       setVoucherFilters(DEFAULT_VOUCHER_FILTERS)
@@ -208,8 +314,8 @@ export function CustomerApp({
 
   const handleVoucherSearchFocus = () => {
     if (page === "vouchers") return
-    setPage("vouchers")
     onInitialPageConsumed?.()
+    router.push("/vouchers")
   }
 
   const goDetail = (v: Voucher) => startTransition(() => router.push(`/vouchers/${v.id}`))
@@ -218,12 +324,13 @@ export function CustomerApp({
   }
 
   const openReview = (order: Order, target: ReviewTarget, returnPage: CustomerPage) => {
+    feedbackSelectionRef.current = `review:${order.id}:${target.id}`
     setReviewOrder(order)
     setReviewTarget(target)
     setReviewReturnPage(returnPage)
     setReviewTargetOptions([])
     setReviewTargetOrder(null)
-    navigate("review")
+    router.push(`/orders/${order.id}?view=review&voucherId=${encodeURIComponent(target.id)}`)
   }
 
   const goReview = async (o: Order | OrderListItem, issuedVoucher?: IssuedVoucher, returnPage: CustomerPage = "orders") => {
@@ -306,8 +413,9 @@ export function CustomerApp({
     }
     setComplaintOrder(detail)
     setComplaintIssuedVoucher(issuedVoucher ?? null)
+    feedbackSelectionRef.current = `complaint:${detail.id}:${issuedVoucher?.id ?? ""}`
     setReviewReturnPage(returnPage)
-    navigate("complaint")
+    router.push(`/orders/${detail.id}?view=complaint&voucherId=${encodeURIComponent(issuedVoucher?.id ?? "")}`)
   }
 
   const handleAddToCart = async (voucher: Voucher) => {
@@ -406,7 +514,8 @@ export function CustomerApp({
     if (reviewReturnPage === "order-detail" && selectedOrder) {
       void orderService.get(selectedOrder.id, { force: true }).then(setSelectedOrder).catch(() => undefined)
     }
-    setPage(reviewReturnPage)
+    const returnPath = customerPagePath(reviewReturnPage, user.role)
+    if (returnPath) router.push(returnPath)
     setReviewOrder(null)
     setReviewTarget(null)
     setComplaintOrder(null)
@@ -451,7 +560,7 @@ export function CustomerApp({
       onNavigate={navigate}
       onLogout={onLogout}
     >
-      {page === "home" && <HomePage onAddToCart={handleAddToCart} onBuyNow={handleBuyNow} onDetail={goDetail} onNavigate={navigate} onOpenArticle={(id) => router.push(`/news/${id}`)} />}
+      {page === "home" && <HomePage viewer="customer" onAddToCart={handleAddToCart} onBuyNow={handleBuyNow} onVoucherDetail={goDetail} onNavigate={(nextPage) => navigate(nextPage as CustomerPage)} onOpenArticle={(id) => router.push(`/news/${id}`)} />}
       {page === "vouchers" && (
         <VoucherListPage
           onAddToCart={handleAddToCart}
@@ -464,11 +573,13 @@ export function CustomerApp({
       )}
       {page === "detail" && selectedVoucher && (
         <VoucherDetailPage
+          viewer="customer"
           voucher={selectedVoucher}
           detail={selectedVoucherDetail!}
-          onBuy={() => handleAddToCart(selectedVoucher)}
+          onDetail={goDetail}
+          onAddToCart={() => handleAddToCart(selectedVoucher)}
           onBuyNow={() => handleBuyNow(selectedVoucher)}
-           onBack={() => router.push("/vouchers")}
+          onBack={() => router.push("/vouchers")}
         />
       )}
       {page === "cart" && (
@@ -635,7 +746,7 @@ export function CustomerApp({
         />
       )}
     </CustomerLayout>
-    <PopupModal />
+    <PopupModal isHome={page === "home"} />
     </>
   )
 }

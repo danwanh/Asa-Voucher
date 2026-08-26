@@ -14,7 +14,6 @@ vi.mock("../../repositories/issued-voucher.repository.js", () => ({
 }));
 
 vi.mock("../../repositories/voucher-usage.repository.js", () => ({
-  createVoucherUsage: vi.fn(),
   listUsagesByIssuedVoucher: vi.fn(),
   listUsages: vi.fn(),
 }));
@@ -271,12 +270,6 @@ describe("Issued Voucher Service", () => {
             update: vi.fn().mockResolvedValue({ ...voucher, status: "used" }),
             count: vi.fn().mockResolvedValue(1),
           },
-          voucherUsage: {
-            create: vi.fn().mockResolvedValue({
-              id: "usage-1", issued_voucher_id: "iv-1", branch_id: "branch-1",
-              redeemed_by: "u-staff", used_at: new Date(),
-            }),
-          },
           order: { updateMany: vi.fn() },
           orderLog: { create: vi.fn() },
         } as never);
@@ -299,7 +292,6 @@ describe("Issued Voucher Service", () => {
           update: vi.fn().mockResolvedValue({ ...voucher, status: "used" }),
           count: vi.fn().mockResolvedValue(0),
         },
-        voucherUsage: { create: vi.fn().mockResolvedValue({ id: "usage-1" }) },
         order: { updateMany: orderUpdate },
         orderLog: { create: vi.fn().mockResolvedValue({}) },
       } as never));

@@ -7,6 +7,10 @@ import { useCartContext } from "@/components/CartProvider"
 import { useAuthStore } from "@/stores/authStore"
 import type { AppUser, CartItem } from "@/types"
 import type { CustomerPage } from "@/layouts/CustomerLayout"
+import type { GuestPage } from "@/layouts/GuestLayout"
+import type { PartnerPage } from "@/layouts/PartnerLayout"
+import type { StaffPage } from "@/layouts/StaffLayout"
+import type { VoucherStaffPage } from "@/routes/VoucherStaffApp"
 import { toast } from "sonner"
 import { LoadingState } from "@/components/LoadingState"
 
@@ -34,7 +38,55 @@ function LogoutConfirmDialog({ onCancel, onConfirm }: { onCancel: () => void; on
   )
 }
 
-export default function App({ initialPage, initialOrderId, initialVoucherId, initialStaffCode, initialPaymentStatus }: { initialPage?: CustomerPage | "profile" | "cart"; initialOrderId?: string; initialVoucherId?: string; initialStaffCode?: string; initialPaymentStatus?: string } = {}) {
+type AppRoutePage = CustomerPage | GuestPage | "profile" | "cart"
+
+function rolePageFromPath(routePath: string | undefined, role: string): PartnerPage | StaffPage | VoucherStaffPage | "profile" | undefined {
+  const segments = routePath?.split("/").filter(Boolean) ?? []
+  const segment = segments.at(-1)
+  if (role === "partner_owner") {
+    if (segment === "profile") return "profile"
+    if (segment === "new" || segment === "create") return "create"
+    if (segments[1] === "vouchers" && segments.length >= 3) {
+      return segment === "edit" ? "edit" : "voucher-detail"
+    }
+    if (segment === "vouchers") return "vouchers"
+    if (segment === "edit") return "edit"
+    if (segment === "revenue") return "revenue"
+    if (segment === "branches") return "branches"
+    if (segment === "staff") return "staff"
+    if (segment === "check-voucher") return "check-voucher"
+    return "revenue"
+  }
+  if (role === "partner_store_staff") {
+    if (segment === "profile") return "profile"
+    if (segment === "verify" || segment === "qr-scan") return "qr-scan"
+    if (segment === "history") return "history"
+    return "dashboard"
+  }
+  if (role === "partner_voucher_staff") {
+    if (segment === "profile") return "profile"
+    if (segment === "new" || segment === "create") return "create"
+    if (segments[1] === "vouchers" && segments.length >= 3) {
+      return segment === "edit" ? "edit" : "voucher-detail"
+    }
+    if (segment === "edit") return "edit"
+    if (segment === "reports") return "staff-reports"
+    if (segment === "check-voucher") return "check-voucher"
+    if (segment === "detail") return "voucher-detail"
+    return "vouchers"
+  }
+  if (segment === "profile") return "profile"
+  return undefined
+}
+
+function roleVoucherIdFromPath(routePath: string | undefined) {
+  const segments = routePath?.split("/").filter(Boolean) ?? []
+  return segments[1] === "vouchers" && segments.length >= 3 && !["new", "create", "edit", "detail"].includes(segments[2])
+    ? segments[2]
+    : undefined
+}
+
+export default function App({ initialPage, initialOrderId, initialVoucherId, initialStaffCode, initialPaymentStatus, routePath, protectedRoute = false }: { initialPage?: AppRoutePage; initialOrderId?: string; initialVoucherId?: string; initialStaffCode?: string; initialPaymentStatus?: string; routePath?: string; protectedRoute?: boolean } = {}) {
   const user = useAuthStore((s) => s.user)
   const isInitialized = useAuthStore((s) => s.isInitialized)
   const initializationError = useAuthStore((s) => s.initializationError)
@@ -111,10 +163,10 @@ export default function App({ initialPage, initialOrderId, initialVoucherId, ini
     </>
   )
 
-  const guestInitialPage = initialPage === "cart" || initialPage === "vouchers" || initialPage === "detail" || initialPage === "categories"
+  const guestInitialPage = initialPage === "cart" || initialPage === "vouchers" || initialPage === "detail" || initialPage === "categories" || initialPage === "about" || initialPage === "contact"
     ? initialPage
     : undefined
-  const isPublicRoute = !initialPage || Boolean(guestInitialPage)
+  const isPublicRoute = !protectedRoute && (!initialPage || Boolean(guestInitialPage))
 
   useEffect(() => {
     if (!isPublicRoute) {
@@ -129,7 +181,7 @@ export default function App({ initialPage, initialOrderId, initialVoucherId, ini
   // Public pages do not need to wait for session recovery before showing content.
   // Protected pages still wait so their first render cannot expose the wrong shell.
   if (!isInitialized && !isPublicRoute) return <LoadingState label="Đang khôi phục phiên đăng nhập..." variant="page" />
-  if (initializationError && !isPublicRoute) return (
+  if (initializationError && !isPublicRoute && user) return (
     <div className="mx-auto max-w-md px-4 py-20 text-center">
       <h1 className="text-xl font-black text-[#3D405B]">Không thể khôi phục phiên đăng nhập</h1>
       <p className="mt-2 text-sm text-[#8A8DA8]">Vui lòng kiểm tra kết nối và thử lại.</p>
@@ -137,12 +189,11 @@ export default function App({ initialPage, initialOrderId, initialVoucherId, ini
     </div>
   )
 
-  if (!user && !showLogin && (!initialPage || guestInitialPage)) return (
+  if (!user && !showLogin && isPublicRoute) return (
     <GuestApp
       onLogin={handleRequestLogin}
       onRegister={handleRequestRegister}
       onCheckout={handleCheckoutAsGuest}
-      cartAdd={add}
        cartCount={cartCount}
        cartCountLoading={cartCountLoading}
       cart={cart}
@@ -181,7 +232,7 @@ export default function App({ initialPage, initialOrderId, initialVoucherId, ini
        setCartCheckout={setCartCheckout}
        setDirectCheckout={setDirectCheckout}
        clearCheckoutDraft={clearCheckoutDraft}
-      initialPage={initialPage}
+      initialPage={initialPage && !["about", "contact"].includes(initialPage) ? initialPage as CustomerPage : undefined}
        initialOrderId={initialOrderId}
        initialVoucherId={initialVoucherId}
       initialPaymentStatus={initialPaymentStatus}
@@ -189,10 +240,12 @@ export default function App({ initialPage, initialOrderId, initialVoucherId, ini
     />
   )
 
-  if (user.role === "partner_owner")         return withLogoutDialog(<PartnerApp user={user} onLogout={handleLogout} initialPage={initialPage === "profile" ? initialPage : undefined} />)
-  if (user.role === "partner_voucher_staff") return withLogoutDialog(<VoucherStaffApp user={user} onLogout={handleLogout} initialPage={initialPage === "profile" ? initialPage : undefined} />)
-  if (user.role === "partner_store_staff")   return withLogoutDialog(<StaffApp user={user} onLogout={handleLogout} initialPage={initialPage === "profile" ? initialPage : undefined} initialCode={initialStaffCode} />)
+  const rolePage = rolePageFromPath(routePath, user.role)
+  const roleVoucherId = roleVoucherIdFromPath(routePath)
+  if (user.role === "partner_owner")         return withLogoutDialog(<PartnerApp user={user} onLogout={handleLogout} initialPage={rolePage as PartnerPage | undefined} initialVoucherId={roleVoucherId} />)
+  if (user.role === "partner_voucher_staff") return withLogoutDialog(<VoucherStaffApp user={user} onLogout={handleLogout} initialPage={rolePage as VoucherStaffPage | undefined} initialVoucherId={roleVoucherId} />)
+  if (user.role === "partner_store_staff")   return withLogoutDialog(<StaffApp user={user} onLogout={handleLogout} initialPage={rolePage as StaffPage | undefined} initialCode={initialStaffCode} />)
   if (user.role === "admin_content" || user.role === "admin_operations" || user.role === "admin_security")
-    return withLogoutDialog(<AdminApp user={user} onLogout={handleLogout} initialPage={initialPage === "profile" ? initialPage : undefined} />)
+    return withLogoutDialog(<AdminApp user={user} onLogout={handleLogout} initialPage={initialPage === "profile" ? initialPage : undefined} routePath={routePath} />)
   return null
 }
