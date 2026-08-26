@@ -151,7 +151,7 @@ export function CustomerApp({
       void orderService.get(initialOrderId).then((order) => {
         setSelectedOrder(order)
         setPage("order-detail")
-        if (initialPaymentStatus === "success" && (order.status === "confirmed" || order.status === "completed")) {
+        if (initialPaymentStatus === "success" && order.status === "confirmed") {
           toast.success("Thanh toán thành công, voucher đã được phát hành.")
         } else if (initialPaymentStatus) {
           toast.error(order.status === "cancelled"
@@ -286,7 +286,7 @@ export function CustomerApp({
       return
     }
     if (!issuedVoucher) {
-      const canComplaint = detail.status === "confirmed" || detail.status === "completed"
+      const canComplaint = detail.status === "confirmed"
       const targets = (detail.items ?? []).flatMap((item) => (item.issuedVouchers ?? [])
         .filter((voucher) => voucher.complaint || canComplaint || voucher.status === "used")
         .map((voucher) => ({
@@ -556,8 +556,10 @@ export function CustomerApp({
             currentUserId={user.id}
         />
       )}
-      {page === "order-detail" && selectedOrder && (
-          <OrderDetailPage order={selectedOrder} onBack={() => navigate("orders")} onReview={(o, issuedVoucher) => goReview(o, issuedVoucher, "order-detail")} onComplaint={(o, issuedVoucher) => goComplaint(o, issuedVoucher, "order-detail")} onPayAgain={handlePayAgain} currentUserId={user.id} />
+      {page === "order-detail" && (
+          selectedOrder
+            ? <OrderDetailPage order={selectedOrder} onBack={() => navigate("orders")} onReview={(o, issuedVoucher) => goReview(o, issuedVoucher, "order-detail")} onComplaint={(o, issuedVoucher) => goComplaint(o, issuedVoucher, "order-detail")} onPayAgain={handlePayAgain} currentUserId={user.id} />
+            : <LoadingState label="Đang tải đơn hàng..." variant="page" />
       )}
        {page === "review" && reviewOrder && reviewTarget && (
          <ReviewPage

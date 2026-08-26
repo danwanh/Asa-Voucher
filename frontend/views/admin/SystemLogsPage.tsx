@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react"
-import { X, Download } from "lucide-react"
+import { X, Download, ChevronLeft, ChevronRight } from "lucide-react"
 import { C } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import { securityService } from "@/services/securityService"
@@ -35,30 +35,30 @@ const LEVEL_BG: Record<string, string> = {
 }
 
 const ACTION_OPTIONS = [
-  { value: "", label: "Tất cả hành động" },
-  { value: "LOGIN", label: "Đăng nhập" },
-  { value: "LOGOUT", label: "Đăng xuất" },
-  { value: "VERIFY_EMAIL", label: "Xác thực email" },
-  { value: "REGISTER", label: "Đăng ký" },
-  { value: "PAYMENT_CREATED", label: "Tạo thanh toán" },
-  { value: "PAYMENT_SUCCESS", label: "Thanh toán thành công" },
-  { value: "PAYMENT_FAILED", label: "Thanh toán thất bại" },
-  { value: "user_created", label: "Tạo người dùng" },
-  { value: "user_updated", label: "Cập nhật người dùng" },
-  { value: "user_deactivated", label: "Vô hiệu hóa người dùng" },
-  { value: "user_activated", label: "Kích hoạt người dùng" },
-  { value: "partner_approved", label: "Duyệt đối tác" },
-  { value: "partner_rejected", label: "Từ chối đối tác" },
-  { value: "partner_status_changed", label: "Đổi trạng thái đối tác" },
-  { value: "voucher_approved", label: "Duyệt voucher" },
-  { value: "voucher_rejected", label: "Từ chối voucher" },
-  { value: "voucher_status_changed", label: "Đổi trạng thái voucher" },
-  { value: "complaint_assigned", label: "Gán khiếu nại" },
-  { value: "complaint_resolved", label: "Giải quyết khiếu nại" },
-  { value: "complaint_closed", label: "Đóng khiếu nại" },
-  { value: "security_lock_account", label: "Khóa tài khoản" },
-  { value: "security_unlock_account", label: "Mở khóa tài khoản" },
-  { value: "security_review_alert", label: "Xem xét cảnh báo" },
+  { value: "", label: "Tất cả hành động", tab: "all" as const },
+  { value: "LOGIN", label: "Đăng nhập", tab: "auth" as const },
+  { value: "LOGOUT", label: "Đăng xuất", tab: "auth" as const },
+  { value: "VERIFY_EMAIL", label: "Xác thực email", tab: "auth" as const },
+  { value: "REGISTER", label: "Đăng ký", tab: "auth" as const },
+  { value: "PAYMENT_CREATED", label: "Tạo thanh toán", tab: "payment" as const },
+  { value: "PAYMENT_SUCCESS", label: "Thanh toán thành công", tab: "payment" as const },
+  { value: "PAYMENT_FAILED", label: "Thanh toán thất bại", tab: "payment" as const },
+  { value: "user_created", label: "Tạo người dùng", tab: "admin" as const },
+  { value: "user_updated", label: "Cập nhật người dùng", tab: "admin" as const },
+  { value: "user_deactivated", label: "Vô hiệu hóa người dùng", tab: "admin" as const },
+  { value: "user_activated", label: "Kích hoạt người dùng", tab: "admin" as const },
+  { value: "partner_approved", label: "Duyệt đối tác", tab: "admin" as const },
+  { value: "partner_rejected", label: "Từ chối đối tác", tab: "admin" as const },
+  { value: "partner_status_changed", label: "Đổi trạng thái đối tác", tab: "admin" as const },
+  { value: "voucher_approved", label: "Duyệt voucher", tab: "admin" as const },
+  { value: "voucher_rejected", label: "Từ chối voucher", tab: "admin" as const },
+  { value: "voucher_status_changed", label: "Đổi trạng thái voucher", tab: "admin" as const },
+  { value: "complaint_assigned", label: "Gán khiếu nại", tab: "admin" as const },
+  { value: "complaint_resolved", label: "Giải quyết khiếu nại", tab: "admin" as const },
+  { value: "complaint_closed", label: "Đóng khiếu nại", tab: "admin" as const },
+  { value: "security_lock_account", label: "Khóa tài khoản", tab: "admin" as const },
+  { value: "security_unlock_account", label: "Mở khóa tài khoản", tab: "admin" as const },
+  { value: "security_review_alert", label: "Xem xét cảnh báo", tab: "admin" as const },
 ]
 
 const ACTION_LABELS: Record<string, { label: string; level: UnifiedLog["level"] }> = {
@@ -85,9 +85,10 @@ function unwrap<T = any>(response: { data: Envelope<T> } | any): T {
   return response.data.data
 }
 
-function toISOString(dateStr: string): string | undefined {
+function toISOString(dateStr: string, endOfDay = false): string | undefined {
   if (!dateStr) return undefined
-  return new Date(dateStr + "T00:00:00.000Z").toISOString()
+  const time = endOfDay ? "T23:59:59.999Z" : "T00:00:00.000Z"
+  return new Date(dateStr + time).toISOString()
 }
 
 function buildUserMap(list: AdminOption[]): Map<string, string> {
@@ -137,16 +138,30 @@ function mapAdminLogs(raw: any[]): UnifiedLog[] {
   })
 }
 
+// Action thực tế của order-logs (theo dữ liệu backend đang trả về) — gắn nhãn
+// tiếng Việt + level màu, cùng kiểu với ACTION_LABELS của admin logs.
+const ORDER_ACTION_LABELS: Record<string, { label: string; level: UnifiedLog["level"] }> = {
+  CREATE_ORDER:         { label: "Tạo đơn hàng",           level: "info" },
+  COMPLETE_ORDER:       { label: "Hoàn tất đơn hàng",       level: "success" },
+  CANCEL_ORDER:         { label: "Hủy đơn hàng",            level: "warning" },
+  CANCEL_ORDER_EXPIRED: { label: "Hủy đơn hàng do hết hạn", level: "warning" },
+  REFUND_ORDER:         { label: "Hoàn tiền đơn hàng",      level: "info" },
+  REFUND_VOUCHER:       { label: "Hoàn voucher",             level: "info" },
+  REISSUE_VOUCHER:      { label: "Cấp lại voucher",          level: "info" },
+  PAYMENT_SUCCESS:      { label: "Thanh toán thành công",   level: "success" },
+}
+
 function mapOrderLogs(raw: any[], userMap: Map<string, string>): UnifiedLog[] {
   return (raw ?? []).map((l) => {
+    const actionInfo = ORDER_ACTION_LABELS[l.action]
     const userName = l.users?.full_name || l.users?.email || userMap.get(l.user_id) || l.user_email || l.user_id || ""
     return {
       id: `order-${l.id}`,
       rawId: l.id,
       time: l.occurred_at || l.created_at,
-      level: "info" as const,
+      level: actionInfo?.level ?? "info",
       type: "Đơn hàng",
-      message: `${l.action ?? ""} ${l.description ?? ""}`.trim(),
+      message: `${actionInfo?.label ?? l.action ?? ""} ${l.description ?? ""}`.trim(),
       actor: userName,
       action: l.action,
       detail: l,
@@ -175,6 +190,25 @@ function mapPaymentLogs(raw: any[], userMap: Map<string, string>): UnifiedLog[] 
   })
 }
 
+// Đơn hàng (order-logs) không có danh sách action cố định trong hệ thống này,
+// nên với tab "order" ta lấy các action THỰC TẾ đang có trong log đã tải về,
+// thay vì trộn chung với action của auth/admin/payment như trước.
+function humanizeAction(v: string): string {
+  return v.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+function getActionOptionsForTab(tab: TabKey, logs: UnifiedLog[]) {
+  if (tab === "all") return ACTION_OPTIONS
+  if (tab === "order") {
+    const values = Array.from(new Set(logs.filter((l) => l.type === "Đơn hàng" && l.action).map((l) => l.action as string))).sort()
+    return [
+      { value: "", label: "Tất cả hành động" },
+      ...values.map((v) => ({ value: v, label: ORDER_ACTION_LABELS[v]?.label ?? humanizeAction(v) })),
+    ]
+  }
+  return ACTION_OPTIONS.filter((o) => o.value === "" || o.tab === tab)
+}
+
 interface AdminOption { id: string; email: string; full_name: string }
 
 export function SystemLogsPage() {
@@ -198,6 +232,10 @@ export function SystemLogsPage() {
   const hasDateFilter = dateFrom || dateTo
   const clearDateFilter = () => { setDateFrom(""); setDateTo("") }
 
+  // Đổi tab thì bỏ action filter cũ — action của tab trước có thể không tồn tại
+  // ở tab mới (vd đang lọc "Đăng nhập" ở tab auth rồi chuyển sang tab Đơn hàng).
+  useEffect(() => { setActionFilter("") }, [activeTab])
+
   useEffect(() => {
     api.get("/users", { params: { limit: 1000 } })
       .then((r) => {
@@ -217,10 +255,14 @@ export function SystemLogsPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
 
-  const filteredActors = actorSearch.trim()
+  // Yêu cầu tối thiểu 2 ký tự và chỉ khớp từ ĐẦU tên/email (không match giữa chuỗi
+  // như trước) — tránh việc gõ 1 ký tự ra hàng loạt kết quả không liên quan.
+  const filteredActors = actorSearch.trim().length >= 2
     ? adminList.filter((a) => {
-        const q = actorSearch.toLowerCase()
-        return (a.full_name || "").toLowerCase().includes(q) || a.email.toLowerCase().includes(q)
+        const q = actorSearch.trim().toLowerCase()
+        const nameWords = (a.full_name || "").toLowerCase().split(/\s+/)
+        const emailLocalPart = a.email.toLowerCase().split("@")[0]
+        return nameWords.some((w) => w.startsWith(q)) || emailLocalPart.startsWith(q)
       }).slice(0, 8)
     : []
 
@@ -230,7 +272,7 @@ export function SystemLogsPage() {
     try {
       const baseParams: Record<string, any> = { limit: 100 }
       if (dateFrom) baseParams.date_from = toISOString(dateFrom)
-      if (dateTo) baseParams.date_to = toISOString(dateTo + "T23:59:59")
+      if (dateTo) baseParams.date_to = toISOString(dateTo, true)
 
       const adminParams = { ...baseParams }
       if (actionFilter) adminParams.action = actionFilter
@@ -300,6 +342,24 @@ export function SystemLogsPage() {
         return true
       })
 
+  // Số đếm cho từng tab luôn tính từ toàn bộ `logs` (chưa lọc theo tab), nên
+  // khi đổi tab các con số khác không nhảy — giống cách đã làm ở Security.
+  const tabCounts: Record<TabKey, number> = {
+    all: logs.length,
+    auth: logs.filter((l) => l.type === "Xác thực").length,
+    admin: logs.filter((l) => l.type !== "Xác thực" && l.type !== "Đơn hàng" && l.type !== "Thanh toán").length,
+    order: logs.filter((l) => l.type === "Đơn hàng").length,
+    payment: logs.filter((l) => l.type === "Thanh toán").length,
+  }
+
+  const PAGE_SIZE = 20
+  const [page, setPage] = useState(1)
+  useEffect(() => { setPage(1) }, [activeTab, actionFilter, actorFilter, dateFrom, dateTo])
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const pageLogs = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const goPrevPage = () => setPage((p) => (p === 1 ? totalPages : p - 1)) // quay vòng về trang cuối
+  const goNextPage = () => setPage((p) => (p === totalPages ? 1 : p + 1)) // quay vòng về trang đầu
+
   function handleExportCSV() {
     const BOM = "\uFEFF"
     const header = "Thời gian,Loại,Hành động,Mức độ,Tác nhân,Mô tả"
@@ -329,7 +389,7 @@ export function SystemLogsPage() {
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
-            className="px-4 py-2 rounded-xl text-sm font-bold transition-all"
+            className="px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-1.5"
             style={{
               backgroundColor: activeTab === tab.key ? C.indigo : "white",
               color: activeTab === tab.key ? "white" : "#6B7280",
@@ -337,6 +397,15 @@ export function SystemLogsPage() {
             }}
           >
             {tab.label}
+            <span
+              className="px-1.5 py-0.5 rounded-full text-[11px] font-bold tabular-nums"
+              style={{
+                backgroundColor: activeTab === tab.key ? "rgba(255,255,255,0.25)" : "#F3F4F6",
+                color: activeTab === tab.key ? "white" : "#6B7280",
+              }}
+            >
+              {tabCounts[tab.key]}
+            </span>
           </button>
         ))}
       </div>
@@ -349,7 +418,7 @@ export function SystemLogsPage() {
           className="px-3 py-2 rounded-xl text-xs border bg-white"
           style={{ borderColor: "#E5E7EB", color: C.indigo, minWidth: 160 }}
         >
-          {ACTION_OPTIONS.map((opt) => (
+          {getActionOptionsForTab(activeTab, logs).map((opt) => (
             <option key={opt.value} value={opt.value}>{opt.label}</option>
           ))}
         </select>
@@ -366,7 +435,7 @@ export function SystemLogsPage() {
               }
             }}
             onFocus={() => setShowActorDropdown(true)}
-            placeholder="Tìm tác nhân..."
+            placeholder="Tìm tác nhân (tên hoặc email)"
             className="px-3 py-2 rounded-xl text-xs border bg-white"
             style={{ borderColor: "#E5E7EB", color: C.indigo, minWidth: 180 }}
           />
@@ -460,7 +529,7 @@ export function SystemLogsPage() {
             <div className="text-xs mt-1" style={{ color: "#8A8DA8" }}>Thử thay đổi bộ lọc hoặc ngày tháng</div>
           </div>
         ) : (
-          filtered.map((log) => (
+          pageLogs.map((log) => (
             <div
               key={log.id}
               onClick={() => setDetailLog(log)}
@@ -495,6 +564,24 @@ export function SystemLogsPage() {
               </div>
             </div>
           ))
+        )}
+        {!loading && !dateError && filtered.length > 0 && totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t" style={{ borderColor: "#F0EDD8" }}>
+            <div className="text-xs" style={{ color: "#8A8DA8" }}>
+              Hiển thị {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} / {filtered.length}
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={goPrevPage} className="p-1.5 rounded-lg hover:bg-muted/30 transition-colors" title="Trang trước (quay về trang cuối nếu đang ở trang đầu)">
+                <ChevronLeft className="w-4 h-4" style={{ color: C.indigo }} />
+              </button>
+              <span className="text-xs font-bold tabular-nums" style={{ color: C.indigo }}>
+                Trang {page} / {totalPages}
+              </span>
+              <button onClick={goNextPage} className="p-1.5 rounded-lg hover:bg-muted/30 transition-colors" title="Trang sau (quay về trang đầu nếu đang ở trang cuối)">
+                <ChevronRight className="w-4 h-4" style={{ color: C.indigo }} />
+              </button>
+            </div>
+          </div>
         )}
       </div>
 

@@ -48,7 +48,7 @@ function isAdmin(user: CurrentUser) {
 
 type PaymentRecord = { status: string };
 
-const ORDER_STATUS_VALUES = ["pending_payment", "payment_failed", "confirmed", "completed", "cancelled", "refunded"] as const;
+const ORDER_STATUS_VALUES = ["pending_payment", "payment_failed", "confirmed", "cancelled", "refunded"] as const;
 type OrderStatus = typeof ORDER_STATUS_VALUES[number];
 const ORDER_PAYMENT_STATUS_VALUES = ["pending", "paid", "failed", "refunded"] as const;
 type OrderPaymentStatus = typeof ORDER_PAYMENT_STATUS_VALUES[number];
@@ -65,7 +65,6 @@ type CreateOrderInput = {
 
 function normalizeOrderStatus(status: unknown): OrderStatus {
   if (status === "pending") return "pending_payment";
-  if (status === "used") return "completed";
   if (status === "pending_manual") return "confirmed";
   return ORDER_STATUS_VALUES.includes(status as OrderStatus) ? status as OrderStatus : "pending_payment";
 }
@@ -73,7 +72,6 @@ function normalizeOrderStatus(status: unknown): OrderStatus {
 function storedStatuses(status: string) {
   if (status === "pending_payment") return ["pending_payment", "pending"];
   if (status === "confirmed") return ["confirmed", "pending_manual"];
-  if (status === "completed") return ["completed", "used"];
   return [status];
 }
 
@@ -360,11 +358,7 @@ function buildOrderListWhere(user: CurrentUser, query?: { status?: string; payme
 
   const where: Record<string, unknown> = and.length > 0 ? { AND: and } : {};
   if (query?.status) {
-    if (query.status === "complaining") {
-      where.complaints = { some: { status: "open" } };
-    } else {
-      where.status = { in: storedStatuses(query.status) };
-    }
+    where.status = { in: storedStatuses(query.status) };
   }
   if (query?.payment_status) where.payment_status = query.payment_status;
   return where;
@@ -402,7 +396,7 @@ export async function listOrders(
   const page = query?.page ?? 1;
   const limit = query?.limit ?? 20;
   const skip = (page - 1) * limit;
-  const [data, total, groupedCounts, groupedPaymentCounts, complainingCount] = await prisma.$transaction([
+  const [data, total, groupedCounts, groupedPaymentCounts] = await prisma.$transaction([
     prisma.order.findMany({
     where,
     select: {
@@ -421,11 +415,6 @@ export async function listOrders(
       payment_expires_at: true,
       created_at: true,
       users: { select: { full_name: true } },
-      complaints: {
-        where: user.role === "buyer" ? { user_id: user.id, status: "open" } : { status: "open" },
-        select: { id: true },
-        take: 1,
-      },
       payments: { select: { status: true } },
       order_items: {
         where: isPartnerStaff(user.role) && user.partnerId ? { voucher_products: { partner_id: user.partnerId } } : undefined,
@@ -451,18 +440,11 @@ export async function listOrders(
     prisma.order.count({ where }),
     prisma.order.groupBy({ by: ["status"], where: countsWhere, orderBy: { status: "asc" }, _count: { _all: true } }),
     prisma.order.groupBy({ by: ["payment_status"], where: countsWhere, orderBy: { payment_status: "asc" }, _count: { _all: true } }),
-    prisma.order.count({
-      where: {
-        ...countsWhere,
-        complaints: { some: { status: "open" } },
-      },
-    }),
   ]);
 
   const items = data.map((order) => {
-    const { complaints, order_items, payments } = order;
+    const { order_items, payments } = order;
     const summary = { ...order } as Record<string, unknown>;
-    delete summary.complaints;
     delete summary.order_items;
     delete summary.payments;
     delete summary.subtotal;
@@ -474,11 +456,10 @@ export async function listOrders(
       total_amount: isPartnerStaff(user.role)
         ? order_items.reduce((sum, item) => sum + Number(item.subtotal), 0)
         : summary.total_amount,
-      has_complaint: !isPartnerStaff(user.role) && (complaints ?? []).length > 0,
       order_items: order_items.map(({ issued_vouchers, _count, subtotal: _subtotal, ...item }) => ({
         ...item,
         issued_voucher_count: _count.issued_vouchers,
-        invalidated_voucher_count: (issued_vouchers ?? []).filter((v) => v.status === "refunded").length,
+        invalidated_voucher_count: (issued_vouchers ?? []).filter((v) => v.status === "revoked").length,
         has_review: (issued_vouchers ?? []).some((voucher) => (voucher.reviews ?? []).length > 0),
       })),
     };
@@ -486,10 +467,7 @@ export async function listOrders(
 
   return {
     ...buildPaginatedResult(items, total, { page, limit }),
-    countsByStatus: {
-      ...buildCountsByStatus(groupedCounts as Array<{ status: string; _count: { _all: number } }>),
-      complaining: complainingCount as number,
-    },
+    countsByStatus: buildCountsByStatus(groupedCounts as Array<{ status: string; _count: { _all: number } }>),
     countsByPaymentStatus: buildCountsByPaymentStatus(groupedPaymentCounts as Array<{ payment_status: string; _count: { _all: number } }>),
   };
 }
@@ -608,7 +586,7 @@ export async function getOrderReviewTargets(userId: string, orderId: string) {
     throw new HttpError(403, "Only the buyer who created the order can view review targets", "FORBIDDEN");
   }
 
-  const paidOrder = ["confirmed", "completed"].includes(normalizeOrderStatus(order.status));
+  const paidOrder = normalizeOrderStatus(order.status) === "confirmed";
   return {
     order_id: order.id,
     order_items: order.order_items.map((item) => ({
@@ -642,7 +620,7 @@ export async function cancelOrder(user: CurrentUser, id: string, reason?: string
       where: { id },
       include: {
         payments: true,
-        order_items: { include: { issued_vouchers: { include: { voucher_usages: true } } } }
+        order_items: { include: { issued_vouchers: true } }
       }
     }) as unknown as Record<string, unknown> | null,
     "Order not found"
@@ -651,8 +629,8 @@ export async function cancelOrder(user: CurrentUser, id: string, reason?: string
   assertCanMutateOrder(user, order);
   const status = normalizeOrderStatus(order.status);
 
-  if (["completed", "refunded"].includes(status)) {
-    throw new HttpError(409, "Completed or refunded orders cannot be cancelled", "ORDER_CANNOT_CANCEL");
+  if (["refunded"].includes(status)) {
+    throw new HttpError(409, "Refunded orders cannot be cancelled", "ORDER_CANNOT_CANCEL");
   }
 
   if (status === "cancelled") {
@@ -666,7 +644,7 @@ export async function cancelOrder(user: CurrentUser, id: string, reason?: string
   const orderItems = (order.order_items as Array<Record<string, unknown>>) ?? [];
   const hasUsedVoucher = orderItems.some((item) =>
     ((item.issued_vouchers as Array<Record<string, unknown>>) ?? []).some(
-      (v) => ((v.voucher_usages as unknown[]) ?? []).length > 0
+      (v) => v.status === "used"
     )
   );
   if (hasUsedVoucher) {
@@ -701,20 +679,18 @@ export async function cancelOrder(user: CurrentUser, id: string, reason?: string
       }
     }
 
-    if (wasPaid) {
-      for (const item of orderItems) {
-        const activeVoucherCount = ((item.issued_vouchers as Array<Record<string, unknown>>) ?? [])
-          .filter((voucher) => voucher.status === "active").length;
-        if (activeVoucherCount === 0) continue;
-        await tx.issuedVoucher.updateMany({
-          where: { order_item_id: item.id as string, status: "active" },
-          data: { status: "refunded" }
-        });
-        await tx.voucherProduct.update({
-          where: { id: item.voucher_product_id as string },
-          data: { remaining_quantity: { increment: activeVoucherCount } }
-        });
-      }
+    for (const item of orderItems) {
+      const activeVoucherCount = ((item.issued_vouchers as Array<Record<string, unknown>>) ?? [])
+        .filter((voucher) => voucher.status === "active").length;
+      if (activeVoucherCount === 0) continue;
+      await tx.issuedVoucher.updateMany({
+        where: { order_item_id: item.id as string, status: "active" },
+        data: { status: "revoked" }
+      });
+      await tx.voucherProduct.update({
+        where: { id: item.voucher_product_id as string },
+        data: { remaining_quantity: { increment: activeVoucherCount } }
+      });
     }
 
     await tx.orderLog.create({
@@ -821,6 +797,17 @@ export async function refundOrder(user: CurrentUser, id: string, note?: string) 
       data: { status: "refunded", payment_status: "refunded", refund_amount: order.total_amount as unknown as never, updated_at: new Date() }
     });
 
+    const allIssuedVouchers = (order.order_items as Array<Record<string, unknown>>)
+      .flatMap((item) => (item.issued_vouchers as Array<Record<string, unknown>>) ?? []);
+    for (const v of allIssuedVouchers) {
+      if (v.status === "active" || v.status === "used") {
+        await tx.issuedVoucher.update({
+          where: { id: v.id as string },
+          data: { status: "revoked", updated_at: new Date() },
+        });
+      }
+    }
+
     await tx.paymentLog.create({
       data: {
         payment_id: successPayment.id as string,
@@ -918,7 +905,6 @@ export async function createPayment(
   ) {
     const isPaid = [
       "confirmed",
-      "completed",
       "refunded",
     ].includes(orderStatus);
 
@@ -1176,7 +1162,7 @@ async function completePayment(
     });
     if (orderClaim.count === 0) {
       const currentOrder = await tx.order.findUnique({ where: { id: order.id as string }, select: { status: true } });
-      if (currentOrder && ["confirmed", "completed", "refunded"].includes(normalizeOrderStatus(currentOrder.status))) {
+      if (currentOrder && ["confirmed", "refunded"].includes(normalizeOrderStatus(currentOrder.status))) {
         throw new HttpError(409, "Payment already completed", "PAYMENT_ALREADY_COMPLETED");
       }
       throw new HttpError(409, "Order is not payable", "ORDER_NOT_PAYABLE");
@@ -1248,7 +1234,7 @@ export async function simulatePaymentSuccess(user: CurrentUser, id: string) {
   const order = payment.orders as Record<string, unknown>;
   assertOrderAccess(user, order);
   assertCanMutateOrder(user, order);
-  if (payment.status === "success" || ["confirmed", "completed", "refunded"].includes(String(order.status))) throw new HttpError(409, "Payment already completed", "PAYMENT_ALREADY_COMPLETED");
+  if (payment.status === "success" || ["confirmed", "refunded"].includes(String(order.status))) throw new HttpError(409, "Payment already completed", "PAYMENT_ALREADY_COMPLETED");
   if (!["pending_payment", "payment_failed"].includes(normalizeOrderStatus(order.status))) throw new HttpError(409, "Order is not payable", "ORDER_NOT_PAYABLE");
   if (order.payment_expires_at && new Date(order.payment_expires_at as string | Date) <= new Date()) {
     await cancelExpiredOrder(order.id as string, user.id);
@@ -1317,7 +1303,7 @@ export async function handleVnpayReturn(query: Record<string, unknown>) {
   const result = verifyVnpayReturn(query);
   const payment = await paymentByTransactionRef(result.transactionRef);
   const order = payment.orders as Record<string, unknown>;
-  if (payment.status === "success" || ["confirmed", "completed", "refunded"].includes(normalizeOrderStatus(order.status))) {
+  if (payment.status === "success" || ["confirmed", "refunded"].includes(normalizeOrderStatus(order.status))) {
     return redirectResult(order.id as string, "success");
   }
   const successfulReturn = result.validSignature && result.validTmnCode && result.responseCode === "00" && result.transactionStatus === "00" && result.amount === Number(payment.amount);
@@ -1355,7 +1341,7 @@ export async function handleVnpayReturn(query: Record<string, unknown>) {
 export async function handlePayPalReturn(token: string) {
   const payment = await paymentByTransactionRef(token);
   const order = payment.orders as Record<string, unknown>;
-  if (payment.status === "success" || ["confirmed", "completed", "refunded"].includes(normalizeOrderStatus(order.status))) return redirectResult(order.id as string, "success");
+  if (payment.status === "success" || ["confirmed", "refunded"].includes(normalizeOrderStatus(order.status))) return redirectResult(order.id as string, "success");
   if (normalizeOrderStatus(order.status) === "cancelled") return redirectResult(order.id as string, "failed");
   if (paymentWindowExpired(order)) {
     await markPaymentFailed(payment.id as string, order.user_id as string, "PAYPAL_PAYMENT_EXPIRED");

@@ -462,8 +462,9 @@ export function PartnerManagementPage() {
       setPartners((current) =>
         current.map((p) => (p.id === partnerId ? updated : p)),
       );
-    } catch (error) {
-      console.error("Không thể cập nhật trạng thái:", error);
+    } catch (error: any) {
+      const msg = error?.response?.data?.message || error?.message || "Không thể cập nhật trạng thái";
+      alert(msg);
     }
   }
 

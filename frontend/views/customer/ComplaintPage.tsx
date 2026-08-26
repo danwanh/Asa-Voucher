@@ -25,11 +25,13 @@ const REASONS = [
 
 const STATUS: Record<ComplaintStatus, { label: string; color: string; background: string }> = {
   open: { label: "Chờ tiếp nhận", color: "#B66A00", background: C.apricot + "25" },
-  resolved: { label: "Đã giải quyết", color: "#15803D", background: "#DCFCE7" },
+  contacting_partner: { label: "Đang liên hệ đối tác", color: "#B66A00", background: "#FEF3C7" },
+  reissued: { label: "Đã cấp lại", color: "#15803D", background: "#DCFCE7" },
+  refunded: { label: "Đã hoàn tiền", color: "#15803D", background: "#DCFCE7" },
 }
 
 export function ComplaintPage({ order, issuedVoucher, onBack, onSubmit }: Props) {
-  const complaint = issuedVoucher?.complaint ?? order.complaints?.[0]
+  const complaint = issuedVoucher?.complaint ?? null
   const [reason, setReason] = useState(complaint?.reason ?? "")
   const [description, setDescription] = useState(complaint?.description ?? "")
   const [responses, setResponses] = useState<ComplaintResponse[]>([])
@@ -100,8 +102,8 @@ export function ComplaintPage({ order, issuedVoucher, onBack, onSubmit }: Props)
       toast.success("Khiếu nại đã được gửi thành công")
       onSubmit()
     } catch (errorResponse) {
-      const response = errorResponse as { response?: { data?: { message?: string } } }
-      const message = response.response?.data?.message ?? "Không thể gửi khiếu nại. Vui lòng thử lại."
+      const response = errorResponse as { response?: { data?: { error?: { message?: string } } } }
+      const message = response.response?.data?.error?.message ?? "Không thể gửi khiếu nại. Vui lòng thử lại."
       setError(message)
       toast.error(message)
     } finally {

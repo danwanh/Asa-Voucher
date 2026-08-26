@@ -217,6 +217,7 @@ function StatusBadge({ status }: { status: string }) {
     used: { bg: "#E0EEFF", text: "#1A5FAD" },
     expired: { bg: "#FCEAEA", text: "#C0392B" },
     refunded: { bg: "#FFF3CD", text: "#856404" },
+    revoked: { bg: "#FFF3CD", text: "#856404" },
   }
   const c = colorMap[status] || { bg: "#F3F4F6", text: "#6B7280" }
   return (

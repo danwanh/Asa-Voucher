@@ -309,7 +309,6 @@ describe("Commerce Service", () => {
       expect(result.items[0].order_items[0].issued_voucher_count).toBe(2);
       expect(result.items[0].order_items[0].invalidated_voucher_count).toBe(0);
       expect(result.items[0].order_items[0].has_review).toBe(true);
-      expect(result.items[0].has_complaint).toBe(true);
       expect((result.countsByStatus as any).all).toBe(1);
       expect((result.countsByStatus as any).payment_failed).toBe(1);
       expect(prisma.order.findMany).toHaveBeenCalledWith(
