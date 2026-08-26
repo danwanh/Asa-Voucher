@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { AlertCircle, Eye, EyeOff, Building2, User as UserIcon, Loader2 } from "lucide-react"
+import { AlertCircle, Eye, EyeOff, Building2, User as UserIcon, Loader2, X } from "lucide-react"
 import { toast } from "sonner"
 import { C } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
@@ -8,6 +8,28 @@ import { useAuthStore } from "@/stores/authStore"
 import { authService } from "@/services/authService"
 
 type AuthPage = "login" | "register" | "forgot"
+type LegalDocument = "terms" | "privacy"
+
+const legalDocuments: Record<LegalDocument, { title: string; paragraphs: string[] }> = {
+  terms: {
+    title: "Điều khoản sử dụng",
+    paragraphs: [
+      "Điều khoản này áp dụng cho khách hàng, đối tác và nhân sự vận hành khi truy cập hoặc sử dụng ASA Voucher.",
+      "Khi tạo tài khoản, đăng voucher, đặt mua voucher hoặc sử dụng mã voucher, bạn xác nhận đã đọc và đồng ý với các điều khoản này.",
+      "Người dùng chịu trách nhiệm về tính chính xác của thông tin đăng ký và bảo mật tài khoản. Voucher chỉ có hiệu lực trong thời gian, khu vực và điều kiện áp dụng được hiển thị trong chi tiết voucher.",
+      "Yêu cầu hủy hoặc hoàn tiền được xử lý theo trạng thái đơn hàng, trạng thái sử dụng voucher và quy trình kiểm tra khiếu nại.",
+    ],
+  },
+  privacy: {
+    title: "Chính sách bảo mật",
+    paragraphs: [
+      "ASA Voucher có thể thu thập họ tên, email, số điện thoại, vai trò tài khoản, thông tin đơn hàng và dữ liệu sử dụng voucher.",
+      "Thông tin được dùng để xác thực tài khoản, xử lý đơn hàng, phát hành voucher, hỗ trợ khách hàng và cải thiện chất lượng dịch vụ.",
+      "Dữ liệu cần thiết có thể được chia sẻ với đối tác cung cấp voucher, cổng thanh toán hoặc đơn vị hỗ trợ kỹ thuật để hoàn tất giao dịch.",
+      "ASA Voucher áp dụng kiểm soát truy cập, phân quyền tài khoản và ghi nhận nhật ký để giảm rủi ro truy cập trái phép.",
+    ],
+  },
+}
 
 interface Props {
   onLogin: (u: AppUser) => void
@@ -272,6 +294,7 @@ type RegStep = "role" | "form" | "success" | "partner-pending"
 function RegisterForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
   const [step, setStep] = useState<RegStep>("role")
   const [regRole, setRegRole] = useState<"customer" | "partner">("customer")
+  const [legalDocument, setLegalDocument] = useState<LegalDocument | null>(null)
   const [form, setForm] = useState({
     name: "", email: "", phone: "", password: "", confirm: "",
     businessName: "", taxCode: "", terms: false,
@@ -566,8 +589,22 @@ function RegisterForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
             <input type="checkbox" checked={form.terms} onChange={(e) => set("terms", e.target.checked)} className="mt-0.5 rounded" />
             <span className="text-sm" style={{ color: C.indigo }}>
               Tôi đồng ý với{" "}
-              <span className="font-bold" style={{ color: C.peach }}>Điều khoản sử dụng</span> và{" "}
-              <span className="font-bold" style={{ color: C.peach }}>Chính sách bảo mật</span>
+              <button
+                type="button"
+                onClick={(event) => { event.preventDefault(); event.stopPropagation(); setLegalDocument("terms") }}
+                className="font-bold hover:underline"
+                style={{ color: C.peach }}
+              >
+                Điều khoản sử dụng
+              </button>{" "}và{" "}
+              <button
+                type="button"
+                onClick={(event) => { event.preventDefault(); event.stopPropagation(); setLegalDocument("privacy") }}
+                className="font-bold hover:underline"
+                style={{ color: C.peach }}
+              >
+                Chính sách bảo mật
+              </button>
             </span>
           </label>
           {errors.terms && <p className="text-xs mt-1" style={{ color: C.peach }}>{errors.terms}</p>}
@@ -594,6 +631,49 @@ function RegisterForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
           Đăng nhập
         </button>
       </p>
+
+      {legalDocument && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+          style={{ backgroundColor: "rgba(0,0,0,0.55)" }}
+          onClick={() => setLegalDocument(null)}
+          role="presentation"
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="legal-document-title"
+            className="relative w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setLegalDocument(null)}
+              aria-label="Đóng nội dung pháp lý"
+              className="absolute right-4 top-4 rounded-full p-1.5 hover:bg-black/5"
+              style={{ color: C.indigo }}
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <h3 id="legal-document-title" className="pr-10 text-xl font-black" style={{ color: C.indigo }}>
+              {legalDocuments[legalDocument].title}
+            </h3>
+            <div className="mt-5 max-h-[60vh] space-y-4 overflow-y-auto pr-2 text-sm leading-6" style={{ color: "#4B5563" }}>
+              {legalDocuments[legalDocument].paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
+            </div>
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setLegalDocument(null)}
+                className="rounded-xl px-5 py-2.5 text-sm font-bold text-white hover:opacity-90"
+                style={{ backgroundColor: C.teal }}
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
