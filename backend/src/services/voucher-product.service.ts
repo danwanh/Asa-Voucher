@@ -364,10 +364,19 @@ export async function listVoucherProducts(user: CurrentUser | undefined, queryIn
     }
   ]));
 
+  const rejectVoucher = await Promise.all(items.map(async (item) => {
+    const base = withWorkflow(item as unknown as Record<string, unknown>);
+    if (base.approval_status === "rejected") {
+      (base as any).rejection_reason = await getRejectReason(item.id);
+    }
+
+    return base;
+  }));
+
   return {
-    items: items.map((item) => ({
-      ...withWorkflow(item as unknown as Record<string, unknown>),
-      ...(reviewStatsByVoucher.get(item.id) ?? { average_rating: 0, review_count: 0 })
+    items: rejectVoucher.map((item) => ({
+      ...item,
+      ...(reviewStatsByVoucher.get(item.id as string) ?? { average_rating: 0, review_count: 0 })
     })),
     count,
     page,
@@ -455,7 +464,11 @@ export async function getVoucherProduct(user: CurrentUser | undefined, id: strin
   const isPublicVisible = voucher.approval_status === "approved" && workflowStatus === "active";
   if (!isPublicVisible && user) await assertVoucherOwnerOrAdmin(user, voucher);
   if (!isPublicVisible && !user) throw new HttpError(404, "Voucher product not found", "NOT_FOUND");
-  return withWorkflow(voucher);
+  const workflow = withWorkflow(voucher);
+  if (workflow.approval_status === "rejected") {
+    return {...workflow, rejection_reason: await getRejectReason(id)};
+  }
+  return workflow;
 }
 
 export async function getPublicVoucherDetail(id: string) {
@@ -847,4 +860,18 @@ export async function deleteVoucherBranch(user: CurrentUser, id: string, branchI
   const voucher = await getVoucher(id);
   await assertVoucherOwnerOrAdmin(user, voucher, false);
   await prisma.voucherProductBranch.deleteMany({ where: { voucher_product_id: id, branch_id: branchId } });
+}
+
+// Thêm cho lấy lý do từ chối
+async function getRejectReason(voucherId: string) {
+  const log = await prisma.adminLog.findFirst({
+    where: {
+      target_voucher_id: voucherId,
+      action: "REJECT_VOUCHER"
+    },
+    orderBy: {occurred_at: "desc"},
+    select: {description: true},
+  });
+
+  return log?.description?.split("Lý do: ")[1]??null;
 }

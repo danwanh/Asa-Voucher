@@ -151,6 +151,13 @@ export function PartnerVoucherDetailPage({ voucher: initialVoucher, onBack, onEd
           </div>
         </div>
 
+        {voucher.status === "rejected" && (
+          <div className="mt-4 p-3 rounded-xl border" style={{borderColor: "#FCA5A5", background: "#FEF2F2"}}>
+            <div className="text-sm font-bold" style={{color:"#C0392B"}}>Lý do từ chối</div>
+            <p className="text-sm mt-1" style={{color: "#7F1D1D"}}>{(voucher as any).rejection_reason ?? "Không có lý do"}</p>
+          </div>
+        )}
+
         {isLoadingDetail && (
           <div className="mb-4 inline-flex items-center gap-2 text-sm" style={{ color: "#8A8DA8" }}>
             <Loader2 className="w-4 h-4 animate-spin" />
