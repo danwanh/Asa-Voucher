@@ -98,6 +98,7 @@ export interface Voucher {
   originalPrice: number
   validFrom: string
   validTo: string
+  createdAt?: string
   quantity: number
   sold: number
   status: VoucherStatus

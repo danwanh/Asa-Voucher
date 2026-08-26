@@ -113,8 +113,8 @@ export function MyVouchersPage({ orders, ownerId, loading = false, onReview, onC
             const complaintStatus = issuedVoucher.complaint ? COMPLAINT_STATUS[issuedVoucher.complaint.status] : null
             const isInvalidated = issuedVoucher.status === "refunded"
             return (
-              <div key={issuedVoucher.id} className="bg-card rounded-3xl overflow-hidden shadow-sm" style={{ opacity: isInvalidated ? 0.7 : 1, borderColor: isInvalidated ? "#FCA5A5" : undefined, borderWidth: isInvalidated ? 1 : 0, borderStyle: "solid" }}>
-                <div className="p-5 flex items-start gap-4">
+              <div key={issuedVoucher.id} className="flex h-full flex-col bg-card rounded-3xl overflow-hidden shadow-sm" style={{ opacity: isInvalidated ? 0.7 : 1, borderColor: isInvalidated ? "#FCA5A5" : undefined, borderWidth: isInvalidated ? 1 : 0, borderStyle: "solid" }}>
+                <div className="flex-1 p-5 flex items-start gap-4">
                   <div className="flex-shrink-0"><MockQR code={issuedVoucher.qrPayload || issuedVoucher.code} disabled={isInvalidated} /></div>
                   <div className="flex-1 min-w-0">
                     <StatusBadge status={issuedVoucher.status} />
@@ -129,7 +129,9 @@ export function MyVouchersPage({ orders, ownerId, loading = false, onReview, onC
                     <span>{order.isGift ? "Ngày nhận" : "Ngày mua"}: {fmtDate(order.createdAt)}</span>
                     <span className="font-bold" style={{ color: C.peach }}>{fmt(item.subtotal || order.amount)}</span>
                   </div>
-                  {complaintStatus && <div className="flex items-center justify-between"><span className="text-xs font-semibold" style={{ color: "#6B7280" }}>Trạng thái khiếu nại</span><span className="px-2 py-1 rounded-lg text-xs font-bold" style={{ backgroundColor: complaintStatus.background, color: complaintStatus.color }}>{complaintStatus.label}</span></div>}
+                  <div className="min-h-7">
+                    {complaintStatus && <div className="flex items-center justify-between"><span className="text-xs font-semibold" style={{ color: "#6B7280" }}>Trạng thái khiếu nại</span><span className="px-2 py-1 rounded-lg text-xs font-bold" style={{ backgroundColor: complaintStatus.background, color: complaintStatus.color }}>{complaintStatus.label}</span></div>}
+                  </div>
                   <div className="flex items-center gap-2 flex-wrap">
                     {isInvalidated ? (
                       <span className="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg" style={{ backgroundColor: "#FEE2E2", color: "#DC2626" }}><Lock className="w-3 h-3" /> Đã khóa</span>
