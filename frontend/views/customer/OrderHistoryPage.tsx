@@ -4,7 +4,7 @@ import { Search, Star, CreditCard, MessageSquare, ChevronLeft, ChevronRight } fr
 import { C, fmt, fmtDate } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import type { OrderPaymentStatusCounts } from "@/services/orderService"
-import type { OrderListItem, OrderPaymentStatus, OrderStatus } from "@/types"
+import type { OrderListItem, OrderPaymentStatus } from "@/types"
 import { LoadingState } from "@/components/LoadingState"
 
 interface Props {
@@ -31,12 +31,11 @@ const PAYMENT_TABS: { label: string; value: OrderPaymentStatus | "all" }[] = [
   { label: "Đã hoàn tiền", value: "refunded" },
 ]
 
-function orderStatusLabel(status: OrderStatus) {
-  if (status === "pending_payment") return "Đã tạo đơn, đang chờ thanh toán"
-  if (status === "payment_failed") return "Thanh toán thất bại, có thể thử lại"
-  if (status === "confirmed") return "Thanh toán thành công, voucher đã phát hành"
-  if (status === "cancelled") return "Đơn bị hủy trước khi hoàn tất"
-  return "Đã hoàn tiền cho khách"
+function paymentStatusMeta(status: OrderPaymentStatus) {
+  if (status === "paid") return { label: "Đã thanh toán", bg: C.teal + "20", color: C.teal }
+  if (status === "failed") return { label: "Thanh toán thất bại", bg: "#FEE2E2", color: "#DC2626" }
+  if (status === "refunded") return { label: "Đã hoàn tiền", bg: "#E0EEFF", color: "#1A5FAD" }
+  return { label: "Chờ thanh toán", bg: C.apricot + "25", color: "#D97706" }
 }
 
 function itemSummary(order: OrderListItem) {
@@ -156,6 +155,7 @@ export function OrderHistoryPage({ orders, countsByStatus, onDetail, onReview, o
           const canPayAgain = order.userId === currentUserId && (order.status === "pending_payment" || order.status === "payment_failed") && (!order.paymentExpiresAt || new Date(order.paymentExpiresAt).getTime() > Date.now())
           const voucherSummary = itemSummary(order)
           const displaySummary = orderDisplaySummary(order)
+          const paymentMeta = paymentStatusMeta(order.paymentStatus)
 
           return (
             <div
@@ -169,9 +169,9 @@ export function OrderHistoryPage({ orders, countsByStatus, onDetail, onReview, o
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs" style={{ color: "#8A8DA8" }}>{fmtDate(order.createdAt)}</span>
-                  <span className="text-xs" style={{ color: "#6B7280" }}>Trạng thái:</span>
-                  <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{ backgroundColor: order.status === "confirmed" ? C.teal + "20" : order.status === "payment_failed" || order.status === "cancelled" ? "#FEE2E2" : order.status === "refunded" ? "#E0EEFF" : C.apricot + "25", color: order.status === "confirmed" ? C.teal : order.status === "payment_failed" || order.status === "cancelled" ? "#DC2626" : order.status === "refunded" ? "#1A5FAD" : "#D97706" }}>
-                     {orderStatusLabel(order.status)}
+                  <span className="text-xs" style={{ color: "#6B7280" }}>Trạng thái thanh toán:</span>
+                  <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{ backgroundColor: paymentMeta.bg, color: paymentMeta.color }}>
+                     {paymentMeta.label}
                   </span>
                 </div>
               </div>
