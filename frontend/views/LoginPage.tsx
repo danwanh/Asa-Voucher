@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { AlertCircle, Eye, EyeOff, Building2, User as UserIcon, Loader2, X } from "lucide-react"
 import { toast } from "sonner"
 import { C } from "@/utils/constants"
@@ -303,6 +303,8 @@ function RegisterForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
   const [showPw, setShowPw] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [generalErr, setGeneralErr] = useState("")
+  const [isRegistering, setIsRegistering] = useState(false)
+  const isSubmittingRef = useRef(false)
   const [resendLoading, setResendLoading] = useState(false)
   const [resendCooldown, setResendCooldown] = useState(0)
   const [resendMessage, setResendMessage] = useState("")
@@ -339,7 +341,11 @@ function RegisterForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
   }
 
   const handleFormSubmit = async () => {
+    if (isSubmittingRef.current) return
     if (!validateForm()) return
+
+    isSubmittingRef.current = true
+    setIsRegistering(true)
     setGeneralErr("")
     try {
       if (regRole === "partner") {
@@ -371,6 +377,9 @@ function RegisterForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
     } catch (error: unknown) {
       const err = error as { response?: { data?: { error?: { message?: string } } } }
       setGeneralErr(err?.response?.data?.error?.message ?? "Đăng ký thất bại")
+    } finally {
+      isSubmittingRef.current = false
+      setIsRegistering(false)
     }
   }
 
@@ -619,11 +628,11 @@ function RegisterForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
 
       <button
         onClick={handleFormSubmit}
-        disabled={isLoading}
+        disabled={isLoading || isRegistering}
         className="mt-5 w-full py-3.5 rounded-2xl font-bold text-white hover:opacity-90 active:scale-95 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
         style={{ backgroundColor: C.peach }}
       >
-        {isLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Đang xử lý...</> : "Đăng ký"}
+        {isLoading || isRegistering ? <><Loader2 className="w-4 h-4 animate-spin" /> Đang đăng ký...</> : "Đăng ký"}
       </button>
       <p className="text-center text-sm mt-5" style={{ color: "#8A8DA8" }}>
         Đã có tài khoản?{" "}
