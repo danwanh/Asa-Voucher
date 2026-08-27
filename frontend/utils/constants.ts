@@ -55,6 +55,7 @@ export const STATUS_DESCRIPTION: Record<string, string> = {
   open: "Khiếu nại đang chờ xử lý",
   contacting_partner: "Đang liên hệ đối tác",
   reissued: "Đã cấp lại voucher",
+  rejected: "Khiếu nại đã bị từ chối",
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -98,6 +99,7 @@ export function statusColor(s: string): { bg: string; text: string } {
   if (s === "revoked") return { bg: "#FFF3CD", text: "#856404" };
   if (s === "complaining") return { bg: "#FFF3CD", text: "#856404" };
   if (s === "resolved" || s === "contacting_partner") return { bg: "#E0EEFF", text: "#1A5FAD" };
+  if (s === "rejected") return { bg: "#FCEAEA", text: "#C0392B" };
   if (s === "suspended") {
     return { bg: "#FFF3CD", text: "#856404" };
   }

@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { AlertTriangle, Shield, Lock, Unlock, Eye, CheckCircle2, XCircle, Wifi, Clock, ChevronLeft, ChevronRight } from "lucide-react"
 import { toast } from "sonner"
 import { C } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader"
 import { securityService, type SecurityAlertItem } from "@/services/securityService"
 
 const TYPE_LABELS: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
@@ -28,22 +29,21 @@ export function SecurityMonitorPage() {
   const [detailAlert, setDetailAlert] = useState<SecurityAlertItem | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
 
-  useEffect(() => {
-    let mounted = true
-    async function load() {
-      setLoading(true)
-      try {
-        const result = await securityService.listAlerts({ limit: 100 })
-        if (mounted) setAllAlerts(result.items)
-      } catch {
-        if (mounted) setAllAlerts([])
-      } finally {
-        if (mounted) setLoading(false)
-      }
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const result = await securityService.listAlerts({ limit: 100 })
+      setAllAlerts(result.items)
+    } catch {
+      setAllAlerts([])
+    } finally {
+      setLoading(false)
     }
-    load()
-    return () => { mounted = false }
   }, [])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   // Table only shows the alerts matching the active filter; counts below
   // always come from allAlerts so switching tabs never moves the stat numbers.
@@ -118,10 +118,12 @@ export function SecurityMonitorPage() {
 
   return (
     <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-black" style={{ color: C.indigo, fontFamily: "'Nunito', sans-serif" }}>Giám sát Bảo mật</h1>
-        <p className="text-sm mt-1" style={{ color: "#8A8DA8" }}>Phát hiện đăng nhập bất thường, quản lý cảnh báo và khóa tài khoản nghi vấn</p>
-      </div>
+      <AdminPageHeader
+        title="Giám sát Bảo mật"
+        subtitle="Phát hiện đăng nhập bất thường, quản lý cảnh báo và khóa tài khoản nghi vấn"
+        onReload={loadData}
+        loading={loading}
+      />
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4 mb-6">

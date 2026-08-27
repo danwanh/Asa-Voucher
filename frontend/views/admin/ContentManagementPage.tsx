@@ -213,9 +213,12 @@ export function ContentManagementPage() {
 
       {/* Error */}
       {error && (
-        <div className="flex items-center gap-3 p-4 rounded-2xl" style={{ backgroundColor: "#FEE2E2" }}>
-          <AlertCircle className="w-5 h-5" style={{ color: "#B91C1C" }} />
-          <span className="text-sm font-bold" style={{ color: "#B91C1C" }}>{error}</span>
+        <div className="flex items-center justify-between gap-3 p-4 rounded-2xl" style={{ backgroundColor: "#FEE2E2" }}>
+          <div className="flex items-center gap-3">
+            <AlertCircle className="w-5 h-5" style={{ color: "#B91C1C" }} />
+            <span className="text-sm font-bold" style={{ color: "#B91C1C" }}>{error}</span>
+          </div>
+          <button onClick={loadContents} className="text-sm font-bold underline" style={{ color: "#B91C1C" }}>Thử lại</button>
         </div>
       )}
 

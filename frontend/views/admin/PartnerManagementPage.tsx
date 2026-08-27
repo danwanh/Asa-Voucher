@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { C, fmtDate } from "@/utils/constants";
 import { StatusBadge } from "@/components/StatusBadge";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import {
   partnerService,
   type PartnerProfile,
@@ -496,9 +497,11 @@ export function PartnerManagementPage() {
 
   return (
     <div className="p-4">
-      <h2 className="font-black text-lg mb-5" style={{ color: C.indigo }}>
-        Quản lý đối tác ({partners.length})
-      </h2>
+      <AdminPageHeader
+        title={`Quản lý đối tác (${partners.length})`}
+        onReload={loadPartners}
+        loading={loading}
+      />
 
       <div className="bg-card rounded-2xl p-4 mb-5 shadow-sm">
         <div className="flex flex-col lg:flex-row gap-3">

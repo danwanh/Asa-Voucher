@@ -91,8 +91,20 @@ api.interceptors.response.use(
   },
   async (error) => {
     const originalRequest = error.config as (AxiosRequestConfig & { _retry?: boolean }) | undefined
+    const status = error.response?.status
+    const errorCode = error.response?.data?.error?.code
 
-    if (!originalRequest || error.response?.status !== 401 || originalRequest._retry || isAuthEndpoint(originalRequest.url)) {
+    // Handle 403 USER_INACTIVE - account locked/deactivated
+    if (status === 403 && errorCode === "USER_INACTIVE") {
+      setAccessToken(null)
+      tokenRefreshHandler?.(null)
+      if (typeof window !== "undefined") {
+        window.location.href = "/login"
+      }
+      return Promise.reject(error)
+    }
+
+    if (!originalRequest || status !== 401 || originalRequest._retry || isAuthEndpoint(originalRequest.url)) {
       return Promise.reject(error)
     }
 

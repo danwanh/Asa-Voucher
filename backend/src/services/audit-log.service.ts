@@ -10,6 +10,7 @@ export type AuditAction =
   | "partner_approved"
   | "partner_rejected"
   | "partner_status_changed"
+  | "partner_closed"
   | "branch_created"
   | "branch_updated"
   | "branch_deleted"

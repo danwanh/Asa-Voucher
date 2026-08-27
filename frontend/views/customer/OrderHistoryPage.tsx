@@ -153,9 +153,12 @@ export function OrderHistoryPage({ orders, countsByStatus, onDetail, onReview, o
           const canReview = isCreator && order.status === "confirmed"
           const hasReview = order.items.some((item) => item.hasReview)
           const canPayAgain = order.userId === currentUserId && (order.status === "pending_payment" || order.status === "payment_failed") && (!order.paymentExpiresAt || new Date(order.paymentExpiresAt).getTime() > Date.now())
+          const isCapturedCancelled = order.status === "cancelled" && order.paymentStatus === "paid"
           const voucherSummary = itemSummary(order)
           const displaySummary = orderDisplaySummary(order)
-          const paymentMeta = paymentStatusMeta(order.paymentStatus)
+          const paymentMeta = isCapturedCancelled
+            ? { label: "Cần hoàn tiền", bg: "#FEF3C7", color: "#D97706" }
+            : paymentStatusMeta(order.paymentStatus)
 
           return (
             <div
@@ -225,13 +228,22 @@ export function OrderHistoryPage({ orders, countsByStatus, onDetail, onReview, o
                     {hasReview ? "Xem đánh giá" : "Đánh giá"}
                   </button>
                 )}
-                {onComplaint && isCreator && order.status === "confirmed" && (
+                {onComplaint && isCreator && order.status === "confirmed" && !order.hasComplaint && (
                   <button
                     onClick={() => onComplaint(order)}
                     className="text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors"
                     style={{ backgroundColor: "#EFF6FF", color: "#2563EB" }}
                   >
                     <MessageSquare className="w-3 h-3" /> Khiếu nại
+                  </button>
+                )}
+                {onComplaint && isCreator && order.status === "confirmed" && order.hasComplaint && (
+                  <button
+                    onClick={() => onComplaint(order)}
+                    className="text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors"
+                    style={{ backgroundColor: "#F0FDF4", color: "#15803D" }}
+                  >
+                    <MessageSquare className="w-3 h-3" /> Xem khiếu nại
                   </button>
                 )}
                 {canPayAgain && onPayAgain && (

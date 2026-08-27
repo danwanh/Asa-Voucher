@@ -13,6 +13,7 @@ import {
 import { Users, Store, ShoppingBag, Banknote } from "lucide-react"
 import { C, fmt, fmtDate, statusColor, STATUS_LABEL } from "@/utils/constants"
 import { StatusBadge } from "@/components/StatusBadge"
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader"
 import {
   getDashboardStats,
   type DashboardStats,
@@ -117,17 +118,12 @@ export function AdminOperationsDashboardPage() {
   return (
     <div className="p-6">
       {/* Header */}
-      <div className="mb-6">
-        <h1
-          className="text-2xl font-black"
-          style={{ color: C.indigo, fontFamily: "'Nunito', sans-serif" }}
-        >
-          Dashboard Vận hành
-        </h1>
-        <p className="text-sm mt-1" style={{ color: "#8A8DA8" }}>
-          Tổng quan người dùng, đối tác, đơn hàng và doanh thu toàn hệ thống
-        </p>
-      </div>
+      <AdminPageHeader
+        title="Dashboard Vận hành"
+        subtitle="Tổng quan người dùng, đối tác, đơn hàng và doanh thu toàn hệ thống"
+        onReload={loadDashboard}
+        loading={loading}
+      />
 
       {/* Filter */}
       <div className="bg-white rounded-2xl p-5 shadow-sm mb-6">
@@ -175,8 +171,9 @@ export function AdminOperationsDashboardPage() {
 
       {/* Error */}
       {error && (
-        <div className="mb-6 rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">
-          {error}
+        <div className="mb-6 rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-600 flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={loadDashboard} className="underline font-bold ml-2">Thử lại</button>
         </div>
       )}
 
@@ -216,7 +213,7 @@ export function AdminOperationsDashboardPage() {
         {/* Revenue */}
         <div className="lg:col-span-2 bg-white rounded-2xl p-5 shadow-sm">
           <h3 className="font-black mb-4" style={{ color: C.indigo }}>
-            Doanh thu theo tháng (triệu VNĐ)
+            Doanh thu theo tháng
           </h3>
           <ResponsiveContainer width="100%" height={200}>
             <AreaChart data={stats.revenueByMonth}>
@@ -231,7 +228,7 @@ export function AdminOperationsDashboardPage() {
               <YAxis tick={{ fontSize: 11, fill: "#8A8DA8" }} axisLine={false} tickLine={false} />
               <Tooltip
                 contentStyle={{ borderRadius: 12, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.08)" }}
-                formatter={(value) => [`${Number(value)} triệu VNĐ`, "Doanh thu"]}
+                formatter={(value) => [fmt(Number(value)), "Doanh thu"]}
               />
               <Area type="monotone" dataKey="revenue" stroke={C.teal} strokeWidth={2.5} fill={`url(#rev-${uid})`} />
             </AreaChart>

@@ -165,6 +165,8 @@ export async function resolveComplaint(user: AuthUser, id: string, input: Resolv
     newStatus = "refunded";
   } else if (input.resolution_types.includes("reissue")) {
     newStatus = "reissued";
+  } else if (input.resolution_types.includes("reject")) {
+    newStatus = "rejected";
   } else {
     newStatus = "contacting_partner";
   }
@@ -373,33 +375,33 @@ async function processReissueVoucher(
   const newOrderCode = `ORD${Date.now()}${crypto.randomInt(1000, 9999)}`;
   const unitPrice = Number(oldVoucher.voucher_products.selling_price);
 
-  const isActive = oldVoucher.status === "active";
+  const wasActive = oldVoucher.status === "active";
   const oldOrderId = oldVoucher.order_items?.order_id ?? "";
 
   await prisma.$transaction(async (tx) => {
-    // 1. Cancel old voucher if active
-    if (isActive) {
-      await tx.issuedVoucher.update({
-        where: { id: issuedVoucherId },
-        data: { status: "cancelled", updated_at: new Date() },
-      });
+    // 1. Always cancel old voucher
+    await tx.issuedVoucher.update({
+      where: { id: issuedVoucherId },
+      data: { status: "cancelled", updated_at: new Date() },
+    });
+    if (wasActive) {
       await tx.voucherProduct.update({
         where: { id: oldVoucher.voucher_product_id },
         data: { remaining_quantity: { increment: 1 } },
       });
     }
 
-    // 2. Create new order (auto-confirmed, paid, total=0, method=reissue)
+    // 2. Create new order (auto-confirmed, paid, total=0, method=vnpay)
     const newOrder = await tx.order.create({
       data: {
         order_code: newOrderCode,
         user_id: oldOrder.user_id,
         recipient_id: oldOrder.recipient_id,
         is_gift: false,
-        subtotal: unitPrice,
+        subtotal: 0,
         discount_amount: 0,
-        total_amount: unitPrice,
-        payment_method: "reissue",
+        total_amount: 0,
+        payment_method: "vnpay",
         payment_status: "paid",
         status: "confirmed",
         note: `Cấp lại từ đơn ${oldOrder.order_code} - Khiếu nại ${complaintId}`,
@@ -412,11 +414,11 @@ async function processReissueVoucher(
         order_id: newOrder.id,
         voucher_product_id: oldVoucher.voucher_product_id,
         quantity: 1,
-        unit_price: unitPrice,
-        snapped_original_price: oldVoucher.order_items?.snapped_original_price ?? unitPrice,
-        snapped_selling_price: oldVoucher.order_items?.snapped_selling_price ?? unitPrice,
-        snapped_discount_rate: oldVoucher.order_items?.snapped_discount_rate ?? 0,
-        subtotal: unitPrice,
+        unit_price: 0,
+        snapped_original_price: 0,
+        snapped_selling_price: 0,
+        snapped_discount_rate: 0,
+        subtotal: 0,
       },
     });
 
@@ -434,19 +436,7 @@ async function processReissueVoucher(
       },
     });
 
-    // 5. Create payment log for reissue
-    await tx.paymentLog.create({
-      data: {
-        payment_id: null as never,
-        order_id: newOrder.id,
-        user_id: adminId,
-        action: "REISSUE_PAYMENT",
-        status: "success",
-        amount: unitPrice as never,
-      },
-    });
-
-    // 6. Order log on new order
+    // 5. Order log on new order
     await tx.orderLog.create({
       data: {
         order_id: newOrder.id,

@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react"
 import { X, Download, ChevronLeft, ChevronRight } from "lucide-react"
 import { C } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader"
 import { securityService } from "@/services/securityService"
 import { api } from "@/services/api"
 
@@ -381,7 +382,11 @@ export function SystemLogsPage() {
 
   return (
     <div className="p-6">
-      <h2 className="font-black text-lg mb-5" style={{ color: C.indigo }}>Nhật ký hệ thống</h2>
+      <AdminPageHeader
+        title="Nhật ký hệ thống"
+        onReload={fetchLogs}
+        loading={loading}
+      />
 
       {/* Filters row 1: Tabs */}
       <div className="flex items-center gap-2 mb-3 flex-wrap">

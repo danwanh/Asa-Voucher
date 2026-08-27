@@ -5,8 +5,8 @@ export type ComplaintReason =
   | "wrong_value"
   | "other";
 
-export type ComplaintStatus = "open" | "contacting_partner" | "reissued" | "refunded";
-export type ComplaintResolutionType = "refund" | "reissue" | "no_action";
+export type ComplaintStatus = "open" | "contacting_partner" | "reissued" | "refunded" | "rejected";
+export type ComplaintResolutionType = "refund" | "reissue" | "no_action" | "reject";
 export type ComplaintResponderRole = "admin" | "partner" | "user";
 
 export interface ComplaintRow {

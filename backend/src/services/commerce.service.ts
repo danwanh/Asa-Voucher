@@ -414,6 +414,7 @@ export async function listOrders(
       payment_method: true,
       payment_expires_at: true,
       created_at: true,
+      _count: { select: { complaints: true } },
       users: { select: { full_name: true } },
       payments: { select: { status: true } },
       order_items: {
@@ -449,10 +450,13 @@ export async function listOrders(
     delete summary.payments;
     delete summary.subtotal;
     delete summary.discount_amount;
+    const orderCount = (order as any)._count;
+    delete summary._count;
     return {
       ...summary,
       status: normalizeOrderStatus(order.status),
       payment_status: order.payment_status ?? derivePaymentStatus((payments ?? []) as PaymentRecord[]),
+      has_complaint: (orderCount?.complaints ?? 0) > 0,
       total_amount: isPartnerStaff(user.role)
         ? order_items.reduce((sum, item) => sum + Number(item.subtotal), 0)
         : summary.total_amount,

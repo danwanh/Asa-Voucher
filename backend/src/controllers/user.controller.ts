@@ -283,7 +283,7 @@ export async function lookupRecipient(req: Request, res: Response) {
 }
 
 export async function updateUser(req: Request, res: Response) {
-  const isAdmin = req.user!.role === "admin_operations";
+  const isAdmin = ["admin_operations", "admin_security"].includes(req.user!.role);
   if (
     isAdmin &&
     req.user!.id === req.params.id &&
@@ -372,6 +372,9 @@ export async function updateUser(req: Request, res: Response) {
     if ("dob" in req.body) {
       updateData.dob = req.body.dob ? new Date(req.body.dob) : null;
     }
+    if (isAdmin && req.body.is_active === false && req.user!.id !== req.params.id) {
+      updateData.auth_version = { increment: 1 };
+    }
     const user = await prisma.user.update({ where: { id: req.params.id }, data: updateData as never });
     if (isAdmin && req.user!.id !== req.params.id) {
       const changes = Object.keys(req.body).filter((k) => k !== "updated_at").join(", ");
@@ -432,6 +435,7 @@ export async function deleteUser(req: Request, res: Response) {
       where: { id: req.params.id },
       data: {
         is_active: false,
+        auth_version: { increment: 1 },
         updated_at: new Date(),
       },
     });

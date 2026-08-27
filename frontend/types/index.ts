@@ -258,7 +258,7 @@ export interface ReviewTarget {
   review?: Review
 }
 
-export type ComplaintStatus = "open" | "contacting_partner" | "reissued" | "refunded"
+export type ComplaintStatus = "open" | "contacting_partner" | "reissued" | "refunded" | "rejected"
 
 export interface Complaint {
   id: string
