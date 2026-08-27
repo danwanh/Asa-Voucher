@@ -23,6 +23,12 @@ export async function updatePartner(req: Request, res: Response) {
 
 export async function deletePartner(req: Request, res: Response) {
   await partnerService.deletePartner(req.params.id);
+  await writeAuditLog({
+    adminId: req.user!.id,
+    action: "partner_closed",
+    description: "Đóng đối tác",
+    targetPartnerId: req.params.id,
+  });
   noContent(res);
 }
 
@@ -102,10 +108,24 @@ export async function getBranchController(req: Request, res: Response) {
 }
 
 export async function updateBranch(req: Request, res: Response) {
+  const branch = await partnerService.getBranchById(req.user!, req.params.id);
   ok(res, await partnerService.updateBranch(req.user!, req.params.id, req.body), "Branch updated");
+  await writeAuditLog({
+    adminId: req.user!.id,
+    action: "branch_updated",
+    description: "Cập nhật chi nhánh",
+    targetPartnerId: (branch as Record<string, unknown>).partner_id as string,
+  });
 }
 
 export async function deleteBranch(req: Request, res: Response) {
+  const branch = await partnerService.getBranchById(req.user!, req.params.id);
   await partnerService.deleteBranch(req.user!, req.params.id);
+  await writeAuditLog({
+    adminId: req.user!.id,
+    action: "branch_deleted",
+    description: "Ngưng hoạt động chi nhánh",
+    targetPartnerId: (branch as Record<string, unknown>).partner_id as string,
+  });
   noContent(res);
 }

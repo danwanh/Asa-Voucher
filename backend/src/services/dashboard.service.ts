@@ -28,30 +28,30 @@ export const getDashboardStats = async ({
 
   const now = new Date()
   const monthsBack = 6
-  const startDate = new Date(now.getFullYear(), now.getMonth() - monthsBack + 1, 1)
+  const chartStartDate = new Date(now.getFullYear(), now.getMonth() - monthsBack + 1, 1)
 
-  const chartFrom = from && new Date(from) > startDate ? new Date(from) : startDate
-  const chartTo = toForFilter ?? now
-
-  const [users, partners, orders, revenue, paidPayments, recentPartners, recentOrdersRaw] = await Promise.all([
+  const [users, partners, orders, revenueAgg, paidOrdersForChart, recentPartners, recentOrdersRaw] = await Promise.all([
     prisma.user.count({ where: { role: "buyer", ...createdAtFilter } }),
     prisma.partner.count({ where: { approval_status: "approved", status: "active", ...createdAtFilter } }),
     prisma.order.count({ where: createdAtFilter }),
-    prisma.payment.aggregate({
-      _sum: { amount: true },
+    prisma.order.aggregate({
+      _sum: { total_amount: true, refund_amount: true },
       where: {
-        status: "success",
-        ...(from || to
-          ? { paid_at: { ...(from ? { gte: from } : {}), ...(toForFilter ? { lte: toForFilter } : {}) } }
-          : {}),
+        status: "confirmed",
+        payment_status: "paid",
+        ...createdAtFilter,
       },
     }),
-    prisma.payment.findMany({
-      where: { status: "success", paid_at: { gte: chartFrom, lte: chartTo } },
-      select: { paid_at: true, amount: true },
+    prisma.order.findMany({
+      where: {
+        status: "confirmed",
+        payment_status: "paid",
+        created_at: { gte: chartStartDate, lte: now },
+      },
+      select: { created_at: true, total_amount: true, refund_amount: true },
     }),
     prisma.partner.findMany({
-      where: { created_at: { gte: startDate, ...(createdAtFilter.created_at ?? {}) } },
+      where: { created_at: { gte: chartStartDate, lte: now } },
       select: { created_at: true },
     }),
     prisma.order.findMany({
@@ -76,15 +76,15 @@ export const getDashboardStats = async ({
   })
 
   const revenueMap = new Map<string, number>()
-  for (const p of paidPayments) {
-    if (!p.paid_at) continue
-    const key = toMonthKey(new Date(p.paid_at))
-    revenueMap.set(key, (revenueMap.get(key) ?? 0) + Number(p.amount))
+  for (const o of paidOrdersForChart) {
+    const key = toMonthKey(new Date(o.created_at))
+    const net = Number(o.total_amount) - Number(o.refund_amount ?? 0)
+    revenueMap.set(key, (revenueMap.get(key) ?? 0) + net)
   }
 
   const revenueByMonth = monthLabels.map((month) => ({
     month,
-    revenue: Math.round((revenueMap.get(month) ?? 0) / 1_000_000),
+    revenue: revenueMap.get(month) ?? 0,
   }))
 
   const partnerMap = new Map<string, number>()
@@ -135,7 +135,7 @@ export const getDashboardStats = async ({
     users,
     partners,
     orders,
-    revenue: revenue._sum.amount ?? 0,
+    revenue: Number(revenueAgg._sum.total_amount ?? 0) - Number(revenueAgg._sum.refund_amount ?? 0),
     revenueByMonth,
     partnersByMonth,
     recentOrders,

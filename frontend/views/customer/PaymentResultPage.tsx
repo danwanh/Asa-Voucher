@@ -59,12 +59,14 @@ export function PaymentResultPage({ orderId, callbackStatus }: { orderId?: strin
   const succeeded = order?.status === "confirmed"
   const refunded = order?.status === "refunded"
   const pending = order?.status === "pending_payment" || callbackStatus === "pending"
+  const capturedButCancelled = order?.status === "cancelled" && order?.paymentStatus === "paid"
   const Icon = succeeded ? CheckCircle2 : pending || refunded ? Clock3 : XCircle
-  const color = succeeded ? C.teal : refunded ? "#2563EB" : pending ? "#D97706" : "#DC2626"
-  const title = succeeded ? "Thanh toán thành công" : refunded ? "Đơn hàng đã được hoàn tiền" : pending ? "Thanh toán đang được xử lý" : "Thanh toán chưa thành công"
+  const color = succeeded ? C.teal : refunded ? "#2563EB" : capturedButCancelled ? "#D97706" : pending ? "#D97706" : "#DC2626"
+  const title = succeeded ? "Thanh toán thành công" : refunded ? "Đơn hàng đã được hoàn tiền" : capturedButCancelled ? "Thanh toán thành công nhưng đơn hàng bị hủy" : pending ? "Thanh toán đang được xử lý" : "Thanh toán chưa thành công"
   const description = succeeded
     ? order?.isGift ? "Voucher đã được phát hành cho người nhận." : "Voucher của bạn đã được phát hành."
     : refunded ? "Khoản thanh toán của đơn hàng này đã được hoàn lại."
+      : capturedButCancelled ? "Tiền đã được trừ. Vui lòng liên hệ hỗ trợ để được hoàn tiền hoặc cấp lại voucher."
       : pending ? "Hệ thống chưa nhận được xác nhận cuối cùng. Bạn có thể kiểm tra lại trong lịch sử đơn hàng."
       : "Giao dịch không hoàn tất. Bạn có thể thử thanh toán lại nếu đơn hàng còn hạn."
   const errorTitle = loadError === "forbidden" ? "Bạn không có quyền xem đơn hàng này" : loadError === "not-found" ? "Không tìm thấy đơn hàng" : "Không thể tải kết quả thanh toán"

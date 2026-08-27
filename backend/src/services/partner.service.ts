@@ -76,6 +76,11 @@ export async function deletePartner(id: string) {
     if (activeVoucherCount > 0) {
       throw new HttpError(409, "Đối tác còn voucher đang hoạt động, không thể đóng", "PARTNER_HAS_ACTIVE_VOUCHERS");
     }
+    // Kick ALL users belonging to this partner
+    await prisma.user.updateMany({
+      where: { partner_id: id },
+      data: { is_active: false, auth_version: { increment: 1 } },
+    });
     await prisma.partner.update({ where: { id }, data: { status: "closed", updated_at: new Date() } });
   } catch (error) {
     if (error instanceof HttpError) throw error;
@@ -111,6 +116,11 @@ export async function updatePartnerStatus(id: string, status: string) {
       if (activeVoucherCount > 0) {
         throw new HttpError(409, "Đối tác còn voucher đang hoạt động, không thể thay đổi trạng thái", "PARTNER_HAS_ACTIVE_VOUCHERS");
       }
+      // Kick ALL users belonging to this partner
+      await prisma.user.updateMany({
+        where: { partner_id: id },
+        data: { is_active: false, auth_version: { increment: 1 } },
+      });
     }
     return await prisma.partner.update({ where: { id }, data: { status, updated_at: new Date() } });
   } catch (error) {

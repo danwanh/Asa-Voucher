@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, useCallback } from "react"
 import { Search, MoreVertical, X, Pencil, Eye, EyeOff, Lock, Unlock } from "lucide-react"
 import { toast } from "sonner"
 import { C, fmtDate } from "@/utils/constants"
 import { StatusBadge } from "@/components/StatusBadge"
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader"
 import { getUsers, getUser, createUser, updateUser } from "@/services/userService"
 import { partnerService, type PartnerProfile, type PartnerBranch } from "@/services/partnerService"
 import type { AdminUser, Role, UserQuery } from "@/types"
@@ -159,26 +160,26 @@ export function UserManagementPage() {
     return () => clearTimeout(timer)
   }, [filters])
 
-  useEffect(() => {
-    async function loadUsers() {
-      try {
-        setLoading(true)
-        setError("")
+  const loadUsers = useCallback(async () => {
+    try {
+      setLoading(true)
+      setError("")
 
-        const result = await getUsers(buildUserQuery(page, limit, appliedFilters))
+      const result = await getUsers(buildUserQuery(page, limit, appliedFilters))
 
-        setUsers(result.data.items)
-        setTotal(result.data.count)
-      } catch (error) {
-        console.error("Failed to load users:", error)
-        setError("Không thể tải danh sách người dùng")
-      } finally {
-        setLoading(false)
-      }
+      setUsers(result.data.items)
+      setTotal(result.data.count)
+    } catch (error) {
+      console.error("Failed to load users:", error)
+      setError("Không thể tải danh sách người dùng")
+    } finally {
+      setLoading(false)
     }
-
-    loadUsers()
   }, [page, appliedFilters])
+
+  useEffect(() => {
+    loadUsers()
+  }, [loadUsers])
 
   function getRoleLabel(role: AdminUser["role"]) {
     const labels: Record<AdminUser["role"], string> = {
@@ -335,18 +336,20 @@ export function UserManagementPage() {
   return (
     <div className="p-6">
       <div className="mb-5 space-y-4">
-        <div className="flex items-center justify-between gap-4">
-          <h2 className="font-black text-lg" style={{ color: C.indigo }}>
-            Quản lý người dùng ({total})
-          </h2>
-          <button
-            onClick={() => setShowCreate(true)}
-            className="px-4 py-2 rounded-xl text-sm font-bold text-white"
-            style={{ backgroundColor: C.indigo }}
-          >
-            + Thêm người dùng
-          </button>
-        </div>
+        <AdminPageHeader
+          title={`Quản lý người dùng (${total})`}
+          onReload={loadUsers}
+          loading={loading}
+          actions={
+            <button
+              onClick={() => setShowCreate(true)}
+              className="px-4 py-2 rounded-xl text-sm font-bold text-white"
+              style={{ backgroundColor: C.indigo }}
+            >
+              + Thêm người dùng
+            </button>
+          }
+        />
 
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-[1.2fr_1.4fr_1fr_1.1fr_1fr_auto]">
           <label className="space-y-1">

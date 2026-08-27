@@ -3,6 +3,7 @@ import { C, fmt, fmtDate, STATUS_DESCRIPTION } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import { ImageLightbox } from "@/components/ImageLightbox"
 import { StatusBadge } from "@/components/StatusBadge"
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader"
 import { orderService, type OrderStatusCounts } from "@/services/orderService"
 import type { Order, OrderListItem } from "@/types"
 
@@ -208,17 +209,12 @@ export function AdminOrdersPage() {
   return (
     <div className="min-h-screen p-6" style={{ backgroundColor: C.content }}>
       <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-xl font-black" style={{ color: C.indigo }}>
-            Quản lý đơn hàng
-          </h1>
-          <span
-            className="text-sm font-semibold px-3 py-1 rounded-full"
-            style={{ backgroundColor: C.eggshell, color: C.indigo }}
-          >
-            {loading ? "Đang tải..." : `${orders.length}/${total} đơn`}
-          </span>
-        </div>
+        <AdminPageHeader
+          title="Quản lý đơn hàng"
+          subtitle={loading ? "Đang tải..." : `${orders.length}/${total} đơn`}
+          onReload={fetchOrders}
+          loading={loading}
+        />
 
         <div className="bg-white rounded-2xl shadow-sm p-4 mb-5">
           <div className="flex flex-wrap gap-2 mb-4">

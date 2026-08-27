@@ -35,6 +35,7 @@ const COMPLAINT_STATUS: Record<ComplaintStatus, { label: string; color: string; 
   contacting_partner: { label: "Đang liên hệ đối tác", color: "#B66A00", background: "#FEF3C7" },
   reissued: { label: "Đã cấp lại", color: "#15803D", background: "#DCFCE7" },
   refunded: { label: "Đã hoàn tiền", color: "#15803D", background: "#DCFCE7" },
+  rejected: { label: "Đã từ chối", color: "#C0392B", background: "#FEE2E2" },
 }
 
 function buildEntries(orders: Order[]): VoucherEntry[] {

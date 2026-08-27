@@ -3,6 +3,7 @@ import { C, fmt, fmtDate, STATUS_LABEL } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
 import { ImageLightbox } from "@/components/ImageLightbox"
 import { StatusBadge } from "@/components/StatusBadge"
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader"
 import { feedbackService, type ComplaintListItem, type ComplaintDetail } from "@/services/feedbackService"
 
 type ComplaintAction = "accept_refund" | "accept_reissue" | "reject" | "external"
@@ -35,6 +36,10 @@ export function AdminComplaintsPage() {
   const [dialogComplaint, setDialogComplaint] = useState<ComplaintListItem | null>(null)
   const [resolutionNote, setResolutionNote] = useState("")
   const [actionLoading, setActionLoading] = useState(false)
+  const [partnerSearch, setPartnerSearch] = useState("")
+  const [partnerResults, setPartnerResults] = useState<Array<{ id: string; businessName: string; representativeName?: string; representativeEmail?: string; representativePhone?: string }>>([])
+  const [selectedPartner, setSelectedPartner] = useState<{ id: string; businessName: string; representativeName?: string; representativeEmail?: string; representativePhone?: string } | null>(null)
+  const [partnerSearchLoading, setPartnerSearchLoading] = useState(false)
 
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null)
   const [lightbox, setLightbox] = useState<{ images: string[]; index: number } | null>(null)
@@ -121,7 +126,29 @@ export function AdminComplaintsPage() {
     setDialogAction(null)
     setDialogComplaint(null)
     setResolutionNote("")
+    setPartnerSearch("")
+    setPartnerResults([])
+    setSelectedPartner(null)
   }
+
+  useEffect(() => {
+    if (dialogAction !== "external" || !partnerSearch.trim() || partnerSearch.trim().length < 2) {
+      setPartnerResults([])
+      return
+    }
+    const timer = setTimeout(async () => {
+      setPartnerSearchLoading(true)
+      try {
+        const results = await feedbackService.searchPartners(partnerSearch.trim())
+        setPartnerResults(results)
+      } catch {
+        setPartnerResults([])
+      } finally {
+        setPartnerSearchLoading(false)
+      }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [partnerSearch, dialogAction])
 
   const executeAction = async () => {
     if (!dialogAction || !dialogComplaint) return
@@ -143,7 +170,7 @@ export function AdminComplaintsPage() {
       } else if (dialogAction === "reject") {
         await feedbackService.resolveComplaint(complaint.id, {
           resolutionNote: resolutionNote || "Từ chối khiếu nại",
-          resolutionTypes: ["no_action"],
+          resolutionTypes: ["reject"],
         })
         showToast("success", "Đã từ chối khiếu nại")
       } else if (dialogAction === "external") {
@@ -173,22 +200,18 @@ export function AdminComplaintsPage() {
     { v: "contacting_partner", l: "Liên hệ đối tác", color: "#1A5FAD" },
     { v: "reissued", l: "Đã cấp lại", color: "#7C3AED" },
     { v: "refunded", l: "Đã hoàn tiền", color: "#2D7A52" },
+    { v: "rejected", l: "Đã từ chối", color: "#C0392B" },
   ]
 
   return (
     <div className="min-h-screen p-6" style={{ backgroundColor: C.content }}>
       <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-xl font-black" style={{ color: C.indigo }}>
-            Quản lý khiếu nại
-          </h1>
-          <span
-            className="text-sm font-semibold px-3 py-1 rounded-full"
-            style={{ backgroundColor: C.eggshell, color: C.indigo }}
-          >
-            {loading ? "Đang tải..." : `${complaints.length}/${total} khiếu nại`}
-          </span>
-        </div>
+        <AdminPageHeader
+          title="Quản lý khiếu nại"
+          subtitle={loading ? "Đang tải..." : `${complaints.length}/${total} khiếu nại`}
+          onReload={fetchComplaints}
+          loading={loading}
+        />
 
         {/* Filter Tabs */}
         <div className="bg-white rounded-2xl shadow-sm p-4 mb-5">
@@ -500,6 +523,44 @@ export function AdminComplaintsPage() {
                 {dialogAction === "reject" && "Khiếu nại sẽ bị từ chối, không có hành động nào được thực hiện."}
                 {dialogAction === "external" && "Khiếu nại sẽ được đánh dấu đã liên hệ đối tác."}
               </p>
+              {dialogAction === "external" && (
+                <div className="mb-3 relative">
+                  <input
+                    value={partnerSearch}
+                    onChange={(e) => { setPartnerSearch(e.target.value); setSelectedPartner(null) }}
+                    placeholder="Tìm tên đối tác..."
+                    className="w-full px-3 py-2 rounded-xl border text-sm"
+                    style={{ borderColor: "#E2DFC8" }}
+                  />
+                  {partnerSearchLoading && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs" style={{ color: "#8A8DA8" }}>Đang tìm...</div>
+                  )}
+                  {partnerResults.length > 0 && !selectedPartner && (
+                    <div className="absolute z-10 w-full bg-white border rounded-xl shadow-lg mt-1 max-h-48 overflow-auto" style={{ borderColor: "#E2DFC8" }}>
+                      {partnerResults.map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedPartner(p)
+                            setPartnerSearch(p.businessName)
+                            setResolutionNote(
+                              `Liên hệ đối tác ${p.businessName}\nChủ đối tác: ${p.representativeName ?? ""}\nSĐT: ${p.representativePhone ?? "Không có"}\nEmail: ${p.representativeEmail ?? "Không có"}`
+                            )
+                          }}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 border-b last:border-0"
+                          style={{ borderColor: "#F0F0F0" }}
+                        >
+                          <div className="font-semibold" style={{ color: C.indigo }}>{p.businessName}</div>
+                          <div className="text-xs" style={{ color: "#8A8DA8" }}>
+                            {p.representativeName} · {p.representativePhone ?? "Không có SĐT"}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               <textarea
                 value={resolutionNote}
                 onChange={(e) => setResolutionNote(e.target.value)}

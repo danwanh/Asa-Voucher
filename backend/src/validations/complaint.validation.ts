@@ -7,8 +7,8 @@ const reasonEnum = z.enum([
   "wrong_value",
   "other",
 ]);
-const statusEnum = z.enum(["open", "contacting_partner", "reissued", "refunded"]);
-const resolutionTypeEnum = z.enum(["refund", "reissue", "no_action"]);
+const statusEnum = z.enum(["open", "contacting_partner", "reissued", "refunded", "rejected"]);
+const resolutionTypeEnum = z.enum(["refund", "reissue", "no_action", "reject"]);
 
 export const listComplaintsQuerySchema = z.object({
   status: statusEnum.optional(),
