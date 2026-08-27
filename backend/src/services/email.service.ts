@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer";
 import { isIP } from "node:net";
 import { resolve4 } from "node:dns/promises";
+import { Resend } from "resend";
 import { env } from "../config/env.js";
 import { HttpError } from "../utils/http-error.js";
 
@@ -30,6 +31,58 @@ async function getTransporter() {
   });
 }
 
+async function sendWithResend(to: string, subject: string, html: string) {
+  if (!env.RESEND_API_KEY) throw new Error("RESEND_API_KEY is not configured");
+
+  const resend = new Resend(env.RESEND_API_KEY);
+  const { data, error } = await resend.emails.send({
+    from: env.EMAIL_FROM,
+    to: [to],
+    subject,
+    html
+  });
+
+  if (error) throw new Error(error.message);
+
+  console.log(JSON.stringify({
+    event: "email.sent",
+    provider: "resend",
+    to,
+    messageId: data?.id
+  }));
+}
+
+async function sendWithSendGrid(to: string, subject: string, html: string) {
+  if (!env.SENDGRID_API_KEY) throw new Error("SENDGRID_API_KEY is not configured");
+
+  const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.SENDGRID_API_KEY}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      personalizations: [{ to: [{ email: to }] }],
+      from: { email: env.EMAIL_FROM.match(/<([^>]+)>/)?.[1]?.trim() ?? env.EMAIL_FROM.trim(), name: "Asa Voucher" },
+      subject,
+      content: [{ type: "text/html", value: html }]
+    }),
+    signal: AbortSignal.timeout(15_000)
+  });
+
+  if (!response.ok) {
+    const details = await response.text();
+    throw new Error(`SendGrid ${response.status}: ${details || response.statusText}`);
+  }
+
+  console.log(JSON.stringify({
+    event: "email.sent",
+    provider: "sendgrid",
+    to,
+    statusCode: response.status
+  }));
+}
+
 function mailFrom() {
   const smtpUser = env.SMTP_USER;
   if (!smtpUser) return env.EMAIL_FROM;
@@ -44,9 +97,18 @@ function mailFrom() {
 }
 
 export async function sendEmail(to: string, subject: string, html: string) {
-  const smtpUser = requireSmtpAuth().user;
-
   try {
+    if (env.EMAIL_PROVIDER === "sendgrid") {
+      await sendWithSendGrid(to, subject, html);
+      return;
+    }
+
+    if (env.EMAIL_PROVIDER === "resend") {
+      await sendWithResend(to, subject, html);
+      return;
+    }
+
+    const smtpUser = requireSmtpAuth().user;
     const result = await (await getTransporter()).sendMail({
       from: mailFrom(),
       to,
@@ -56,6 +118,7 @@ export async function sendEmail(to: string, subject: string, html: string) {
     });
     console.log(JSON.stringify({
       event: "email.sent",
+      provider: "smtp",
       to,
       messageId: result.messageId,
       accepted: result.accepted,

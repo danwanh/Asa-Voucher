@@ -29,6 +29,7 @@
     "morgan": "^1.10.0",
     "node-cron": "^4.6.0",
     "nodemailer": "^9.0.3",
+    "resend": "^6.24.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
