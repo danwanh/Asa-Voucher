@@ -28,7 +28,7 @@ function voucherStaffPageFromPath(pathname: string, fallback: VoucherStaffPage =
   if (last === "new" || last === "create") return "create"
   if (segments[1] === "vouchers" && segments.length >= 3) return last === "edit" ? "edit" : "voucher-detail"
   if (last === "vouchers") return "vouchers"
-  if (last === "reports") return "staff-reports"
+  if (last === "staff-reports" || last === "reports") return "staff-reports"
   if (last === "check-voucher") return "check-voucher"
   return fallback
 }
@@ -158,7 +158,9 @@ export function VoucherStaffApp({ user, onLogout, initialPage, initialVoucherId 
       {/* Header */}
       <div className="p-5 border-b" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
         <div className="flex items-center gap-2.5 mb-4">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center font-black text-sm" style={{ backgroundColor: ACCENT, color: "white" }}>A</div>
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center font-black text-sm" style={{ backgroundColor: ACCENT, color: "white" }}>
+              <img src="/logo.png" alt="Asa" className="h-8 w-8 object-contain" />
+            </div>
           <span className="font-black text-white text-sm">Asa Vouchers</span>
         </div>
         {/* Role badge */}
