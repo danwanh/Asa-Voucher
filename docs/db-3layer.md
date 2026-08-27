@@ -150,8 +150,7 @@ erDiagram
     categories ||--o{ voucher_products : categorizes
     voucher_products ||--o{ cart_items : contains
     voucher_products ||--o{ order_items : contains
-    voucher_products ||--o{ voucher_product_branches : applies_at
-    partner_branches ||--o{ voucher_product_branches : hosts
+    voucher_products }|--o{ partner_branches : hosts
     voucher_products ||--o{ issued_vouchers : issues
     voucher_products ||--o{ reviews : receives
     carts ||--o{ cart_items : contains
@@ -673,19 +672,137 @@ erDiagram
         text reason
         timestamptz created_at
     }
+
+    users ||--o{ refresh_tokens : has
+    users ||--o{ authentication_logs : generates
+    users ||--o{ admin_logs : performs
+    users ||--o{ admin_logs : targets
+    users ||--o{ order_logs : creates
+    users ||--o{ payment_logs : creates
+    users ||--o{ auth_tokens : owns
+    users ||--o{ security_alerts : has
+    users ||--o{ cms_contents : creates
+    users ||--o{ voucher_check_logs : performs
+    users ||--o{ partners : represents
+    users ||--o{ partners : approves
+    users ||--o{ partner_branches : staffs
+    users ||--o{ voucher_products : manages
+    users ||--o{ orders : places
+    users ||--o{ orders : receives
+    users ||--o{ issued_vouchers : owns
+    users ||--o{ issued_vouchers : redeems
+    users ||--o{ reviews : writes
+    users ||--o{ complaints : submits
+    users ||--o{ complaints : assigns
+    users ||--o{ complaint_responses : responds
+
+    partners ||--o{ partner_branches : has
+    partners ||--o{ voucher_products : lists
+    partners ||--o{ admin_logs : targets
+    partner_branches ||--o{ voucher_product_branches : hosts
+    partner_branches ||--o{ issued_vouchers : redeems
+    voucher_products ||--o{ voucher_product_images : has
+    voucher_products ||--o{ voucher_product_branches : applies_at
+    voucher_products ||--o{ cart_items : appears_in
+    voucher_products ||--o{ order_items : appears_in
+    voucher_products ||--o{ issued_vouchers : issues
+    voucher_products ||--o{ admin_logs : targets
+    voucher_products ||--o{ reviews : receives
+    categories ||--o{ categories : parent
+    categories ||--o{ voucher_products : contains
+    carts ||--o{ cart_items : contains
+    orders ||--o{ order_items : contains
+    orders ||--o{ payments : has
+    orders ||--o{ order_logs : logs
+    orders ||--o{ payment_logs : logs
+    orders ||--o{ complaints : concerns
+    payments ||--o{ payment_logs : logs
+    order_items ||--o{ issued_vouchers : generates
+    issued_vouchers ||--o{ reviews : supports
+    issued_vouchers ||--o{ complaints : concerns
+    complaints ||--o{ complaint_responses : receives
 ```
 
 ### Physical constraints
 
-- PK và FK trong sơ đồ trên khớp các constraint trong `db.sql`.
-- UNIQUE: `refresh_tokens.token_hash`, `partners.business_code`,
+- **Primary key:** Mỗi bảng nghiệp vụ trong Physical ERD có khóa chính trên
+  `id`. Các bảng associative trong SQL là `voucher_product_branches` vẫn có
+  `id` riêng và khóa chính `voucher_product_branches_pkey`.
+- **Unique:** `refresh_tokens.token_hash`, `partners.business_code`,
   `partners.tax_number`, `categories.slug`, `carts.user_id`,
   `orders.order_code`, `issued_vouchers.voucher_code` và
-  `issued_vouchers.qr_code_payload`.
-- CHECK được khai báo cho role/gender, loại đối tác, trạng thái đối tác,
-  voucher, phương thức thanh toán, trạng thái payment và số lượng/validity.
-- `db.sql` có các chuỗi `NOT VALI)` sau một số CHECK của orders/payments;
-  đây là lỗi cú pháp của SQL nguồn, không phải bảng hoặc cột bổ sung.
+  `issued_vouchers.qr_code_payload` là các giá trị duy nhất.
+- **Foreign key:**
+  `users.partner_branches_id` -> `partner_branches.id`;
+    `users.partner_id` -> `partners.id`.
+  `refresh_tokens.user_id`, `authentication_logs.user_id`,
+    `auth_tokens.user_id`, `security_alerts.user_id`,
+    `security_alerts.reviewed_by`, `cms_contents.created_by`,
+    `voucher_check_logs.user_id` -> `users.id`.
+  `admin_logs.admin_id`, `target_user_id` -> `users.id`;
+    `target_partner_id` -> `partners.id`; `target_voucher_id` ->
+    `voucher_products.id`; `target_order_id` -> `orders.id`.
+  `partners.representative_user_id`, `partners.approved_by` -> `users.id`;
+    `partner_branches.partner_id` -> `partners.id`.
+  `categories.parent_id` -> `categories.id`;
+    `voucher_products.partner_id` -> `partners.id`,
+    `category_id` -> `categories.id`, and `approved_by`, `created_by`,
+    `submitted_by` -> `users.id`.
+  `voucher_product_images.voucher_product_id` -> `voucher_products.id`;
+    `voucher_product_branches.voucher_product_id` -> `voucher_products.id`;
+    `branch_id` -> `partner_branches.id`.
+  `carts.user_id` -> `users.id`; `cart_items.cart_id` -> `carts.id`;
+    `cart_items.voucher_product_id` -> `voucher_products.id`.
+  `orders.user_id`, `orders.recipient_id` -> `users.id`;
+    `order_items.order_id` -> `orders.id`;
+    `order_items.voucher_product_id` -> `voucher_products.id`.
+  `payments.order_id` -> `orders.id`;
+    `order_logs.order_id` -> `orders.id`, `order_logs.user_id` -> `users.id`;
+    `payment_logs.payment_id` -> `payments.id`, `order_id` and `user_id` ->
+    the corresponding `orders.id` and `users.id`.
+  `issued_vouchers.order_item_id` -> `order_items.id`;
+    `voucher_product_id` -> `voucher_products.id`; `owner_id` and
+    `redeemed_by` -> `users.id`; `branch_id` -> `partner_branches.id`.
+  `reviews.voucher_product_id` -> `voucher_products.id`, `user_id` ->
+    `users.id`, `issued_voucher_id` -> `issued_vouchers.id`.
+  `complaints.order_id` -> `orders.id`, `issued_voucher_id` ->
+    `issued_vouchers.id`, `user_id` and `assigned_to` -> `users.id`.
+  `complaint_responses.complaint_id` -> `complaints.id`;
+    `responded_by` -> `users.id`.
+- **Check:** `users.role`, `users.gender`, `partners.business_type`,
+  `partners.approval_status`, `partners.status`,
+  `voucher_products.status`, `voucher_products.approval_status`,
+  `orders.payment_method`, `payments.method`, `payments.status`,
+  `issued_vouchers.status`, `voucher_products.total_quantity >= 0`,
+  `voucher_products.remaining_quantity >= 0`,
+  `voucher_products.validity_days > 0`, `cart_items.quantity > 0` và
+  `order_items.quantity > 0` có CHECK trong SQL.
+- **Default:** Các giá trị mặc định được ghi tại từng thuộc tính trong Data
+  Dictionary, gồm trạng thái, cờ boolean, số lần đăng nhập, thời gian tạo,
+  ngày phát hành và số tiền mặc định.
+
+### Mô tả ràng buộc
+
+- **Khóa chính và khóa ngoại:** Mỗi bảng nghiệp vụ được mô tả trong Physical
+  ERD sử dụng UUID làm khóa chính. Các khóa ngoại trong `db.sql` liên kết
+  người dùng, đối tác, sản phẩm, danh mục, đơn hàng, thanh toán, voucher phát
+  hành và khiếu nại; nhờ đó bản ghi con không thể tham chiếu đến đối tượng
+  không tồn tại.
+- **Duy nhất:** `UQ` được áp dụng cho token hash của refresh token; mã doanh
+  nghiệp và mã số thuế của đối tác; slug danh mục; người sở hữu giỏ hàng; mã
+  đơn hàng; mã voucher và dữ liệu QR. Các giá trị này không được trùng lặp
+  trong phạm vi bảng tương ứng.
+- **Miền giá trị:** `db.sql` dùng CHECK cho vai trò người dùng, giới tính,
+  loại và trạng thái đối tác, trạng thái sản phẩm, phương thức thanh toán,
+  trạng thái payment và trạng thái voucher.
+- **Giá trị số:** SQL yêu cầu số lượng voucher và tồn kho lớn hơn hoặc bằng 0,
+  số lượng trong giỏ/đơn lớn hơn 0 và `validity_days > 0`.
+- **NOT NULL và giá trị mặc định:** Các trường định danh, trạng thái và thời
+  điểm tạo quan trọng được khai báo bắt buộc. Trạng thái ban đầu, cờ boolean,
+  bộ đếm đăng nhập thất bại, số tiền mặc định và các mốc `created_at` được gán
+  giá trị mặc định để tránh dữ liệu thiếu nhất quán.
+- **Toàn vẹn dữ liệu:** Một người dùng chỉ có một giỏ hàng nhờ UNIQUE trên
+  `carts.user_id`; `orders.recipient_id` được khai báo NOT NULL.
 
 ## 4. Data Dictionary
 
@@ -1012,7 +1129,6 @@ ngoại, `UQ` = `UNIQUE`.
 | `expires_at` | TIMESTAMPTZ | NN | Thời điểm hết hạn |
 | `used_at` | TIMESTAMPTZ | nullable | Thời điểm sử dụng |
 | `created_at` | TIMESTAMPTZ | NN, default `CURRENT_TIMESTAMP` | Thời điểm tạo |
-
 ### `security_alerts`
 
 | Column | Type | Constraint | Mô tả |
@@ -1052,7 +1168,6 @@ ngoại, `UQ` = `UNIQUE`.
 | `status` | VARCHAR | NN | Trạng thái |
 | `reason` | TEXT | nullable | Lý do |
 | `created_at` | TIMESTAMPTZ | NN, default `CURRENT_TIMESTAMP` | Thời điểm tạo |
-
 ## 5. Enum và domain values trong code
 
 Các cột trong database vẫn được khai báo là `VARCHAR`; các tập giá trị dưới
