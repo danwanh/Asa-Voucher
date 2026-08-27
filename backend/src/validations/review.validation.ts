@@ -19,8 +19,3 @@ export const updateReviewSchema = z.object({
   is_published: z.boolean().optional(),
 });
 export type UpdateReviewInput = z.infer<typeof updateReviewSchema>;
-
-export const createReviewResponseSchema = z.object({
-  content: z.string().min(1).max(2000),
-});
-export type CreateReviewResponseInput = z.infer<typeof createReviewResponseSchema>;

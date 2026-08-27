@@ -103,6 +103,7 @@ export function StaffVoucherReportPage() {
           date_to: filters.date_to || undefined,
           category_id: filters.category_id || undefined,
           branch_id: user?.branchId || undefined,
+          staffUserId: user?.id || undefined,
         }
         const result = await reportService.getStaffVoucherReport(params);
         if (isMounted) setData(result);

@@ -15,14 +15,6 @@ type ReviewSeed = {
   created_at: Date;
 };
 
-type ReviewResponseSeed = {
-  id: string;
-  review_id: string;
-  responded_by: string;
-  content: string;
-  created_at: Date;
-};
-
 type ComplaintSeed = {
   id: string;
   order_id?: string;
@@ -70,23 +62,6 @@ const reviews: ReviewSeed[] = [
     media_urls: ["https://cdn.asa.test/review/phuclong-1.jpg"],
     is_published: true,
     created_at: daysFrom(now, -10)
-  }
-];
-
-const reviewResponses: ReviewResponseSeed[] = [
-  {
-    id: "75100000-0000-0000-0000-000000000001",
-    review_id: "75000000-0000-0000-0000-000000000001",
-    responded_by: ids.users.voucherStaffCGV,
-    content: "Cảm ơn anh/chị đã phản hồi. CGV rất vui khi được phục vụ.",
-    created_at: daysFrom(now, -11)
-  },
-  {
-    id: "75100000-0000-0000-0000-000000000002",
-    review_id: "75000000-0000-0000-0000-000000000002",
-    responded_by: ids.users.voucherStaffPhucLong,
-    content: "Phúc Long cảm ơn anh/chị. Mong sớm gặp lại ở cửa hàng.",
-    created_at: daysFrom(now, -9)
   }
 ];
 
@@ -272,14 +247,6 @@ export async function seedEngagement({ prisma }: SeedContext) {
         created_at: review.created_at,
         updated_at: daysFrom(review.created_at, 1)
       }
-    });
-  }
-
-  for (const response of reviewResponses) {
-    await prisma.reviewResponse.upsert({
-      where: { id: response.id },
-      create: response,
-      update: response
     });
   }
 

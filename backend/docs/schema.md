@@ -1,4 +1,4 @@
-# Voucher Platform – ERD & Data Dictionary
+# Voucher Platform - ERD & Data Dictionary
 
 ---
 
@@ -11,7 +11,7 @@
 | **DR-03**  | **Voucher sản phẩm**     | Thông tin voucher bao gồm tên voucher, danh mục, giá gốc, giá bán, điều kiện áp dụng, hướng dẫn sử dụng, thời gian mở bán, thời hạn sử dụng, khu vực áp dụng, số lượng phát hành và trạng thái của voucher. |
 | **DR-04**  | **Đơn hàng**             | Thông tin đơn hàng gồm mã đơn, người mua, danh sách voucher đã mua, tổng tiền, phương thức thanh toán, trạng thái đơn hàng và trạng thái thanh toán.                                                        |
 | **DR-05**  | **Voucher phát hành**    | Thông tin voucher điện tử được phát hành sau khi thanh toán thành công, bao gồm mã voucher, đơn hàng liên quan, người sở hữu, trạng thái sử dụng, ngày phát hành, ngày hết hạn và lịch sử sử dụng voucher.  |
-| **DR-06**  | **Đánh giá và phản hồi** | Thông tin đánh giá của khách hàng đối với voucher, bao gồm điểm đánh giá, nhận xét, hình ảnh minh chứng (nếu có), khiếu nại và phản hồi xử lý từ đối tác hoặc quản trị viên.                                |
+| **DR-06**  | **Đánh giá và khiếu nại** | Thông tin đánh giá của khách hàng đối với voucher, bao gồm điểm đánh giá, nhận xét, hình ảnh minh chứng (nếu có), cùng các khiếu nại liên quan.                                |
 
 ---
 
@@ -43,6 +43,9 @@ erDiagram
         uuid      partner_branches_id      FK
         timestamp created_at
         timestamp updated_at
+        int       failed_login_attempts
+        timestamp locked_until
+        int       auth_version
     }
 
     refresh_tokens {
@@ -74,6 +77,8 @@ erDiagram
         string    action
         text      description
         timestamp occurred_at
+        uuid      target_order_id     FK
+        string    content_type
     }
 
     order_logs {
@@ -94,6 +99,28 @@ erDiagram
         string    status
         decimal   amount
         timestamp occurred_at
+    }
+
+    auth_tokens {
+        uuid      id          PK
+        uuid      user_id     FK
+        string    token_hash
+        string    type
+        timestamp expires_at
+        timestamp used_at
+        timestamp created_at
+    }
+
+    security_alerts {
+        uuid      id          PK
+        uuid      user_id     FK
+        string    alert_type
+        text      detail
+        string    ip_address
+        string    status
+        uuid      reviewed_by FK
+        timestamp reviewed_at
+        timestamp created_at
     }
 
     %% ══════════════════════════════════════════
@@ -169,6 +196,9 @@ erDiagram
         timestamp approved_at
         timestamp created_at
         timestamp updated_at
+        uuid      created_by              FK
+        uuid      submitted_by            FK
+        timestamp submitted_at
     }
 
     voucher_product_images {
@@ -184,7 +214,6 @@ erDiagram
         uuid    voucher_product_id  FK
         uuid    branch_id           FK
     }
-    %% Gợi ý ràng buộc: UNIQUE (voucher_product_id, branch_id) để mỗi chi nhánh chỉ xuất hiện một lần cho cùng một voucher.
 
     %% ══════════════════════════════════════════
     %% DR-04 · GIỎ HÀNG & ĐƠN HÀNG
@@ -203,15 +232,11 @@ erDiagram
         string    note
         boolean   is_gift
         timestamp payment_expires_at
+        string    payment_status
+        decimal   refund_amount
         timestamp created_at
         timestamp updated_at
     }
-
-    %% Migration 202608080001_add_order_recipient_and_payment_expiry:
-    %% recipient_id is backfilled from user_id, then made NOT NULL.
-    %% is_gift is NOT NULL DEFAULT false; payment_expires_at is nullable TIMESTAMPTZ(6).
-    %% FK: orders_recipient_id_fkey -> users(id), ON DELETE RESTRICT, ON UPDATE CASCADE.
-    %% INDEX: orders_recipient_id_idx on orders(recipient_id).
 
     carts {
         uuid      id          PK
@@ -253,6 +278,8 @@ erDiagram
         string    gateway_response
         timestamp paid_at
         timestamp created_at
+        string    refund_ref
+        timestamp refunded_at
     }
 
     %% ══════════════════════════════════════════
@@ -272,16 +299,11 @@ erDiagram
         string    status
         timestamp created_at
         timestamp updated_at
-    }
-
-    voucher_usages {
-        uuid      id                  PK
-        uuid      issued_voucher_id   FK
+        boolean   is_test
         uuid      branch_id           FK
         uuid      redeemed_by         FK
-        string    redemption_code
         timestamp used_at
-        string    note
+        text      note
     }
 
     %% ══════════════════════════════════════════
@@ -312,7 +334,7 @@ erDiagram
         string    status
         uuid      assigned_to         FK
         text      resolution_note
-        string    resolution_type
+        json      resolution_types
         timestamp created_at
         timestamp resolved_at
     }
@@ -326,6 +348,28 @@ erDiagram
         timestamp created_at
     }
 
+    cms_contents {
+        uuid      id          PK
+        string    content_type
+        string    title
+        text      content
+        string    image_url
+        string    status
+        int       sort_order
+        uuid      created_by  FK
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    voucher_check_logs {
+        uuid      id          PK
+        uuid      user_id     FK
+        string    voucher_code
+        string    status
+        text      reason
+        timestamp created_at
+    }
+
     %% ══════════════════════════════════════════
     %% RELATIONSHIPS
     %% ══════════════════════════════════════════
@@ -336,6 +380,10 @@ erDiagram
     users                   ||--o{ admin_logs          : "target user"
     users                   ||--o{ order_logs          : "order logs"
     users                   ||--o{ payment_logs        : "payment logs"
+    users                   ||--o{ auth_tokens         : "tokens"
+    users                   ||--o{ security_alerts     : "security alerts"
+    users                   ||--o{ cms_contents        : "creates content"
+    users                   ||--o{ voucher_check_logs  : "checks vouchers"
 
     partners                o|--|| users    : "represented by"
     partners                ||--o{ partner_branches           : "has"
@@ -370,12 +418,8 @@ erDiagram
 
     order_items             ||--o{ issued_vouchers            : "generates"
 
-    issued_vouchers         ||--o{ voucher_usages             : "used via"
     issued_vouchers         ||--o{ reviews                    : "tied to"
     issued_vouchers         ||--o{ complaints                 : "may trigger"
-
-    partner_branches        ||--o{ voucher_usages             : "redeemed at"
-    users        ||--o{ voucher_usages             : "confirmed by"
 
     complaints              ||--o{ complaint_responses        : "replied by"
 ```
@@ -389,14 +433,14 @@ erDiagram
 | Column                | Type         | Constraint      | Mô tả                                                                                                                                 |
 | --------------------- | ------------ | --------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | `id`                  | UUID         | PK              | Định danh người dùng                                                                                                                  |
-| `email`               | VARCHAR(255) | UNIQUE NOT NULL | Email đăng nhập                                                                                                                       |
-| `phone`               | VARCHAR(20)  | UNIQUE          | Số điện thoại                                                                                                                         |
-| `password_hash`       | VARCHAR(255) | NOT NULL        | Mật khẩu đã hash (bcrypt)                                                                                                             |
-| `full_name`           | VARCHAR(100) | NOT NULL        | Họ tên đầy đủ                                                                                                                         |
+| `email`               | VARCHAR      | NOT NULL        | Email đăng nhập                                                                                                                       |
+| `phone`               | VARCHAR      |                 | Số điện thoại                                                                                                                         |
+| `password_hash`       | VARCHAR      | NOT NULL        | Mật khẩu đã hash                                                                                                                      |
+| `full_name`           | VARCHAR      | NOT NULL        | Họ tên đầy đủ                                                                                                                         |
 | `avatar_url`          | TEXT         |                 | URL ảnh đại diện                                                                                                                      |
-| `role`                | ENUM         | NOT NULL        | `buyer` · `partner_owner` · `partner_voucher_staff` · `partner_store_staff` · `admin_content` · `admin_operations` · `admin_security` |
+| `role`                | VARCHAR      | NOT NULL CHECK  | `buyer` · `partner_owner` · `partner_voucher_staff` · `partner_store_staff` · `admin_content` · `admin_operations` · `admin_security` |
 | `dob`                 | DATE         |                 | Ngày sinh                                                                                                                             |
-| `gender`              | ENUM         |                 | `male` · `female` · `other`                                                                                                           |
+| `gender`              | VARCHAR      | CHECK           | `male` · `female` · `other`                                                                                                           |
 | `address`             | TEXT         |                 | Địa chỉ chi tiết                                                                                                                      |
 | `city`                | VARCHAR(100) |                 | Tỉnh/thành phố                                                                                                                        |
 | `district`            | VARCHAR(100) |                 | Quận/huyện                                                                                                                            |
@@ -406,6 +450,9 @@ erDiagram
 | `partner_branches_id` | UUID         | FK NULLABLE     | Chi nhánh làm việc, dùng cho `partner_store_staff`                                                                                    |
 | `created_at`          | TIMESTAMP    | NOT NULL        | Thời điểm tạo                                                                                                                         |
 | `updated_at`          | TIMESTAMP    | NOT NULL        | Thời điểm cập nhật                                                                                                                    |
+| `failed_login_attempts` | INTEGER    | NOT NULL DEFAULT 0 | Số lần đăng nhập thất bại                                                                                                           |
+| `locked_until`         | TIMESTAMPTZ |                 | Thời điểm hết khóa                                                                                                                    |
+| `auth_version`         | INTEGER     | NOT NULL DEFAULT 0 | Phiên bản xác thực                                                                                                                  |
 
 ### DR-01 · authentication_logs
 
@@ -431,6 +478,8 @@ erDiagram
 | `action`            | VARCHAR(100) | NOT NULL    | `APPROVE_PARTNER` · `REJECT_PARTNER` · `APPROVE_VOUCHER` · `REJECT_VOUCHER` · `LOCK_ACCOUNT` · `CHANGE_ROLE` |
 | `description`       | TEXT         |             | Mô tả chi tiết thao tác quản trị                                                                             |
 | `occurred_at`       | TIMESTAMP    | NOT NULL    | Thời điểm xảy ra                                                                                             |
+| `target_order_id`   | UUID         | FK NULLABLE | Đơn hàng bị tác động                                                                                          |
+| `content_type`      | VARCHAR      |             | Loại nội dung liên quan                                                                                       |
 
 Ràng buộc nghiệp vụ: mỗi bản ghi `admin_logs` chỉ có một trong ba cột `target_user_id`, `target_partner_id`, `target_voucher_id` khác NULL.
 
@@ -473,8 +522,8 @@ Ràng buộc nghiệp vụ: mỗi bản ghi `admin_logs` chỉ có một trong b
 | `logo_url`               | TEXT         |                 | URL logo                                                              |
 | `website_url`            | TEXT         |                 | Website đối tác                                                       |
 | `description`            | TEXT         |                 | Mô tả đối tác                                                         |
-| `approval_status`        | ENUM         | NOT NULL        | `pending` · `approved` · `rejected`                                   |
-| `status`                 | ENUM         | NOT NULL        | `active` · `suspended` · `closed`                                     |
+| `approval_status`        | VARCHAR      | NOT NULL DEFAULT `pending` CHECK | `pending` · `approved` · `rejected`                                   |
+| `status`                 | VARCHAR      | NOT NULL DEFAULT `active` CHECK | `active` · `suspended` · `closed`                                     |
 | `approved_by`            | UUID         | FK              | Tham chiếu `users.id` (admin)                                         |
 | `approved_at`            | TIMESTAMP    |                 |                                                                       |
 | `created_at`             | TIMESTAMP    | NOT NULL        |                                                                       |
@@ -497,6 +546,8 @@ Ràng buộc nghiệp vụ: mỗi bản ghi `admin_logs` chỉ có một trong b
 | `created_at`  | TIMESTAMP    | NOT NULL     |                          |
 
 ---
+
+| `ward`       | VARCHAR      |              | Phường/xã                  |
 
 ### DR-03 · categories
 
@@ -530,12 +581,16 @@ Ràng buộc nghiệp vụ: mỗi bản ghi `admin_logs` chỉ có một trong b
 | `sale_start_date`      | DATE          | NOT NULL    | Ngày bắt đầu bán                                                     |
 | `sale_end_date`        | DATE          | NOT NULL    | Ngày kết thúc bán                                                    |
 | `validity_days`        | INT           | NOT NULL    | Số ngày hiệu lực sau khi mua                                         |
-| `status`               | ENUM          | NOT NULL    | `draft` · `active` · `paused` · `sold_out` · `expired`               |
-| `approval_status`      | ENUM          | NOT NULL    | `pending` · `approved` · `rejected`                                  |
+| `status`               | VARCHAR       | NOT NULL DEFAULT `draft` CHECK | `draft` · `active` · `paused` · `sold_out` · `expired`               |
+| `approval_status`      | VARCHAR       | NOT NULL DEFAULT `pending` CHECK | `pending` · `approved` · `rejected`                                  |
 | `approved_by`          | UUID          | FK          | Tham chiếu `users.id` (admin)                                        |
 | `approved_at`          | TIMESTAMP     |             |                                                                      |
 | `created_at`           | TIMESTAMP     | NOT NULL    |                                                                      |
 | `updated_at`           | TIMESTAMP     | NOT NULL    |                                                                      |
+
+| `created_by`           | UUID          | FK              | User tạo voucher                                                     |
+| `submitted_by`         | UUID          | FK              | User gửi duyệt                                                       |
+| `submitted_at`         | TIMESTAMPTZ   |                 | Thời điểm gửi duyệt                                                  |
 
 ### DR-03 · voucher_product_images
 
@@ -555,7 +610,6 @@ Ràng buộc nghiệp vụ: mỗi bản ghi `admin_logs` chỉ có một trong b
 | `voucher_product_id` | UUID | FK NOT NULL | Tham chiếu `voucher_products.id` |
 | `branch_id`          | UUID | FK NOT NULL | Chi nhánh có thể đổi voucher     |
 
-Gợi ý ràng buộc: UNIQUE (`voucher_product_id`, `branch_id`) để mỗi chi nhánh chỉ xuất hiện một lần cho cùng một voucher.
 
 ---
 
@@ -579,24 +633,25 @@ Gợi ý ràng buộc: UNIQUE (`voucher_product_id`, `branch_id`) để mỗi ch
 | `created_at`         | TIMESTAMP | NOT NULL    | Thời điểm thêm vào giỏ           |
 | `updated_at`         | TIMESTAMP | NOT NULL    | Thời điểm cập nhật số lượng      |
 
-Gợi ý ràng buộc: UNIQUE (`cart_id`, `voucher_product_id`) để mỗi voucher product chỉ xuất hiện một dòng trong cùng một giỏ hàng.
 
 ### DR-04 · orders
 
 | Column               | Type           | Constraint      | Mô tả                                                                               |
 | -------------------- | -------------- | --------------- | ----------------------------------------------------------------------------------- |
 | `id`                 | UUID           | PK              |                                                                                     |
-| `order_code`         | VARCHAR(30)    | UNIQUE NOT NULL | Mã đơn hàng hiển thị                                                                |
+| `order_code`         | VARCHAR       | UNIQUE NOT NULL | Mã đơn hàng hiển thị                                                                |
 | `user_id`            | UUID           | FK NOT NULL     | Tham chiếu `users.id`                                                               |
-| `recipient_id`       | UUID           | FK NOT NULL     | Người sở hữu voucher, tham chiếu `users.id`; `ON DELETE RESTRICT ON UPDATE CASCADE` |
+| `recipient_id`       | UUID           | FK NOT NULL     | Người sở hữu voucher, tham chiếu `users.id`                                           |
 | `subtotal`           | DECIMAL(15,0)  | NOT NULL        | Tổng trước giảm giá _(suy diễn: Σ order_items.subtotal)_                            |
 | `discount_amount`    | DECIMAL(15,0)  | DEFAULT 0       | Số tiền được giảm                                                                   |
 | `total_amount`       | DECIMAL(15,0)  | NOT NULL        | Tổng thanh toán _(suy diễn: subtotal − discount_amount)_                            |
-| `payment_method`     | ENUM           | NOT NULL        | `vnpay` · `paypal`                                                                  |
-| `status`             | ENUM           | NOT NULL        | `pending_payment` · `payment_failed` · `confirmed` · `completed` · `cancelled` · `refunded` |
+| `payment_method`     | VARCHAR        | NOT NULL CHECK  | `vnpay` · `paypal`                                                                  |
+| `status`             | VARCHAR        | NOT NULL DEFAULT `pending` | Không có CHECK trong SQL                                                          |
 | `note`               | TEXT           |                 | Ghi chú của người mua                                                               |
 | `is_gift`            | BOOLEAN        | DEFAULT false   | Đơn tặng người dùng khác hay không                                                  |
 | `payment_expires_at` | TIMESTAMPTZ(6) |                 | Thời hạn hoàn tất thanh toán                                                        |
+| `payment_status`     | VARCHAR        | NOT NULL DEFAULT `pending` | Trạng thái thanh toán                                                             |
+| `refund_amount`      | NUMERIC        | NOT NULL DEFAULT 0 | Số tiền hoàn                                                                     |
 | `created_at`         | TIMESTAMP      | NOT NULL        |                                                                                     |
 | `updated_at`         | TIMESTAMP      | NOT NULL        |                                                                                     |
 
@@ -615,7 +670,6 @@ Gợi ý ràng buộc: UNIQUE (`cart_id`, `voucher_product_id`) để mỗi vouc
 | `subtotal`               | DECIMAL(15,0) | NOT NULL    | _(suy diễn: `unit_price × quantity`)_                      |
 | `created_at`             | TIMESTAMP     | NOT NULL    |                                                            |
 
-Gợi ý ràng buộc: UNIQUE (`order_id`, `voucher_product_id`) để mỗi voucher product chỉ xuất hiện một dòng trong cùng một đơn hàng.
 
 ### DR-04 · payments
 
@@ -623,13 +677,15 @@ Gợi ý ràng buộc: UNIQUE (`order_id`, `voucher_product_id`) để mỗi vou
 | ------------------ | ------------- | ----------- | ------------------------------------------------------------ |
 | `id`               | UUID          | PK          |                                                              |
 | `order_id`         | UUID          | FK NOT NULL | Tham chiếu `orders.id`                                       |
-| `method`           | ENUM          | NOT NULL    | `vnpay` · `paypal`                                           |
+| `method`           | VARCHAR       | NOT NULL CHECK | `vnpay` · `paypal`                                        |
 | `amount`           | DECIMAL(15,0) | NOT NULL    | Số tiền giao dịch                                            |
-| `status`           | ENUM          | NOT NULL    | `pending` · `processing` · `success` · `failed` · `refunded` |
+| `status`           | VARCHAR       | NOT NULL    | `pending` · `processing` · `success` · `failed` · `refunded` |
 | `transaction_ref`  | VARCHAR(255)  |             | Mã giao dịch từ cổng thanh toán                              |
 | `gateway_response` | TEXT          |             | Raw response từ gateway                                      |
 | `paid_at`          | TIMESTAMP     |             | Thời điểm thanh toán thành công                              |
 | `created_at`       | TIMESTAMP     | NOT NULL    |                                                              |
+| `refund_ref`       | VARCHAR       |             | Mã tham chiếu hoàn tiền                                      |
+| `refunded_at`      | TIMESTAMP     |             | Thời điểm hoàn tiền                                          |
 
 ---
 
@@ -641,26 +697,19 @@ Gợi ý ràng buộc: UNIQUE (`order_id`, `voucher_product_id`) để mỗi vou
 | `voucher_code`       | VARCHAR(50)  | UNIQUE NOT NULL | Mã voucher điện tử (hiển thị cho user — mỗi voucher phát hành là **duy nhất**)                                     |
 | `qr_code_payload`    | VARCHAR(255) | UNIQUE NOT NULL | _(bổ sung)_ Chuỗi dữ liệu mã hóa dùng để sinh QR, đảm bảo mỗi voucher có 1 mã QR duy nhất để quét xác thực khi đổi |
 | `qr_code_image_url`  | TEXT         |                 | _(bổ sung)_ URL ảnh QR đã render từ `qr_code_payload` để hiển thị/quét — thuộc tính kỹ thuật (chỉ có ở Physical)   |
-| `order_item_id`      | UUID         | FK NOT NULL     | Tham chiếu `order_items.id`                                                                                        |
+| `order_item_id`      | UUID         | FK NULLABLE     | Tham chiếu `order_items.id`                                                                                        |
 | `voucher_product_id` | UUID         | FK NOT NULL     | Tham chiếu `voucher_products.id`                                                                                   |
-| `owner_id`           | UUID         | FK NOT NULL     | Tham chiếu `users.id`                                                                                              |
+| `owner_id`           | UUID         | FK NULLABLE     | Tham chiếu `users.id`                                                                                              |
 | `issued_date`        | DATE         | NOT NULL        | Ngày phát hành                                                                                                     |
 | `expired_date`       | DATE         | NOT NULL        | Ngày hết hạn (`issued_date + validity_days`)                                                                       |
-| `status`             | ENUM         | NOT NULL        | `active` · `used` · `expired` · `refunded`                                                                         |
+| `status`             | VARCHAR      | NOT NULL        | `active` · `used` · `expired` · `revoked` · `cancelled`                                                            |
 | `created_at`         | TIMESTAMP    | NOT NULL        |                                                                                                                    |
 | `updated_at`         | TIMESTAMP    | NOT NULL        |                                                                                                                    |
-
-### DR-05 · voucher_usages
-
-| Column              | Type        | Constraint  | Mô tả                                                           |
-| ------------------- | ----------- | ----------- | --------------------------------------------------------------- |
-| `id`                | UUID        | PK          |                                                                 |
-| `issued_voucher_id` | UUID        | FK NOT NULL | Tham chiếu `issued_vouchers.id`                                 |
-| `branch_id`         | UUID        | FK NOT NULL | Chi nhánh thực hiện đổi                                         |
-| `redeemed_by`       | UUID        | FK NOT NULL | Tham chiếu `users.id` (nhân viên xác nhận)                      |
-| `redemption_code`   | VARCHAR(50) |             | Mã xác nhận tại quầy (nhập tay dự phòng nếu không quét được QR) |
-| `used_at`           | TIMESTAMP   | NOT NULL    | Thời điểm sử dụng                                               |
-| `note`              | TEXT        |             | Ghi chú thêm                                                    |
+| `is_test`            | BOOLEAN      | NOT NULL DEFAULT false | Voucher thử nghiệm                                                                                             |
+| `branch_id`          | UUID         | FK              | Chi nhánh đổi voucher                                                                                           |
+| `redeemed_by`        | UUID         | FK              | User xác nhận đổi voucher                                                                                        |
+| `used_at`            | TIMESTAMPTZ  |                 | Thời điểm sử dụng                                                                                                |
+| `note`               | TEXT         |                 | Ghi chú                                                                                                          |
 
 ---
 
@@ -672,7 +721,7 @@ Gợi ý ràng buộc: UNIQUE (`order_id`, `voucher_product_id`) để mỗi vou
 | `voucher_product_id` | UUID      | FK NOT NULL          | Tham chiếu `voucher_products.id` |
 | `user_id`            | UUID      | FK NOT NULL          | Tham chiếu `users.id`            |
 | `issued_voucher_id`  | UUID      | FK NOT NULL          | Chỉ review sau khi đã dùng       |
-| `rating`             | SMALLINT  | NOT NULL CHECK (1–5) | Điểm đánh giá                    |
+| `rating`             | INTEGER   | NOT NULL             | Điểm đánh giá                    |
 | `comment`            | TEXT      |                      | Nội dung nhận xét                |
 | `media_urls`         | JSONB     |                      | Mảng URL ảnh/video đính kèm      |
 | `is_published`       | BOOLEAN   | DEFAULT true         | Kiểm duyệt trước khi hiển thị    |
@@ -687,13 +736,13 @@ Gợi ý ràng buộc: UNIQUE (`order_id`, `voucher_product_id`) để mỗi vou
 | `order_id`          | UUID      | FK          | Tham chiếu `orders.id`                                                           |
 | `issued_voucher_id` | UUID      | FK          | Tham chiếu `issued_vouchers.id`                                                  |
 | `user_id`           | UUID      | FK NOT NULL | Người gửi khiếu nại                                                              |
-| `reason`            | ENUM      | NOT NULL    | `not_as_described` · `cannot_redeem` · `expired_early` · `wrong_value` · `other` |
+| `reason`            | VARCHAR   | NOT NULL    | Lý do khiếu nại                                                               |
 | `description`       | TEXT      | NOT NULL    | Mô tả chi tiết                                                                   |
 | `evidence_urls`     | JSONB     |             | Mảng URL bằng chứng                                                              |
-| `status`            | ENUM      | NOT NULL    | `open` · `under_review` · `resolved` · `closed`                                  |
+| `status`            | VARCHAR   | NOT NULL DEFAULT `open` | Trạng thái xử lý                                                  |
 | `assigned_to`       | UUID      | FK          | Admin xử lý                                                                      |
 | `resolution_note`   | TEXT      |             | Ghi chú xử lý                                                                    |
-| `resolution_type`   | ENUM      |             | `refund` · `reissue` · `no_action` · `partner_penalized`                         |
+| `resolution_types`  | JSON      |             | Các hình thức xử lý                                                         |
 | `created_at`        | TIMESTAMP | NOT NULL    |                                                                                  |
 | `resolved_at`       | TIMESTAMP |             |                                                                                  |
 
@@ -704,11 +753,66 @@ Gợi ý ràng buộc: UNIQUE (`order_id`, `voucher_product_id`) để mỗi vou
 | `id`             | UUID      | PK          |                              |
 | `complaint_id`   | UUID      | FK NOT NULL | Tham chiếu `complaints.id`   |
 | `responded_by`   | UUID      | FK NOT NULL | Tham chiếu `users.id`        |
-| `responder_role` | ENUM      | NOT NULL    | `admin` · `partner` · `user` |
+| `responder_role` | VARCHAR   | NOT NULL    | Vai trò người phản hồi       |
 | `content`        | TEXT      | NOT NULL    | Nội dung trao đổi            |
 | `created_at`     | TIMESTAMP | NOT NULL    |                              |
 
 ---
+
+Lưu ý: SQL không có bảng `voucher_usages`; thông tin đổi voucher được lưu trực
+tiếp trên `issued_vouchers` qua `branch_id`, `redeemed_by`, `used_at` và `note`.
+
+### DR-01 · auth_tokens
+
+| Column | Type | Constraint / default |
+| ------ | ---- | -------------------- |
+| `id` | UUID | PK, default `gen_random_uuid()` |
+| `user_id` | UUID | FK `users.id`, NOT NULL |
+| `token_hash` | TEXT | NOT NULL |
+| `type` | VARCHAR | NOT NULL |
+| `expires_at` | TIMESTAMPTZ | NOT NULL |
+| `used_at` | TIMESTAMPTZ | |
+| `created_at` | TIMESTAMPTZ | NOT NULL, default `CURRENT_TIMESTAMP` |
+
+### DR-01 · security_alerts
+
+| Column | Type | Constraint / default |
+| ------ | ---- | -------------------- |
+| `id` | UUID | PK, default `gen_random_uuid()` |
+| `user_id` | UUID | FK `users.id`, NOT NULL |
+| `alert_type` | VARCHAR | NOT NULL |
+| `detail` | TEXT | |
+| `ip_address` | VARCHAR | |
+| `status` | VARCHAR | NOT NULL, default `open` |
+| `reviewed_by` | UUID | FK `users.id` |
+| `reviewed_at` | TIMESTAMPTZ | |
+| `created_at` | TIMESTAMPTZ | NOT NULL, default `CURRENT_TIMESTAMP` |
+
+### DR-06 · cms_contents
+
+| Column | Type | Constraint / default |
+| ------ | ---- | -------------------- |
+| `id` | UUID | PK, default `gen_random_uuid()` |
+| `content_type` | VARCHAR | NOT NULL |
+| `title` | VARCHAR | NOT NULL |
+| `content` | TEXT | |
+| `image_url` | VARCHAR | |
+| `status` | VARCHAR | NOT NULL, default `active` |
+| `sort_order` | INTEGER | NOT NULL, default `0` |
+| `created_by` | UUID | FK `users.id` |
+| `created_at` | TIMESTAMPTZ | NOT NULL, default `CURRENT_TIMESTAMP` |
+| `updated_at` | TIMESTAMPTZ | NOT NULL, default `CURRENT_TIMESTAMP` |
+
+### DR-06 · voucher_check_logs
+
+| Column | Type | Constraint / default |
+| ------ | ---- | -------------------- |
+| `id` | UUID | PK, default `gen_random_uuid()` |
+| `user_id` | UUID | FK `users.id`, NOT NULL |
+| `voucher_code` | VARCHAR | |
+| `status` | VARCHAR | NOT NULL |
+| `reason` | TEXT | |
+| `created_at` | TIMESTAMPTZ | NOT NULL, default `CURRENT_TIMESTAMP` |
 
 ## 5. Enum Reference
 
@@ -725,14 +829,13 @@ Gợi ý ràng buộc: UNIQUE (`order_id`, `voucher_product_id`) để mỗi vou
 | `voucher_products`    | `status`          | `draft` · `active` · `paused` · `sold_out` · `expired`                                                                                                        |
 | `voucher_products`    | `approval_status` | `pending` · `approved` · `rejected`                                                                                                                           |
 | `orders`              | `payment_method`  | `vnpay` · `paypal`                                                                                                                                            |
-| `orders`              | `status`          | `pending_payment` · `payment_failed` · `confirmed` · `completed` · `cancelled` · `refunded`                                                                  |
+| `orders`              | `status`          | Không có CHECK constraint trong SQL                                                                                                                            |
 | `order_logs`          | `action`          | `CREATE_ORDER` · `CANCEL_ORDER` · `UPDATE_STATUS` · `PAYMENT_SUCCESS` · `EXPIRE_ORDER`                                                                        |
 | `payments`            | `method`          | `vnpay` · `paypal`                                                                                                                                            |
 | `payments`            | `status`          | `pending` · `processing` · `success` · `failed` · `refunded`                                                                                                  |
 | `payment_logs`        | `action`          | `PAYMENT_CREATED` · `PAYMENT_SUCCESS` · `PAYMENT_FAILED` · `REFUND`                                                                                           |
 | `payment_logs`        | `status`          | `pending` · `success` · `failed` · `refunded`                                                                                                                 |
-| `issued_vouchers`     | `status`          | `active` · `used` · `expired` · `refunded`                                                                                                                    |
-| `complaints`          | `reason`          | `not_as_described` · `cannot_redeem` · `expired_early` · `wrong_value` · `other`                                                                              |
-| `complaints`          | `status`          | `open` · `under_review` · `resolved` · `closed`                                                                                                               |
-| `complaints`          | `resolution_type` | `refund` · `reissue` · `no_action` · `partner_penalized`                                                                                                      |
-| `complaint_responses` | `responder_role`  | `admin` · `partner` · `user`                                                                                                                                  |
+| `issued_vouchers`     | `status`          | `active` · `used` · `expired` · `revoked` · `cancelled`                                                                                                      |
+
+`db.sql` chứa chuỗi `NOT VALI)` sau các CHECK của `orders.payment_method`,
+`payments.method` và `payments.status`; đây là lỗi cú pháp trong file nguồn.
