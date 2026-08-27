@@ -3,7 +3,7 @@ import Link from "next/link"
 import { ArrowLeft, Copy, CheckCircle2, Download, Star, MessageSquare, CreditCard } from "lucide-react"
 import { C, fmt, fmtDate } from "@/utils/constants"
 import { AppIcon } from "@/components/AppIcon"
-import type { IssuedVoucher, Order, OrderStatus } from "@/types"
+import type { IssuedVoucher, Order } from "@/types"
 import { MockQR } from "@/components/MockQR"
 
 interface Props {
@@ -15,12 +15,11 @@ interface Props {
   currentUserId?: string
 }
 
-function orderStatusLabel(status: OrderStatus) {
-  if (status === "pending_payment") return "Đã tạo đơn, đang chờ thanh toán"
-  if (status === "payment_failed") return "Thanh toán thất bại, có thể thử lại"
-  if (status === "confirmed") return "Thanh toán thành công, voucher đã phát hành"
-  if (status === "cancelled") return "Đơn bị hủy trước khi hoàn tất"
-  return "Đã hoàn tiền cho khách"
+function paymentStatusMeta(status: Order["paymentStatus"]) {
+  if (status === "paid") return { label: "Thanh toán thành công", bg: C.teal + "20", color: C.teal }
+  if (status === "failed") return { label: "Thanh toán thất bại", bg: "#FEE2E2", color: "#DC2626" }
+  if (status === "refunded") return { label: "Đã hoàn tiền", bg: "#E0EEFF", color: "#1A5FAD" }
+  return { label: "Chờ thanh toán", bg: C.apricot + "25", color: "#D97706" }
 }
 
 function issuedVoucherStatusLabel(status: string) {
@@ -45,6 +44,7 @@ export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAga
   const ownsVoucher = order.recipientId === currentUserId
   const canCreateFeedback = order.status === "confirmed"
   const isGiftSender = Boolean(order.isGift && order.recipientId !== currentUserId)
+  const paymentBadge = paymentStatusMeta(order.paymentStatus)
 
   const copy = () => {
     navigator.clipboard.writeText(displayedVouchers[0]?.code ?? order.orderCode ?? order.id).catch(() => {})
@@ -77,8 +77,8 @@ export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAga
             <div className="font-black text-xl" style={{ color: C.indigo, fontFamily: "'Nunito', sans-serif" }}>{order.orderCode ?? order.id}</div>
             <div className="text-xs mt-1" style={{ color: "#9CA3AF" }}>Ngày đặt: {fmtDate(order.createdAt)}</div>
           </div>
-          <span className="px-3 py-1.5 rounded-xl text-sm font-bold" style={{ backgroundColor: order.status === "confirmed" ? C.teal + "20" : order.status === "payment_failed" || order.status === "cancelled" ? "#FEE2E2" : order.status === "refunded" ? "#E0EEFF" : C.apricot + "25", color: order.status === "confirmed" ? C.teal : order.status === "payment_failed" || order.status === "cancelled" ? "#DC2626" : order.status === "refunded" ? "#1A5FAD" : "#D97706" }}>
-            {orderStatusLabel(order.status)}
+          <span className="px-3 py-1.5 rounded-xl text-sm font-bold" style={{ backgroundColor: paymentBadge.bg, color: paymentBadge.color }}>
+            {paymentBadge.label}
           </span>
         </div>
       </div>
@@ -241,9 +241,6 @@ export function OrderDetailPage({ order, onBack, onReview, onComplaint, onPayAga
             <MessageSquare className="w-4 h-4" /> {order.complaints?.[0] ? "Xem khiếu nại đơn hàng" : "Khiếu nại đơn hàng"}
           </button>
         )}
-        <button className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm border-2" style={{ borderColor: "#E5E7EB", color: C.indigo }}>
-          <MessageSquare className="w-4 h-4" style={{ color: "#6B7280" }} /> Liên hệ hỗ trợ
-        </button>
       </div>
     </div>
   )
