@@ -1,5 +1,7 @@
 -- Tables are ordered by foreign-key dependency.
 
+BEGIN;
+
 CREATE TABLE public.users (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   email character varying NOT NULL,
@@ -383,3 +385,5 @@ CREATE TABLE public.admin_logs (
   CONSTRAINT admin_logs_target_voucher_fk FOREIGN KEY (target_voucher_id) REFERENCES public.voucher_products(id),
   CONSTRAINT admin_logs_target_order_id_fkey FOREIGN KEY (target_order_id) REFERENCES public.orders(id)
 );
+
+COMMIT;
