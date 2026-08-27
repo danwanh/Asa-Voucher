@@ -2,12 +2,10 @@ import { HttpError } from "../utils/http-error.js";
 import { createCloudinarySignature } from "../utils/cloudinary.js";
 import { buildPaginatedResult } from "../utils/pagination.js";
 import * as reviewRepo from "../repositories/review.repository.js";
-import * as reviewResponseRepo from "../repositories/review-response.repository.js";
 import * as issuedVoucherRepo from "../repositories/issued-voucher.repository.js";
 import type { AuthUser } from "../types/auth.types.js";
 import type {
   CreateReviewInput,
-  CreateReviewResponseInput,
   UpdateReviewInput,
 } from "../validations/review.validation.js";
 
@@ -101,24 +99,4 @@ export async function hideReview(user: AuthUser, id: string) {
   }
 
   return reviewRepo.setReviewPublished(id, false);
-}
-
-export async function listReviewResponses(id: string) {
-  await getReviewById(undefined, id);
-  return reviewResponseRepo.listResponsesByReview(id);
-}
-
-export async function createReviewResponse(user: AuthUser, id: string, input: CreateReviewResponseInput) {
-  const review = await reviewRepo.findReviewById(id);
-  if (!review) throw new HttpError(404, "Không tìm thấy đánh giá");
-
-  const isPartnerOwner =
-    user.role === "partner_owner" && review.voucher_products.partner_id === user.partnerId;
-  const isAdminContent = user.role === "admin_content";
-
-  if (!isPartnerOwner && !isAdminContent) {
-    throw new HttpError(403, "Bạn không có quyền phản hồi đánh giá này");
-  }
-
-  return reviewResponseRepo.createReviewResponse(id, user.id, input.content);
 }

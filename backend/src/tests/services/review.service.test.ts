@@ -12,17 +12,11 @@ vi.mock("../../repositories/review.repository.js", () => ({
   setReviewPublished: vi.fn(),
 }));
 
-vi.mock("../../repositories/review-response.repository.js", () => ({
-  listResponsesByReview: vi.fn(),
-  createReviewResponse: vi.fn(),
-}));
-
 vi.mock("../../repositories/issued-voucher.repository.js", () => ({
   findIssuedVoucherById: vi.fn(),
 }));
 
 import * as reviewRepo from "../../repositories/review.repository.js";
-import * as reviewResponseRepo from "../../repositories/review-response.repository.js";
 import * as issuedVoucherRepo from "../../repositories/issued-voucher.repository.js";
 import * as reviewService from "../../services/review.service.js";
 
@@ -223,34 +217,4 @@ describe("Review Service", () => {
     });
   });
 
-  describe("createReviewResponse", () => {
-    it("partner owner can respond to review of their voucher", async () => {
-      vi.mocked(reviewRepo.findReviewById).mockResolvedValue(makeReview());
-      vi.mocked(reviewResponseRepo.createReviewResponse).mockResolvedValue({
-        id: "rr-1", review_id: "rev-1", responded_by: "u-partner",
-        content: "Thanks!", created_at: "2026-01-01T00:00:00Z",
-      });
-
-      const result = await reviewService.createReviewResponse(PARTNER_OWNER, "rev-1", { content: "Thanks!" });
-      expect(result.content).toBe("Thanks!");
-    });
-
-    it("admin_content can respond", async () => {
-      vi.mocked(reviewRepo.findReviewById).mockResolvedValue(makeReview());
-      vi.mocked(reviewResponseRepo.createReviewResponse).mockResolvedValue({
-        id: "rr-2", review_id: "rev-1", responded_by: "u-admin",
-        content: "Noted", created_at: "2026-01-01T00:00:00Z",
-      });
-
-      await reviewService.createReviewResponse(ADMIN_CONTENT, "rev-1", { content: "Noted" });
-      expect(reviewResponseRepo.createReviewResponse).toHaveBeenCalled();
-    });
-
-    it("rejects response from unauthorized user", async () => {
-      vi.mocked(reviewRepo.findReviewById).mockResolvedValue(makeReview());
-      await expect(
-        reviewService.createReviewResponse(BUYER, "rev-1", { content: "Nice" })
-      ).rejects.toThrow(HttpError);
-    });
-  });
 });

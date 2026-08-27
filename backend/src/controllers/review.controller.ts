@@ -3,7 +3,6 @@ import { sendCreated, sendSuccess } from "../utils/response.js";
 import { HttpError } from "../utils/http-error.js";
 import * as reviewService from "../services/review.service.js";
 import {
-  createReviewResponseSchema,
   createReviewSchema,
   listReviewsQuerySchema,
   updateReviewSchema,
@@ -45,15 +44,4 @@ export async function updateReview(req: Request, res: Response) {
 export async function hideReview(req: Request, res: Response) {
   const review = await reviewService.hideReview(requireUser(req), req.params.id);
   sendSuccess(res, review, "Đã ẩn đánh giá");
-}
-
-export async function listReviewResponses(req: Request, res: Response) {
-  const responses = await reviewService.listReviewResponses(req.params.id);
-  sendSuccess(res, responses);
-}
-
-export async function createReviewResponse(req: Request, res: Response) {
-  const input = createReviewResponseSchema.parse(req.body);
-  const response = await reviewService.createReviewResponse(requireUser(req), req.params.id, input);
-  sendCreated(res, response, "Đã gửi phản hồi");
 }

@@ -16,10 +16,3 @@ reviewRoutes.post("/reviews", requireAuth, asyncHandler(reviewController.createR
 reviewRoutes.get("/reviews/:id", optionalAuth, asyncHandler(reviewController.getReview));
 reviewRoutes.patch("/reviews/:id", requireAuth, asyncHandler(reviewController.updateReview));
 reviewRoutes.delete("/reviews/:id", requireAuth, asyncHandler(reviewController.hideReview));
-
-reviewRoutes.get("/reviews/:id/responses", asyncHandler(reviewController.listReviewResponses));
-reviewRoutes.post(
-  "/reviews/:id/responses",
-  requireAuth,
-  asyncHandler(reviewController.createReviewResponse),
-);

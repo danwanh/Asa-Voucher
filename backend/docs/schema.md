@@ -11,7 +11,7 @@
 | **DR-03**  | **Voucher sản phẩm**     | Thông tin voucher bao gồm tên voucher, danh mục, giá gốc, giá bán, điều kiện áp dụng, hướng dẫn sử dụng, thời gian mở bán, thời hạn sử dụng, khu vực áp dụng, số lượng phát hành và trạng thái của voucher. |
 | **DR-04**  | **Đơn hàng**             | Thông tin đơn hàng gồm mã đơn, người mua, danh sách voucher đã mua, tổng tiền, phương thức thanh toán, trạng thái đơn hàng và trạng thái thanh toán.                                                        |
 | **DR-05**  | **Voucher phát hành**    | Thông tin voucher điện tử được phát hành sau khi thanh toán thành công, bao gồm mã voucher, đơn hàng liên quan, người sở hữu, trạng thái sử dụng, ngày phát hành, ngày hết hạn và lịch sử sử dụng voucher.  |
-| **DR-06**  | **Đánh giá và phản hồi** | Thông tin đánh giá của khách hàng đối với voucher, bao gồm điểm đánh giá, nhận xét, hình ảnh minh chứng (nếu có), khiếu nại và phản hồi xử lý từ đối tác hoặc quản trị viên.                                |
+| **DR-06**  | **Đánh giá và khiếu nại** | Thông tin đánh giá của khách hàng đối với voucher, bao gồm điểm đánh giá, nhận xét, hình ảnh minh chứng (nếu có), cùng các khiếu nại liên quan.                                |
 
 ---
 
@@ -421,7 +421,6 @@ erDiagram
     issued_vouchers         ||--o{ reviews                    : "tied to"
     issued_vouchers         ||--o{ complaints                 : "may trigger"
 
-    reviews                 ||--o{ review_responses           : "replied to"
     complaints              ||--o{ complaint_responses        : "replied by"
 ```
 

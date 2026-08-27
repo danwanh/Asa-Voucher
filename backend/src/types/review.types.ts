@@ -11,14 +11,6 @@ export interface ReviewRow {
   updated_at: string;
 }
 
-export interface ReviewResponseRow {
-  id: string;
-  review_id: string;
-  responded_by: string;
-  content: string;
-  created_at: string;
-}
-
 export interface ReviewListFilter {
   voucherProductId?: string;
   onlyPublished: boolean;
