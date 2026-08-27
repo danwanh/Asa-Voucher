@@ -1,6 +1,9 @@
 import nodemailer from "nodemailer";
+import { setDefaultResultOrder } from "node:dns";
 import { env } from "../config/env.js";
 import { HttpError } from "../utils/http-error.js";
+
+setDefaultResultOrder("ipv4first");
 
 function requireSmtpAuth() {
   if (!env.SMTP_USER || !env.SMTP_PASS) {
