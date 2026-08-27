@@ -18,7 +18,10 @@ function getTransporter() {
     port: env.SMTP_PORT,
     secure: env.SMTP_PORT === 465,
     requireTLS: env.SMTP_PORT === 587,
-    auth
+    auth,
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 15_000
   });
 }
 
@@ -39,13 +42,21 @@ export async function sendEmail(to: string, subject: string, html: string) {
   const smtpUser = requireSmtpAuth().user;
 
   try {
-    await getTransporter().sendMail({
+    const result = await getTransporter().sendMail({
       from: mailFrom(),
       to,
       subject,
       html,
       envelope: { from: smtpUser, to }
     });
+    console.log(JSON.stringify({
+      event: "email.sent",
+      to,
+      messageId: result.messageId,
+      accepted: result.accepted,
+      rejected: result.rejected,
+      response: result.response
+    }));
   } catch (error) {
     if (error instanceof HttpError) throw error;
     console.error(JSON.stringify({

@@ -196,14 +196,10 @@ export async function login(identifier: string, password: string, metadata: { ip
 
 export async function registerBuyer(input: Record<string, unknown>) {
   const user = await createUser(input, "buyer");
-  try {
-    const token = await createAuthToken((user as { id: string }).id, verificationTokenType);
-    const email = input.email as string;
-    const message = buildVerificationEmail(token);
-    await sendEmail(email, message.subject, message.html);
-  } catch (err) {
-    console.error(JSON.stringify({ event: "email.register_send_failed", email: input.email, message: err instanceof Error ? err.message : "Unknown error" }));
-  }
+  const token = await createAuthToken((user as { id: string }).id, verificationTokenType);
+  const email = input.email as string;
+  const message = buildVerificationEmail(token);
+  await sendEmail(email, message.subject, message.html);
   return user;
 }
 
@@ -245,13 +241,9 @@ export async function registerPartner(input: Record<string, unknown>) {
       return { user, partner };
     });
     userId = result.user.id;
-    try {
-      const token = await createAuthToken(userId, verificationTokenType);
-      const emailMessage = buildVerificationEmail(token);
-      await sendEmail(input.email as string, emailMessage.subject, emailMessage.html);
-    } catch (err) {
-      console.error(JSON.stringify({ event: "email.partner_register_send_failed", email: input.email, message: err instanceof Error ? err.message : "Unknown error" }));
-    }
+    const token = await createAuthToken(userId, verificationTokenType);
+    const emailMessage = buildVerificationEmail(token);
+    await sendEmail(input.email as string, emailMessage.subject, emailMessage.html);
     return { user: sanitizeUser(result.user as unknown as Record<string, unknown>), partner: result.partner };
   } catch (error) {
     if (error instanceof HttpError) throw error;
@@ -295,11 +287,7 @@ export async function resendVerification(email: string) {
   await assertResendAllowed(user.id, verificationTokenType);
   const token = await createAuthToken(user.id, verificationTokenType);
   const message = buildVerificationEmail(token);
-  try {
-    await sendEmail(user.email, message.subject, message.html);
-  } catch (err) {
-    console.error(JSON.stringify({ event: "email.resend_send_failed", email: user.email, message: err instanceof Error ? err.message : "Unknown error" }));
-  }
+  await sendEmail(user.email, message.subject, message.html);
 }
 
 export async function forgotPassword(identifier: string) {
