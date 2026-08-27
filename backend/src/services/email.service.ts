@@ -1,9 +1,8 @@
 import nodemailer from "nodemailer";
-import { setDefaultResultOrder } from "node:dns";
+import { isIP } from "node:net";
+import { resolve4 } from "node:dns/promises";
 import { env } from "../config/env.js";
 import { HttpError } from "../utils/http-error.js";
-
-setDefaultResultOrder("ipv4first");
 
 function requireSmtpAuth() {
   if (!env.SMTP_USER || !env.SMTP_PASS) {
@@ -13,15 +12,18 @@ function requireSmtpAuth() {
   return { user: env.SMTP_USER, pass: env.SMTP_PASS.replace(/\s+/g, "") };
 }
 
-function getTransporter() {
+async function getTransporter() {
   const auth = requireSmtpAuth();
+  const host = isIP(env.SMTP_HOST) ? env.SMTP_HOST : (await resolve4(env.SMTP_HOST))[0];
+  if (!host) throw new Error(`No IPv4 address found for ${env.SMTP_HOST}`);
 
   return nodemailer.createTransport({
-    host: env.SMTP_HOST,
+    host,
     port: env.SMTP_PORT,
     secure: env.SMTP_PORT === 465,
     requireTLS: env.SMTP_PORT === 587,
     auth,
+    tls: { servername: env.SMTP_HOST },
     connectionTimeout: 10_000,
     greetingTimeout: 10_000,
     socketTimeout: 15_000
@@ -45,7 +47,7 @@ export async function sendEmail(to: string, subject: string, html: string) {
   const smtpUser = requireSmtpAuth().user;
 
   try {
-    const result = await getTransporter().sendMail({
+    const result = await (await getTransporter()).sendMail({
       from: mailFrom(),
       to,
       subject,
