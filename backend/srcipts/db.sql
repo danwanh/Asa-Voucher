@@ -1,5 +1,4 @@
--- WARNING: This schema is for context only and is not meant to be run.
--- Table order and constraints may not be valid for execution.
+-- Tables are ordered by foreign-key dependency.
 
 CREATE TABLE public.users (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -23,9 +22,7 @@ CREATE TABLE public.users (
   locked_until timestamp with time zone,
   auth_version integer NOT NULL DEFAULT 0,
   partner_id uuid,
-  CONSTRAINT users_pkey PRIMARY KEY (id),
-  CONSTRAINT users_partner_branch_fk FOREIGN KEY (partner_branches_id) REFERENCES public.partner_branches(id),
-  CONSTRAINT users_partner_fk FOREIGN KEY (partner_id) REFERENCES public.partners(id)
+  CONSTRAINT users_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.refresh_tokens (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -47,24 +44,6 @@ CREATE TABLE public.authentication_logs (
   occurred_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT authentication_logs_pkey PRIMARY KEY (id),
   CONSTRAINT authentication_logs_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
-);
-CREATE TABLE public.admin_logs (
-  id uuid NOT NULL DEFAULT gen_random_uuid(),
-  admin_id uuid NOT NULL,
-  target_user_id uuid,
-  target_partner_id uuid,
-  target_voucher_id uuid,
-  action character varying NOT NULL,
-  description text,
-  occurred_at timestamp with time zone NOT NULL DEFAULT now(),
-  target_order_id uuid,
-  content_type character varying,
-  CONSTRAINT admin_logs_pkey PRIMARY KEY (id),
-  CONSTRAINT admin_logs_admin_id_fkey FOREIGN KEY (admin_id) REFERENCES public.users(id),
-  CONSTRAINT admin_logs_target_user_id_fkey FOREIGN KEY (target_user_id) REFERENCES public.users(id),
-  CONSTRAINT admin_logs_target_partner_fk FOREIGN KEY (target_partner_id) REFERENCES public.partners(id),
-  CONSTRAINT admin_logs_target_voucher_fk FOREIGN KEY (target_voucher_id) REFERENCES public.voucher_products(id),
-  CONSTRAINT admin_logs_target_order_id_fkey FOREIGN KEY (target_order_id) REFERENCES public.orders(id)
 );
 CREATE TABLE public.partners (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -379,4 +358,28 @@ CREATE TABLE public.voucher_check_logs (
   created_at timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT voucher_check_logs_pkey PRIMARY KEY (id),
   CONSTRAINT voucher_check_logs_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+
+-- Complete the users <-> partners/partner_branches dependency cycle after both tables exist.
+ALTER TABLE public.users
+  ADD CONSTRAINT users_partner_fk FOREIGN KEY (partner_id) REFERENCES public.partners(id),
+  ADD CONSTRAINT users_partner_branch_fk FOREIGN KEY (partner_branches_id) REFERENCES public.partner_branches(id);
+
+CREATE TABLE public.admin_logs (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  admin_id uuid NOT NULL,
+  target_user_id uuid,
+  target_partner_id uuid,
+  target_voucher_id uuid,
+  action character varying NOT NULL,
+  description text,
+  occurred_at timestamp with time zone NOT NULL DEFAULT now(),
+  target_order_id uuid,
+  content_type character varying,
+  CONSTRAINT admin_logs_pkey PRIMARY KEY (id),
+  CONSTRAINT admin_logs_admin_id_fkey FOREIGN KEY (admin_id) REFERENCES public.users(id),
+  CONSTRAINT admin_logs_target_user_id_fkey FOREIGN KEY (target_user_id) REFERENCES public.users(id),
+  CONSTRAINT admin_logs_target_partner_fk FOREIGN KEY (target_partner_id) REFERENCES public.partners(id),
+  CONSTRAINT admin_logs_target_voucher_fk FOREIGN KEY (target_voucher_id) REFERENCES public.voucher_products(id),
+  CONSTRAINT admin_logs_target_order_id_fkey FOREIGN KEY (target_order_id) REFERENCES public.orders(id)
 );
