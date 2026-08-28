@@ -36,11 +36,13 @@ function tokenExpiresAt() {
 }
 
 export function setRefreshCookie(res: Response, token: string) {
+  const isHttpsDeployment = env.NODE_ENV === "production" || env.FRONTEND_URL.startsWith("https://");
+
   res.cookie(refreshCookieName, token, {
     httpOnly: true,
-    secure: env.NODE_ENV === "production",
-    // Vercel and Render use different sites in production.
-    sameSite: env.NODE_ENV === "production" ? "none" : "lax",
+    secure: isHttpsDeployment,
+    // Vercel and Render use different sites even when NODE_ENV is development.
+    sameSite: isHttpsDeployment ? "none" : "lax",
     path: "/api",
     maxAge: env.JWT_REFRESH_EXPIRES_IN_DAYS * 24 * 60 * 60 * 1000
   });
