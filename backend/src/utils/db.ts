@@ -14,6 +14,9 @@ export function throwDbError(error: unknown, fallback = "Lỗi hệ thống"): n
     if (target.includes("phone")) {
       throw new HttpError(409, "Số điện thoại đã tồn tại trong hệ thống", "CONFLICT");
     }
+    if (target.includes("tax_number")) {
+      throw new HttpError(409, "Mã số thuế đã tồn tại trong hệ thống", "DUPLICATE_TAX_NUMBER");
+    }
     throw new HttpError(409, `Dữ liệu trùng lặp: ${target.join(", ") || "không xác định"}`, "CONFLICT");
   }
 

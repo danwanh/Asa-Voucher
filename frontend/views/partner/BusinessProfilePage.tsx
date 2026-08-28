@@ -79,6 +79,7 @@ export function BusinessProfilePage({ user, partner, onPartnerUpdated }: Props) 
   const [partnerForm, setPartnerForm] = useState<PartnerForm>(() => mapPartnerToForm(partner))
   const [representative, setRepresentative] = useState<RepresentativeForm>(() => mapUserToRepresentative(user))
   const [isSaving, setIsSaving] = useState(false)
+  const [taxNumberError, setTaxNumberError] = useState("")
 
   const hasProfile = Boolean(partner)
   const pendingReadonly = partner?.approvalStatus === "pending"
@@ -90,6 +91,7 @@ export function BusinessProfilePage({ user, partner, onPartnerUpdated }: Props) 
 
   const setPartnerField = (key: keyof PartnerForm, value: string) => {
     setPartnerForm((prev) => ({ ...prev, [key]: value }))
+    if (key === "taxNumber") setTaxNumberError("")
   }
 
   const setRepresentativeField = (key: keyof RepresentativeForm, value: string) => {
@@ -144,6 +146,7 @@ export function BusinessProfilePage({ user, partner, onPartnerUpdated }: Props) 
 
     setIsSaving(true)
     try {
+      setTaxNumberError("")
       const profilePayload = {
         full_name: representative.fullName,
         phone: representative.phone || undefined,
@@ -188,8 +191,14 @@ export function BusinessProfilePage({ user, partner, onPartnerUpdated }: Props) 
 
       await syncLatestPartnerAndUser()
     } catch (error: unknown) {
-      const err = error as { response?: { data?: { error?: { message?: string } } } }
-      toast.error(err?.response?.data?.error?.message ?? "Không thể lưu hồ sơ đối tác")
+      const err = error as { response?: { data?: { error?: { code?: string; message?: string } } } }
+      const code = err?.response?.data?.error?.code
+      const message = err?.response?.data?.error?.message ?? "Không thể lưu hồ sơ đối tác"
+      if (code === "DUPLICATE_TAX_NUMBER" || message.toLowerCase().includes("mã số thuế") || message.includes("tax_number")) {
+        setTaxNumberError("Mã số thuế đã tồn tại trong hệ thống")
+      } else {
+        toast.error(message)
+      }
     } finally {
       setIsSaving(false)
     }
@@ -256,11 +265,12 @@ export function BusinessProfilePage({ user, partner, onPartnerUpdated }: Props) 
             <label className="text-sm font-bold block mb-1.5" style={{ color: C.indigo }}>Mã số thuế</label>
             <input
               className={inputClass}
-              style={inputStyle}
+              style={{ ...inputStyle, borderColor: taxNumberError ? "#EF4444" : inputStyle.borderColor }}
               value={partnerForm.taxNumber}
               onChange={(event) => setPartnerField("taxNumber", event.target.value)}
               disabled={isSaving || pendingReadonly}
             />
+            {taxNumberError && <p className="text-xs mt-1.5" style={{ color: "#EF4444" }}>{taxNumberError}</p>}
           </div>
         </div>
 

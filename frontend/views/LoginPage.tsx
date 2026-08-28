@@ -375,13 +375,17 @@ function RegisterForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
       setResendCooldown(60)
       setResendMessage("")
     } catch (error: unknown) {
-      const err = error as { response?: { data?: { error?: { message?: string } } } }
+      const err = error as { response?: { data?: { error?: { code?: string; message?: string } } } }
+      const code = err?.response?.data?.error?.code
       const message = err?.response?.data?.error?.message ?? "Đăng ký thất bại"
       if (message.toLowerCase().includes("email")) {
         setErrors({ email: "Email đã tồn tại trong hệ thống" })
         setGeneralErr("")
       } else if (message.toLowerCase().includes("điện thoại")) {
         setErrors({ phone: "Số điện thoại đã tồn tại trong hệ thống" })
+        setGeneralErr("")
+      } else if (code === "DUPLICATE_TAX_NUMBER" || message.toLowerCase().includes("mã số thuế") || message.includes("tax_number")) {
+        setErrors({ taxCode: "Mã số thuế đã tồn tại trong hệ thống" })
         setGeneralErr("")
       } else {
         setGeneralErr(message)
