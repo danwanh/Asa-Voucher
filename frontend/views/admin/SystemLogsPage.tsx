@@ -428,7 +428,7 @@ export function SystemLogsPage() {
           ))}
         </select>
 
-        <div className="relative" ref={actorRef}>
+        <div className="relative w-full sm:w-[360px] lg:w-[420px]" ref={actorRef}>
           <input
             type="text"
             value={actorFilter ? actorSearch : actorSearch}
@@ -441,16 +441,16 @@ export function SystemLogsPage() {
             }}
             onFocus={() => setShowActorDropdown(true)}
             placeholder="Tìm tác nhân (tên hoặc email)"
-            className="px-3 py-2 rounded-xl text-xs border bg-white"
-            style={{ borderColor: "#E5E7EB", color: C.indigo, minWidth: 180 }}
+            className="w-full px-4 py-3 rounded-xl text-sm border bg-white"
+            style={{ borderColor: "#E5E7EB", color: C.indigo }}
           />
           {actorFilter && (
             <button
               type="button"
               onClick={() => { setActorFilter(""); setActorSearch(""); setShowActorDropdown(false) }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
             >
-              <X className="w-3 h-3" />
+              <X className="w-4 h-4" />
             </button>
           )}
           {showActorDropdown && actorSearch.trim() && filteredActors.length > 0 && (
