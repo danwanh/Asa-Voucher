@@ -13,6 +13,7 @@ import type { StaffPage } from "@/layouts/StaffLayout"
 import type { VoucherStaffPage } from "@/routes/VoucherStaffApp"
 import { toast } from "sonner"
 import { LoadingState } from "@/components/LoadingState"
+import { getRoleLandingPath } from "@/utils/roleRoutes"
 
 const loading = () => <LoadingState label="Đang tải ứng dụng..." variant="page" />
 const GuestApp = dynamic(() => import("@/routes/GuestApp").then((module) => module.GuestApp), { loading })
@@ -93,6 +94,9 @@ export default function App({ initialPage, initialOrderId, initialVoucherId, ini
   const initialize = useAuthStore((s) => s.initialize)
   const logout = useAuthStore((s) => s.logout)
   const router = useRouter()
+  const isPartnerRole = user?.role === "partner_owner"
+    || user?.role === "partner_voucher_staff"
+    || user?.role === "partner_store_staff"
 
   const [showLogin, setShowLogin] = useState(false)
   const [pendingCheckout, setPendingCheckout] = useState(false)
@@ -102,6 +106,16 @@ export default function App({ initialPage, initialOrderId, initialVoucherId, ini
     cart, add, remove, update, clear, resetLocalState, removeMany, total, count, cartCount, cartCountLoading, isLoading: cartLoading, hasLoaded: cartHasLoaded,
     checkoutDraft, checkoutCartItemIds, checkoutItems, setCartCheckout, setDirectCheckout, clearCheckoutDraft,
   } = useCartContext()
+
+  useEffect(() => {
+    if (!isInitialized || !user || !routePath?.startsWith("/partner") || isPartnerRole) return
+
+    if (user.role === "admin_content" || user.role === "admin_operations" || user.role === "admin_security") {
+      router.replace("/admin")
+    } else {
+      router.replace("/")
+    }
+  }, [isInitialized, isPartnerRole, routePath, router, user])
 
   useEffect(() => {
     if (!pendingCheckout || !user || !checkoutDraft) return
@@ -133,8 +147,9 @@ export default function App({ initialPage, initialOrderId, initialVoucherId, ini
     setShowLogin(true)
   }
 
-  const handleLoginSuccess = (_u: AppUser) => {
+  const handleLoginSuccess = (u: AppUser) => {
     setShowLogin(false)
+    if (!pendingCheckout) router.replace(getRoleLandingPath(u.role))
   }
 
   const handleLoginBack = () => {
@@ -188,6 +203,10 @@ export default function App({ initialPage, initialOrderId, initialVoucherId, ini
       <button onClick={() => void initialize()} className="mt-6 rounded-2xl bg-[#E07A5F] px-6 py-3 font-bold text-white">Thử lại</button>
     </div>
   )
+
+  if (isInitialized && user && routePath?.startsWith("/partner") && !isPartnerRole) {
+    return <LoadingState label="Đang chuyển hướng..." variant="page" />
+  }
 
   if (!user && !showLogin && isPublicRoute) return (
     <GuestApp
