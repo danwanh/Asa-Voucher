@@ -124,18 +124,18 @@ export function VoucherStaffApp({ user, onLogout, initialPage, initialVoucherId 
 
   useEffect(() => {
     if (page === "edit" && selectedVoucher && ["rejected", "expired", "locked", "sold_out"].includes(selectedVoucher.status)) {
-      router.replace(`/voucher-staff/vouchers/${selectedVoucher.id}`)
+      router.replace(`/partner/vouchers/${selectedVoucher.id}`)
     }
   }, [page, router, selectedVoucher])
 
   const goEdit = (v: Voucher) => {
     setSelectedVoucher(v)
     const nextPage = ["rejected", "expired", "locked", "sold_out"].includes(v.status) ? "voucher-detail" : "edit"
-    router.push(`/voucher-staff/vouchers/${v.id}/${nextPage === "edit" ? "edit" : ""}`.replace(/\/$/, ""))
+    router.push(`/partner/vouchers/${v.id}/${nextPage === "edit" ? "edit" : ""}`.replace(/\/$/, ""))
   }
   const goDetail = (v: Voucher) => {
     setSelectedVoucher(v)
-    router.push(`/voucher-staff/vouchers/${v.id}`)
+    router.push(`/partner/vouchers/${v.id}`)
   }
 
   const ACCENT = "#81B29A"
@@ -191,7 +191,7 @@ export function VoucherStaffApp({ user, onLogout, initialPage, initialVoucherId 
           return (
             <button
               key={n.pg}
-              onClick={() => { router.push(`/voucher-staff/${n.pg === "profile" ? "profile" : n.pg}`); setMobileOpen(false) }}
+              onClick={() => { router.push(`/partner/${n.pg === "profile" ? "profile" : n.pg}`); setMobileOpen(false) }}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-left transition-all"
               style={{
                 backgroundColor: active ? ACCENT : "transparent",
@@ -257,22 +257,22 @@ export function VoucherStaffApp({ user, onLogout, initialPage, initialVoucherId 
 
         <main className="flex-1 overflow-y-auto" style={{ backgroundColor: C.content }}>
           {page === "vouchers" && (
-            <PartnerVouchersPage onCreateNew={() => router.push("/voucher-staff/vouchers/new")} onEdit={goEdit} onDetail={goDetail} />
+            <PartnerVouchersPage onCreateNew={() => router.push("/partner/vouchers/new")} onEdit={goEdit} onDetail={goDetail} />
           )}
-          {page === "create" && <CreateVoucherPage onBack={() => router.push("/voucher-staff/vouchers")} onSaveDraft={() => router.push("/voucher-staff/vouchers")} />}
+          {page === "create" && <CreateVoucherPage onBack={() => router.push("/partner/vouchers")} onSaveDraft={() => router.push("/partner/vouchers")} />}
           {page === "edit" && (
             selectedVoucher ? (
               <EditVoucherPage
                 voucher={selectedVoucher}
                 lockPriceAndQuantity={locksPriceAndQuantityFor(selectedVoucher)}
-                onBack={() => router.push("/voucher-staff/vouchers")}
+                onBack={() => router.push("/partner/vouchers")}
                 onSave={(v) => setSelectedVoucher(v)}
               />
             ) : voucherRouteFallback
           )}
           {page === "voucher-detail" && (
             selectedVoucher ? (
-              <PartnerVoucherDetailPage voucher={selectedVoucher} onBack={() => router.push("/voucher-staff/vouchers")} onEdit={goEdit} />
+              <PartnerVoucherDetailPage voucher={selectedVoucher} onBack={() => router.push("/partner/vouchers")} onEdit={goEdit} />
             ) : voucherRouteFallback
           )}
           {page === "reports" && <PartnerRevenuePage />}

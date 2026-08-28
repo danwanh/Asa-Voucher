@@ -4,8 +4,8 @@ BEGIN;
 
 CREATE TABLE public.users (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
-  email character varying NOT NULL,
-  phone character varying,
+  email character varying NOT NULL UNIQUE,
+  phone character varying UNIQUE,
   password_hash character varying NOT NULL,
   full_name character varying NOT NULL,
   avatar_url text,

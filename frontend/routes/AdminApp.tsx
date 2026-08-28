@@ -15,15 +15,19 @@ interface Props {
 }
 
 function pageFromRoute(routePath: string | undefined, role: AppUser["role"]) {
-  const segment = routePath?.split("/").filter(Boolean).at(-1)
+  const segments = routePath?.split("/").filter(Boolean) ?? []
+  const segment = segments.at(-1)
   if (role === "admin_content") {
+    if (segments.length === 2 && segments[1] === "content") return "dashboard"
     if (segment === "content" || segment === "categories" || segment === "approval" || segment === "profile") return segment
     return "dashboard"
   }
   if (role === "admin_operations") {
-    if (segment === "users" || segment === "partners" || segment === "orders" || segment === "profile") return segment
+    if (segments.length === 2 && segments[1] === "operations") return "dashboard"
+    if (segment === "users" || segment === "partners" || segment === "orders" || segment === "complaints" || segment === "profile") return segment
     return "dashboard"
   }
+  if (role === "admin_security" && segments.length === 2 && segments[1] === "security") return "logs"
   if (segment === "security" || segment === "profile") return segment
   return "logs"
 }

@@ -44,6 +44,7 @@ export function ContentTechAdminApp({ user, onLogout, onSwitchRole }: Props) {
       role={ROLE}
       page={page}
       navItems={NAV}
+      basePath="/admin/content"
       onNavigate={() => undefined}
       onLogout={onLogout}
       onSwitchRole={onSwitchRole}

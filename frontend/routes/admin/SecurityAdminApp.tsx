@@ -11,7 +11,9 @@ type Page = "logs" | "security" | "profile"
 const VALID_PAGES: Page[] = ["logs", "security", "profile"]
 
 function pageFromPath(pathname: string, fallback: Page): Page {
-  const segment = pathname.split("/").filter(Boolean).at(-1) as Page | undefined
+  const segments = pathname.split("/").filter(Boolean)
+  if (segments.length === 2 && segments[1] === "security") return "logs"
+  const segment = segments.at(-1) as Page | undefined
   return segment && VALID_PAGES.includes(segment) ? segment : fallback
 }
 
@@ -38,7 +40,7 @@ export function SecurityAdminApp({ user, onLogout, onSwitchRole, initialPage }: 
   const page = pageFromPath(pathname, initialPage ?? "logs")
 
   return (
-    <SubAdminLayout user={user} role={ROLE} page={page} navItems={NAV}
+    <SubAdminLayout user={user} role={ROLE} page={page} navItems={NAV} basePath="/admin/security"
       onNavigate={() => undefined} onLogout={onLogout} onSwitchRole={onSwitchRole}>
       {page === "logs"     && <SystemLogsPage />}
       {page === "security" && <SecurityMonitorPage />}

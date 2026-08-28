@@ -15,7 +15,9 @@ type Page = "dashboard" | "content" | "categories" | "approval" | "profile"
 const VALID_PAGES: Page[] = ["dashboard", "content", "categories", "approval", "profile"]
 
 function pageFromPath(pathname: string, fallback: Page): Page {
-  const segment = pathname.split("/").filter(Boolean).at(-1) as Page | undefined
+  const segments = pathname.split("/").filter(Boolean)
+  if (segments.length === 2 && segments[1] === "content") return "dashboard"
+  const segment = segments.at(-1) as Page | undefined
   return segment && VALID_PAGES.includes(segment) ? segment : fallback
 }
 
@@ -65,7 +67,7 @@ export function ContentAdminApp({ user, onLogout, onSwitchRole, initialPage }: P
   ]
 
   return (
-    <SubAdminLayout user={user} role={ROLE} page={page} navItems={NAV}
+    <SubAdminLayout user={user} role={ROLE} page={page} navItems={NAV} basePath="/admin/content"
       onNavigate={() => undefined} onLogout={onLogout} onSwitchRole={onSwitchRole}>
       {page === "dashboard"   && <AdminContentDashboardPage />}
       {page === "content"     && <ContentManagementPage />}

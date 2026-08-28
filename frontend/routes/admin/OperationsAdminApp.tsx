@@ -44,7 +44,7 @@ export function OperationsAdminApp({ user, onLogout, onSwitchRole, initialPage }
   ]
 
   return (
-    <SubAdminLayout user={user} role={ROLE} page={page} navItems={navItems}
+    <SubAdminLayout user={user} role={ROLE} page={page} navItems={navItems} basePath="/admin/operations"
       onNavigate={() => undefined} onLogout={onLogout} onSwitchRole={onSwitchRole}>
       {page === "dashboard"  && <AdminOperationsDashboardPage />}
       {page === "users"      && <UserManagementPage />}

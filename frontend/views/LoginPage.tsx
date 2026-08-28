@@ -376,7 +376,16 @@ function RegisterForm({ onNavigate }: { onNavigate: (p: AuthPage) => void }) {
       setResendMessage("")
     } catch (error: unknown) {
       const err = error as { response?: { data?: { error?: { message?: string } } } }
-      setGeneralErr(err?.response?.data?.error?.message ?? "Đăng ký thất bại")
+      const message = err?.response?.data?.error?.message ?? "Đăng ký thất bại"
+      if (message.toLowerCase().includes("email")) {
+        setErrors({ email: "Email đã tồn tại trong hệ thống" })
+        setGeneralErr("")
+      } else if (message.toLowerCase().includes("điện thoại")) {
+        setErrors({ phone: "Số điện thoại đã tồn tại trong hệ thống" })
+        setGeneralErr("")
+      } else {
+        setGeneralErr(message)
+      }
     } finally {
       isSubmittingRef.current = false
       setIsRegistering(false)

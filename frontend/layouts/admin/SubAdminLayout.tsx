@@ -30,10 +30,11 @@ interface Props {
   onNavigate: (pg: string) => void
   onLogout: () => void
   onSwitchRole: () => void
+  basePath: string
   children: React.ReactNode
 }
 
-export function SubAdminLayout({ user, role, page, navItems, onNavigate, onLogout, onSwitchRole, children }: Props) {
+export function SubAdminLayout({ user, role, page, navItems, onNavigate, onLogout, onSwitchRole, basePath, children }: Props) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const router = useRouter()
 
@@ -83,7 +84,7 @@ export function SubAdminLayout({ user, role, page, navItems, onNavigate, onLogou
               key={n.pg}
               onClick={() => {
                 onNavigate(n.pg)
-                router.push(`/admin/${n.pg}`)
+                router.push(n.pg === "dashboard" ? basePath : `${basePath}/${n.pg}`)
                 setMobileOpen(false)
               }}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-left transition-all"
