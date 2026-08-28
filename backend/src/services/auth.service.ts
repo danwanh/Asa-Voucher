@@ -39,7 +39,8 @@ export function setRefreshCookie(res: Response, token: string) {
   res.cookie(refreshCookieName, token, {
     httpOnly: true,
     secure: env.NODE_ENV === "production",
-    sameSite: "lax",
+    // Vercel and Render use different sites in production.
+    sameSite: env.NODE_ENV === "production" ? "none" : "lax",
     path: "/api",
     maxAge: env.JWT_REFRESH_EXPIRES_IN_DAYS * 24 * 60 * 60 * 1000
   });

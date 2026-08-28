@@ -195,7 +195,11 @@ describe("Auth Service", () => {
       expect(res.cookie).toHaveBeenCalledWith(
         "refresh_token",
         "token123",
-        expect.objectContaining({ httpOnly: true })
+        expect.objectContaining({
+          httpOnly: true,
+          sameSite: "lax",
+          secure: false
+        })
       );
     });
 
