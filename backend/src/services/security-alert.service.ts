@@ -58,7 +58,7 @@ export async function lockAccount(user: AuthUser, id: string) {
   await prisma.$transaction(async (tx) => {
     await tx.user.update({
       where: { id: alert.user_id },
-      data: { locked_until: lockedUntil, auth_version: { increment: 1 },},
+      data: { is_active: false, locked_until: lockedUntil, auth_version: { increment: 1 } },
     });
 
     await tx.securityAlert.update({
@@ -91,7 +91,7 @@ export async function unlockAccount(user: AuthUser, id: string) {
   await prisma.$transaction(async (tx) => {
     await tx.user.update({
       where: { id: alert.user_id },
-      data: { locked_until: null, failed_login_attempts: 0 },
+      data: { is_active: true, locked_until: null, failed_login_attempts: 0 },
     });
 
     await tx.securityAlert.update({
