@@ -102,6 +102,7 @@ export interface Voucher {
   quantity: number
   sold: number
   status: VoucherStatus
+  rejection_reason?: string | null
   rating: number
   reviews: number
   description: string

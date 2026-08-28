@@ -30,6 +30,7 @@ export type BackendVoucherProduct = {
   status: string
   workflow_status?: string
   workflow_label?: string
+  rejection_reason?: string | null
   average_rating?: number
   review_count?: number
   submitted_at?: string | null
@@ -245,6 +246,7 @@ function mapVoucherProduct(product: BackendVoucherProduct, categorySlug: string)
     quantity: product.total_quantity,
     sold,
     status: mapStatus(product),
+    rejection_reason: product.rejection_reason ?? null,
     rating: product.average_rating ?? 0,
     reviews: product.review_count ?? 0,
     description: product.description ?? "",
