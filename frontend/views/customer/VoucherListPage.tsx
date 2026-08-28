@@ -5,7 +5,7 @@ import { AppIcon } from "@/components/AppIcon"
 import { VoucherCard } from "@/components/VoucherCard"
 import type { Voucher } from "@/types"
 import { voucherService } from "@/services/voucherService"
-import { parseApplicableAreas } from "@/utils/applicableArea"
+import { normalizeAreaName, parseApplicableAreas } from "@/utils/applicableArea"
 import { LoadingState } from "@/components/LoadingState"
 
 interface Props {
@@ -93,6 +93,7 @@ export function VoucherListPage({ onAddToCart, onBuyNow, onDetail, searchQuery, 
   const [sort, setSort] = useState("popular")
   const [showFilters, setShowFilters] = useState(false)
   const [source, setSource] = useState<Voucher[]>([])
+  const [filterOptionSource, setFilterOptionSource] = useState<Voucher[]>([])
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [isLoading, setIsLoading] = useState(true)
@@ -103,6 +104,34 @@ export function VoucherListPage({ onAddToCart, onBuyNow, onDetail, searchQuery, 
     const timer = window.setTimeout(() => setDebouncedSearchQuery(searchQuery), 350)
     return () => window.clearTimeout(timer)
   }, [searchQuery])
+
+  useEffect(() => {
+    let isMounted = true
+    const controller = new AbortController()
+
+    async function loadFilterOptions() {
+      try {
+        const firstPage = await voucherService.listPublicVouchersPage({ page: 1, limit: 100 }, { signal: controller.signal })
+        const remainingPages = Array.from({ length: Math.max(0, firstPage.totalPages - 1) }, (_, index) => index + 2)
+        const remainingResults = await Promise.all(
+          remainingPages.map((pageNumber) =>
+            voucherService.listPublicVouchersPage({ page: pageNumber, limit: 100 }, { signal: controller.signal })
+          )
+        )
+        const items = [firstPage, ...remainingResults].flatMap((result) => result.items)
+        if (isMounted) setFilterOptionSource(items)
+      } catch {
+        if (controller.signal.aborted) return
+        if (isMounted) setFilterOptionSource([])
+      }
+    }
+
+    loadFilterOptions()
+    return () => {
+      isMounted = false
+      controller.abort()
+    }
+  }, [])
 
   const updateFilters = (patch: Partial<Props["filters"]>) => {
     onFiltersChange({ ...filters, ...patch })
@@ -151,10 +180,12 @@ export function VoucherListPage({ onAddToCart, onBuyNow, onDetail, searchQuery, 
     setPage(1)
   }, [debouncedSearchQuery, filters.categoryId, filters.partnerId, filters.area])
 
+  const optionSource = filterOptionSource.length > 0 ? filterOptionSource : source
+
   const categoryOptions = useMemo(() => {
     const map = new Map<string, { id: string; label: string }>()
 
-    for (const voucher of source) {
+    for (const voucher of optionSource) {
       const categoryId = voucher.categoryId ?? voucher.category
       if (map.has(categoryId)) continue
       const label = formatCategoryLabel(voucher.category)
@@ -162,27 +193,35 @@ export function VoucherListPage({ onAddToCart, onBuyNow, onDetail, searchQuery, 
     }
 
     return [{ id: "all", label: "Tất cả" }, ...Array.from(map.values())]
-  }, [source])
+  }, [optionSource])
 
   const partnerOptions = useMemo(() => {
     const map = new Map<string, { id: string; label: string }>()
-    for (const voucher of source) {
+    for (const voucher of optionSource) {
       if (!map.has(voucher.partnerId)) {
         map.set(voucher.partnerId, { id: voucher.partnerId, label: voucher.partnerName || voucher.partnerId })
       }
     }
     return [{ id: "all", label: "Tất cả đối tác" }, ...Array.from(map.values())]
-  }, [source])
+  }, [optionSource])
 
   const areaOptions = useMemo(() => {
     const values = new Set<string>()
-    for (const voucher of source) {
+    for (const voucher of optionSource) {
       for (const area of parseApplicableAreas(voucher.applicableArea)) {
         values.add(area)
       }
     }
+
+    if (filters.area !== "all") {
+      const selectedArea = normalizeAreaName(filters.area)
+      if (selectedArea) values.add(selectedArea)
+    }
+
     return ["all", ...Array.from(values).sort((a, b) => a.localeCompare(b, "vi"))]
-  }, [source])
+  }, [optionSource, filters.area])
+
+  const selectedAreaValue = filters.area === "all" ? "all" : normalizeAreaName(filters.area)
 
   const hasActiveFilters =
     filters.categoryId !== "all" ||
@@ -302,7 +341,7 @@ export function VoucherListPage({ onAddToCart, onBuyNow, onDetail, searchQuery, 
               <select
                 className="px-3 py-2.5 rounded-xl border text-sm outline-none font-semibold cursor-pointer w-full"
                 style={{ borderColor: "#E2DFC8", backgroundColor: "white", color: C.indigo, fontFamily: "'Nunito', sans-serif" }}
-                value={filters.area}
+                value={selectedAreaValue}
                 onChange={(e) => updateFilters({ area: e.target.value })}
               >
                 {areaOptions.map((area) => <option key={area} value={area}>{area === "all" ? "Tất cả khu vực" : area}</option>)}
