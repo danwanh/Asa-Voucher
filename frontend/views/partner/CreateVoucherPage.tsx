@@ -170,6 +170,7 @@ export function CreateVoucherPage({ partnerId, onBack }: Props) {
     if (!form.name.trim()) nextErrors.name = "Vui lòng nhập tên voucher"
     if (!form.categoryId) nextErrors.categoryId = "Vui lòng chọn danh mục"
     if (!form.description.trim()) nextErrors.description = "Vui lòng nhập mô tả"
+    if (images.length === 0) nextErrors.images = "Vui lòng thêm ít nhất một ảnh voucher"
     if (!Number.isFinite(originalPrice) || originalPrice <= 0) nextErrors.originalPrice = "Giá gốc phải lớn hơn 0"
     if (!Number.isFinite(sellingPrice) || sellingPrice <= 0) nextErrors.sellingPrice = "Giá bán phải lớn hơn 0"
     if (Number.isFinite(originalPrice) && Number.isFinite(sellingPrice) && sellingPrice >= originalPrice) {
@@ -352,11 +353,16 @@ export function CreateVoucherPage({ partnerId, onBack }: Props) {
                 Hệ thống tự động lấy khu vực từ tỉnh/thành của chi nhánh áp dụng.
               </p>
             </Field>
-            <Field label="Ảnh voucher">
+            <Field label="Ảnh voucher *" error={errors.images}>
               <VoucherImagesManager
                 images={images}
                 disabled={Boolean(createdVoucherId)}
-                onChange={setImages}
+                onChange={(nextImages) => {
+                  setImages(nextImages)
+                  if (nextImages.length > 0) {
+                    setErrors((current) => ({ ...current, images: "" }))
+                  }
+                }}
                 onError={toast.error}
               />
             </Field>
