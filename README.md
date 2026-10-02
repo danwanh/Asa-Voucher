@@ -1,164 +1,250 @@
-# Asa Voucher Platform
+<a id="readme-top"></a>
 
-Asa Voucher là nền tảng thương mại điện tử chuyên bán **voucher điện tử** trực tuyến, kết nối khách hàng, đối tác doanh nghiệp và nhân viên cửa hàng trong một hệ sinh thái quản lý voucher toàn diện.
+<!-- PROJECT LOGO -->
+<br />
+<div align="center">
+  <a href="https://asa-voucher.vercel.app/">
+    <img src="frontend/public/logo.png" alt="Asa Voucher Logo" width="100" height="80">
+  </a>
 
----
+  <h3 align="center">Asa Voucher Platform</h3>
 
-## Tổng quan dự án
+  <p align="center">
+    An e-commerce platform for buying, selling and redeeming digital vouchers.
+    <br />
+    <br />
+    <a href="https://asa-voucher.vercel.app/">View Demo</a>
 
-| Thành phần | Công nghệ |
+  </p>
+</div>
+
+<br />
+
+<!-- TABLE OF CONTENTS -->
+<details>
+  <summary>Table of Contents</summary>
+  <ol>
+    <li>
+      <a href="#about-the-project">About The Project</a>
+      <ul>
+        <li><a href="#built-with">Built With</a></li>
+      </ul>
+    </li>
+    <li>
+      <a href="#getting-started">Getting Started</a>
+      <ul>
+        <li><a href="#prerequisites">Prerequisites</a></li>
+        <li><a href="#installation">Installation</a></li>
+      </ul>
+    </li>
+    <li><a href="#usage">Usage</a></li>
+  </ol>
+</details>
+
+<br />
+
+<!-- ABOUT THE PROJECT -->
+## About The Project
+
+[![Asa Voucher][product-screenshot]](https://asa-voucher.vercel.app/)
+
+**Asa Voucher** is an e-commerce platform for selling **digital vouchers** online. It connects customers, partner businesses and store staff in a single ecosystem for managing vouchers end to end.
+
+🌐 **Live deployment:** [https://asa-voucher.vercel.app/](https://asa-voucher.vercel.app/)
+
+### Key Features
+
+* **Customers** browse and search vouchers, add them to a cart, pay (VNPay / PayPal sandbox) and receive a voucher code / QR code.
+
+* **Partners** register their business, manage staff, create vouchers and submit them for approval, and view revenue reports.
+
+* **Store staff** scan a QR code or enter a code to redeem vouchers at the point of sale.
+
+* **Admins** approve partners and vouchers, manage accounts and monitor audit logs.
+
+### User Roles
+
+| Role | Description |
 |---|---|
-| Frontend | Next.js 14+, React, TypeScript, Tailwind CSS |
-| Backend | Node.js, Express.js, TypeScript |
-| Database | Supabase PostgreSQL |
+| `buyer` | Customer who purchases vouchers |
+| `partner_owner` | Owner of a partner business |
+| `partner_voucher_staff` | Partner staff who create and manage vouchers |
+| `partner_store_staff` | Store staff who redeem vouchers |
+| `admin_content` | Content admin who reviews vouchers |
+| `admin_operations` | Operations admin who manages accounts and partners |
+| `admin_security` | Security admin who manages logs and security |
 
----
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-## Vai trò người dùng
+### Built With
 
-| Vai trò | Mô tả |
+* [![Next][Next.js]][Next-url]
+
+* [![React][React.js]][React-url]
+
+* [![TypeScript][TypeScript]][TypeScript-url]
+
+* [![Tailwind][TailwindCSS]][Tailwind-url]
+
+* [![Express][Express.js]][Express-url]
+
+* [![Prisma][Prisma]][Prisma-url]
+
+* [![Supabase][Supabase]][Supabase-url]
+
+* [![Vercel][Vercel]][Vercel-url]
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+
+<!-- GETTING STARTED -->
+## Getting Started
+
+Follow these steps to set up and run the project locally.
+
+
+### Prerequisites
+
+* **Node.js** >= 20 LTS
+
+* **npm** >= 10
+
+  ```sh
+  npm install npm@latest -g
+  ```
+
+* A **Supabase** project (PostgreSQL connection string + API keys)
+
+* (Optional) A **Cloudinary** account for image uploads, and SMTP/Resend for sending email
+
+
+### Installation
+
+1. Clone the repo
+
+   ```sh
+   git clone https://github.com/danwanh/Asa-Voucher.git
+   cd Asa-Voucher
+   ```
+
+2. Install dependencies for both frontend and backend
+
+   ```sh
+   npm run install:all
+   ```
+
+3. Create the environment files from the examples and fill in real values
+
+   ```sh
+   cp backend/.env.example backend/.env
+   cp frontend/.env.example frontend/.env.local
+   ```
+
+   Frontend (`frontend/.env.local`):
+
+   ```env
+   NEXT_PUBLIC_API_BASE_URL=http://localhost:5000/api
+   NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+   ```
+
+   Backend (`backend/.env`), key variables:
+
+   ```env
+   PORT=5000
+   FRONTEND_URL=http://localhost:3000
+   DATABASE_URL="postgresql://postgres.your-project-ref:[YOUR-PASSWORD]@aws-0-region.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1"
+   DIRECT_URL="postgresql://postgres:[YOUR-PASSWORD]@db.your-project-ref.supabase.co:5432/postgres"
+   JWT_SECRET=your-jwt-secret
+   ```
+
+
+4. Set up the database
+
+   ```sh
+   cd backend
+   npm run prisma:generate
+   npm run prisma:migrate:deploy
+   npm run seed   # (optional) sample data
+   cd ..
+   ```
+
+5. Run the backend and frontend (in two separate terminals)
+
+   ```sh
+   npm run dev:backend    # http://localhost:5000
+   npm run dev:frontend   # http://localhost:3000
+   ```
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+<br />
+
+<!-- USAGE EXAMPLES -->
+## Usage
+
+Try the live demo at **[asa-voucher.vercel.app](https://asa-voucher.vercel.app/)**, or open http://localhost:3000 when running locally.
+
+
+### Main Business Flow
+
+```
+1. A partner registers a business account
+2. An admin approves the partner
+3. Partner staff create vouchers
+4. A content admin reviews and approves the vouchers
+5. Vouchers are published for sale
+6. Customers search, add vouchers to the cart and check out
+7. The system processes the payment (VNPay / PayPal sandbox)
+8. The system issues a voucher code / QR code
+9. Store staff redeem the voucher
+10. The system aggregates reports and audit logs
+```
+
+
+### Useful Commands
+
+Run from the repo root:
+
+| Command | Description |
 |---|---|
-| `buyer` | Khách hàng mua voucher |
-| `partner_owner` | Chủ sở hữu đối tác |
-| `partner_voucher_staff` | Nhân viên đối tác tạo/quản lý voucher |
-| `partner_store_staff` | Nhân viên cửa hàng xác thực voucher |
-| `admin_content` | Quản trị nội dung và duyệt voucher |
-| `admin_operations` | Quản trị vận hành, tài khoản và đối tác |
-| `admin_security` | Quản trị log và bảo mật |
+| `npm run build` | Build frontend and backend |
+| `npm run lint` | Lint all workspaces |
+| `npm run type-check` | Run TypeScript type checks |
+| `npm test` | Run backend tests (Vitest) |
 
----
 
-## Luồng nghiệp vụ chính
+### Project Structure
 
 ```
-1. Đối tác đăng ký tài khoản doanh nghiệp
-2. Admin duyệt đối tác
-3. Nhân viên đối tác tạo voucher
-4. Admin nội dung duyệt voucher
-5. Voucher được công bố bán trên hệ thống
-6. Khách hàng tìm kiếm, thêm vào giỏ hàng và mua voucher
-7. Hệ thống xử lý thanh toán mô phỏng
-8. Hệ thống phát hành voucher code / QR code
-9. Nhân viên cửa hàng xác thực voucher
-10. Hệ thống tổng hợp báo cáo và audit log
-```
-
----
-
-## Yêu cầu môi trường
-
-- **Node.js** >= 20 LTS
-- **npm** >= 10
-- **Supabase** project (URL + keys)
-
----
-
-## Cài đặt toàn bộ dự án
-
-```bash
-# Clone repository
-git clone https://github.com/your-org/asa-voucher-platform.git
-cd asa-voucher-platform
-
-# Cài đặt dependencies cho cả frontend và backend
-npm run install:all
-```
-
----
-
-## Chạy Frontend
-
-```bash
-cd frontend
-cp .env.example .env.local
-# Điền giá trị thực vào .env.local
-npm run dev
-```
-
-Frontend chạy tại: http://localhost:3000
-
----
-
-## Chạy Backend
-
-```bash
-cd backend
-cp .env.example .env
-# Điền giá trị thực vào .env
-npm run dev
-```
-
-Backend chạy tại: http://localhost:5000
-
----
-
-## Biến môi trường cần thiết
-
-### Frontend (`frontend/.env.local`)
-
-```env
-NEXT_PUBLIC_API_BASE_URL=http://localhost:5000/api
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-NEXT_PUBLIC_VNPAY_RETURN_URL=
-NEXT_PUBLIC_PAYPAL_CLIENT_ID=
-NEXT_PUBLIC_PAYPAL_RETURN_URL=
-```
-
-### Backend (`backend/.env`)
-
-```env
-NODE_ENV=development
-PORT=5000
-FRONTEND_URL=http://localhost:3000
-
-# Runtime connection for Prisma Client. Use Supabase pooler when deploying the app.
-DATABASE_URL="postgresql://postgres.your-project-ref:[YOUR-PASSWORD]@aws-0-region.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1"
-
-# Direct/session connection for Prisma migrations.
-DIRECT_URL="postgresql://postgres:[YOUR-PASSWORD]@db.your-project-ref.supabase.co:5432/postgres"
-
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-
-JWT_SECRET=your-jwt-secret
-JWT_EXPIRES_IN=7d
-
-# Simulated payment providers; leave credentials blank until real gateway integration.
-VNPAY_TMN_CODE=
-VNPAY_HASH_SECRET=
-VNPAY_URL=https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
-VNPAY_RETURN_URL=http://localhost:5000/api/payments/vnpay/return
-PAYPAL_CLIENT_ID=
-PAYPAL_CLIENT_SECRET=
-PAYPAL_ENVIRONMENT=sandbox
-PAYPAL_CURRENCY=USD
-PAYPAL_VND_TO_USD_RATE=25000
-PAYPAL_RETURN_URL=http://localhost:5000/api/payments/paypal/return
-PAYPAL_CANCEL_URL=http://localhost:5000/api/payments/paypal/cancel
-```
-
-`DATABASE_URL` và `DIRECT_URL` phải là PostgreSQL connection string bắt đầu bằng `postgresql://`, không phải `SUPABASE_URL` dạng `https://...supabase.co`. Prisma Client dùng `DATABASE_URL`; Prisma migrate dùng `DIRECT_URL`.
-
-> ⚠️ **Không đưa các secret thật lên Git.** Chỉ commit file `.env.example`.
-
-PayPal sandbox không hỗ trợ thanh toán bằng VND, nên backend quy đổi số tiền VND sang USD theo `PAYPAL_VND_TO_USD_RATE`. VNPay dùng trực tiếp số tiền VND. Hai return URL phải trỏ về backend đang chạy trên localhost.
-
----
-
-## Cấu trúc thư mục tổng quan
-
-```
-asa-voucher-platform/
+Asa-Voucher/
 ├── frontend/          # Next.js App Router (React + TypeScript)
-├── backend/           # Express.js REST API (Node.js + TypeScript)
-├── docs/              # Tài liệu dự án, ERD, API spec
-├── .gitignore
-├── package.json       # Root monorepo scripts
+├── backend/           # Express.js REST API + Prisma
+├── docs/              # Project documentation
+├── package.json       # Root monorepo scripts (npm workspaces)
 └── README.md
 ```
 
-Xem chi tiết trong:
-- [`frontend/README.md`](./frontend/README.md)
-- [`backend/README.md`](./backend/README.md)
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+
+
+<!-- MARKDOWN LINKS & IMAGES -->
+[product-screenshot]: img/home.png
+[Next.js]: https://img.shields.io/badge/next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white
+[Next-url]: https://nextjs.org/
+[React.js]: https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB
+[React-url]: https://reactjs.org/
+[TypeScript]: https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white
+[TypeScript-url]: https://www.typescriptlang.org/
+[TailwindCSS]: https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white
+[Tailwind-url]: https://tailwindcss.com/
+[Express.js]: https://img.shields.io/badge/Express-000000?style=for-the-badge&logo=express&logoColor=white
+[Express-url]: https://expressjs.com/
+[Prisma]: https://img.shields.io/badge/Prisma-2D3748?style=for-the-badge&logo=prisma&logoColor=white
+[Prisma-url]: https://www.prisma.io/
+[Supabase]: https://img.shields.io/badge/Supabase-3FCF8E?style=for-the-badge&logo=supabase&logoColor=white
+[Supabase-url]: https://supabase.com/
+[Vercel]: https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white
+[Vercel-url]: https://vercel.com/
