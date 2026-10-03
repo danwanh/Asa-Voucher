@@ -62,7 +62,7 @@ type IssuedVoucherSeed = {
   owner_id: string;
   issued_date: Date;
   expired_date: Date;
-  status: "active" | "used" | "expired" | "refunded";
+  status: "active" | "used" | "expired" | "revoked";
   created_at: Date;
 };
 
@@ -642,7 +642,7 @@ const issuedVouchers: IssuedVoucherSeed[] = [
     owner_id: ids.users.buyerThuTrang,
     issued_date: daysFrom(now, -25),
     expired_date: daysFrom(now, 35),
-    status: "refunded",
+    status: "revoked",
     created_at: daysFrom(now, -25)
   },
   {
@@ -681,7 +681,7 @@ const issuedVouchers: IssuedVoucherSeed[] = [
     owner_id: ids.users.buyerQuocBao,
     issued_date: daysFrom(now, -5),
     expired_date: daysFrom(now, 25),
-    status: "refunded",
+    status: "revoked",
     created_at: daysFrom(now, -5)
   },
   {
@@ -694,7 +694,7 @@ const issuedVouchers: IssuedVoucherSeed[] = [
     owner_id: ids.users.buyerMinhAnh,
     issued_date: daysFrom(now, -4),
     expired_date: daysFrom(now, 26),
-    status: "refunded",
+    status: "revoked",
     created_at: daysFrom(now, -4)
   },
   {
@@ -707,7 +707,7 @@ const issuedVouchers: IssuedVoucherSeed[] = [
     owner_id: ids.users.buyerThuTrang,
     issued_date: daysFrom(now, -6),
     expired_date: daysFrom(now, 24),
-    status: "refunded",
+    status: "revoked",
     created_at: daysFrom(now, -6)
   },
   {
@@ -720,7 +720,7 @@ const issuedVouchers: IssuedVoucherSeed[] = [
     owner_id: ids.users.buyerThuTrang,
     issued_date: daysFrom(now, -6),
     expired_date: daysFrom(now, 24),
-    status: "refunded",
+    status: "revoked",
     created_at: daysFrom(now, -6)
   }
 ];
@@ -741,6 +741,14 @@ const issuedVoucherUsages: IssuedVoucherUsageSeed[] = [
     note: "Đổi 2 ly trà sữa size L"
   }
 ];
+
+function paymentStatusOf(order: OrderSeed) {
+  if (order.status === "refunded") return "refunded";
+  if (order.status === "confirmed" || order.status === "completed") return "paid";
+  if (order.status === "pending_payment") return "pending";
+  if (order.status === "cancelled") return payments.some((p) => p.order_id === order.id && p.status === "success") ? "paid" : "failed";
+  return "failed";
+}
 
 export async function seedCommerce({ prisma }: SeedContext) {
   for (const cart of carts) {
@@ -765,6 +773,7 @@ export async function seedCommerce({ prisma }: SeedContext) {
       create: {
         ...order,
         recipient_id: order.recipient_id ?? order.user_id,
+        payment_status: paymentStatusOf(order),
         subtotal: money(order.subtotal),
         discount_amount: money(order.discount_amount),
         total_amount: money(order.total_amount),
@@ -774,6 +783,7 @@ export async function seedCommerce({ prisma }: SeedContext) {
         order_code: order.order_code,
         user_id: order.user_id,
         recipient_id: order.recipient_id ?? order.user_id,
+        payment_status: paymentStatusOf(order),
         subtotal: money(order.subtotal),
         discount_amount: money(order.discount_amount),
         total_amount: money(order.total_amount),

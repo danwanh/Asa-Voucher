@@ -5,6 +5,7 @@ import { seedUsers } from "./01-users.js";
 import { seedCatalog } from "./02-catalog.js";
 import { seedCommerce } from "./03-commerce.js";
 import { seedEngagement } from "./04-engagement.js";
+import { seedBulk } from "./05-bulk.js";
 import { TEST_PASSWORD } from "./shared.js";
 
 const prisma = new PrismaClient();
@@ -48,6 +49,10 @@ async function main() {
   await seedCatalog({ prisma, passwordHash });
   await seedCommerce({ prisma, passwordHash });
   await seedEngagement({ prisma, passwordHash });
+
+  if (process.argv.includes("--bulk")) {
+    await seedBulk({ prisma, passwordHash });
+  }
 
   console.log("Seed dữ liệu hoàn tất.");
   console.log(`Mật khẩu test dùng chung: ${TEST_PASSWORD}`);

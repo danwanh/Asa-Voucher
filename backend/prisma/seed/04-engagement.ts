@@ -264,7 +264,7 @@ export async function seedEngagement({ prisma }: SeedContext) {
         status: complaint.status,
         assigned_to: complaint.assigned_to ?? null,
         resolution_note: complaint.resolution_note ?? null,
-        resolution_types: complaint.resolution_types ?? null,
+        resolution_types: complaint.resolution_types ?? Prisma.DbNull,
         created_at: complaint.created_at,
         resolved_at: complaint.resolved_at ?? null
       }
