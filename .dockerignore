@@ -1,0 +1,20 @@
+# Dependencies & build outputs (rebuilt inside the image)
+**/node_modules
+**/.next
+**/dist
+**/*.tsbuildinfo
+
+# Secrets: env values are passed at runtime by docker compose
+**/.env
+**/.env.*
+!**/.env.example
+
+# Not needed in images
+.git
+.agents
+img
+load-test
+**/*.log
+**/.DS_Store
+docker-compose*.yml
+**/Dockerfile

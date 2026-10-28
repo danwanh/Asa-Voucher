@@ -1,0 +1,75 @@
+# Asa Voucher - local stack: Postgres + Express API + Next.js
+#
+#   docker compose up -d --build                  # start everything
+#   docker compose run --rm backend npm run seed  # (optional) sample data
+#   docker compose down                           # stop (add -v to wipe the DB)
+
+name: asa-voucher
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-asa}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-asa_password}
+      POSTGRES_DB: ${POSTGRES_DB:-asa_voucher}
+    # Host port 5433 avoids clashing with a locally installed Postgres
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    # Secrets (JWT, SMTP, VNPay, PayPal, Cloudinary...) come from backend/.env
+    env_file:
+      - path: backend/.env
+        required: false
+    # These override backend/.env so the API talks to the Postgres container
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-asa}:${POSTGRES_PASSWORD:-asa_password}@db:5432/${POSTGRES_DB:-asa_voucher}
+      DIRECT_URL: postgresql://${POSTGRES_USER:-asa}:${POSTGRES_PASSWORD:-asa_password}@db:5432/${POSTGRES_DB:-asa_voucher}
+    # Apply pending migrations, then start the API
+    command: sh -c "npx prisma migrate deploy && node dist/server.js"
+    ports:
+      - "${BACKEND_PORT:-5000}:5000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:5000/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        # Called from the user's browser, so it must be a host-reachable URL
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:5000/api/v1}
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+
+volumes:
+  db-data:

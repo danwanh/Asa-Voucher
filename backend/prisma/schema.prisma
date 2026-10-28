@@ -402,6 +402,9 @@ model IssuedVoucher {
   reviews            Review[]
 
   @@index([owner_id])
+  @@index([branch_id])
+  @@index([redeemed_by])
+  @@index([used_at])
   @@map("issued_vouchers")
 }
 

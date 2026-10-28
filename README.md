@@ -177,6 +177,44 @@ Follow these steps to set up and run the project locally.
    npm run dev:frontend   # http://localhost:3000
    ```
 
+
+### Run with Docker
+
+Runs the whole stack (PostgreSQL + API + web) without installing Node locally. Requires Docker Desktop with Compose v2.24+.
+
+1. (Optional) Create `backend/.env` from `backend/.env.example` for secrets such as JWT, SMTP, VNPay, PayPal and Cloudinary. The database settings in it are ignored: Compose points the API at its own Postgres container.
+
+2. Build and start
+
+   ```sh
+   docker compose up -d --build
+   ```
+
+   | Service | URL |
+   |---|---|
+   | Frontend | http://localhost:3000 |
+   | Backend API | http://localhost:5000/api/v1 (health check: `/api/v1/health`) |
+   | PostgreSQL | `localhost:5433`, user `asa`, password `asa_password`, db `asa_voucher` |
+
+   On startup the backend runs `prisma migrate deploy` to create or update the schema.
+
+3. (Optional) Load sample data (shared test password: `User12345@`)
+
+   ```sh
+   docker compose run --rm backend npm run seed
+   ```
+
+Useful commands:
+
+| Command | Description |
+|---|---|
+| `docker compose logs -f backend` | Follow API logs |
+| `docker compose down` | Stop the stack (data is kept) |
+| `docker compose down -v` | Stop and wipe the database |
+| `docker compose up -d --build frontend` | Rebuild the web app after code changes |
+
+Ports and credentials can be overridden with a root `.env` file or shell variables: `FRONTEND_PORT`, `BACKEND_PORT`, `POSTGRES_PORT`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `NEXT_PUBLIC_API_BASE_URL`. `NEXT_PUBLIC_*` values are baked in at build time, so rebuild the frontend after changing them.
+
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 <br />
