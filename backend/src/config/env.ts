@@ -32,6 +32,8 @@ const envSchema = z.object({
   PAYPAL_VND_TO_USD_RATE: z.coerce.number().positive().default(25000),
   PAYPAL_RETURN_URL: z.string().url().optional(),
   PAYPAL_CANCEL_URL: z.string().url().optional(),
+  // Allows PATCH /payments/:id/simulate-* in production (e.g. a demo deployment)
+  ALLOW_PAYMENT_SIMULATION: z.enum(["true", "false"]).optional(),
   CLOUDINARY_CLOUD_NAME: z.string().optional(),
   CLOUDINARY_API_KEY: z.string().optional(),
   CLOUDINARY_API_SECRET: z.string().optional()

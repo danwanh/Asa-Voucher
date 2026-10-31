@@ -367,7 +367,7 @@ export async function listVoucherProducts(user: CurrentUser | undefined, queryIn
   const rejectVoucher = await Promise.all(items.map(async (item) => {
     const base = withWorkflow(item as unknown as Record<string, unknown>);
     if (base.approval_status === "rejected") {
-      (base as any).rejection_reason = await getRejectReason(item.id);
+      (base as Record<string, unknown>).rejection_reason = await getRejectReason(item.id);
     }
 
     return base;

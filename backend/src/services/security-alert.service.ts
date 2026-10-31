@@ -1,7 +1,7 @@
 import { HttpError } from "../utils/http-error.js";
 import { buildPaginatedResult } from "../utils/pagination.js";
 import * as securityAlertRepo from "../repositories/security-alert.repository.js";
-import { isAdminRole, type AuthUser } from "../types/auth.types.js";
+import type { AuthUser } from "../types/auth.types.js";
 import type { ListAlertsQuery } from "../validations/security.validation.js";
 import { prisma } from "../config/prisma.js";
 

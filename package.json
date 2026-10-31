@@ -13,7 +13,9 @@
     "build": "npm --workspaces run build",
     "lint": "npm --workspaces run lint",
     "type-check": "npm --workspaces run type-check",
-    "test": "npm --workspace backend run test"
+    "test": "npm --workspace backend run test",
+    "test:coverage": "npm --workspace backend run test:coverage",
+    "test:integration": "npm --workspace backend run test:integration"
   },
   "engines": {
     "node": ">=20.0.0"

@@ -186,7 +186,20 @@ export const ids = {
   }
 } as const;
 
-export const now = new Date("2026-08-01T09:00:00.000Z");
+// Reference date for all seed data. Defaults to the current time so sample
+// vouchers are always inside their sale window. Set SEED_NOW (e.g.
+// 2026-08-01T09:00:00Z) to reproduce a fixed dataset.
+function resolveSeedNow() {
+  const raw = process.env.SEED_NOW;
+  if (!raw) return new Date();
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`Invalid SEED_NOW: "${raw}". Use an ISO date such as 2026-08-01T09:00:00Z.`);
+  }
+  return date;
+}
+
+export const now = resolveSeedNow();
 
 export function daysFrom(base: Date, offset: number) {
   const date = new Date(base);

@@ -250,7 +250,26 @@ Run from the repo root:
 | `npm run build` | Build frontend and backend |
 | `npm run lint` | Lint all workspaces |
 | `npm run type-check` | Run TypeScript type checks |
-| `npm test` | Run backend tests (Vitest) |
+| `npm test` | Run backend unit tests (Vitest) |
+| `npm run test:coverage` | Unit tests with a coverage report (`backend/coverage/index.html`) |
+| `npm run test:integration` | API integration tests against a real Postgres database |
+
+
+### Testing
+
+The backend has two test suites:
+
+- **Unit tests** (`backend/src/tests/services`): Prisma and external services are mocked. They need no database and never read `backend/.env`, so they run the same locally and in CI.
+- **Integration tests** (`backend/src/tests/integration/*.int.test.ts`): real HTTP requests through the Express app against a Postgres test database. They cover login and sessions, roles and permissions, cart, orders and payments (including a signed VNPay return), gifting, voucher redemption (including two staff redeeming the same code at once) and the voucher approval flow.
+
+To run the integration tests:
+
+```sh
+docker compose up -d db
+npm run test:integration
+```
+
+They use a separate database, `asa_voucher_test`, in the same Postgres container. Each run applies migrations and reloads the seed data there; your `asa_voucher` data is not touched. To use another database, set `TEST_DATABASE_URL`. For safety, the run stops unless that URL points at a local host and the database name ends with `_test`.
 
 
 ### Project Structure
