@@ -63,15 +63,18 @@ type CreateOrderInput = {
   note?: string;
 };
 
+// Statuses stored in the database that the API reports as another status.
+// "completed" is set when every voucher in a paid order has been used
+// (issued-voucher.service confirmVoucher); to clients it is still a confirmed order.
 function normalizeOrderStatus(status: unknown): OrderStatus {
   if (status === "pending") return "pending_payment";
-  if (status === "pending_manual") return "confirmed";
+  if (status === "pending_manual" || status === "completed") return "confirmed";
   return ORDER_STATUS_VALUES.includes(status as OrderStatus) ? status as OrderStatus : "pending_payment";
 }
 
 function storedStatuses(status: string) {
   if (status === "pending_payment") return ["pending_payment", "pending"];
-  if (status === "confirmed") return ["confirmed", "pending_manual"];
+  if (status === "confirmed") return ["confirmed", "pending_manual", "completed"];
   return [status];
 }
 
@@ -450,7 +453,7 @@ export async function listOrders(
     delete summary.payments;
     delete summary.subtotal;
     delete summary.discount_amount;
-    const orderCount = (order as any)._count;
+    const orderCount = (order as { _count?: { complaints?: number } })._count;
     delete summary._count;
     return {
       ...summary,
@@ -1233,7 +1236,16 @@ export async function getPaymentById(user: CurrentUser, id: string) {
   return toSafePayment(payment);
 }
 
+// Simulated payments let a buyer mark their own order as paid, so they are only
+// available outside production unless explicitly enabled.
+export function assertPaymentSimulationAllowed() {
+  if (env.NODE_ENV === "production" && env.ALLOW_PAYMENT_SIMULATION !== "true") {
+    throw new HttpError(404, "Payment simulation is disabled", "NOT_FOUND");
+  }
+}
+
 export async function simulatePaymentSuccess(user: CurrentUser, id: string) {
+  assertPaymentSimulationAllowed();
   const payment = await getPayment(id);
   const order = payment.orders as Record<string, unknown>;
   assertOrderAccess(user, order);
@@ -1280,6 +1292,7 @@ async function markCapturedPaymentUnfulfilled(paymentId: string, userId: string,
 }
 
 export async function simulatePaymentFailed(user: CurrentUser, id: string) {
+  assertPaymentSimulationAllowed();
   const payment = await getPayment(id);
   const order = payment.orders as Record<string, unknown>;
   assertOrderAccess(user, order);

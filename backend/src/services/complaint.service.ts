@@ -373,7 +373,6 @@ async function processReissueVoucher(
   const newVoucherCode = generateVoucherCode();
   const newQrPayload = crypto.randomUUID();
   const newOrderCode = `ORD${Date.now()}${crypto.randomInt(1000, 9999)}`;
-  const unitPrice = Number(oldVoucher.voucher_products.selling_price);
 
   const wasActive = oldVoucher.status === "active";
   const oldOrderId = oldVoucher.order_items?.order_id ?? "";

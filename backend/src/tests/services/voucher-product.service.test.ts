@@ -63,7 +63,6 @@ const ADMIN_CONTENT: CurrentUser = { id: "u-admin", role: "admin_content" };
 const PARTNER_OWNER: CurrentUser = { id: "u-owner", role: "partner_owner", partnerId: "p1" };
 const VOUCHER_STAFF_WITH_BRANCH: CurrentUser = { id: "u-staff", role: "partner_voucher_staff", branchId: "b1" };
 const OTHER_PARTNER: CurrentUser = { id: "u-other", role: "partner_owner", partnerId: "p2" };
-const BUYER: CurrentUser = { id: "u-buyer", role: "buyer" };
 
 function makeVoucher(overrides: Record<string, unknown> = {}) {
   return {

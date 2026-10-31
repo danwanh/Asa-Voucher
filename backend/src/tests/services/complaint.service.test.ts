@@ -572,13 +572,14 @@ describe("Complaint Service", () => {
         data: { status: "cancelled", updated_at: expect.any(Date) },
       });
 
-      // New order created
+      // New free order created (payment_method must satisfy the orders check constraint)
       expect(mockTx.order.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          payment_method: "reissue",
+          payment_method: "vnpay",
           payment_status: "paid",
           status: "confirmed",
           user_id: "u-buyer",
+          total_amount: 0,
         }),
       });
 
@@ -599,7 +600,7 @@ describe("Complaint Service", () => {
       });
     });
 
-    it("per-voucher reissue (used/expired): old voucher unchanged, create new order + voucher", async () => {
+    it("per-voucher reissue (used/expired): old voucher → cancelled without restocking, create new order + voucher", async () => {
       vi.mocked(complaintRepo.findComplaintById).mockResolvedValue(makeComplaint({ issued_voucher_id: "iv-1" }));
       vi.mocked(complaintRepo.updateComplaint).mockResolvedValue(makeComplaint({
         status: "reissued", resolution_types: ["reissue"],
@@ -642,16 +643,20 @@ describe("Complaint Service", () => {
         resolution_types: ["reissue"],
       });
 
-      // Used voucher: old voucher NOT changed (not active)
-      expect(mockTx.issuedVoucher.update).not.toHaveBeenCalled();
+      // Old voucher is always cancelled, even when it was already used
+      expect(mockTx.issuedVoucher.update).toHaveBeenCalledWith({
+        where: { id: "iv-1" },
+        data: { status: "cancelled", updated_at: expect.any(Date) },
+      });
 
-      // New order created
+      // New free order created
       expect(mockTx.order.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          payment_method: "reissue",
+          payment_method: "vnpay",
           payment_status: "paid",
           status: "confirmed",
           user_id: "u-buyer",
+          total_amount: 0,
         }),
       });
 

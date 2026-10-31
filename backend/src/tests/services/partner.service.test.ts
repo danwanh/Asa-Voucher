@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { HttpError } from "../../utils/http-error.js";
 
-const { mockPrisma, mockTx } = vi.hoisted(() => ({
+const { mockPrisma } = vi.hoisted(() => ({
   mockPrisma: {
     partner: {
       findMany: vi.fn(),
@@ -24,9 +24,12 @@ const { mockPrisma, mockTx } = vi.hoisted(() => ({
     voucherProductBranch: {
       count: vi.fn(),
     },
+    user: {
+      update: vi.fn(),
+      updateMany: vi.fn(),
+    },
     $transaction: vi.fn(),
   },
-  mockTx: {} as Record<string, unknown>,
 }));
 
 vi.mock("../../config/prisma.js", () => ({ prisma: mockPrisma }));
@@ -140,6 +143,10 @@ describe("Partner Service", () => {
       vi.mocked(prisma.partner.update).mockResolvedValue({} as any);
 
       await partnerService.deletePartner("p1");
+      expect(prisma.user.updateMany).toHaveBeenCalledWith({
+        where: { partner_id: "p1" },
+        data: { is_active: false, auth_version: { increment: 1 } },
+      });
       expect(prisma.partner.update).toHaveBeenCalledWith({
         where: { id: "p1" },
         data: { status: "closed", updated_at: expect.any(Date) },
@@ -149,6 +156,7 @@ describe("Partner Service", () => {
     it("rejects closing partner with active vouchers", async () => {
       vi.mocked(mockPrisma.issuedVoucher.count).mockResolvedValue(3);
       await expect(partnerService.deletePartner("p1")).rejects.toThrow("Đối tác còn voucher đang hoạt động");
+      expect(prisma.user.updateMany).not.toHaveBeenCalled();
     });
   });
 
@@ -171,7 +179,19 @@ describe("Partner Service", () => {
       vi.mocked(prisma.partner.update).mockResolvedValue({ id: "p1", status: "suspended" } as any);
 
       await partnerService.updatePartnerStatus("p1", "suspended");
+      expect(prisma.user.updateMany).toHaveBeenCalledWith({
+        where: { partner_id: "p1" },
+        data: { is_active: false, auth_version: { increment: 1 } },
+      });
       expect(prisma.partner.update).toHaveBeenCalled();
+    });
+
+    it("does not sign out partner users when re-activating", async () => {
+      vi.mocked(prisma.partner.update).mockResolvedValue({ id: "p1", status: "active" } as any);
+
+      await partnerService.updatePartnerStatus("p1", "active");
+      expect(prisma.user.updateMany).not.toHaveBeenCalled();
+      expect(prisma.issuedVoucher.count).not.toHaveBeenCalled();
     });
   });
 

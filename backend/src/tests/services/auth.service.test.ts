@@ -45,7 +45,7 @@ vi.mock("../../utils/auth.js", () => ({
 }));
 
 vi.mock("../../utils/db.js", () => ({
-  sanitizeUser: vi.fn((u: Record<string, unknown>) => { const { password_hash, ...rest } = u; return rest; }),
+  sanitizeUser: vi.fn((u: Record<string, unknown>) => { const rest = { ...u }; delete rest.password_hash; return rest; }),
   requireData: vi.fn((d: unknown, msg: string) => { if (!d) throw new Error(msg); return d; }),
   throwDbError: vi.fn((e: unknown) => { throw e; }),
 }));

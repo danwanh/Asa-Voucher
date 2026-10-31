@@ -240,13 +240,20 @@ export async function confirmVoucher(user: AuthUser, input: ConfirmVoucherInput)
       where: { id: voucher.id },
     });
 
-    if (!reVoucher || reVoucher.status !== "active") {
+    const alreadyUsed = async () => {
       await logVoucherCheck(user, voucher.voucher_code, "failed", "Voucher đã được sử dụng hoặc không còn hợp lệ");
-      throw new HttpError(400, "Voucher đã được sử dụng hoặc không còn hợp lệ");
+      return new HttpError(400, "Voucher đã được sử dụng hoặc không còn hợp lệ");
+    };
+
+    if (!reVoucher || reVoucher.status !== "active") {
+      throw await alreadyUsed();
     }
 
-    const updatedVoucher = await tx.issuedVoucher.update({
-      where: { id: voucher.id },
+    // Only flip a voucher that is still active. If two staff confirm the same
+    // code at once, Postgres re-checks the condition after the first update
+    // commits, so the second one matches no row and is rejected.
+    const claimed = await tx.issuedVoucher.updateMany({
+      where: { id: voucher.id, status: "active" },
       data: {
         status: "used",
         branch_id: userBranchId,
@@ -255,6 +262,10 @@ export async function confirmVoucher(user: AuthUser, input: ConfirmVoucherInput)
         updated_at: new Date(),
       },
     });
+    if (claimed.count === 0) {
+      throw await alreadyUsed();
+    }
+    const updatedVoucher = await tx.issuedVoucher.findUniqueOrThrow({ where: { id: voucher.id } });
 
     const usage = {
       id: updatedVoucher.id,

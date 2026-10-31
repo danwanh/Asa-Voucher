@@ -284,7 +284,7 @@ async function geocodeAddress(
           if (res.statusCode !== 200) {
             return reject(new HttpError(502, "Không thể xác định địa chỉ", "GEOCODING_FAILED"));
           }
-          try { resolve(JSON.parse(data) as Array<any>); }
+          try { resolve(JSON.parse(data)); }
           catch { reject(new HttpError(502, "Không thể xác định địa chỉ", "GEOCODING_FAILED")); }
         });
       }

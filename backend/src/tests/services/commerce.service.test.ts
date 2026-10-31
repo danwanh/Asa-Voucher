@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from "vitest";
 import { HttpError } from "../../utils/http-error.js";
 
 const { mockPrisma, mockTx } = vi.hoisted(() => {
@@ -48,7 +48,7 @@ const { mockPrisma, mockTx } = vi.hoisted(() => {
         findUnique: vi.fn(),
         update: vi.fn(),
       },
-      $transaction: vi.fn((input: unknown) => Array.isArray(input) ? Promise.all(input) : (input as Function)(tx)),
+      $transaction: vi.fn((input: unknown) => Array.isArray(input) ? Promise.all(input) : (input as (client: unknown) => unknown)(tx)),
     },
     mockTx: tx,
   };
@@ -57,6 +57,7 @@ const { mockPrisma, mockTx } = vi.hoisted(() => {
 vi.mock("../../config/prisma.js", () => ({ prisma: mockPrisma }));
 
 import { prisma } from "../../config/prisma.js";
+import { env } from "../../config/env.js";
 import * as commerceService from "../../services/commerce.service.js";
 import type { UserRole } from "../../types/auth.types.js";
 
@@ -697,6 +698,47 @@ describe("Commerce Service", () => {
       expect(mockTx.order.updateMany).toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ status: "payment_failed" }),
       }));
+    });
+  });
+
+  describe("payment simulation in production", () => {
+    const original = { nodeEnv: env.NODE_ENV, allow: env.ALLOW_PAYMENT_SIMULATION };
+    afterEach(() => {
+      env.NODE_ENV = original.nodeEnv;
+      env.ALLOW_PAYMENT_SIMULATION = original.allow;
+    });
+
+    it("is disabled in production by default", async () => {
+      env.NODE_ENV = "production";
+      env.ALLOW_PAYMENT_SIMULATION = undefined;
+
+      await expect(commerceService.simulatePaymentSuccess(BUYER, "pay1")).rejects.toMatchObject({ statusCode: 404 });
+      await expect(commerceService.simulatePaymentFailed(BUYER, "pay1")).rejects.toMatchObject({ statusCode: 404 });
+      expect(prisma.payment.findUnique).not.toHaveBeenCalled();
+    });
+
+    it("can be enabled in production with ALLOW_PAYMENT_SIMULATION=true", () => {
+      env.NODE_ENV = "production";
+      env.ALLOW_PAYMENT_SIMULATION = "true";
+      expect(() => commerceService.assertPaymentSimulationAllowed()).not.toThrow();
+    });
+
+    it("is allowed outside production", () => {
+      env.NODE_ENV = "development";
+      env.ALLOW_PAYMENT_SIMULATION = undefined;
+      expect(() => commerceService.assertPaymentSimulationAllowed()).not.toThrow();
+    });
+  });
+
+  describe("order status normalisation", () => {
+    it("reports an order whose vouchers are all used as confirmed and refuses a new payment", async () => {
+      vi.mocked(prisma.order.findUnique).mockResolvedValue({
+        id: "o1", user_id: "u-buyer", status: "completed", order_items: [], payments: [],
+      } as any);
+
+      await expect(commerceService.createPayment(BUYER, "o1")).rejects.toMatchObject({
+        statusCode: 409, code: "ORDER_ALREADY_PAID",
+      });
     });
   });
 });

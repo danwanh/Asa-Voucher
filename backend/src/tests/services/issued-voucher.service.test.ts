@@ -262,12 +262,14 @@ describe("Issued Voucher Service", () => {
       vi.mocked(issuedVoucherRepo.findIssuedVoucherByCode).mockResolvedValue(voucher);
       vi.mocked(issuedVoucherRepo.findEligibleBranchIds).mockResolvedValue(["branch-1"]);
 
+      const claim = vi.fn().mockResolvedValue({ count: 1 });
       const { prisma } = await import("../../config/prisma.js");
       vi.mocked(prisma.$transaction).mockImplementation(async (fn: (tx: never) => Promise<unknown>) => {
         return fn({
           issuedVoucher: {
             findUnique: vi.fn().mockResolvedValue(voucher),
-            update: vi.fn().mockResolvedValue({ ...voucher, status: "used" }),
+            updateMany: claim,
+            findUniqueOrThrow: vi.fn().mockResolvedValue({ ...voucher, status: "used" }),
             count: vi.fn().mockResolvedValue(1),
           },
           order: { updateMany: vi.fn() },
@@ -277,6 +279,37 @@ describe("Issued Voucher Service", () => {
 
       const result = await issuedVoucherService.confirmVoucher(STORE_STAFF, { voucher_code: "VC-001" });
       expect(result.message).toContain("thành công");
+      expect(result.issued_voucher.status).toBe("used");
+      // The update is guarded on the voucher still being active
+      expect(claim).toHaveBeenCalledWith(expect.objectContaining({
+        where: { id: voucher.id, status: "active" },
+        data: expect.objectContaining({ status: "used", redeemed_by: STORE_STAFF.id }),
+      }));
+    });
+
+    it("rejects when another request redeemed the voucher first", async () => {
+      const voucher = makeIssuedVoucher();
+      vi.mocked(issuedVoucherRepo.findIssuedVoucherByCode).mockResolvedValue(voucher);
+      vi.mocked(issuedVoucherRepo.findEligibleBranchIds).mockResolvedValue(["branch-1"]);
+      const orderUpdate = vi.fn();
+
+      const { prisma } = await import("../../config/prisma.js");
+      vi.mocked(prisma.$transaction).mockImplementation(async (fn: (tx: never) => Promise<unknown>) => fn({
+        issuedVoucher: {
+          // Still looked active when read, but the guarded update matched nothing
+          findUnique: vi.fn().mockResolvedValue(voucher),
+          updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+          findUniqueOrThrow: vi.fn(),
+          count: vi.fn(),
+        },
+        order: { updateMany: orderUpdate },
+        orderLog: { create: vi.fn() },
+      } as never));
+
+      await expect(
+        issuedVoucherService.confirmVoucher(STORE_STAFF, { voucher_code: "VC-001" })
+      ).rejects.toMatchObject({ statusCode: 400 });
+      expect(orderUpdate).not.toHaveBeenCalled();
     });
 
     it("completes the order after the final voucher is used", async () => {
@@ -289,7 +322,8 @@ describe("Issued Voucher Service", () => {
       vi.mocked(prisma.$transaction).mockImplementation(async (fn: (tx: never) => Promise<unknown>) => fn({
         issuedVoucher: {
           findUnique: vi.fn().mockResolvedValue(voucher),
-          update: vi.fn().mockResolvedValue({ ...voucher, status: "used" }),
+          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+          findUniqueOrThrow: vi.fn().mockResolvedValue({ ...voucher, status: "used" }),
           count: vi.fn().mockResolvedValue(0),
         },
         order: { updateMany: orderUpdate },

@@ -351,7 +351,7 @@ export async function updateUser(req: Request, res: Response) {
       if (ADMIN_ROLES.includes(currentRole) && currentRole !== newRole) {
         const adminCount = await prisma.user.count({
           where: {
-            role: currentRole as any,
+            role: currentRole,
             is_active: true
           }
         });

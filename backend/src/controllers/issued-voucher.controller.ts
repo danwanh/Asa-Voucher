@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { sendCreated, sendSuccess } from "../utils/response.js";
+import { sendSuccess } from "../utils/response.js";
 import { HttpError } from "../utils/http-error.js";
 import * as issuedVoucherService from "../services/issued-voucher.service.js";
 import {
