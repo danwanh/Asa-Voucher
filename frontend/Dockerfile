@@ -10,6 +10,7 @@ FROM base AS deps
 COPY package.json package-lock.json ./
 COPY frontend/package.json frontend/package.json
 COPY backend/package.json backend/package.json
+COPY e2e/package.json e2e/package.json
 RUN npm ci --workspace frontend --include-workspace-root
 
 # ---- build ----

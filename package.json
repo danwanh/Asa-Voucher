@@ -4,18 +4,20 @@
   "private": true,
   "workspaces": [
     "frontend",
-    "backend"
+    "backend",
+    "e2e"
   ],
   "scripts": {
     "install:all": "npm install --workspaces",
     "dev:frontend": "npm --workspace frontend run dev",
     "dev:backend": "npm --workspace backend run dev",
-    "build": "npm --workspaces run build",
-    "lint": "npm --workspaces run lint",
-    "type-check": "npm --workspaces run type-check",
+    "build": "npm --workspaces --if-present run build",
+    "lint": "npm --workspaces --if-present run lint",
+    "type-check": "npm --workspaces --if-present run type-check",
     "test": "npm --workspace backend run test",
     "test:coverage": "npm --workspace backend run test:coverage",
-    "test:integration": "npm --workspace backend run test:integration"
+    "test:integration": "npm --workspace backend run test:integration",
+    "test:e2e": "npm --workspace e2e run test"
   },
   "engines": {
     "node": ">=20.0.0"

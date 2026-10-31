@@ -1,7 +1,8 @@
 # CI: runs on every push and pull request to main.
 #   1. checks       - type-check, lint, unit tests, production build
 #   2. integration  - API tests against a throwaway Postgres
-#   3. docker       - makes sure both Docker images still build
+#   3. e2e          - Playwright browser tests against the full stack
+#   4. docker       - makes sure both Docker images still build
 # Deploys are not done here: Vercel deploys the frontend from GitHub on its own.
 
 name: CI
@@ -95,6 +96,57 @@ jobs:
       # Global setup applies migrations and loads the seed before the tests
       - name: Integration tests
         run: npm run test:integration
+
+  e2e:
+    name: E2E tests (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: asa
+          POSTGRES_PASSWORD: asa_password
+          POSTGRES_DB: asa_voucher_e2e
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U asa -d asa_voucher_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+        working-directory: backend
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: e2e
+
+      # Playwright starts the API (migrate + seed + server) and the built frontend itself
+      - name: E2E tests
+        run: npm run test:e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            e2e/playwright-report
+            e2e/test-results
+          retention-days: 7
 
   docker:
     name: Docker images build

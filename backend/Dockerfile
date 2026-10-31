@@ -12,6 +12,7 @@ FROM base AS deps
 COPY package.json package-lock.json ./
 COPY backend/package.json backend/package.json
 COPY frontend/package.json frontend/package.json
+COPY e2e/package.json e2e/package.json
 RUN npm ci --workspace backend --include-workspace-root
 
 # ---- build: generate Prisma client + compile TypeScript ----

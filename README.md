@@ -253,14 +253,16 @@ Run from the repo root:
 | `npm test` | Run backend unit tests (Vitest) |
 | `npm run test:coverage` | Unit tests with a coverage report (`backend/coverage/index.html`) |
 | `npm run test:integration` | API integration tests against a real Postgres database |
+| `npm run test:e2e` | Browser end-to-end tests (Playwright) against the full stack |
 
 
 ### Testing
 
-The backend has two test suites:
+There are three test suites:
 
 - **Unit tests** (`backend/src/tests/services`): Prisma and external services are mocked. They need no database and never read `backend/.env`, so they run the same locally and in CI.
 - **Integration tests** (`backend/src/tests/integration/*.int.test.ts`): real HTTP requests through the Express app against a Postgres test database. They cover login and sessions, roles and permissions, cart, orders and payments (including a signed VNPay return), gifting, voucher redemption (including two staff redeeming the same code at once) and the voucher approval flow.
+- **End-to-end tests** (`e2e/tests/*.spec.ts`): Playwright drives a real Chromium browser against the running frontend and API. They cover login and access control, buying a voucher through checkout and VNPay, store staff redeeming a voucher (once only, and only at a valid branch), and the admin approving or rejecting a pending voucher.
 
 To run the integration tests:
 
@@ -271,6 +273,16 @@ npm run test:integration
 
 They use a separate database, `asa_voucher_test`, in the same Postgres container. Each run applies migrations and reloads the seed data there; your `asa_voucher` data is not touched. To use another database, set `TEST_DATABASE_URL`. For safety, the run stops unless that URL points at a local host and the database name ends with `_test`.
 
+To run the end-to-end tests:
+
+```sh
+docker compose up -d db
+npx playwright install chromium   # first time only, run inside the e2e folder
+npm run test:e2e
+```
+
+Playwright starts its own copy of the stack, so it does not touch the docker dev stack: the API on port 5100, the frontend on port 3100 (it builds the frontend first, which takes a minute or two) and a separate database, `asa_voucher_e2e`, that is migrated and re-seeded on every run. For safety the run stops unless the database is local and its name ends with `_e2e` (override with `E2E_DATABASE_URL`). VNPay itself is not called: the test stops the redirect and sends back a correctly signed result. To see the browser, run `npm --workspace e2e run test:headed`; after a failure, `npm --workspace e2e run report` opens the HTML report.
+
 
 ### Project Structure
 
@@ -278,6 +290,7 @@ They use a separate database, `asa_voucher_test`, in the same Postgres container
 Asa-Voucher/
 ├── frontend/          # Next.js App Router (React + TypeScript)
 ├── backend/           # Express.js REST API + Prisma
+├── e2e/               # Playwright end-to-end tests
 ├── docs/              # Project documentation
 ├── package.json       # Root monorepo scripts (npm workspaces)
 └── README.md
