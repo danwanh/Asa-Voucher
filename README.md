@@ -165,8 +165,8 @@ Follow these steps to set up and run the project locally.
    cd backend
    npm run prisma:generate
    npm run prisma:migrate:deploy
-   npm run seed   # (optional) sample data
-   npm run seed:bulk   # (optional) sample data + ~1,200 vouchers, ~11k orders over 12 months
+   npm run seed   
+   npm run seed:bulk   
    cd ..
    ```
 
