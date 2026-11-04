@@ -33,7 +33,7 @@ function dateOnly(value: unknown) {
   return date.toISOString().slice(0, 10);
 }
 
-function getPublicVoucherWhere() {
+export function getPublicVoucherWhere() {
   const today = new Date(todayIsoDate());
   return {
     approval_status: "approved",

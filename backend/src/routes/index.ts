@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { aiRoutes } from "./ai.routes.js";
 import { authRoutes } from "./auth.routes.js";
 import { categoryRoutes } from "./category.routes.js";
 import { commerceRoutes } from "./commerce.routes.js";
@@ -32,3 +33,4 @@ apiRoutes.use(reportRoutes);
 apiRoutes.use(dashboardRoutes);
 apiRoutes.use(cmsContentRoutes);
 apiRoutes.use(securityRoutes);
+apiRoutes.use(aiRoutes);

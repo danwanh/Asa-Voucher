@@ -42,6 +42,8 @@ const envSchema = z.object({
   AI_BASE_URL: z.string().url().default("https://generativelanguage.googleapis.com/v1beta/openai"),
   AI_MODEL: z.string().default("gemini-flash-latest"),
   // Comma-separated models tried in order when AI_MODEL is overloaded or fails.
+  // Chat needs fast replies: a light model is tried first, then AI_MODEL and fallbacks.
+  AI_CHAT_MODEL: z.string().default("gemini-flash-lite-latest"),
   AI_FALLBACK_MODELS: z.string().default("gemini-flash-lite-latest,gemini-3-flash-preview"),
   AI_TIMEOUT_MS: z.coerce.number().int().positive().default(15000)
 });

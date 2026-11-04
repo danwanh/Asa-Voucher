@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ShoppingCart, Search, Menu, Home, Tag, Package, User, Grid3x3, Gift, LogOut } from "lucide-react"
 import { AppFooter } from "@/components/AppFooter"
+import { VoucherChatWidget } from "@/components/VoucherChatWidget"
 import { C } from "@/utils/constants"
 import type { AppUser } from "@/types"
 
@@ -166,6 +167,7 @@ export function CustomerLayout({
       </header>
 
       <main className="flex-1">{children}</main>
+      <VoucherChatWidget />
       <AppFooter
         onHome={() => onNavigate("home")}
         onVouchers={() => onNavigate("vouchers")}

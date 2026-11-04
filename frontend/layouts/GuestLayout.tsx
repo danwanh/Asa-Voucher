@@ -1,6 +1,7 @@
 import { useRouter } from "next/navigation"
 import { Grid3x3, Home, Info, LogIn, Search, ShoppingCart, Tag } from "lucide-react"
 import { AppFooter } from "@/components/AppFooter"
+import { VoucherChatWidget } from "@/components/VoucherChatWidget"
 import { GuestSiteHeader } from "@/components/GuestSiteHeader"
 import { C } from "@/utils/constants"
 
@@ -67,6 +68,7 @@ export function GuestLayout({
 
       {/* Content */}
       <main className="flex-1" style={{ backgroundColor: C.content }}>{children}</main>
+      <VoucherChatWidget />
 
       <AppFooter
         onHome={() => onNavigate("home")}
