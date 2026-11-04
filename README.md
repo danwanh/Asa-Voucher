@@ -27,6 +27,7 @@
     <li>
       <a href="#about-the-project">About The Project</a>
       <ul>
+        <li><a href="#ai-features">AI Features</a></li>
         <li><a href="#built-with">Built With</a></li>
       </ul>
     </li>
@@ -62,6 +63,24 @@
 
 * **Admins** approve partners and vouchers, manage accounts and monitor audit logs.
 
+* **AI assistant** helps customers find vouchers by chatting, and helps partners write voucher descriptions (see [AI Features](#ai-features)).
+
+### AI Features
+
+Both features work with any OpenAI-compatible chat API. The default is the free tier of **Google Gemini**. They are optional: without an API key the rest of the app works normally and the AI buttons show a "not configured" message.
+
+| Feature | Who | What it does |
+|---|---|---|
+| **Voucher search chat** | Guests and customers | A chat button in the corner of every customer page. Ask in plain Vietnamese, e.g. *"cà phê ở TP.HCM dưới 100k"* or follow-ups like *"ở Hà Nội thì sao"*, and get matching vouchers you can open directly. |
+| **Write voucher copy with AI** | Partner voucher staff | A *Viết bằng AI* button on the create / edit voucher pages fills in the description, terms and usage instructions from the voucher name, category, price and validity. The partner reviews and edits before saving. |
+
+How it stays reliable:
+
+- **The AI never invents vouchers.** In the chat, the model only turns the question into filters (category, area, max price, min discount, sort). The backend then searches the database with the same rules as the public catalogue (approved, on sale, in stock), so every result is real and buyable.
+- **Fallback models.** If the main model is overloaded or times out, the backend tries the next model in `AI_FALLBACK_MODELS`. The chat tries a faster model (`AI_CHAT_MODEL`) first so replies take about a second.
+- **Quota protection.** Rate limits per user (or per IP for guests): 10 copy generations and 20 chat messages every 10 minutes.
+- **AI output is validated** before use, and the generated copy is only a suggestion: nothing is saved until the partner clicks save.
+
 ### User Roles
 
 | Role | Description |
@@ -94,6 +113,8 @@
 
 * [![Vercel][Vercel]][Vercel-url]
 
+* [![Gemini][Gemini]][Gemini-url]
+
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
@@ -116,6 +137,8 @@ Follow these steps to set up and run the project locally.
 * A **Supabase** project (PostgreSQL connection string + API keys)
 
 * (Optional) A **Cloudinary** account for image uploads, and SMTP/Resend for sending email
+
+* (Optional) A free **Google Gemini API key** from [Google AI Studio](https://aistudio.google.com/apikey) for the AI features
 
 
 ### Installation
@@ -157,6 +180,19 @@ Follow these steps to set up and run the project locally.
    DIRECT_URL="postgresql://postgres:[YOUR-PASSWORD]@db.your-project-ref.supabase.co:5432/postgres"
    JWT_SECRET=your-jwt-secret
    ```
+
+   AI features (optional, leave `AI_API_KEY` empty to turn them off):
+
+   ```env
+   AI_API_KEY=your-gemini-api-key
+   AI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+   AI_MODEL=gemini-flash-latest                     # voucher copy writing
+   AI_CHAT_MODEL=gemini-flash-lite-latest           # voucher search chat (fast model, tried first)
+   AI_FALLBACK_MODELS=gemini-flash-lite-latest,gemini-3-flash-preview
+   AI_TIMEOUT_MS=15000                              # per model attempt
+   ```
+
+   To use another provider, change `AI_BASE_URL` and the model names, e.g. Groq: `AI_BASE_URL=https://api.groq.com/openai/v1`. Free-tier model names change over time; if you get model errors, pick a current one from the provider's model list.
 
 
 4. Set up the database
@@ -261,8 +297,10 @@ Run from the repo root:
 There are three test suites:
 
 - **Unit tests** (`backend/src/tests/services`): Prisma and external services are mocked. They need no database and never read `backend/.env`, so they run the same locally and in CI.
-- **Integration tests** (`backend/src/tests/integration/*.int.test.ts`): real HTTP requests through the Express app against a Postgres test database. They cover login and sessions, roles and permissions, cart, orders and payments (including a signed VNPay return), gifting, voucher redemption (including two staff redeeming the same code at once) and the voucher approval flow.
-- **End-to-end tests** (`e2e/tests/*.spec.ts`): Playwright drives a real Chromium browser against the running frontend and API. They cover login and access control, buying a voucher through checkout and VNPay, store staff redeeming a voucher (once only, and only at a valid branch), and the admin approving or rejecting a pending voucher.
+- **Integration tests** (`backend/src/tests/integration/*.int.test.ts`): real HTTP requests through the Express app against a Postgres test database. They cover login and sessions, roles and permissions, cart, orders and payments (including a signed VNPay return), gifting, voucher redemption (including two staff redeeming the same code at once), the voucher approval flow, and the AI endpoints (access rules, rate limits, fallback models and real database filtering for the chat).
+- **End-to-end tests** (`e2e/tests/*.spec.ts`): Playwright drives a real Chromium browser against the running frontend and API. They cover login and access control, buying a voucher through checkout and VNPay, store staff redeeming a voucher (once only, and only at a valid branch), the admin approving or rejecting a pending voucher, the partner *Viết bằng AI* button and the voucher search chat.
+
+The AI provider is never called by any test suite: requests to it are mocked, so tests need no API key, use no quota and do not depend on the provider being up.
 
 To run the integration tests:
 
@@ -319,3 +357,5 @@ Asa-Voucher/
 [Supabase-url]: https://supabase.com/
 [Vercel]: https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white
 [Vercel-url]: https://vercel.com/
+[Gemini]: https://img.shields.io/badge/Google_Gemini-8E75B2?style=for-the-badge&logo=googlegemini&logoColor=white
+[Gemini-url]: https://ai.google.dev/
