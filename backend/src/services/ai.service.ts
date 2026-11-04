@@ -1,4 +1,7 @@
-import type { ZodSchema } from "zod";
+import type { ZodType, ZodTypeDef } from "zod";
+
+// Output type T, any input (the model reply is untrusted JSON).
+type OutputSchema<T> = ZodType<T, ZodTypeDef, unknown>;
 import { env } from "../config/env.js";
 import { HttpError } from "../utils/http-error.js";
 
@@ -19,12 +22,17 @@ export function isAiConfigured() {
   return Boolean(env.AI_API_KEY);
 }
 
-function getModels() {
+function getModels(preferredModel?: string) {
   const fallbacks = (env.AI_FALLBACK_MODELS ?? "").split(",").map((model) => model.trim()).filter(Boolean);
-  return [...new Set([env.AI_MODEL, ...fallbacks])];
+  return [...new Set([preferredModel, env.AI_MODEL, ...fallbacks].filter((model): model is string => Boolean(model)))];
 }
 
-async function callModel<T>(model: string, systemPrompt: string, userPrompt: string, schema: ZodSchema<T>): Promise<T> {
+export type GenerateJsonOptions = {
+  /** Tried before AI_MODEL, e.g. a faster model for latency-sensitive features. */
+  preferredModel?: string;
+};
+
+async function callModel<T>(model: string, systemPrompt: string, userPrompt: string, schema: OutputSchema<T>): Promise<T> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), env.AI_TIMEOUT_MS);
 
@@ -71,13 +79,18 @@ async function callModel<T>(model: string, systemPrompt: string, userPrompt: str
  * and validated against `schema`. Tries AI_MODEL first, then each AI_FALLBACK_MODELS entry
  * when the provider is overloaded or the reply is unusable.
  */
-export async function generateJson<T>(systemPrompt: string, userPrompt: string, schema: ZodSchema<T>): Promise<T> {
+export async function generateJson<T>(
+  systemPrompt: string,
+  userPrompt: string,
+  schema: OutputSchema<T>,
+  options: GenerateJsonOptions = {}
+): Promise<T> {
   if (!env.AI_API_KEY) {
     throw new HttpError(503, "Tính năng AI chưa được cấu hình", "AI_NOT_CONFIGURED");
   }
 
   let lastError: AttemptError | undefined;
-  for (const model of getModels()) {
+  for (const model of getModels(options.preferredModel)) {
     try {
       return await callModel(model, systemPrompt, userPrompt, schema);
     } catch (error) {
