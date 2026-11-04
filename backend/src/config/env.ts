@@ -36,7 +36,14 @@ const envSchema = z.object({
   ALLOW_PAYMENT_SIMULATION: z.enum(["true", "false"]).optional(),
   CLOUDINARY_CLOUD_NAME: z.string().optional(),
   CLOUDINARY_API_KEY: z.string().optional(),
-  CLOUDINARY_API_SECRET: z.string().optional()
+  CLOUDINARY_API_SECRET: z.string().optional(),
+  // Any OpenAI-compatible chat API (Gemini, Groq, OpenRouter...). No key = AI features disabled.
+  AI_API_KEY: z.string().optional(),
+  AI_BASE_URL: z.string().url().default("https://generativelanguage.googleapis.com/v1beta/openai"),
+  AI_MODEL: z.string().default("gemini-flash-latest"),
+  // Comma-separated models tried in order when AI_MODEL is overloaded or fails.
+  AI_FALLBACK_MODELS: z.string().default("gemini-flash-lite-latest,gemini-3-flash-preview"),
+  AI_TIMEOUT_MS: z.coerce.number().int().positive().default(15000)
 });
 
 export const env = envSchema.parse(process.env);

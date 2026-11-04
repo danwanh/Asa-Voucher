@@ -1,12 +1,13 @@
 import { Router } from "express";
 import type { NextFunction, Request, Response } from "express";
-import { approveVoucherProduct, createVoucherBranch, createVoucherImage, createVoucherProduct, deleteVoucherBranch, deleteVoucherImage, deleteVoucherProduct, generateVoucherTestCode, getPublicHomepageSummary, getPublicVoucherDetail, getVoucherProduct, listVoucherBranches, listVoucherImages, listVoucherProducts, submitVoucherProduct, updateVoucherImage, updateVoucherProduct, updateVoucherStatus } from "../controllers/voucher-product.controller.js";
+import { approveVoucherProduct, createVoucherBranch, generateVoucherCopy, createVoucherImage, createVoucherProduct, deleteVoucherBranch, deleteVoucherImage, deleteVoucherProduct, generateVoucherTestCode, getPublicHomepageSummary, getPublicVoucherDetail, getVoucherProduct, listVoucherBranches, listVoucherImages, listVoucherProducts, submitVoucherProduct, updateVoucherImage, updateVoucherProduct, updateVoucherStatus } from "../controllers/voucher-product.controller.js";
 import { optionalAuth, requireAuth } from "../middlewares/auth.js";
+import { rateLimitAi } from "../middlewares/rate-limit-ai.js";
 import { requireRole } from "../middlewares/require-role.js";
 import { validateBody, validateParams, validateQuery } from "../middlewares/validate.js";
 import { asyncHandler } from "../utils/async-handler.js";
 import { branchMappingParamSchema, idParamSchema, imageIdParamSchema } from "../validations/common.validation.js";
-import { approvalSchema, createVoucherImageSchema, createVoucherProductSchema, updateVoucherImageSchema, updateVoucherProductSchema, voucherBranchSchema, voucherProductQuerySchema, voucherStatusSchema } from "../validations/voucher-product.validation.js";
+import { approvalSchema, createVoucherImageSchema, generateVoucherCopySchema, createVoucherProductSchema, updateVoucherImageSchema, updateVoucherProductSchema, voucherBranchSchema, voucherProductQuerySchema, voucherStatusSchema } from "../validations/voucher-product.validation.js";
 
 export const voucherRoutes = Router();
 
@@ -33,6 +34,7 @@ function requireAdminForApprovalStatus(req: Request, res: Response, next: NextFu
 
 voucherRoutes.get("/voucher-products", validateQuery(voucherProductQuerySchema), requireAuthForMineScope, requireAdminForApprovalStatus, asyncHandler(listVoucherProducts));
 voucherRoutes.get("/homepage/summary", asyncHandler(getPublicHomepageSummary));
+voucherRoutes.post("/voucher-products/ai/generate-copy", requireAuth, requireRole("partner_owner", "partner_voucher_staff"), rateLimitAi, validateBody(generateVoucherCopySchema), asyncHandler(generateVoucherCopy));
 voucherRoutes.post("/voucher-products", requireAuth, requireRole("partner_owner", "partner_voucher_staff"), validateBody(createVoucherProductSchema), asyncHandler(createVoucherProduct));
 voucherRoutes.get("/voucher-products/:id/detail", validateParams(idParamSchema), asyncHandler(getPublicVoucherDetail));
 voucherRoutes.get("/voucher-products/:id", optionalAuth, validateParams(idParamSchema), asyncHandler(getVoucherProduct));
