@@ -4,6 +4,7 @@ export const PASSWORD = "User12345@";
 export const accounts = {
   buyer: "buyer@asa.test",
   adminContent: "admin.content@asa.test",
+  highlandsVoucherStaff: "voucher.staff@asa.test",
   highlandsStoreQ1: "store.staff@asa.test",
   highlandsStoreTDB: "store.highlands.tdb@asa.test",
 } as const;

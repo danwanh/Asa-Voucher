@@ -7,6 +7,7 @@ import { voucherService, type VoucherImage, type VoucherUpdateInput } from "@/se
 import { mediaUploadService } from "@/services/mediaUploadService"
 import type { Voucher } from "@/types"
 import { serializeApplicableAreas } from "@/utils/applicableArea"
+import { AiVoucherCopyButton } from "@/components/AiVoucherCopyButton"
 import { VoucherImagesManager, normalizeVoucherImages, type ManagedVoucherImage } from "@/components/VoucherImagesManager"
 
 interface Props {
@@ -366,8 +367,31 @@ export function EditVoucherPage({ voucher, onBack, onSave, lockPriceAndQuantity 
                 {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
               </select>
             </Field>
+            <AiVoucherCopyButton
+              disabled={isSaving}
+              hasExistingContent={Boolean(form.description.trim() || form.terms.trim() || form.usageInstructions.trim())}
+              getContext={() => ({
+                name: form.name,
+                category_name: categories.find((category) => category.id === form.categoryId)?.name,
+                original_price: Number(form.originalPrice) || undefined,
+                selling_price: Number(form.sellingPrice) || undefined,
+                validity_days: Number(form.validityDays) || undefined,
+                applicable_area: derivedApplicableArea || undefined
+              })}
+              onApply={(copy) => {
+                updateField("description", copy.description)
+                updateField("terms", copy.terms.join("\n"))
+                updateField("usageInstructions", copy.usageInstructions.join("\n"))
+              }}
+            />
             <Field label="Mô tả *" error={errors.description}>
               <textarea rows={3} className={`${inputCls(errors.description)} resize-none`} value={form.description} onChange={(event) => updateField("description", event.target.value)} disabled={isSaving} />
+            </Field>
+            <Field label="Điều kiện áp dụng *" error={errors.terms}>
+              <textarea rows={4} className={`${inputCls(errors.terms)} resize-none`} value={form.terms} onChange={(event) => updateField("terms", event.target.value)} disabled={isSaving} />
+            </Field>
+            <Field label="Hướng dẫn sử dụng">
+              <textarea rows={3} className={`${inputCls()} resize-none`} value={form.usageInstructions} onChange={(event) => updateField("usageInstructions", event.target.value)} disabled={isSaving} />
             </Field>
             <Field label="Khu vực áp dụng">
               <input className={inputCls()} value={derivedApplicableArea} readOnly placeholder="Tự động từ chi nhánh đã chọn" />
@@ -431,18 +455,6 @@ export function EditVoucherPage({ voucher, onBack, onSave, lockPriceAndQuantity 
             </Field>
             <Field label="Số ngày sử dụng *" error={errors.validityDays}>
               <input type="number" className={inputCls(errors.validityDays)} value={form.validityDays} onChange={(event) => updateField("validityDays", event.target.value)} disabled={isSaving} />
-            </Field>
-          </div>
-        </section>
-
-        <section className="bg-white rounded-2xl p-6 border border-black/5">
-          <h3 className="font-bold text-sm mb-4" style={{ color: C.indigo }}>Điều kiện & hướng dẫn sử dụng</h3>
-          <div className="space-y-4">
-            <Field label="Điều kiện áp dụng *" error={errors.terms}>
-              <textarea rows={4} className={`${inputCls(errors.terms)} resize-none`} value={form.terms} onChange={(event) => updateField("terms", event.target.value)} disabled={isSaving} />
-            </Field>
-            <Field label="Hướng dẫn sử dụng">
-              <textarea rows={3} className={`${inputCls()} resize-none`} value={form.usageInstructions} onChange={(event) => updateField("usageInstructions", event.target.value)} disabled={isSaving} />
             </Field>
           </div>
         </section>

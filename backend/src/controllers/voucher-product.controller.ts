@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import * as voucherProductService from "../services/voucher-product.service.js";
+import * as voucherAiService from "../services/voucher-ai.service.js";
 import { created, noContent, ok } from "../utils/response.js";
 import { writeAuditLog } from "../services/audit-log.service.js";
 
@@ -90,4 +91,8 @@ export async function createVoucherBranch(req: Request, res: Response) {
 export async function deleteVoucherBranch(req: Request, res: Response) {
   await voucherProductService.deleteVoucherBranch(req.user!, req.params.id, req.params.branchId);
   noContent(res);
+}
+
+export async function generateVoucherCopy(req: Request, res: Response) {
+  ok(res, await voucherAiService.generateVoucherCopy(req.body));
 }

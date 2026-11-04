@@ -78,3 +78,13 @@ export const createVoucherImageSchema = z.object({
 
 export const updateVoucherImageSchema = createVoucherImageSchema.partial();
 export const voucherBranchSchema = z.object({ branch_id: z.string().uuid() });
+
+export const generateVoucherCopySchema = z.object({
+  name: z.string().trim().min(1, "Vui lòng nhập tên voucher").max(255),
+  category_name: z.string().trim().max(100).optional(),
+  original_price: z.number().positive().optional(),
+  selling_price: z.number().positive().optional(),
+  validity_days: z.number().int().positive().max(3650).optional(),
+  applicable_area: z.string().trim().max(255).optional(),
+  highlights: z.string().trim().max(500, "Ý chính không được vượt quá 500 ký tự").optional()
+});

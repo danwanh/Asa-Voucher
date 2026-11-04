@@ -46,6 +46,22 @@ export type BackendVoucherProduct = {
   }>
 }
 
+export type GenerateVoucherCopyInput = {
+  name: string
+  category_name?: string
+  original_price?: number
+  selling_price?: number
+  validity_days?: number
+  applicable_area?: string
+  highlights?: string
+}
+
+export type GeneratedVoucherCopy = {
+  description: string
+  terms: string[]
+  usageInstructions: string[]
+}
+
 export type BackendCategory = {
   id: string
   name: string
@@ -425,6 +441,16 @@ export const voucherService = {
     const item = extractData(createRes)
     const category = categoryFromMap(categoryMap, item.category_id)
     return mapVoucherProduct(item, category.slug)
+  },
+
+  async generateCopy(input: GenerateVoucherCopyInput): Promise<GeneratedVoucherCopy> {
+    const res = await api.post<ApiEnvelope<{ description: string; terms: string[]; usage_instructions: string[] }>>(
+      "/voucher-products/ai/generate-copy",
+      input,
+      { timeout: 60_000 } // backend may try several fallback models
+    )
+    const data = extractData(res)
+    return { description: data.description, terms: data.terms, usageInstructions: data.usage_instructions }
   },
 
   async updateVoucher(voucherId: string, input: VoucherUpdateInput): Promise<Voucher> {
